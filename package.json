@@ -1,14 +1,27 @@
 {
   "name": "console-canvas",
-  "version": "0.7.4",
+  "version": "0.8.0",
   "private": true,
   "description": "Embedded Chromium console UI editor with MCP control",
   "main": "desktop/main.cjs",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "format": "node scripts/format.mjs",
+    "format:check": "node scripts/format.mjs --check",
+    "build": "python3 scripts/build.py",
+    "test": "node scripts/check.mjs",
+    "check": "node scripts/check.mjs",
+    "test:browser": "electron tests/browser-runner.cjs",
+    "test:desktop": "node scripts/check-desktop.mjs"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
     "electron": "45.0.0",
-    "@modelcontextprotocol/sdk": "1.32.2"
+    "esbuild": "0.28.2",
+    "prettier": "3.9.10"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
   }
 }

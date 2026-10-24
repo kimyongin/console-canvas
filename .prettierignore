@@ -1,0 +1,10 @@
+node_modules/
+dist/
+local/
+reviews/
+preview.html
+agent-guide.md
+sample.uiclone.json
+package-lock.json
+tests/example-review.html
+skills/console-canvas/assets/

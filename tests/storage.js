@@ -1,0 +1,100 @@
+import { database, saveCapture, saveSession, getDocument, listDocuments } from '../db.js';
+const results = [];
+function check(name, value) {
+  results.push({ name, passed: !!value });
+  document.querySelector('#results').textContent = JSON.stringify(results, null, 2);
+  if (!value) throw new Error(name);
+}
+async function openEditor() {
+  const frame = document.querySelector('#editor');
+  frame.src = '../editor.html?sample=1';
+  const deadline = Date.now() + 20000;
+  while (!frame.contentWindow.ConsoleCanvas?.state.ready) {
+    if (Date.now() > deadline) throw new Error('Editor not ready');
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return { app: frame.contentWindow.ConsoleCanvas, doc: frame.contentDocument };
+}
+try {
+  const capture = await (await fetch('../sample.uiclone.json')).json();
+  capture.id = crypto.randomUUID();
+  await saveCapture(capture);
+  const original = capture.html;
+  capture.html = 'this replacement must never be written';
+  check(
+    'Saving the same capture never rewrites immutable HTML',
+    (await saveCapture(capture)) === false,
+  );
+  await saveSession(capture.id, {
+    edits: { n1: { dx: 25, dy: 9, deleted: false } },
+    annotations: { n1: 'keep' },
+    timeline: { entries: [{ id: 'past' }, { id: 'future' }], activeId: 'past' },
+    note: 'draft',
+    updatedAt: '2099-01-01T00:00:00.000Z',
+  });
+  const joined = await getDocument(capture.id);
+  check(
+    'Capture and mutable state join without losing timeline or comments',
+    joined.html === original &&
+      joined.edits.n1.dx === 25 &&
+      joined.annotations.n1 === 'keep' &&
+      joined.timeline.entries.length === 2,
+  );
+  const recent = await listDocuments(1);
+  check(
+    'Recent documents query returns only bounded metadata',
+    recent.length === 1 &&
+      recent[0].id === capture.id &&
+      !('html' in recent[0]) &&
+      !('nodes' in recent[0]) &&
+      !('timeline' in recent[0]),
+  );
+  const db = await database();
+  check(
+    'Captures, sessions and document metadata have separate stores',
+    ['captures', 'sessions', 'documents'].every((name) => db.objectStoreNames.contains(name)),
+  );
+  db.close();
+  let rejected = false;
+  try {
+    await saveSession('missing', { updatedAt: 'now' });
+  } catch {
+    rejected = true;
+  }
+  check('An orphan session fails atomically', rejected && !(await getDocument('missing')));
+  const { app, doc } = await openEditor(),
+    oldId = app.state.snapshot.id;
+  const node = [...app.state.scene.nodes.values()].find((n) => n.tag === 'button');
+  app.selectNode(node.id);
+  doc.querySelector('#component-comment').value = 'unfinished comment before switching';
+  doc.querySelector('#review-note').value = 'unfinished note';
+  const next = structuredClone(app.state.snapshot);
+  next.id = crypto.randomUUID();
+  await app.openSnapshot(next);
+  const previous = await getDocument(oldId);
+  check(
+    'Switching captures flushes comment and note drafts before mounting the next one',
+    previous.annotations[node.id] === 'unfinished comment before switching' &&
+      previous.note === 'unfinished note' &&
+      app.state.snapshot.id === next.id,
+  );
+  const a = structuredClone(next),
+    b = structuredClone(next);
+  a.id = crypto.randomUUID();
+  b.id = crypto.randomUUID();
+  await Promise.all([app.openSnapshot(a), app.openSnapshot(b)]);
+  check(
+    'Concurrent document-open requests are serialized',
+    app.state.ready && app.state.snapshot.id === b.id,
+  );
+  await saveSession(capture.id, { ...joined, updatedAt: '2000-01-01T00:00:00.000Z' });
+  document.querySelector('#status').textContent = JSON.stringify({
+    passed: results.length,
+    failed: 0,
+    total: results.length,
+  });
+  document.body.dataset.result = 'pass';
+} catch (error) {
+  document.querySelector('#status').textContent = 'FAILED: ' + error.stack;
+  document.body.dataset.result = 'fail';
+}

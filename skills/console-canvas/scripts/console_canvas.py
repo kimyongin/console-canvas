@@ -14,16 +14,6 @@ import zipfile
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 MAX_MEMBER = 128 * 1024 * 1024
 MAX_TOTAL = 384 * 1024 * 1024
-RUNTIME_FILES = {
-    'manifest.json', 'background.js', 'capture.js', 'db.js', 'engine.js',
-    'export.js', 'editor.js', 'editor.css', 'editor.html', 'README.md',
-    'preview.html', 'sample.uiclone.json', 'fixtures/console.html',
-    'fixtures/console.css', 'fixtures/console.js',
-    'bridge-client.js', 'editor-controller.js', 'snapshot-history.js', 'agent-guide.md', 'mcp/server.py', 'mcp/bridge.py', 'mcp/skill_install.py',
-    'package.json', 'desktop/main.cjs', 'desktop/preload.cjs', 'desktop/shell-preload.cjs',
-    'desktop/shell.html', 'desktop/shell.css', 'desktop/shell.cjs',
-    'mcp/app_update.py', 'desktop/updater.cjs',
-}
 REVIEW_FILES = {
     'review.json', 'changes.json', 'instructions.txt', 'before.png', 'after.png',
     'source-viewport.png', 'before.html', 'after.html', 'review.html', 'READ-ME.txt',
@@ -76,9 +66,16 @@ def prepare(output):
     bundle = SKILL_ROOT / 'assets' / 'console-canvas-extension.zip'
     with zipfile.ZipFile(bundle) as archive:
         members = archive_members(archive)
-        expected = {'console-canvas/' + name for name in RUNTIME_FILES}
-        if set(members) != expected:
+        manifest_name = 'console-canvas/runtime-manifest.json'
+        if manifest_name not in members:
+            fail('Runtime manifest is missing; rebuild the skill assets')
+        manifest = json.loads(archive.read(members[manifest_name]))
+        expected = {'console-canvas/' + name for name in manifest['files']} | {manifest_name}
+        if set(members) != expected or not set(manifest['public']).issubset(manifest['files']):
             fail('Runtime bundle file list is invalid; rebuild the skill assets')
+        for name, digest in manifest['files'].items():
+            if hashlib.sha256(archive.read(members['console-canvas/' + name])).hexdigest() != digest:
+                fail('Runtime checksum mismatch: ' + name)
         # Validate everything before creating the destination or writing files.
         files = {name: archive.read(info) for name, info in members.items()}
     output = new_output(output)

@@ -158,7 +158,14 @@ ZIP에는 다음 파일이 들어갑니다.
 
 ## 개발 및 검증
 
-HTML 편집기는 외부 npm 의존성이 없고 MCP 서버는 Python 표준 라이브러리만 사용합니다. 독립 앱은 Electron을 내장하며 공식 MCP SDK를 개발 검증에 사용합니다.
+실행 중인 편집기와 MCP 서버에는 외부 런타임 패키지가 필요 없습니다. 소스 개발·빌드는 Node.js 22.12 이상과 Python 3.9 이상을 사용하며, 개발 의존성으로 Electron·MCP SDK·esbuild·Prettier를 설치합니다.
+
+```sh
+npm ci
+npm run check
+```
+
+`check`는 포맷 검사 → 모듈 번들·스킬 패키징 → Python → Node → 실제 Chromium UI → 독립 앱·공식 MCP SDK·종료 후 재실행 검증을 순서대로 실행합니다. 가상 NORTH 데이터와 임시 프로필·임시 포트만 사용합니다. `npm run format`은 포맷을 정리하고 `npm run test:desktop`은 독립 앱 검증만 실행합니다. 별도로 준비한 Electron은 `ELECTRON_BINARY=/absolute/path/to/Electron npm run check`로 지정할 수 있습니다.
 
 ```sh
 python3 -m http.server 8848 --bind 127.0.0.1 --directory /absolute/path/to/console-canvas
@@ -167,6 +174,7 @@ python3 -m http.server 8848 --bind 127.0.0.1 --directory /absolute/path/to/conso
 - `http://127.0.0.1:8848/editor.html?sample=1`: 편집기
 - `http://127.0.0.1:8848/tests/integration.html`: 실제 DOM 수집·편집·내보내기 통합 검사
 - `http://127.0.0.1:8848/tests/panels.html`: 좌우 패널 접기·캔버스 확장·주석 보존·상태 복원 검사
+- `http://127.0.0.1:8848/tests/storage.html`: 캡처·편집 분리, 최근 목록, 문서 전환 전 저장 검사
 - `http://127.0.0.1:8848/tests/snapshots.html`: 스냅샷 UI·IndexedDB 재실행·파일 재가져오기 검사
 - `python3 scripts/build.py`: 포함된 샘플로 독립 실행 데모와 확장 ZIP 생성
 - `python3 scripts/build.py --output /absolute/path/to/output`: 배포 출력 위치 지정
@@ -174,11 +182,13 @@ python3 -m http.server 8848 --bind 127.0.0.1 --directory /absolute/path/to/conso
 
 빌드 결과는 `dist/Console Canvas.html`, `dist/console-canvas-extension.zip`, `dist/console-canvas-skill.zip`입니다. 스킬 런타임 자산도 같은 빌드에서 갱신합니다. 저장소에 포함된 `sample.uiclone.json`은 가상 데이터만 사용합니다. 실제 캡처 파일과 사용자 전달 ZIP은 커밋하지 않습니다.
 
-브라우저 엔진 통합 검사 61개와 스냅샷 UI·저장 검사 11개를 통과했고, 358개 표시 요소의 이동·삭제·복원을 확인했습니다. 상세 검증 범위는 [docs/verification.md](docs/verification.md)에 있습니다. **개인 Chrome에 확장을 설치한 뒤 탭 권한으로 실제 사이트를 가져오는 경계는 아직 검증하지 않았습니다.**
+브라우저 검사 99개와 독립 HTML 파일 실행, Python 37개, Node 11개, 공식 MCP SDK 실제 연결 18개를 통과했습니다. 358개 표시 요소의 이동·삭제·복원, 문서 전환 전 저장, 앱 종료·재실행 후 복원을 확인했습니다. 상세 검증 범위는 [docs/verification.md](docs/verification.md)에 있습니다. **개인 Chrome에 확장을 설치한 뒤 탭 권한으로 실제 사이트를 가져오는 경계는 아직 검증하지 않았습니다.**
 
 Chrome 확장의 권한은 `activeTab`, `scripting`, `storage`, `unlimitedStorage`와 로컬 MCP 연결용 `http://127.0.0.1/*` 접근입니다. 원격 서버나 AI API에 데이터를 전송하는 기능은 없습니다.
 
-구조: `capture.js`(화면 수집) → `background.js`(확장 버튼·저장) → `engine.js`(독립 레이어 편집) → `editor.js`(편집기) → `export.js`(ZIP·비교 화면).
+구조와 저장·종료 흐름은 [docs/architecture.md](docs/architecture.md)에 정리했습니다. `editor.js`는 모듈을 연결하고, `ui/`는 화면별 표시, `editor-session.js`는 편집 기록·저장, `edit-commands.js`는 수동 편집과 MCP의 공통 명령을 담당합니다.
+
+0.8 개발판은 새 IndexedDB `console-canvas-workspace`를 사용합니다. 기존 0.7 저장소의 자동 이관·호환 계층은 포함하지 않습니다. 필요한 기존 화면은 이전 앱에서 편집 파일로 저장한 뒤 새 앱에서 가져올 수 있습니다.
 
 ### 독립 앱 빌드·검증
 
@@ -189,6 +199,6 @@ python3 scripts/install_desktop.py
 
 공식 Electron 릴리스의 SHA-256을 확인한 뒤 `dist/Console Canvas.app`과 `dist/console-canvas-desktop-macos-arm64.zip`을 생성합니다. `--download-only`는 런타임 준비만 수행합니다. 설치 위치는 기본 `~/Applications/Console Canvas.app`이며 기존 앱은 `--update`를 지정한 Console Canvas만 교체합니다.
 
-Node.js 개발 환경에서는 `npm install` 후 `npm start`로 소스를 실행할 수 있습니다. Python 실행 파일은 `CONSOLE_CANVAS_PYTHON`, 로컬 상태 폴더는 `CONSOLE_CANVAS_STATE_DIR`로 지정할 수 있습니다. 일반 CLI 서버의 상태 폴더는 `--state-dir`로 지정합니다.
+Node.js 개발 환경에서는 `npm install` 후 `npm start`로 소스를 실행할 수 있습니다. Python 실행 파일은 `CONSOLE_CANVAS_PYTHON`, 로컬 상태 폴더는 `CONSOLE_CANVAS_STATE_DIR`, 개발용 브리지 포트는 `CONSOLE_CANVAS_PORT`(기본 8849)로 지정할 수 있습니다. 일반 CLI 서버의 상태 폴더는 `--state-dir`로 지정합니다.
 
 독립 앱에서 가상 **샘플 콘솔**을 가져온 뒤 `node scripts/verify_mcp.mjs`를 실행하면 공식 SDK가 실제 stdio MCP 서버와 통신해 이동·삭제·주석 수정·실행 취소·재전송·버전 충돌을 검증합니다. 사용자 실제 데이터에는 이 검증 스크립트를 사용하지 않습니다.

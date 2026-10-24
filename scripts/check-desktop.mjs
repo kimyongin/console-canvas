@@ -1,0 +1,107 @@
+import { spawn } from 'node:child_process';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+import net from 'node:net';
+const root = path.resolve(import.meta.dirname, '..');
+const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'console-canvas-desktop-check-'));
+const socket = net.createServer();
+await new Promise((resolve) => socket.listen(0, '127.0.0.1', resolve));
+const port = socket.address().port;
+await new Promise((resolve) => socket.close(resolve));
+const env = {
+  ...process.env,
+  HOME: path.join(temporary, 'home'),
+  CODEX_HOME: path.join(temporary, 'home/.codex'),
+  CONSOLE_CANVAS_TEST_DIR: temporary,
+  CONSOLE_CANVAS_STATE_DIR: path.join(temporary, 'bridge'),
+  CONSOLE_CANVAS_PORT: String(port),
+};
+await fs.mkdir(env.HOME, { recursive: true });
+let active;
+function start(command, args, extra = {}) {
+  const child = spawn(command, args, {
+    cwd: root,
+    env: { ...env, ...extra },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let output = '';
+  child.stdout.on('data', (chunk) => (output += chunk));
+  child.stderr.on('data', (chunk) => (output += chunk));
+  const done = new Promise((resolve, reject) => {
+    child.on('error', reject);
+    child.on('exit', (code) =>
+      code === 0 ? resolve(output) : reject(new Error(output || 'Process failed: ' + code)),
+    );
+  });
+  done.catch(() => {});
+  return { child, done };
+}
+async function waitFor(filename) {
+  const deadline = Date.now() + 30000;
+  while (Date.now() < deadline) {
+    try {
+      return JSON.parse(await fs.readFile(path.join(temporary, filename), 'utf8'));
+    } catch {}
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw new Error('Timed out: ' + filename);
+}
+try {
+  const electron = process.env.ELECTRON_BINARY || path.join(root, 'node_modules/.bin/electron');
+  active = start(electron, ['tests/desktop-fixture.cjs'], { CONSOLE_CANVAS_TEST_PHASE: 'prepare' });
+  const capture = await waitFor('prepare-ready.json');
+  const sdk = start(process.execPath, ['scripts/verify_mcp.mjs'], {
+    CONSOLE_CANVAS_MCP_ARGS: JSON.stringify([
+      path.join(root, 'mcp/server.py'),
+      '--state-dir',
+      env.CONSOLE_CANVAS_STATE_DIR,
+      '--port',
+      String(port),
+    ]),
+  });
+  const sdkOutput = await sdk.done;
+  const sdkReport = JSON.parse(sdkOutput);
+  console.log(`Real SDK: ${sdkReport.passed} checks passed`);
+  await fs.writeFile(path.join(temporary, 'sdk-complete'), 'done');
+  await active.done;
+  active = null;
+  const expected = JSON.parse(await fs.readFile(path.join(temporary, 'expected.json'), 'utf8'));
+  const session = JSON.parse(
+    await fs.readFile(path.join(temporary, 'profile/session.json'), 'utf8'),
+  );
+  if (session.document_id !== expected.document_id)
+    throw new Error('Normal quit did not persist last document');
+  active = start(electron, ['tests/desktop-fixture.cjs'], { CONSOLE_CANVAS_TEST_PHASE: 'reopen' });
+  const reopened = await waitFor('reopen-ready.json');
+  await active.done;
+  active = null;
+  const report = {
+    capture,
+    reopened,
+    officialSdkChecks: sdkReport.passed,
+    normalQuitAndRelaunch: true,
+  };
+  await fs.writeFile(
+    path.join(root, 'dist/desktop-checks.json'),
+    JSON.stringify(report, null, 2) + '\n',
+  );
+  console.log(JSON.stringify(report));
+} finally {
+  if (active) {
+    active.child.kill('SIGTERM');
+    await active.done.catch(() => {});
+  }
+  // Only stop the disposable broker owned by this fixture.
+  try {
+    const connection = JSON.parse(
+      await fs.readFile(path.join(temporary, 'bridge/connection.json'), 'utf8'),
+    );
+    await fetch(connection.url + '/admin/stop', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + connection.token, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+  } catch {}
+  await fs.rm(temporary, { recursive: true, force: true });
+}

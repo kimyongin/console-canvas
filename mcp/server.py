@@ -11,9 +11,10 @@ import time
 import urllib.error
 import urllib.request
 
-VERSION = '0.7.4'
 PROTOCOLS = ('2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05')
 APP = Path(__file__).resolve().parents[1]
+VERSION = json.loads((APP / 'package.json').read_text())['version']
+EDIT_LIMITS = json.loads((APP / 'edit-policy.json').read_text())
 DEFAULT_STATE = Path(os.environ.get('CODEX_HOME', str(Path.home() / '.codex'))) / 'console-canvas'
 
 
@@ -36,10 +37,10 @@ TOOLS = [
     ('list_comments', 'Read component comments with element IDs, original locators and deleted-target status.',
      schema({**BASE, 'element_id': {'type': 'string'}, 'offset': {'type': 'integer', 'minimum': 0}, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 200}}, BASE)),
     ('apply_edits', 'Atomically apply moves, deletions and component comment edits as ONE undo step. Move mode absolute sets offsets from capture; relative adds to current offsets. Empty comment text removes it. Does not edit source code.',
-     schema({**WRITE, 'operations': {'type': 'array', 'minItems': 1, 'maxItems': 100, 'items': {'oneOf': [
-         schema({'type': {'const': 'move'}, 'element_id': {'type': 'string'}, 'dx': {'type': 'number', 'minimum': -60000, 'maximum': 60000}, 'dy': {'type': 'number', 'minimum': -200000, 'maximum': 200000}, 'mode': {'enum': ['absolute', 'relative']}}, ['type', 'element_id', 'dx', 'dy', 'mode']),
+     schema({**WRITE, 'operations': {'type': 'array', 'minItems': 1, 'maxItems': EDIT_LIMITS['operations'], 'items': {'oneOf': [
+         schema({'type': {'const': 'move'}, 'element_id': {'type': 'string'}, 'dx': {'type': 'number', 'minimum': -EDIT_LIMITS['x'], 'maximum': EDIT_LIMITS['x']}, 'dy': {'type': 'number', 'minimum': -EDIT_LIMITS['y'], 'maximum': EDIT_LIMITS['y']}, 'mode': {'enum': ['absolute', 'relative']}}, ['type', 'element_id', 'dx', 'dy', 'mode']),
          schema({'type': {'const': 'delete'}, 'element_id': {'type': 'string'}}, ['type', 'element_id']),
-         schema({'type': {'const': 'comment'}, 'element_id': {'type': 'string'}, 'text': {'type': 'string', 'maxLength': 4000}}, ['type', 'element_id', 'text']),
+         schema({'type': {'const': 'comment'}, 'element_id': {'type': 'string'}, 'text': {'type': 'string', 'maxLength': EDIT_LIMITS['comment']}}, ['type', 'element_id', 'text']),
      ]}}}, [*WRITE, 'operations'])),
     ('undo', 'Undo the latest shared editor history step, whether made by a person or agent. Check get_screen first.', schema(WRITE, WRITE)),
     ('redo', 'Redo the latest undone shared editor history step.', schema(WRITE, WRITE)),

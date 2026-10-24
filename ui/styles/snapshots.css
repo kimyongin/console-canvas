@@ -1,0 +1,115 @@
+.snapshot-panel {
+  padding-bottom: 16px;
+}
+.snapshot-panel .panel-heading button {
+  border: 0;
+  background: transparent;
+  padding: 0 3px;
+  font-size: 20px;
+  color: #9098ab;
+}
+.snapshot-help {
+  margin: 0 18px 18px;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+#snapshot-form {
+  padding: 0 16px;
+}
+#snapshot-form label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.snapshot-create {
+  display: flex;
+  gap: 6px;
+}
+.snapshot-create input {
+  width: 0;
+  flex: 1;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 11px;
+}
+.snapshot-create button {
+  font-size: 11px;
+  padding: 8px 10px;
+}
+.snapshot-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 18px 14px 10px;
+}
+.snapshot-navigation button {
+  font-size: 10px;
+  padding: 6px;
+}
+.snapshot-navigation span {
+  font-size: 10px;
+  color: var(--muted);
+}
+.snapshot-current {
+  margin: 0 17px 12px;
+  color: #796ca8;
+  font-size: 10px;
+  line-height: 1.7;
+  min-height: 34px;
+}
+.snapshot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px;
+}
+.snapshot-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  padding: 12px;
+  white-space: normal;
+  border-color: var(--line);
+  background: #fff;
+}
+.snapshot-entry strong {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.snapshot-entry span {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.snapshot-entry small {
+  font-size: 9px;
+  color: #969caf;
+}
+.snapshot-entry[aria-pressed='true'] {
+  background: #f1efff;
+  border-color: #b9b1ec;
+}
+.snapshot-entry[aria-pressed='true'] strong,
+.snapshot-entry[aria-pressed='true'] small {
+  color: var(--accent);
+}
+#snapshots-button[aria-expanded='true'] {
+  background: #eeedfc;
+  color: var(--accent);
+  border-color: #dcd9f7;
+}
+#snapshot-count {
+  font-size: 10px;
+  background: #f1f0fa;
+  border-radius: 4px;
+  padding: 1px 5px;
+}

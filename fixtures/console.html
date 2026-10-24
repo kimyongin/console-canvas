@@ -1,18 +1,240 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>고객 관리 · NORTH Console</title><link rel="stylesheet" href="console.css"></head><body>
-  <aside class="sidebar"><div class="logo"><span class="logo-icon">N</span><strong>NORTH</strong><span>CONSOLE</span></div><div class="workspace-label">워크스페이스</div><button class="workspace-switch"><span class="workspace-icon">M</span>메인 워크스페이스 <span>⌄</span></button><nav><div class="nav-label">OVERVIEW</div><a><span>▦</span>대시보드</a><a class="active"><span>♙</span>고객 관리 <small>128</small></a><a><span>▤</span>주문 관리</a><a><span>▧</span>상품 관리</a><div class="nav-label second">MANAGEMENT</div><a><span>◈</span>팀 멤버</a><a><span>⚙</span>설정</a></nav><div class="sidebar-footer"><span class="avatar">YL</span><div>이유림<small>관리자</small></div><span class="more">···</span></div></aside>
-  <div class="page"><header class="topbar"><div class="breadcrumbs">워크스페이스 <span>/</span> <strong>고객 관리</strong></div><div class="top-actions"><span class="help">도움말 ↗</span><button aria-label="알림"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></button><span class="avatar small">YL</span></div></header>
-  <main><div class="title-row"><div><div class="page-eyebrow">CUSTOMER MANAGEMENT</div><h1>고객 관리</h1><p class="description">고객 정보를 확인하고 등록 상태를 관리하세요.</p></div><div class="title-actions"><button id="export-customers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></svg>내보내기</button><button class="primary" id="new-customer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>고객 등록</button></div></div>
-    <section class="stats"><div class="stat"><span>전체 고객</span><div>128 <small>명</small></div><p><b>+12</b> 지난달 대비</p></div><div class="stat"><span>활성 고객</span><div>104 <small>명</small></div><p>전체 고객의 <b>81.3%</b></p></div><div class="stat"><span>이번 달 신규</span><div>24 <small>명</small></div><p><b>+8</b> 지난달 대비</p></div></section>
-    <section class="list-card"><div class="tabs"><button class="selected">전체 고객 <span>128</span></button><button>활성</button><button>비활성</button><button>가입 대기</button></div>
-      <form class="filters" id="customer-filter"><label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input id="customer-search" placeholder="이름 또는 이메일 검색" aria-label="고객 검색"></label><label class="filter-label">등급<select aria-label="고객 등급"><option>전체 등급</option><option>VIP</option><option>일반</option></select></label><label class="filter-label">등록일<select aria-label="등록 기간"><option>전체 기간</option><option>최근 30일</option></select></label><button type="submit" id="search-button">검색</button><button type="reset" class="reset" id="reset-button">초기화</button></form>
-      <div class="list-meta"><span>총 <strong>128</strong>명의 고객</span><div><button class="subtle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 5h16v14H4zM10 5v14M16 5v14"/></svg>열 설정</button><select aria-label="페이지당 표시 수"><option>10개씩 보기</option><option>20개씩 보기</option></select></div></div>
-      <table><thead><tr><th class="check"><input type="checkbox" aria-label="고객 전체 선택"></th><th>고객명 <span>↕</span></th><th>이메일</th><th>등급</th><th>상태</th><th>등록일 <span>↓</span></th><th>관리</th></tr></thead><tbody>
-      <tr><td class="check"><input type="checkbox" aria-label="김민서 선택"></td><td><div class="person"><span class="customer-avatar purple">민</span><div><strong>김민서</strong><small>CUS-00128</small></div></div></td><td>minseo.kim@example.com</td><td><span class="grade vip">VIP</span></td><td><span class="state active">활성</span></td><td>2026.10.24</td><td><button class="edit-button">편집</button></td></tr>
-      <tr><td class="check"><input type="checkbox" aria-label="이준호 선택"></td><td><div class="person"><span class="customer-avatar blue">준</span><div><strong>이준호</strong><small>CUS-00127</small></div></div></td><td>junho.lee@example.com</td><td><span class="grade">일반</span></td><td><span class="state active">활성</span></td><td>2026.10.23</td><td><button class="edit-button">편집</button></td></tr>
-      <tr><td class="check"><input type="checkbox" aria-label="박서연 선택"></td><td><div class="person"><span class="customer-avatar green">서</span><div><strong>박서연</strong><small>CUS-00126</small></div></div></td><td>seoyeon.park@example.com</td><td><span class="grade">일반</span></td><td><span class="state pending">가입 대기</span></td><td>2026.10.23</td><td><button class="edit-button">편집</button></td></tr>
-      <tr><td class="check"><input type="checkbox" aria-label="정하린 선택"></td><td><div class="person"><span class="customer-avatar peach">하</span><div><strong>정하린</strong><small>CUS-00125</small></div></div></td><td>harin.jung@example.com</td><td><span class="grade vip">VIP</span></td><td><span class="state active">활성</span></td><td>2026.10.22</td><td><button class="edit-button">편집</button></td></tr>
-      <tr><td class="check"><input type="checkbox" aria-label="최도윤 선택"></td><td><div class="person"><span class="customer-avatar blue">도</span><div><strong>최도윤</strong><small>CUS-00124</small></div></div></td><td>doyun.choi@example.com</td><td><span class="grade">일반</span></td><td><span class="state inactive">비활성</span></td><td>2026.10.21</td><td><button class="edit-button">편집</button></td></tr>
-      <tr><td class="check"><input type="checkbox" aria-label="윤지우 선택"></td><td><div class="person"><span class="customer-avatar purple">지</span><div><strong>윤지우</strong><small>CUS-00123</small></div></div></td><td>jiwoo.yoon@example.com</td><td><span class="grade">일반</span></td><td><span class="state active">활성</span></td><td>2026.10.20</td><td><button class="edit-button">편집</button></td></tr>
-      </tbody></table><div class="table-footer"><span>128개 중 1–6개 표시</span><div class="pagination"><button aria-label="이전 페이지">‹</button><button class="current">1</button><button>2</button><button>3</button><span>···</span><button>22</button><button aria-label="다음 페이지">›</button></div></div>
-    </section><p class="demo-caption">프로토타입용 가상 고객 데이터 · 실제 서비스 정보가 아닙니다.</p>
-  </main></div><script src="console.js"></script></body></html>
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>고객 관리 · NORTH Console</title>
+    <link rel="stylesheet" href="console.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="logo">
+        <span class="logo-icon">N</span><strong>NORTH</strong><span>CONSOLE</span>
+      </div>
+      <div class="workspace-label">워크스페이스</div>
+      <button class="workspace-switch">
+        <span class="workspace-icon">M</span>메인 워크스페이스 <span>⌄</span>
+      </button>
+      <nav>
+        <div class="nav-label">OVERVIEW</div>
+        <a><span>▦</span>대시보드</a><a class="active"><span>♙</span>고객 관리 <small>128</small></a
+        ><a><span>▤</span>주문 관리</a><a><span>▧</span>상품 관리</a>
+        <div class="nav-label second">MANAGEMENT</div>
+        <a><span>◈</span>팀 멤버</a><a><span>⚙</span>설정</a>
+      </nav>
+      <div class="sidebar-footer">
+        <span class="avatar">YL</span>
+        <div>이유림<small>관리자</small></div>
+        <span class="more">···</span>
+      </div>
+    </aside>
+    <div class="page">
+      <header class="topbar">
+        <div class="breadcrumbs">워크스페이스 <span>/</span> <strong>고객 관리</strong></div>
+        <div class="top-actions">
+          <span class="help">도움말 ↗</span
+          ><button aria-label="알림">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+            >
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" />
+            </svg></button
+          ><span class="avatar small">YL</span>
+        </div>
+      </header>
+      <main>
+        <div class="title-row">
+          <div>
+            <div class="page-eyebrow">CUSTOMER MANAGEMENT</div>
+            <h1>고객 관리</h1>
+            <p class="description">고객 정보를 확인하고 등록 상태를 관리하세요.</p>
+          </div>
+          <div class="title-actions">
+            <button id="export-customers">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5" /></svg
+              >내보내기</button
+            ><button class="primary" id="new-customer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M12 5v14M5 12h14" /></svg
+              >고객 등록
+            </button>
+          </div>
+        </div>
+        <section class="stats">
+          <div class="stat">
+            <span>전체 고객</span>
+            <div>128 <small>명</small></div>
+            <p><b>+12</b> 지난달 대비</p>
+          </div>
+          <div class="stat">
+            <span>활성 고객</span>
+            <div>104 <small>명</small></div>
+            <p>전체 고객의 <b>81.3%</b></p>
+          </div>
+          <div class="stat">
+            <span>이번 달 신규</span>
+            <div>24 <small>명</small></div>
+            <p><b>+8</b> 지난달 대비</p>
+          </div>
+        </section>
+        <section class="list-card">
+          <div class="tabs">
+            <button class="selected">전체 고객 <span>128</span></button><button>활성</button
+            ><button>비활성</button><button>가입 대기</button>
+          </div>
+          <form class="filters" id="customer-filter">
+            <label class="search"
+              ><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <circle cx="10.5" cy="10.5" r="6.5" />
+                <path d="m16 16 4 4" /></svg
+              ><input
+                id="customer-search"
+                placeholder="이름 또는 이메일 검색"
+                aria-label="고객 검색" /></label
+            ><label class="filter-label"
+              >등급<select aria-label="고객 등급">
+                <option>전체 등급</option>
+                <option>VIP</option>
+                <option>일반</option>
+              </select></label
+            ><label class="filter-label"
+              >등록일<select aria-label="등록 기간">
+                <option>전체 기간</option>
+                <option>최근 30일</option>
+              </select></label
+            ><button type="submit" id="search-button">검색</button
+            ><button type="reset" class="reset" id="reset-button">초기화</button>
+          </form>
+          <div class="list-meta">
+            <span>총 <strong>128</strong>명의 고객</span>
+            <div>
+              <button class="subtle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M4 5h16v14H4zM10 5v14M16 5v14" /></svg
+                >열 설정</button
+              ><select aria-label="페이지당 표시 수">
+                <option>10개씩 보기</option>
+                <option>20개씩 보기</option>
+              </select>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th class="check"><input type="checkbox" aria-label="고객 전체 선택" /></th>
+                <th>고객명 <span>↕</span></th>
+                <th>이메일</th>
+                <th>등급</th>
+                <th>상태</th>
+                <th>등록일 <span>↓</span></th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="check"><input type="checkbox" aria-label="김민서 선택" /></td>
+                <td>
+                  <div class="person">
+                    <span class="customer-avatar purple">민</span>
+                    <div><strong>김민서</strong><small>CUS-00128</small></div>
+                  </div>
+                </td>
+                <td>minseo.kim@example.com</td>
+                <td><span class="grade vip">VIP</span></td>
+                <td><span class="state active">활성</span></td>
+                <td>2026.10.24</td>
+                <td><button class="edit-button">편집</button></td>
+              </tr>
+              <tr>
+                <td class="check"><input type="checkbox" aria-label="이준호 선택" /></td>
+                <td>
+                  <div class="person">
+                    <span class="customer-avatar blue">준</span>
+                    <div><strong>이준호</strong><small>CUS-00127</small></div>
+                  </div>
+                </td>
+                <td>junho.lee@example.com</td>
+                <td><span class="grade">일반</span></td>
+                <td><span class="state active">활성</span></td>
+                <td>2026.10.23</td>
+                <td><button class="edit-button">편집</button></td>
+              </tr>
+              <tr>
+                <td class="check"><input type="checkbox" aria-label="박서연 선택" /></td>
+                <td>
+                  <div class="person">
+                    <span class="customer-avatar green">서</span>
+                    <div><strong>박서연</strong><small>CUS-00126</small></div>
+                  </div>
+                </td>
+                <td>seoyeon.park@example.com</td>
+                <td><span class="grade">일반</span></td>
+                <td><span class="state pending">가입 대기</span></td>
+                <td>2026.10.23</td>
+                <td><button class="edit-button">편집</button></td>
+              </tr>
+              <tr>
+                <td class="check"><input type="checkbox" aria-label="정하린 선택" /></td>
+                <td>
+                  <div class="person">
+                    <span class="customer-avatar peach">하</span>
+                    <div><strong>정하린</strong><small>CUS-00125</small></div>
+                  </div>
+                </td>
+                <td>harin.jung@example.com</td>
+                <td><span class="grade vip">VIP</span></td>
+                <td><span class="state active">활성</span></td>
+                <td>2026.10.22</td>
+                <td><button class="edit-button">편집</button></td>
+              </tr>
+              <tr>
+                <td class="check"><input type="checkbox" aria-label="최도윤 선택" /></td>
+                <td>
+                  <div class="person">
+                    <span class="customer-avatar blue">도</span>
+                    <div><strong>최도윤</strong><small>CUS-00124</small></div>
+                  </div>
+                </td>
+                <td>doyun.choi@example.com</td>
+                <td><span class="grade">일반</span></td>
+                <td><span class="state inactive">비활성</span></td>
+                <td>2026.10.21</td>
+                <td><button class="edit-button">편집</button></td>
+              </tr>
+              <tr>
+                <td class="check"><input type="checkbox" aria-label="윤지우 선택" /></td>
+                <td>
+                  <div class="person">
+                    <span class="customer-avatar purple">지</span>
+                    <div><strong>윤지우</strong><small>CUS-00123</small></div>
+                  </div>
+                </td>
+                <td>jiwoo.yoon@example.com</td>
+                <td><span class="grade">일반</span></td>
+                <td><span class="state active">활성</span></td>
+                <td>2026.10.20</td>
+                <td><button class="edit-button">편집</button></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="table-footer">
+            <span>128개 중 1–6개 표시</span>
+            <div class="pagination">
+              <button aria-label="이전 페이지">‹</button><button class="current">1</button
+              ><button>2</button><button>3</button><span>···</span><button>22</button
+              ><button aria-label="다음 페이지">›</button>
+            </div>
+          </div>
+        </section>
+        <p class="demo-caption">프로토타입용 가상 고객 데이터 · 실제 서비스 정보가 아닙니다.</p>
+      </main>
+    </div>
+    <script src="console.js"></script>
+  </body>
+</html>

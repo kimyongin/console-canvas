@@ -168,7 +168,12 @@ class HandoffTests(unittest.TestCase):
             extension = Path(prepared['extension_directory'])
             self.assertEqual(json.loads((extension / 'manifest.json').read_text())['manifest_version'], 3)
             self.assertIn('embedded-sample', Path(prepared['preview']).read_text())
-            self.assertEqual(prepared['files'], 31)
+            self.assertGreater(prepared['files'], 31)
+            self.assertTrue((extension / 'ui/workspace-layout.js').is_file())
+            self.assertTrue((extension / 'edit-commands.js').is_file())
+            public = json.loads((extension / 'runtime-manifest.json').read_text())['public']
+            self.assertTrue(all((extension / name).is_file() for name in public))
+            self.assertNotIn('desktop/main.cjs', public)
             self.assertTrue((extension / 'mcp/server.py').is_file())
             self.assertTrue((extension / 'desktop/main.cjs').is_file())
             again = subprocess.run([sys.executable, str(ROOT / 'scripts' / 'install_skill.py'),

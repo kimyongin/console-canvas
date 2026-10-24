@@ -1,16 +1,128 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'"><title>Console Canvas</title><link rel="stylesheet" href="shell.css"></head><body data-view="source">
-<header><div class="top"><strong><span>▧</span> Console Canvas</strong><nav><button id="show-source" class="active">웹사이트</button><button id="show-editor">편집기</button><button id="show-agent">에이전트 연결</button><button id="show-update">업데이트</button></nav><small id="status" role="status">원하는 화면을 열어 주세요.</small><button id="capture" class="primary">이 화면 가져오기 →</button></div><form id="navigation"><button id="back" type="button" aria-label="뒤로">←</button><button id="forward" type="button" aria-label="앞으로">→</button><button id="reload" type="button" aria-label="새로고침">↻</button><input id="address" type="text" aria-label="웹사이트 주소" placeholder="https://console.example.com"><button type="submit">열기</button><button id="demo" type="button">샘플 콘솔</button></form></header>
-<main id="fallback"><h1>원본 사이트와 편집을 한 곳에서</h1><p>위 주소창에 사이트를 열고, 원하는 화면에서 가져오기를 누르세요.</p></main>
-<section id="agent-setup" class="agent-setup" hidden aria-label="에이전트 연결 설정">
-  <div class="agent-intro"><div class="eyebrow">CONNECT YOUR AGENT</div><h1>앱에서 스킬까지 한 번에.</h1><p>스킬은 사용 지침, MCP는 화면을 읽고 편집하는 연결입니다.<br>이 앱에 포함된 버전으로 준비하세요.</p><span id="skill-version" class="version-tag"></span></div>
-  <div class="setup-cards">
-    <article><span class="step">01 · SKILL</span><h2>스킬 설치</h2><p>Codex에서 <strong>$console-canvas</strong>로 불러오세요.<br>앱을 업데이트하면 설치된 스킬도 자동으로 갱신합니다.</p><div class="setup-actions"><button id="install-skill" class="primary">Codex 스킬 설치·업데이트</button><button id="save-skill">스킬 ZIP 저장</button></div><p id="skill-install-status" role="status">설치 정보를 확인하고 있습니다.</p><code id="skill-path"></code><p id="skill-auto-status" role="status"></p></article>
-    <article><span class="step">02 · MCP</span><h2>에이전트 연결</h2><p>등록 명령을 터미널에서 한 번 실행하세요.<br>스킬 설치 없이도 MCP로 앱의 최신 지침을 읽을 수 있습니다.</p><textarea id="mcp-command" readonly rows="3" aria-label="MCP 등록 명령"></textarea><button id="copy-mcp">MCP 등록 명령 복사</button><p class="setup-note">이미 연결했다면 다시 등록할 필요가 없습니다. 앱을 옮겼다면 명령을 다시 복사하세요.</p></article>
-  </div>
-  <p id="agent-result" class="agent-result" role="status"></p>
-  <div class="agent-next"><strong>준비되었다면</strong><p>웹사이트에서 <b>이 화면 가져오기</b>를 누르고, 에이전트에게 “가져온 화면의 주석을 읽고 수정해 줘”라고 요청하세요.</p><p>MCP의 <code>get_agent_guide</code>로 앱에 포함된 스킬 지침을 직접 읽을 수 있습니다. 스킬이 목록에 보이지 않으면 Codex를 다시 열어 주세요.</p></div>
-</section>
-<section id="update-setup" class="agent-setup" hidden aria-label="앱 업데이트">
-  <div class="agent-intro"><div class="eyebrow">APP UPDATES</div><h1>편집은 그대로. 앱은 최신으로.</h1><p>공개 GitHub Releases에서 업데이트를 가져옵니다.<br>편집 화면과 스냅샷은 이 Mac에 유지됩니다.</p><span id="update-version" class="version-tag"></span></div>
-  <article class="update-card"><span class="step">CONSOLE CANVAS FOR MAC</span><h2 id="update-title">새 버전 확인</h2><p id="update-message" role="status">GitHub에서 새 버전을 확인하세요.</p><p id="update-skill-status" role="status"></p><progress id="update-progress" max="100" value="0" hidden aria-label="업데이트 다운로드 진행률"></progress><div class="setup-actions"><button id="check-update">업데이트 확인</button><button id="download-update" class="primary" hidden>업데이트 다운로드</button><button id="install-update" class="primary" hidden>업데이트하고 다시 시작</button></div><p class="setup-note">다운로드한 앱을 검증한 뒤 적용합니다. 앱을 종료하기 전에 현재 편집 내용을 저장합니다. 설치된 스킬도 새 앱 실행 시 자동으로 업데이트합니다.</p></article>
-</section><script src="shell.cjs"></script></body></html>
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'"
+    />
+    <title>Console Canvas</title>
+    <link rel="stylesheet" href="shell.css" />
+  </head>
+  <body data-view="source">
+    <header>
+      <div class="top">
+        <strong><span>▧</span> Console Canvas</strong>
+        <nav>
+          <button id="show-source" class="active">웹사이트</button
+          ><button id="show-editor">편집기</button><button id="show-agent">에이전트 연결</button
+          ><button id="show-update">업데이트</button>
+        </nav>
+        <small id="status" role="status">원하는 화면을 열어 주세요.</small
+        ><button id="capture" class="primary">이 화면 가져오기 →</button>
+      </div>
+      <form id="navigation">
+        <button id="back" type="button" aria-label="뒤로">←</button
+        ><button id="forward" type="button" aria-label="앞으로">→</button
+        ><button id="reload" type="button" aria-label="새로고침">↻</button
+        ><input
+          id="address"
+          type="text"
+          aria-label="웹사이트 주소"
+          placeholder="https://console.example.com"
+        /><button type="submit">열기</button><button id="demo" type="button">샘플 콘솔</button>
+      </form>
+    </header>
+    <main id="fallback">
+      <h1>원본 사이트와 편집을 한 곳에서</h1>
+      <p>위 주소창에 사이트를 열고, 원하는 화면에서 가져오기를 누르세요.</p>
+    </main>
+    <section id="agent-setup" class="agent-setup" hidden aria-label="에이전트 연결 설정">
+      <div class="agent-intro">
+        <div class="eyebrow">CONNECT YOUR AGENT</div>
+        <h1>앱에서 스킬까지 한 번에.</h1>
+        <p>
+          스킬은 사용 지침, MCP는 화면을 읽고 편집하는 연결입니다.<br />이 앱에 포함된 버전으로
+          준비하세요.
+        </p>
+        <span id="skill-version" class="version-tag"></span>
+      </div>
+      <div class="setup-cards">
+        <article>
+          <span class="step">01 · SKILL</span>
+          <h2>스킬 설치</h2>
+          <p>
+            Codex에서 <strong>$console-canvas</strong>로 불러오세요.<br />앱을 업데이트하면 설치된
+            스킬도 자동으로 갱신합니다.
+          </p>
+          <div class="setup-actions">
+            <button id="install-skill" class="primary">Codex 스킬 설치·업데이트</button
+            ><button id="save-skill">스킬 ZIP 저장</button>
+          </div>
+          <p id="skill-install-status" role="status">설치 정보를 확인하고 있습니다.</p>
+          <code id="skill-path"></code>
+          <p id="skill-auto-status" role="status"></p>
+        </article>
+        <article>
+          <span class="step">02 · MCP</span>
+          <h2>에이전트 연결</h2>
+          <p>
+            등록 명령을 터미널에서 한 번 실행하세요.<br />스킬 설치 없이도 MCP로 앱의 최신 지침을
+            읽을 수 있습니다.
+          </p>
+          <textarea id="mcp-command" readonly rows="3" aria-label="MCP 등록 명령"></textarea
+          ><button id="copy-mcp">MCP 등록 명령 복사</button>
+          <p class="setup-note">
+            이미 연결했다면 다시 등록할 필요가 없습니다. 앱을 옮겼다면 명령을 다시 복사하세요.
+          </p>
+        </article>
+      </div>
+      <p id="agent-result" class="agent-result" role="status"></p>
+      <div class="agent-next">
+        <strong>준비되었다면</strong>
+        <p>
+          웹사이트에서 <b>이 화면 가져오기</b>를 누르고, 에이전트에게 “가져온 화면의 주석을 읽고
+          수정해 줘”라고 요청하세요.
+        </p>
+        <p>
+          MCP의 <code>get_agent_guide</code>로 앱에 포함된 스킬 지침을 직접 읽을 수 있습니다. 스킬이
+          목록에 보이지 않으면 Codex를 다시 열어 주세요.
+        </p>
+      </div>
+    </section>
+    <section id="update-setup" class="agent-setup" hidden aria-label="앱 업데이트">
+      <div class="agent-intro">
+        <div class="eyebrow">APP UPDATES</div>
+        <h1>편집은 그대로. 앱은 최신으로.</h1>
+        <p>
+          공개 GitHub Releases에서 업데이트를 가져옵니다.<br />편집 화면과 스냅샷은 이 Mac에
+          유지됩니다.
+        </p>
+        <span id="update-version" class="version-tag"></span>
+      </div>
+      <article class="update-card">
+        <span class="step">CONSOLE CANVAS FOR MAC</span>
+        <h2 id="update-title">새 버전 확인</h2>
+        <p id="update-message" role="status">GitHub에서 새 버전을 확인하세요.</p>
+        <p id="update-skill-status" role="status"></p>
+        <progress
+          id="update-progress"
+          max="100"
+          value="0"
+          hidden
+          aria-label="업데이트 다운로드 진행률"
+        ></progress>
+        <div class="setup-actions">
+          <button id="check-update">업데이트 확인</button
+          ><button id="download-update" class="primary" hidden>업데이트 다운로드</button
+          ><button id="install-update" class="primary" hidden>업데이트하고 다시 시작</button>
+        </div>
+        <p class="setup-note">
+          다운로드한 앱을 검증한 뒤 적용합니다. 앱을 종료하기 전에 현재 편집 내용을 저장합니다.
+          설치된 스킬도 새 앱 실행 시 자동으로 업데이트합니다.
+        </p>
+      </article>
+    </section>
+    <script src="shell.cjs"></script>
+  </body>
+</html>

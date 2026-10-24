@@ -1,0 +1,184 @@
+/* The embedded editor is a workspace: app navigation lives in the outer shell. */
+.canvas-tools {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-width: 0;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+}
+.canvas-tools > .canvas-toolbar {
+  flex: 1;
+  min-width: 0;
+  border-bottom: 0;
+}
+.panel-toggle {
+  flex-shrink: 0;
+  align-self: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 5px 6px;
+  margin: 0 5px;
+  font-size: 11px;
+  border-color: transparent;
+  background: transparent;
+}
+.panel-toggle svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+}
+.panel-toggle .panel-fill {
+  stroke: none;
+  fill: currentColor;
+}
+.panel-toggle[aria-expanded='true'] {
+  color: var(--accent);
+  background: #eeedf9;
+}
+.panel-toggle[aria-expanded='false'] .panel-fill {
+  display: none;
+}
+.desktop-editor .canvas-tools {
+  height: 44px;
+  background: #fafbfe;
+}
+.desktop-editor .canvas-tools > .canvas-toolbar {
+  flex: 1 1 auto;
+}
+.panel-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  z-index: 25;
+  cursor: col-resize;
+  touch-action: none;
+  outline-offset: -2px;
+}
+.layers-resizer {
+  left: -4px;
+}
+.properties-resizer {
+  right: -4px;
+}
+.panel-resizer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+}
+.panel-resizer::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: calc(50% - 12px);
+  height: 24px;
+  width: 2px;
+  border-radius: 2px;
+  background: #a8adc0;
+}
+.panel-resizer:hover::before,
+.panel-resizer:focus-visible::before,
+.panel-resizer.active::before {
+  background: var(--accent);
+}
+.panel-resizer:focus-visible {
+  outline: 2px solid var(--accent);
+}
+.resizing-panels,
+.resizing-panels * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+.resizing-panels iframe {
+  pointer-events: none;
+}
+@media (min-width: 581px) {
+  .workspace > .left-panel {
+    grid-column: 1;
+    display: flex;
+  }
+  .workspace > .canvas-panel {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .workspace > .right-panel {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .workspace.layers-collapsed {
+    --layers-width: 0px;
+  }
+  .workspace.properties-collapsed {
+    --properties-width: 0px;
+  }
+}
+@media (min-width: 581px) and (max-width: 1100px) {
+  .workspace:not(.layers-collapsed) {
+    --layers-width: var(--layers-open-width, 190px);
+  }
+  .workspace:not(.properties-collapsed) {
+    --properties-width: var(--properties-open-width, 220px);
+  }
+}
+.desktop-editor .workspace {
+  height: 100dvh;
+  min-height: 0;
+}
+.desktop-editor .canvas-toolbar {
+  background: #fafbfe;
+  flex: 0 0 44px;
+  height: 44px;
+  min-height: 44px;
+  max-height: 44px;
+  padding: 4px 12px;
+  gap: 12px;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+.desktop-editor .canvas-toolbar > div {
+  flex-shrink: 0;
+}
+.desktop-editor .canvas-toolbar .zoom-controls {
+  margin-left: auto;
+}
+.desktop-editor .canvas-toolbar .header-actions {
+  gap: 4px;
+  margin-left: 0;
+  flex-wrap: nowrap;
+  border-left: 1px solid var(--line);
+  padding-left: 9px;
+}
+.desktop-editor .header-actions button {
+  font-size: 11px;
+  padding: 5px 7px;
+  min-height: 27px;
+  border-color: transparent;
+  background: transparent;
+  border-radius: 5px;
+  box-shadow: none;
+  gap: 5px;
+}
+.desktop-editor .header-actions button:hover:not(:disabled) {
+  background: #eeedf9;
+  border-color: transparent;
+}
+.desktop-editor .header-actions #export-button {
+  background: #eceafa;
+  color: #5a55bf;
+  border-color: transparent;
+}
+.desktop-editor .header-actions #mcp-button.connected {
+  background: transparent;
+  border-color: transparent;
+  color: #5b8f7c;
+}

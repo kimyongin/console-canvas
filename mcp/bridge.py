@@ -237,7 +237,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({'service': 'console-canvas', 'version': VERSION})
         # The local editor and fixtures are public static assets; no captured user data is served.
         path = unquote(urlsplit(self.path).path).lstrip('/') or 'editor.html'
-        allowed = {'editor.html', 'editor.css', 'editor.js', 'capture.js', 'db.js', 'engine.js', 'export.js', 'preview.html', 'bridge-client.js', 'editor-controller.js', 'snapshot-history.js', 'sample.uiclone.json', 'fixtures/console.html', 'fixtures/console.css', 'fixtures/console.js'}
+        allowed = set(json.loads((self.server.app_dir / 'runtime-manifest.json').read_text())['public'])
         if path not in allowed:
             return self.send_json(error('not_found', 'Static asset not found'), 404)
         file = self.server.app_dir / path
