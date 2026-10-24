@@ -766,6 +766,7 @@ export class CanvasScene {
         parentId: node.parentId,
         locator: node.locator,
         text,
+        ...(node.copiedFrom ? { copiedFrom: node.copiedFrom } : {}),
         before: node.rect,
         after: this.hidden(id)
           ? null
@@ -823,7 +824,17 @@ export class CanvasScene {
       this.openComment(marker.dataset.uicComment);
       return;
     }
-    const id = this.targetId(event);
+    let id = this.targetId(event);
+    if (
+      this.callbacks.smartSelection &&
+      this.interactionMode === 'edit' &&
+      !event.altKey &&
+      !event.shiftKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      id
+    )
+      id = [id, ...this.ancestors(id)].find((key) => this.selection.has(key)) || id;
     if (this.interactionMode === 'edit' && this.callbacks.onAreaStart?.(event, id)) return;
     if (!id || !this.elements.has(id) || this.hidden(id)) {
       this.select(null);

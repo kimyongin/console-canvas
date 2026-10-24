@@ -12,6 +12,8 @@ export function createInspector({ $, state, kinds, selectNode }) {
     $('#select-parent').disabled = !node || !scene.parent(id);
     $('#direct-edit-controls').hidden = state.mode === 'comment';
     const count = scene?.selection.size || 0;
+    $('#inspector').classList.toggle('multi-selection', count > 1);
+    $('#inspector-delete').textContent = count > 1 ? '선택한 ' + count + '개 삭제' : '이 요소 삭제';
     $('#batch-controls').hidden = count < 2;
     $('#selection-count').textContent = count + '개 선택됨';
     $('.coordinate-fields').hidden = count > 1;
@@ -31,7 +33,8 @@ export function createInspector({ $, state, kinds, selectNode }) {
     $('#comment-status').textContent = comment
       ? '저장된 주석 · 전달 파일에 포함됩니다.'
       : '주석은 화면을 바꾸지 않고 요청으로 전달됩니다.';
-    $('#element-kind').textContent = (kinds[node.kind] || '요소') + ' · ' + node.tag;
+    $('#element-kind').textContent =
+      count > 1 ? '다중 선택 · ' + count + '개' : (kinds[node.kind] || '요소') + ' · ' + node.tag;
     $('#element-name').textContent = count > 1 ? count + '개 요소 선택' : elementLabel(node);
     const path = $('#element-path');
     path.replaceChildren();
@@ -46,8 +49,23 @@ export function createInspector({ $, state, kinds, selectNode }) {
     const edit = scene.edits[id] || {};
     $('#offset-x').value = edit.dx || 0;
     $('#offset-y').value = edit.dy || 0;
-    const rect = scene.rect(id) || node.rect;
+    let rect = scene.rect(id) || node.rect;
+    if (count > 1) {
+      const boxes = scene
+        .selectionRoots()
+        .map((key) => scene.rect(key))
+        .filter(Boolean);
+      if (boxes.length) {
+        const left = Math.min(...boxes.map((r) => r.x)),
+          top = Math.min(...boxes.map((r) => r.y));
+        rect = {
+          width: Math.max(...boxes.map((r) => r.x + r.width)) - left,
+          height: Math.max(...boxes.map((r) => r.y + r.height)) - top,
+        };
+      }
+    }
     $('#element-size').textContent =
+      (count > 1 ? '선택 영역 · ' : '') +
       Math.round(rect.width) +
       ' × ' +
       Math.round(rect.height) +

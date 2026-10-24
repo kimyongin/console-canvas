@@ -1,4 +1,4 @@
-import { reviewPayload } from '../export.js';
+import { reviewPayload, instructionText } from '../export.js';
 const frame = document.querySelector('#editor'),
   results = [];
 function check(name, passed) {
@@ -156,6 +156,47 @@ try {
     'Starting in cloned-page background selects without moving its body',
     scene.selection.has(first.id) && !scene.drag && !scene.areaSelecting && !scene.edits.n1,
   );
+  const stats = [...scene.nodes.values()].find(
+    (n) => n.tag === 'section' && n.name.startsWith('전체 고객 128 명'),
+  );
+  const statText = [...scene.nodes.values()].find(
+    (n) => n.kind === 'text' && n.name === '128' && scene.ancestors(n.id).includes(stats.id),
+  );
+  app.selectNode(stats.id);
+  app.selectNode(first.id, { additive: true });
+  const childrenBefore = app.state.undo.length;
+  pointer(scene.elements.get(statText.id), 'pointerdown', 10, 10);
+  pointer(sceneRoot, 'pointermove', 30, 35);
+  pointer(sceneRoot, 'pointerup', 30, 35);
+  check(
+    'Dragging text inside a selected container moves the complete selection as one undo step',
+    scene.selection.size === 2 &&
+      scene.edits[stats.id]?.dx === 20 &&
+      scene.edits[first.id]?.dx === 20 &&
+      !scene.edits[statText.id] &&
+      app.state.undo.length === childrenBefore + 1,
+  );
+  app.undo();
+  pointer(scene.elements.get(statText.id), 'pointerdown', 10, 10, { altKey: true });
+  pointer(sceneRoot, 'pointerup', 10, 10, { altKey: true });
+  check(
+    'Alt retains explicit access to a child inside the selected group',
+    scene.selected === statText.id && scene.selection.size === 1,
+  );
+  app.selectNode(first.id);
+  pointer(scene.elements.get(stats.id), 'pointerdown', 10, 10, { metaKey: true });
+  pointer(sceneRoot, 'pointerup', 10, 10, { metaKey: true });
+  check(
+    'Cmd-click on container background adds it even without a marquee drag',
+    scene.selection.has(first.id) && scene.selection.has(stats.id),
+  );
+  check(
+    'Multi-selection inspector presents group controls first and labels its delete scope and bounds',
+    doc.querySelector('#direct-edit-controls').getBoundingClientRect().top <
+      doc.querySelector('#inspector-comment-host').getBoundingClientRect().top &&
+      doc.querySelector('#inspector-delete').textContent === '선택한 2개 삭제' &&
+      doc.querySelector('#element-size').textContent.startsWith('선택 영역'),
+  );
   root.setPointerCapture = oldSet;
   root.hasPointerCapture = oldHas;
   sceneRoot.setPointerCapture = oldSceneSet;
@@ -218,6 +259,22 @@ try {
         scene.nodes.get(id).copiedFrom === first.id || scene.nodes.get(id).copiedFrom === second.id,
     ),
   );
+  app.undo();
+  scene.remove(copyRoot);
+  doc.querySelector('#export-button').click();
+  await until(() =>
+    doc.querySelector('#handoff-items').textContent.includes('삭제된 복사본의 주석'),
+  );
+  check(
+    'Handoff distinguishes deleted copies and their comments from captured-element deletions',
+    doc.querySelector('#handoff-items').textContent.includes('복사본 삭제') &&
+      doc.querySelector('#export-summary').textContent.includes('삭제 0개') &&
+      doc.querySelector('#export-summary').textContent.includes('복사본 삭제 1개') &&
+      instructionText(app.state.snapshot, scene.changes(), '', scene.comments()).includes(
+        '참조 원본 ' + first.id + '은 유지',
+      ),
+  );
+  doc.querySelector('#export-dialog').close();
   app.undo();
   scene.nudge(10, 5);
   check(

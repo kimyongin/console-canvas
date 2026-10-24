@@ -267,6 +267,7 @@ def summarize(data):
                 comments.append({'id': node_id, 'name': node.get('name', ''),
                                  'kind': node.get('kind'), 'tag': node.get('tag'),
                                  'parentId': node.get('parentId'), 'locator': node.get('locator', {}),
+                                 **({'copiedFrom': node['copiedFrom']} if node.get('copiedFrom') else {}),
                                  'text': text.strip()[:4000], 'before': before,
                                  'after': None if deleted else {**before, 'x': before['x'] + dx, 'y': before['y'] + dy},
                                  'targetDeleted': deleted})

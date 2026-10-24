@@ -404,3 +404,17 @@
   user-select: none !important;
   cursor: crosshair !important;
 }
+.inspector.multi-selection {
+  display: flex;
+  flex-direction: column;
+}
+.inspector.multi-selection #direct-edit-controls {
+  order: 1;
+}
+.inspector.multi-selection #inspector-comment-host {
+  order: 2;
+}
+.handoff-item.target-deleted {
+  border-left: 3px solid #ba7787;
+  background: #fbf4f6;
+}

@@ -47,6 +47,7 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(changes[0]['copiedFrom'], 'n2')
         self.assertEqual(summary['componentComments'][0]['after']['x'], 63)
         self.assertEqual(summary['componentComments'][0]['locator']['selector'], '#n3')
+        self.assertEqual(summary['componentComments'][0]['copiedFrom'], 'n3')
         data['edits']['n50']['copy']['nodes'][1]['parentId'] = 'n1'
         with self.assertRaises(ValueError):
             tool.summarize(data)

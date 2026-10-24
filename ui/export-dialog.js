@@ -1,4 +1,10 @@
-import { download, instructionText, reviewPayload, buildReview } from '../export.js';
+import {
+  download,
+  instructionText,
+  reviewPayload,
+  buildReview,
+  changeActionLabel,
+} from '../export.js';
 import { withVersionScene, versionOptions } from './version-preview.js';
 import { elementLabel } from './element-labels.js';
 export function createExportDialog({ $, state, commitCommentDraft, editorId }) {
@@ -35,15 +41,17 @@ export function createExportDialog({ $, state, commitCommentDraft, editorId }) {
         if (token !== generation) return;
         const changes = scene.changes(),
           comments = scene.comments(),
-          deleted = changes.filter((c) => c.action === 'delete').length,
+          deleted = changes.filter((c) => c.action === 'delete' && !c.copiedFrom).length,
+          deletedCopies = changes.filter((c) => c.action === 'delete' && c.copiedFrom).length,
           copied = changes.filter((c) => c.action === 'copy').length;
         $('#export-summary').textContent =
           '이동 ' +
-          (changes.length - deleted - copied) +
+          changes.filter((c) => c.action === 'move').length +
           '개 · 삭제 ' +
           deleted +
           '개 · 복사본 ' +
           copied +
+          (deletedCopies ? '개 · 복사본 삭제 ' + deletedCopies : '') +
           '개 · 주석 ' +
           comments.length +
           '개 · ' +
@@ -54,11 +62,8 @@ export function createExportDialog({ $, state, commitCommentDraft, editorId }) {
           const item = document.createElement('div');
           item.className = 'handoff-item';
           item.textContent =
-            (change.action === 'delete'
-              ? '삭제 · '
-              : change.action === 'copy'
-                ? '복사본 추가 · '
-                : '이동 · ') +
+            changeActionLabel(change) +
+            ' · ' +
             elementLabel(scene.nodes.get(change.id)) +
             (change.action === 'move' ? ' · X ' + change.delta.x + ' / Y ' + change.delta.y : '');
           list.append(item);
@@ -66,8 +71,16 @@ export function createExportDialog({ $, state, commitCommentDraft, editorId }) {
         for (const comment of comments) {
           const item = document.createElement('div');
           item.className = 'handoff-item';
+          item.classList.toggle('target-deleted', comment.targetDeleted);
           item.textContent =
-            '주석 · ' + elementLabel(scene.nodes.get(comment.id)) + '\n' + comment.text;
+            (comment.targetDeleted
+              ? comment.copiedFrom
+                ? '삭제된 복사본의 주석 · '
+                : '삭제된 요소의 주석 · '
+              : '주석 · ') +
+            elementLabel(scene.nodes.get(comment.id)) +
+            '\n' +
+            comment.text;
           list.append(item);
         }
         if (version.id !== '@current' && version.state.note) {

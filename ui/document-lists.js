@@ -1,4 +1,5 @@
 import { elementLabel, isMajorElement } from './element-labels.js';
+import { changeActionLabel } from '../export.js';
 export function createDocumentLists({ $, state, selectNode, focusComment }) {
   function renderLayers() {
     const scene = state.scene,
@@ -110,9 +111,9 @@ export function createDocumentLists({ $, state, selectNode, focusComment }) {
       const detail = document.createElement('span');
       detail.textContent =
         change.action === 'copy'
-          ? '복사본 추가'
+          ? changeActionLabel(change)
           : change.action === 'delete'
-            ? '삭제' +
+            ? changeActionLabel(change) +
               (change.affectedDescendants
                 ? ' · 하위 ' + change.affectedDescendants + '개 포함'
                 : '')

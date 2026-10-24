@@ -69,7 +69,7 @@ export function createAreaSelection({ $, state, toast }) {
     if (g.capture.hasPointerCapture(g.pointerId)) g.capture.releasePointerCapture(g.pointerId);
     if (cancel) g.scene.select(g.primary, { ids: g.before });
     else if (!g.started) {
-      if (!g.additive) g.scene.select(g.clickId);
+      if (!g.additive || g.clickId) g.scene.select(g.clickId, { additive: g.additive });
     } else
       toast(
         g.scene.selection.size +

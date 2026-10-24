@@ -1,4 +1,13 @@
 const encoder = new TextEncoder();
+export function changeActionLabel(change) {
+  return change.action === 'copy'
+    ? '복사본 추가'
+    : change.action === 'delete'
+      ? change.copiedFrom
+        ? '복사본 삭제'
+        : '삭제'
+      : '이동';
+}
 const escapeHtml = (value) =>
   String(value).replace(
     /[&<>"']/g,
@@ -43,7 +52,9 @@ export function instructionText(snapshot, changes, note = '', comments = []) {
         (change.action === 'copy'
           ? '복사본 추가 (원본 ' + change.copiedFrom + ')'
           : change.action === 'delete'
-            ? '삭제'
+            ? change.copiedFrom
+              ? '복사본 삭제 (참조 원본 ' + change.copiedFrom + '은 유지)'
+              : '삭제'
             : '가로 ' + change.delta.x + 'px, 세로 ' + change.delta.y + 'px 이동') +
         (change.affectedDescendants
           ? ' · 하위 ' + change.affectedDescendants + '개 요소 포함'
@@ -63,6 +74,7 @@ export function instructionText(snapshot, changes, note = '', comments = []) {
           ' (' +
           comment.tag +
           ')' +
+          (comment.copiedFrom ? ' · 복사본 (참조 원본 ' + comment.copiedFrom + ')' : '') +
           (comment.targetDeleted ? ' · 대상이 삭제된 상태' : ''),
         '  요청: ' + comment.text,
         '  원본 식별 정보: ' + JSON.stringify(comment.locator),
