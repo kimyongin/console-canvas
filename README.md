@@ -1,0 +1,108 @@
+# Console Canvas · 화면 복제 편집기
+
+현재 보고 있는 콘솔 웹 화면을 **소스코드 없이** 가져와 독립된 편집 공간에서 수정하는 로컬 프로토타입입니다. 웹사이트는 Chrome 확장 프로그램이 읽고, 편집은 별도 탭에서 실행합니다. 서버·계정·API 키가 필요하지 않습니다.
+
+## 바로 체험하기
+
+[Releases](https://github.com/kimyongin/console-canvas/releases)에서 `Console Canvas.html`을 내려받아 Chrome에서 엽니다. ‘샘플 콘솔로 시작’을 누르면 실제 HTML로 렌더링한 별도 콘솔 페이지에서 수집한 복제본을 편집할 수 있습니다. 이 파일은 서버 없이 열립니다. 실제 웹사이트를 가져오려면 아래 확장 프로그램을 설치하세요.
+
+저장소를 복제했다면 `python3 scripts/build.py`로 `preview.html`과 `dist/`의 배포 파일을 생성합니다.
+
+## 에이전트 스킬
+
+`skills/console-canvas/`에는 편집기 준비와 전달 파일 해석을 위한 독립 설치형 스킬이 있습니다. 런타임 ZIP도 포함하므로 설치 후 GitHub 연결이나 저장소 경로가 없어도 작동합니다. Python 3만 필요합니다.
+
+```sh
+git clone https://github.com/kimyongin/console-canvas.git
+cd console-canvas
+python3 scripts/install_skill.py
+```
+
+기본 설치 위치는 `$CODEX_HOME/skills/console-canvas` 또는 `~/.codex/skills/console-canvas`입니다. 이미 같은 이름의 스킬이 있으면 덮어쓰지 않습니다. 다른 경로는 `--target /absolute/path/to/skills/console-canvas`로 지정합니다. 스킬 목록이 갱신된 대화에서 다음처럼 요청합니다.
+
+> $console-canvas로 실제 콘솔 화면을 편집할 수 있게 준비해 줘.
+
+편집 결과를 첨부했다면:
+
+> $console-canvas로 첨부한 ZIP을 읽고 이 프로젝트의 UI에 반영해 줘.
+
+에이전트는 비교 이미지와 원본 요소 식별 정보, 부모·자식 이동 관계를 읽고 실제 소스의 레이아웃으로 구현합니다. 소스가 없으면 재구현안이나 수정 명세를 만들 수 있습니다. 실제 사이트 가져오기는 Chrome 확장 버튼으로 시작하며 대화 첨부는 사용자가 합니다.
+
+스킬만 배포하려면 Release의 `console-canvas-skill.zip`을 내려받아 압축 내부의 `console-canvas` 폴더를 스킬 디렉터리에 둡니다. 상세 동작은 [SKILL.md](skills/console-canvas/SKILL.md)에 있습니다.
+
+## 실제 사이트 가져오기
+
+1. 전달받은 `console-canvas-extension.zip`을 압축 해제합니다.
+2. Chrome 주소창에서 `chrome://extensions`를 엽니다.
+3. 오른쪽 위 **개발자 모드**를 켭니다.
+4. **압축해제된 확장 프로그램을 로드합니다**를 누르고 `manifest.json`이 있는 **console-canvas 폴더**를 선택합니다.
+5. 확장 프로그램 목록에서 **Console Canvas**를 고정합니다.
+6. 편집할 실제 HTTP·HTTPS 웹사이트를 열고, 필요하면 평소처럼 로그인합니다.
+7. 현재 화면에서 **Console Canvas 확장 프로그램 버튼**을 누릅니다. 화면을 읽는 동안 버튼에 ‘…’가 표시되고, 완료되면 독립된 편집기 탭이 열립니다.
+
+원래 사이트의 DOM은 수정하지 않습니다. 원본 스크립트와 이벤트는 복제본에서 실행되지 않습니다. 확장 프로그램은 사용자가 버튼을 누른 탭에 `activeTab`으로 접근합니다. 브라우저 설정·확장 스토어 등 제한 페이지에서는 작동하지 않습니다.
+
+## 편집
+
+- 화면의 문구·아이콘·버튼·입력창·체크박스·표 셀·행·영역을 클릭해서 선택합니다.
+- 드래그하면 원래 레이아웃 제약에서 벗어나 독립된 레이어로 이동합니다.
+- **Shift+클릭**, **상위 요소**, 왼쪽 레이어 트리로 묶음을 선택할 수 있습니다.
+- Delete / Backspace 또는 **삭제** 버튼으로 선택한 요소를 숨깁니다. 빈자리는 유지하는 자유 배치 방식입니다.
+- 방향키는 1px, Shift+방향키는 10px 이동합니다. 오른쪽 좌표 입력으로도 위치를 정할 수 있습니다.
+- Cmd/Ctrl+Z는 실행 취소, Cmd/Ctrl+Shift+Z는 다시 실행입니다.
+- 부모 묶음을 이동하면 이미 따로 이동한 자식 요소도 따라갑니다. 부모를 삭제하면 해당 자식도 숨겨집니다.
+- 확대 비율과 **너비 맞춤**을 사용하고, 작업 공간을 스크롤해서 긴 페이지를 확인합니다.
+- 편집 결과는 해당 브라우저의 IndexedDB에 자동 저장됩니다. 확장을 제거하면 저장 데이터도 없어질 수 있으므로 편집 파일을 따로 저장할 수 있습니다.
+
+## 변경 내용을 Codex에 전달하기
+
+1. **변경 내용 전달**을 누릅니다.
+2. 필요한 경우 짧은 설명을 추가합니다.
+3. **전달용 ZIP 다운로드**를 누릅니다.
+4. ZIP 파일을 이 대화에 첨부하고 **“이 편집 결과를 기준으로 수정해 줘”**라고 요청합니다.
+
+ZIP에는 다음 파일이 들어갑니다.
+
+| 파일 | 내용 |
+| --- | --- |
+| `changes.json` | 요소 식별 정보, 원래 위치, 이동 거리, 최종 위치, 삭제 여부 |
+| `instructions.txt` | Codex에 전달할 편집 방향 |
+| `review.html` | 브라우저에서 전후 화면을 전환하며 비교 |
+| `before.html`, `after.html` | 원본 복제본과 편집본 |
+| `before.png`, `after.png` | 비교 이미지. 생성 가능한 경우 포함 |
+| `source-viewport.png` | 가져올 때 실제 Chrome 탭의 화면. 캡처 가능한 경우 포함 |
+| `review.json` | 복제본과 편집 상태를 모두 보존한 재편집 파일 |
+
+**편집 파일 저장**은 ZIP 대신 `.uiclone.json` 하나를 저장합니다. **화면 파일 열기** 또는 파일 드래그로 다시 열 수 있습니다. 내보내기는 원래 화면의 보이는 문구·이미지·입력값을 포함하며, 비밀번호 입력값은 복제하지 않습니다. 대화로의 전송은 사용자가 파일을 첨부할 때 이루어집니다.
+
+## 현재 범위
+
+- 단일 페이지에서 현재 DOM에 렌더링된 일반적인 콘솔 UI가 대상입니다. 다른 경로, 닫힌 화면, 서버에만 있는 데이터, 가상 목록의 아직 렌더링되지 않은 행은 가져오지 않습니다.
+- HTML/CSS 기반 복제본을 자유 배치 공간에 표시합니다. 전체 웹페이지를 그래픽 객체로 다시 그리는 렌더러는 아닙니다.
+- SVG 아이콘은 한 개의 아이콘 레이어로 다룹니다. Canvas·영상·iframe은 한 개의 이미지/대체 레이어이며, 내부 개체까지 자동 분해하지 않습니다.
+- 읽을 수 있는 이미지와 웹폰트는 내장합니다. 외부 도메인·인증 리소스가 읽히지 않으면 원래 주소를 참조하며, 가져오기 참고사항에 표시됩니다. 오프라인 재현은 사이트별로 달라질 수 있습니다.
+- 복잡한 변형·Shadow DOM·고정 위치·특수 CSS는 원본과 일부 달라질 수 있습니다. PNG는 보조 이미지이며 HTML 비교본을 함께 확인할 수 있습니다.
+- 표의 열 전체 재정렬, 여러 요소 동시 선택, 자동 반응형 레이아웃 생성은 이번 프로토타입 범위에 포함되지 않습니다. 개별 셀·행·내부 요소의 자유 이동과 삭제를 지원합니다.
+- 실제 서비스 코드 변경이나 원본 사이트 저장은 수행하지 않습니다. 소스가 있으면 Codex가 편집 기록을 근거로 코드를 수정하고, 소스가 없으면 재구현 방향을 정리할 수 있습니다.
+
+## 개발 및 검증
+
+외부 패키지와 빌드 도구 없이 HTML·CSS·JavaScript만 사용합니다.
+
+```sh
+python3 -m http.server 8848 --bind 127.0.0.1 --directory /absolute/path/to/console-canvas
+```
+
+- `http://127.0.0.1:8848/editor.html?sample=1`: 편집기
+- `http://127.0.0.1:8848/tests/integration.html`: 실제 DOM 수집·편집·내보내기 통합 검사
+- `python3 scripts/build.py`: 포함된 샘플로 독립 실행 데모와 확장 ZIP 생성
+- `python3 scripts/build.py --output /absolute/path/to/output`: 배포 출력 위치 지정
+- `python3 -m unittest discover -s tests -p 'test_*.py'`: 스킬의 부모·자식 변경 해석, ZIP 처리, 독립 설치·준비 검사
+
+빌드 결과는 `dist/Console Canvas.html`, `dist/console-canvas-extension.zip`, `dist/console-canvas-skill.zip`입니다. 스킬 런타임 자산도 같은 빌드에서 갱신합니다. 저장소에 포함된 `sample.uiclone.json`은 가상 데이터만 사용합니다. 실제 캡처 파일과 사용자 전달 ZIP은 커밋하지 않습니다.
+
+이전 프로토타입의 실제 브라우저 검사에서 수집·편집·전달 25개 검사가 통과했고, 358개 표시 요소의 이동·삭제·복원을 확인했습니다. **개인 Chrome에 확장을 설치한 뒤 탭 권한으로 실제 사이트를 가져오는 경계는 아직 검증하지 않았습니다.**
+
+기본 권한은 `activeTab`, `scripting`, `storage`, `unlimitedStorage`입니다. 원격 서버나 AI API에 데이터를 전송하는 기능은 없습니다.
+
+구조: `capture.js`(화면 수집) → `background.js`(확장 버튼·저장) → `engine.js`(독립 레이어 편집) → `editor.js`(편집기) → `export.js`(ZIP·비교 화면).
