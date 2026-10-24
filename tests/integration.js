@@ -1,5 +1,5 @@
 import {CanvasScene,copy,validateSnapshot,sanitizeHtml} from '../engine.js';
-import {buildReview,download,zipFiles,reviewPayload} from '../export.js';
+import {buildReview,download,zipFiles,reviewPayload,instructionText} from '../export.js';
 const results=[],output=document.getElementById('results'),status=document.getElementById('status');
 function check(name,predicate) {let passed=false,error='';try{passed=!!predicate();}catch(e){error=e.message;}results.push({name,passed,error});output.textContent=results.map(r=>(r.passed?'PASS ':'FAIL ')+r.name+(r.error?' · '+r.error:'')).join('\n');}
 function near(a,b){return Math.abs(a-b)<.75;}
@@ -58,7 +58,27 @@ async function run() {
   check('Imported active content is removed',()=>!cleaned.includes('onerror')&&!cleaned.includes('<script')&&!cleaned.includes('<iframe')&&!cleaned.includes('javascript:'));
   let rejected=false;try{validateSnapshot({...snapshot,nodes:[{...snapshot.nodes[0],parentId:snapshot.nodes[0].id}]});}catch{rejected=true;}
   check('Cyclic imported element identities are rejected',()=>rejected);
+  const originalEdits=JSON.stringify(scene.edits),originalPosition=scene.rect(text.id);
+  scene.setComment(text.id,'제목 문구를 고객 목록으로 바꾸고\n설명은 한 줄로 줄여 주세요.');
+  check('Comment-only requests preserve the visual layout and original locator',()=>JSON.stringify(scene.edits)===originalEdits&&near(scene.rect(text.id).x,originalPosition.x)&&scene.comments()[0].locator.selector===text.locator.selector);
+  scene.interactionMode='comment';
+  target.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerId:8,button:0,clientX:r.x+5,clientY:r.y+5}));
+  scene.doc.documentElement.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,pointerId:8,clientX:r.x+200,clientY:r.y+200}));
+  scene.doc.documentElement.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,pointerId:8}));
+  check('Comment mode selects without accidentally dragging',()=>scene.selected===text.id&&!scene.drag&&JSON.stringify(scene.edits)===originalEdits);
+  scene.interactionMode='edit';
+  scene.setComment(label.id,'버튼 문구를 바꿔 주세요.');scene.setEdits({[button.id]:{deleted:true}});
+  check('Comments survive deleted ancestors and mark the missing target',()=>scene.comments().some(c=>c.id===label.id&&c.targetDeleted&&c.after===null));
+  scene.setEdits(moved);scene.setComment(label.id,'');
+  const savedComments=copy(scene.annotations);scene.setComments({...savedComments,n999999:'unknown',bad:123});
+  check('Imported comments exclude unknown IDs and invalid values',()=>JSON.stringify(scene.annotations)===JSON.stringify(savedComments));
   scene.select(icon.id);scene.remove();
+  scene.setComment(icon.id,'아이콘 대신 텍스트만 남겨 주세요.');
+  const payload=reviewPayload(snapshot,scene,'주석과 직접 편집을 함께 전달합니다.');
+  check('Review JSON preserves comments separately from visual changes',()=>payload.comments.length===2&&payload.annotations[text.id].includes('\n')&&payload.comments.some(c=>c.id===icon.id&&c.targetDeleted));
+  scene.setComments({});scene.setComments(payload.annotations);
+  check('Reopened comments retain text, targets, and delete status',()=>JSON.stringify(scene.comments())===JSON.stringify(payload.comments));
+  check('Human-readable handoff includes component comment text and identity',()=>instructionText(snapshot,scene.changes(),'',scene.comments()).includes('제목 문구를 고객 목록으로')&&instructionText(snapshot,scene.changes(),'',scene.comments()).includes('원본 식별 정보:'));
   const result=await buildReview(snapshot,scene,'제목은 오른쪽으로 옮기고 등록 버튼의 아이콘은 삭제해 주세요.');
   check('Review contains reopenable JSON, changes, and visual comparison',()=>['review.json','changes.json','review.html','before.html','after.html'].every(name=>result.fileNames.includes(name)));
   check('Before and after comparison PNGs are generated',()=>result.fileNames.includes('before.png')&&result.fileNames.includes('after.png'));

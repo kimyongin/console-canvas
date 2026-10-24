@@ -37,10 +37,16 @@ export function cleanEdits(value,nodes) {
   }
   return result;
 }
+export function cleanComments(value,nodes) {
+  const result={};
+  if(!value||typeof value!=='object'||Array.isArray(value))return result;
+  for(const [id,text] of Object.entries(value))if(nodes.has(id)&&typeof text==='string'&&text.trim())result[id]=text.trim().slice(0,4000);
+  return result;
+}
 export class CanvasScene {
   constructor(frame,snapshot,callbacks={}) {
     validateSnapshot(snapshot);this.frame=frame;this.snapshot=snapshot;this.callbacks=callbacks;
-    this.nodes=new Map(snapshot.nodes.map(node=>[node.id,node]));this.edits={};this.elements=new Map();this.lifts=new Map();this.selected=null;this.drag=null;
+    this.nodes=new Map(snapshot.nodes.map(node=>[node.id,node]));this.edits={};this.annotations={};this.interactionMode='edit';this.elements=new Map();this.lifts=new Map();this.selected=null;this.drag=null;
   }
   async mount() {
     this.frame.width=Math.max(this.snapshot.source.width,this.snapshot.source.viewport.width);this.frame.height=this.snapshot.source.height;
@@ -142,6 +148,21 @@ export class CanvasScene {
     lift.element.setAttribute('style',lift.originalStyle);lift.placeholder.replaceWith(lift.element);lift.wrapper.remove();this.lifts.delete(id);
   }
   setEdits(edits) {this.edits=cleanEdits(edits,this.nodes);this.apply();}
+  setComments(value) {this.annotations=cleanComments(value,this.nodes);}
+  setComment(id,text) {
+    if(!this.nodes.has(id)||typeof text!=='string')return;
+    const next=text.trim().slice(0,4000);if((this.annotations[id]||'')===next)return;
+    this.callbacks.onBeforeChange?.();
+    if(next)this.annotations[id]=next;else delete this.annotations[id];
+    this.callbacks.onCommit?.();
+  }
+  comments() {
+    return Object.entries(this.annotations).map(([id,text])=>{
+      const node=this.nodes.get(id),offset=this.offset(id);
+      return {id,name:node.name,kind:node.kind,tag:node.tag,parentId:node.parentId,locator:node.locator,text,
+        before:node.rect,after:this.hidden(id)?null:{...node.rect,x:node.rect.x+offset.x,y:node.rect.y+offset.y},targetDeleted:this.hidden(id)};
+    });
+  }
   apply() {
     for(const [id] of [...this.lifts])if(!this.edits[id]?.dx&&!this.edits[id]?.dy)this.restoreLift(id);
     for(const [id,edit] of Object.entries(this.edits))if((edit.dx||edit.dy)&&this.elements.has(id))this.lift(id);
@@ -166,7 +187,8 @@ export class CanvasScene {
     let element=event.target.closest?.('[data-uic-id]'),id=element?.dataset.uicId;
     if(event.shiftKey&&id)id=this.parent(id)||id;
     if(!id||!this.elements.has(id)||this.hidden(id)){this.select(null);return;}
-    this.select(id);this.drag={id,pointerId:event.pointerId,x:event.clientX,y:event.clientY,before:copy(this.edits),started:false};
+    this.select(id);if(this.interactionMode==='comment')return;
+    this.drag={id,pointerId:event.pointerId,x:event.clientX,y:event.clientY,before:copy(this.edits),started:false};
     this.doc.documentElement.setPointerCapture(event.pointerId);
   }
   move(event) {

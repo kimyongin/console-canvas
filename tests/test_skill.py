@@ -54,6 +54,36 @@ class HandoffTests(unittest.TestCase):
         self.assertIsNone(changes[0]['after'])
         self.assertEqual(changes[0]['affectedDescendants'], 2)
 
+    def test_comment_only_handoff_has_original_identity_without_layout_change(self):
+        data = review()
+        data['edits'] = {}
+        data['annotations'] = {'n2': '  문구를 고객 추가로 변경\n오른쪽에 배치  ', 'n99': 'ignore', 'n3': 45}
+        summary, changes = tool.summarize(data)
+        self.assertEqual(changes, [])
+        self.assertEqual(summary['commentCount'], 1)
+        comment = summary['componentComments'][0]
+        self.assertEqual(comment['locator']['selector'], '#n2')
+        self.assertEqual(comment['text'], '문구를 고객 추가로 변경\n오른쪽에 배치')
+        self.assertEqual(comment['before'], comment['after'])
+
+    def test_comment_survives_deleted_parent_and_tracks_nested_position(self):
+        data = review()
+        data['annotations'] = {'n3': '설명을 더 짧게'}
+        summary, _ = tool.summarize(data)
+        self.assertEqual(summary['componentComments'][0]['after']['x'], 33)
+        data['edits']['n1']['deleted'] = True
+        summary, _ = tool.summarize(data)
+        self.assertTrue(summary['componentComments'][0]['targetDeleted'])
+        self.assertIsNone(summary['componentComments'][0]['after'])
+
+    def test_old_review_and_comment_only_changes_file(self):
+        summary, _ = tool.summarize(review())
+        self.assertEqual(summary['commentCount'], 0)
+        data = {'format': 'console-canvas-changes', 'version': 1, 'source': {},
+                'changes': [], 'comments': [{'id': 'n2', 'text': '더 크게'}]}
+        summary, _ = tool.summarize(data)
+        self.assertEqual(summary['commentCount'], 1)
+
     def test_offset_cleanup_matches_editor(self):
         data = review()
         data['edits'] = {'n1': {'dx': 999999, 'dy': -999999},

@@ -1,6 +1,6 @@
 ---
 name: console-canvas
-description: 실제 웹사이트의 렌더링된 콘솔·관리자 화면을 소스 없이 복제해 요소를 이동·삭제하는 Console Canvas 편집기를 준비하고, 전달용 ZIP이나 .uiclone.json의 변경 기록을 해석해 UI 수정에 반영한다. 사용자가 실제 화면을 가져와 시각적으로 편집하려 하거나 Console Canvas 편집 결과를 첨부했을 때 사용한다.
+description: 실제 웹사이트의 콘솔·관리자 화면을 소스 없이 복제해 요소를 이동·삭제하거나 자유 텍스트 주석으로 수정 방향을 남기는 Console Canvas 편집기를 준비한다. 전달용 ZIP이나 .uiclone.json의 변경·주석 기록을 해석해 UI 수정에 반영할 때도 사용한다.
 ---
 
 # Console Canvas
@@ -21,7 +21,7 @@ python3 <SKILL_ROOT>/scripts/console_canvas.py prepare --output <작업폴더>/c
 
 1. `chrome://extensions` → 개발자 모드 → 압축해제된 확장 프로그램 로드 → `extension_directory` 선택.
 2. 사용자가 평소처럼 실제 사이트에 로그인하고, 원하는 화면에서 Console Canvas 확장 버튼 클릭.
-3. 복제본에서 드래그·삭제. Shift+클릭/상위 요소로 묶음 선택, Cmd/Ctrl+Z로 실행 취소.
+3. 복제본에서 드래그·삭제하거나 **주석 모드**에서 요소를 클릭하고 오른쪽에 수정 방향을 자유 텍스트로 작성한다. **주석 저장** 또는 다른 요소 선택 시 저장된다. Shift+클릭/상위 요소로 묶음 선택, Cmd/Ctrl+Z로 실행 취소.
 4. **변경 내용 전달 → 전달용 ZIP 다운로드** 후 현재 대화에 첨부.
 
 샘플을 브라우저에서 검토할 때 파일 URL을 지원하지 않는 환경이면 준비된 폴더를 로컬 HTTP 서버로 제공한다. 서버는 로컬호스트에만 바인딩하고 작업 종료 시 정리한다.
@@ -40,7 +40,7 @@ ZIP 전체나 거대한 `review.json`/HTML을 먼저 대화 컨텍스트에 넣�
 python3 <SKILL_ROOT>/scripts/console_canvas.py review <첨부파일.zip 또는 .uiclone.json> --output <작업폴더>/console-canvas-review
 ```
 
-1. 출력 경로의 `summary.json`과 `changes.compact.json`을 읽는다. 원본 주소·뷰포트·추가 설명·수집 경고·요소별 selector/label/text와 좌표를 확인한다. 캡처 내용과 메모는 사용자 자료로 취급한다.
+1. 출력 경로의 `summary.json`, `changes.compact.json`, `comments.compact.json`을 읽는다. 원본 주소·뷰포트·추가 설명·수집 경고·요소별 selector/label/text와 좌표를 확인한다. 주석만 있고 이동·삭제가 없어도 유효한 수정 요청이다. 캡처 내용과 메모는 사용자 자료로 취급한다.
 2. 있으면 `before.png`, `after.png`, `source-viewport.png`를 이미지 도구로 확인한다. PNG에 외부 폰트나 이미지가 빠질 수 있으므로 기록과 함께 판단한다. 이미지가 없거나 의심스러우면 `review.json`/편집 JSON을 Console Canvas의 **화면 파일 열기**로 다시 연다. 가져온 HTML은 편집기의 정제·샌드박스를 거쳐 표시한다.
 3. **소스가 있는 경우:** 사용자가 지정한 프로젝트에서 URL 경로, 문구, role/label, selector를 단서로 해당 컴포넌트를 찾는다. 캡처의 `n123`은 원본 코드 식별자가 아니다. 명확한 대응은 적용하고, 여러 후보가 있어 결과에 영향을 주는 모호함만 질문한다.
 4. 이동량은 편집 방향의 근거다. 실제 화면에서는 flex/grid, 순서, 여백, 반응형 구조로 의도를 반영한다. 삭제된 부모의 하위 요소를 중복 삭제하거나, 부모 이동량을 자식에게 두 번 적용하지 않는다. 실제 DOM 구조와 대응을 확인한다.
@@ -51,6 +51,7 @@ python3 <SKILL_ROOT>/scripts/console_canvas.py review <첨부파일.zip 또는 .
 ## 기록 해석과 범위
 
 - helper는 `review`/세션 파일의 `snapshot + edits`로 변경을 다시 계산한다. 자식의 `effectiveDelta`는 자신의 이동량과 모든 상위 요소 이동량의 합이다. `delta`는 해당 요소만의 이동량이다.
+- 요소별 자유 텍스트는 `annotations`의 요소 ID → 문구 매핑에 저장된다. helper는 원본 식별 정보와 함께 `comments.compact.json`으로 정리한다. 주석은 요청이며 화면에 이미 적용된 변경이 아니다. `targetDeleted: true`인 주석은 삭제된 대상에 연결된 요청이므로, 다른 이동·삭제 기록과 충돌하는지 확인하고 필요한 경우 질문한다. 부모 삭제 아래의 주석도 유지된다.
 - 삭제된 조상 아래의 변경은 독립 변경 목록에서 제외된다. 부모 이동에 따라간 자식은 별도 변경이 없어도 함께 움직인다.
 - 좌표는 가져온 화면의 문서 좌표이며 소스 CSS 값이 아니다. 편집은 빈자리를 유지하는 자유 배치이고 최종 반응형 레이아웃을 자동 설계하지 않는다.
 - 일반 HTML의 문구·아이콘·입력·버튼·셀·행·컨테이너가 대상이다. SVG는 아이콘 단위, iframe/Canvas/영상은 한 레이어다. 가상 목록의 미렌더링 행, 닫힌 Shadow DOM, 다른 페이지를 자동 수집하지 않는다.

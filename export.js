@@ -4,7 +4,7 @@ export function download(name,data,type='application/octet-stream') {
   const blob=data instanceof Blob?data:new Blob([data],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');
   a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
 }
-export function instructionText(snapshot,changes,note='') {
+export function instructionText(snapshot,changes,note='',comments=[]) {
   const lines=['다음 콘솔 UI 편집 결과를 기준으로 화면을 수정하거나 구현 방향을 정리해 주세요.',
     '화면: '+snapshot.source.title,'주소: '+snapshot.source.url,'가져온 시각: '+snapshot.capturedAt,
     '원본 화면 크기: '+snapshot.source.viewport.width+' × '+snapshot.source.viewport.height,'',
@@ -16,12 +16,19 @@ export function instructionText(snapshot,changes,note='') {
     lines.push('  원본 식별 정보: '+JSON.stringify(change.locator));
   }
   if(!changes.length)lines.push('- 변경 없음');
+  if(comments.length) {
+    lines.push('','요소별 주석 (아래 문구는 수정 요청이며 화면에 자동 적용되지 않았습니다):');
+    for(const comment of comments) {
+      lines.push('- ['+comment.id+'] '+comment.name+' ('+comment.tag+')'+(comment.targetDeleted?' · 대상이 삭제된 상태':''),
+        '  요청: '+comment.text,'  원본 식별 정보: '+JSON.stringify(comment.locator));
+    }
+  }
   if(note.trim())lines.push('','추가 설명:',note.trim());
   lines.push('','ZIP의 changes.json에 상세 변경 사항, review.html에 비교 화면, review.json에 다시 편집할 수 있는 전체 화면이 있습니다.');
   return lines.join('\n');
 }
 export function reviewPayload(snapshot,scene,note='') {
-  return {format:'console-canvas-review',version:1,createdAt:new Date().toISOString(),snapshot,edits:scene.edits,changes:scene.changes(),note};
+  return {format:'console-canvas-review',version:1,createdAt:new Date().toISOString(),snapshot,edits:scene.edits,annotations:scene.annotations,comments:scene.comments(),changes:scene.changes(),note};
 }
 function reportRuntime() {
   const data=JSON.parse(document.getElementById('review-data').textContent),frame=document.getElementById('screen'),host=document.getElementById('screen-host');
@@ -82,8 +89,8 @@ export async function zipFiles(files) {
 export async function buildReview(snapshot,scene,note,onProgress=()=>{}) {
   onProgress('변경 전후 화면을 정리하고 있어요.');
   const before=await scene.beforeHtml(),after=scene.serialize(),changes=scene.changes(),size=scene.contentSize();
-  const instructions=instructionText(snapshot,changes,note),payload=reviewPayload(snapshot,scene,note),warnings=[];
-  const files={'changes.json':JSON.stringify({format:'console-canvas-changes',version:1,source:snapshot.source,note,changes},null,2),
+  const comments=scene.comments(),instructions=instructionText(snapshot,changes,note,comments),payload=reviewPayload(snapshot,scene,note),warnings=[];
+  const files={'changes.json':JSON.stringify({format:'console-canvas-changes',version:1,source:snapshot.source,note,changes,comments},null,2),
     'instructions.txt':instructions,'review.json':JSON.stringify(payload),'before.html':before,'after.html':after,
     'review.html':makeReport(snapshot,before,after,instructions,size)};
   onProgress('비교 이미지를 만들고 있어요.');

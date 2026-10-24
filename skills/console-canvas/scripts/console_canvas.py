@@ -185,7 +185,7 @@ def summarize(data):
         source = snapshot.get('source', {})
     elif kind == 'console-canvas-snapshot':
         snapshot = data
-        changes = calculate_changes(snapshot, {})
+        changes = calculate_changes(snapshot, data.get('edits', {}))
         source = snapshot.get('source', {})
     elif kind == 'console-canvas-changes':
         changes = data.get('changes')
@@ -200,6 +200,36 @@ def summarize(data):
     if not isinstance(source, dict):
         fail('Invalid source metadata')
     counts = Counter(change['action'] for change in changes)
+    comments = []
+    if snapshot:
+        nodes = {node['id']: node for node in snapshot['nodes']}
+        annotations = data.get('annotations', {})
+        edits = data.get('edits', {})
+        if isinstance(annotations, dict):
+            for node_id, text in annotations.items():
+                if node_id not in nodes or not isinstance(text, str) or not text.strip():
+                    continue
+                node = nodes[node_id]
+                current, dx, dy, deleted = node_id, 0, 0, False
+                while current:
+                    edit = edits.get(current, {})
+                    if isinstance(edit, dict):
+                        x, y = edit.get('dx'), edit.get('dy')
+                        dx += max(-60000, min(60000, x)) if finite(x) else 0
+                        dy += max(-200000, min(200000, y)) if finite(y) else 0
+                        deleted = deleted or edit.get('deleted') is True
+                    current = nodes[current].get('parentId')
+                before = rect(node['rect'])
+                comments.append({'id': node_id, 'name': node.get('name', ''),
+                                 'kind': node.get('kind'), 'tag': node.get('tag'),
+                                 'parentId': node.get('parentId'), 'locator': node.get('locator', {}),
+                                 'text': text.strip()[:4000], 'before': before,
+                                 'after': None if deleted else {**before, 'x': before['x'] + dx, 'y': before['y'] + dy},
+                                 'targetDeleted': deleted})
+    else:
+        comments = data.get('comments', [])
+        if not isinstance(comments, list) or any(not isinstance(c, dict) or not isinstance(c.get('text'), str) for c in comments):
+            fail('Invalid component comments')
     summary = {
         'format': kind, 'source': source, 'note': data.get('note', ''),
         'capturedAt': snapshot.get('capturedAt') if snapshot else None,
@@ -208,6 +238,7 @@ def summarize(data):
         'warnings': snapshot.get('warnings', []) if snapshot else [],
         'canReopen': snapshot is not None,
         'changeBasis': 'snapshot+edits' if snapshot else 'changes-only',
+        'commentCount': len(comments), 'componentComments': comments,
     }
     return summary, changes
 
@@ -235,11 +266,13 @@ def review(input_path, output):
         data = read_json(input_path.read_bytes())
         selected, unknown = input_path.name, []
     summary, changes = summarize(data)
+    comments = summary.pop('componentComments')
     summary.update({'input': str(input_path), 'selectedEntry': selected,
                     'ignoredZipEntries': unknown, 'images': list(images)})
     output = new_output(output)
     (output / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     (output / 'changes.compact.json').write_text(json.dumps(changes, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    (output / 'comments.compact.json').write_text(json.dumps(comments, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     for name, raw in images.items():
         (output / name).write_bytes(raw)
     reopen = input_path if summary['canReopen'] else None
@@ -249,6 +282,7 @@ def review(input_path, output):
     return {'summary': str(output / 'summary.json'),
             'changes': str(output / 'changes.compact.json'),
             'moves': summary['moves'], 'deletions': summary['deletions'],
+            'comment_count': summary['commentCount'], 'comments': str(output / 'comments.compact.json'),
             'images': [str(output / name) for name in images],
             'reopen_input': str(reopen) if reopen else None}
 
