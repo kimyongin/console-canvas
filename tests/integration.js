@@ -1,10 +1,11 @@
 import {CanvasScene,copy,validateSnapshot,sanitizeHtml} from '../engine.js';
 import {buildReview,download,zipFiles,reviewPayload,instructionText} from '../export.js';
+import {createEditorController} from '../editor-controller.js';
 const results=[],output=document.getElementById('results'),status=document.getElementById('status');
 function check(name,predicate) {let passed=false,error='';try{passed=!!predicate();}catch(e){error=e.message;}results.push({name,passed,error});output.textContent=results.map(r=>(r.passed?'PASS ':'FAIL ')+r.name+(r.error?' · '+r.error:'')).join('\n');}
 function near(a,b){return Math.abs(a-b)<.75;}
 async function run() {
-  const sourceFrame=document.getElementById('source');if(sourceFrame.contentDocument?.readyState!=='complete')await new Promise(resolve=>sourceFrame.addEventListener('load',resolve,{once:true}));
+  const sourceFrame=document.getElementById('source');if(sourceFrame.contentDocument?.readyState!=='complete'||!sourceFrame.contentDocument?.getElementById('customer-search'))await new Promise(resolve=>sourceFrame.addEventListener('load',resolve,{once:true}));
   const source=sourceFrame.contentDocument;source.getElementById('customer-search').value='김민서';source.querySelector('input[type=checkbox]').checked=true;source.querySelector('select').value='VIP';
   const password=source.createElement('input');password.type='password';password.value='DO-NOT-COPY-PASSWORD';password.setAttribute('value','DO-NOT-COPY-PASSWORD');password.setAttribute('aria-label','password-test');source.body.append(password);
   const beforeSource=source.documentElement.outerHTML;
@@ -96,6 +97,32 @@ async function run() {
   check('Reopened comments retain text, targets, and delete status',()=>JSON.stringify(scene.comments())===JSON.stringify(payload.comments));
   check('Reopening comments rebuilds their canvas markers',()=>scene.commentMarkers.size===2&&scene.commentMarkers.has(text.id)&&scene.commentMarkers.has(icon.id));
   check('Human-readable handoff includes component comment text and identity',()=>instructionText(snapshot,scene.changes(),'',scene.comments()).includes('제목 문구를 고객 목록으로')&&instructionText(snapshot,scene.changes(),'',scene.comments()).includes('원본 식별 정보:'));
+  const initial={edits:copy(scene.edits),annotations:copy(scene.annotations),selected:scene.selected,changes:copy(scene.changes())};
+  const controlState={snapshot,scene,ready:true,revision:20,undo:[],redo:[],commentTarget:null};let userBusy=false;
+  const point=()=>({edits:copy(scene.edits),annotations:copy(scene.annotations),selected:scene.selected});
+  const control=createEditorController({state:controlState,editorId:'integration-editor',checkpoint:point,isBusy:()=>userBusy,
+    historyBefore:()=>{controlState.undo.push(point());controlState.redo=[];},changeCommitted:()=>{controlState.revision++;},
+    undo:direction=>{const previous=controlState[direction].pop();controlState[direction==='undo'?'redo':'undo'].push(point());scene.setComments(previous.annotations);scene.setEdits(previous.edits);scene.select(previous.selected);controlState.revision++;}});
+  const invoke=(name,args={})=>control.execute({name,arguments:{editor_id:'integration-editor',...args},document_id:snapshot.id,deadline:Date.now()/1000+30});
+  const query=await invoke('list_elements',{query:'new-customer'});
+  check('MCP controller queries original captured element identities',()=>query.ok&&query.elements.some(e=>e.id===button.id&&e.locator.id==='new-customer'));
+  const invalid=await invoke('apply_edits',{expected_revision:20,operations:[{type:'move',element_id:text.id,mode:'relative',dx:5,dy:0},{type:'delete',element_id:'n999999'}]});
+  check('MCP invalid batches do not partially change the scene',()=>!invalid.ok&&controlState.revision===20&&JSON.stringify(scene.edits)===JSON.stringify(initial.edits)&&!controlState.undo.length);
+  const applied=await invoke('apply_edits',{expected_revision:20,operations:[{type:'move',element_id:text.id,mode:'absolute',dx:80,dy:30},{type:'comment',element_id:button.id,text:'MCP controller comment'}]});
+  check('MCP batched edits create one history step and one revision',()=>applied.ok&&controlState.revision===21&&controlState.undo.length===1&&scene.edits[text.id].dx===80&&scene.annotations[button.id]==='MCP controller comment');
+  const controllerComments=await invoke('list_comments',{element_id:button.id});
+  check('MCP comment lookup returns only the requested element',()=>controllerComments.comments.length===1&&controllerComments.comments[0].id===button.id);
+  const stale=await invoke('undo',{expected_revision:20});
+  check('MCP stale revisions cannot overwrite intervening edits',()=>stale.error?.code==='revision_conflict'&&controlState.revision===21);
+  userBusy=true;const busy=await invoke('undo',{expected_revision:21});userBusy=false;
+  check('MCP writes wait for active user editing',()=>busy.error?.code==='editor_busy'&&controlState.revision===21);
+  await invoke('undo',{expected_revision:21});
+  check('MCP undo restores the entire batch',()=>JSON.stringify(scene.changes())===JSON.stringify(initial.changes)&&JSON.stringify(scene.annotations)===JSON.stringify(initial.annotations)&&controlState.revision===22);
+  await invoke('redo',{expected_revision:22});
+  check('MCP redo restores the batch without losing comments',()=>scene.annotations[button.id]==='MCP controller comment'&&scene.edits[text.id].dx===80);
+  const wrong=await control.execute({name:'get_screen',arguments:{editor_id:'integration-editor'},document_id:'different',deadline:Date.now()/1000+30});
+  check('MCP commands are bound to the captured document identity',()=>wrong.error?.code==='wrong_document');
+  scene.setComments(initial.annotations);scene.setEdits(initial.edits);scene.select(initial.selected);
   const result=await buildReview(snapshot,scene,'제목은 오른쪽으로 옮기고 등록 버튼의 아이콘은 삭제해 주세요.');
   check('Review contains reopenable JSON, changes, and visual comparison',()=>['review.json','changes.json','review.html','before.html','after.html'].every(name=>result.fileNames.includes(name)));
   check('Before and after comparison PNGs are generated',()=>result.fileNames.includes('before.png')&&result.fileNames.includes('after.png'));

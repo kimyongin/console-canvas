@@ -1,6 +1,45 @@
 # Console Canvas · 화면 복제 편집기
 
-현재 보고 있는 콘솔 웹 화면을 **소스코드 없이** 가져와 독립된 편집 공간에서 수정하거나 요소별 주석으로 변경 방향을 남기는 로컬 프로토타입입니다. 웹사이트는 Chrome 확장 프로그램이 읽고, 편집은 별도 탭에서 실행합니다. 서버·계정·API 키가 필요하지 않습니다.
+현재 보고 있는 콘솔 웹 화면을 **소스코드 없이** 가져와 독립된 편집 공간에서 수정하거나 요소별 주석으로 변경 방향을 남기는 로컬 프로토타입입니다. 주 사용 경로는 Chromium을 내장한 독립 앱이며 Chrome 확장은 보조 방식으로 유지합니다. 원본 사이트와 복제본 편집기는 분리되고, AI API 키 없이 로컬 MCP로 에이전트와 연결할 수 있습니다.
+
+## 독립 앱으로 사용하기
+
+[Releases](https://github.com/kimyongin/console-canvas/releases)에서 `console-canvas-desktop-macos-arm64.zip`을 내려받아 압축을 풀고 **Console Canvas.app**을 엽니다. 현재 배포 대상은 macOS Apple Silicon이며 Python 3.9 이상이 필요합니다. 개발용 서명을 사용하며 배포용 공증은 아직 적용하지 않았습니다.
+
+1. 앱 주소창에 실제 웹사이트 URL을 입력합니다. 앱의 별도 세션에서 로그인할 수 있습니다.
+2. 원하는 화면에서 **이 화면 가져오기**를 누르면 복제본 편집기가 열리고 **MCP 연결됨**이 표시됩니다.
+3. 직접 요소를 옮기거나 주석을 남기고, 연결한 에이전트에게 주석 조회·편집을 요청합니다.
+4. 위쪽 **웹사이트 / 편집기**로 원본과 복제본을 오갈 수 있습니다. **샘플 콘솔**로 가상 데이터만 사용해 체험할 수도 있습니다.
+
+원본 사이트에는 Node.js나 편집기 preload API를 제공하지 않습니다. 기존 Chrome의 로그인 상태는 자동 공유하지 않습니다. SSO·다중 프레임·특수 리소스의 동작은 사이트별로 검증해야 합니다.
+
+## MCP로 직접 편집
+
+설치한 스킬의 절대 경로로 MCP 서버를 등록합니다. 기본 설치 위치의 예시는 다음과 같습니다.
+
+```sh
+codex mcp add console-canvas -- python3 ~/.codex/skills/console-canvas/scripts/console_canvas.py mcp
+codex mcp get console-canvas --json
+```
+
+등록한 서버를 사용하는 에이전트는 다음 도구를 호출할 수 있습니다. 새 도구가 나타나지 않으면 MCP 연결을 재시작하거나 새 대화에서 확인합니다.
+
+| 도구 | 기능 |
+| --- | --- |
+| `list_screens` | 명시적으로 연결한 편집 화면 목록 |
+| `get_screen` | 현재 버전, 변경·실행 기록 개수, 최근 작업 |
+| `list_elements` | 문구·원본 식별자·selector로 검색, 위치·삭제 상태 조회 |
+| `list_comments` | 요소별 주석과 원본 식별 정보 조회 |
+| `apply_edits` | 이동·삭제·주석 수정·주석 삭제를 원자적으로 적용 |
+| `undo`, `redo` | 사람과 에이전트가 공유하는 실행 기록 취소·복원 |
+
+예: “가져온 고객 관리 화면의 주석을 읽고, 등록 버튼을 왼쪽으로 120px·아래로 50px 이동해 줘.”
+
+쓰기는 최신 `expected_revision`과 고유 `operation_id`를 요구합니다. 여러 작업을 한 호출로 보내면 실행 취소 한 단계로 묶입니다. 버전 충돌이나 미저장 사용자 입력이 있으면 적용하지 않습니다. 같은 작업의 응답을 받지 못했다면 같은 operation_id와 같은 인수로 재시도해 중복 적용을 막습니다.
+
+MCP는 **가져온 복제본만** 제어합니다. 원본 사이트 수집·로그인은 앱에서 수행합니다. 연결 코드는 로컬의 `~/.codex/console-canvas/connection.json`에 사용자 전용 권한으로 저장하고, 앱에서는 자동 전달합니다. 브리지는 `127.0.0.1`에만 바인딩하며 화면 데이터는 메모리에만 중계합니다. 편집기 자체의 자동 저장은 IndexedDB를 사용합니다.
+
+웹 편집기나 Chrome 확장에서 수동 연결하려면 `python3 mcp/server.py --start`로 서버를 시작하고, **MCP 연결**에서 로컬 주소와 connection.json의 token 값을 입력합니다. 연결을 끊으면 해당 편집 화면은 도구에서 사라집니다.
 
 ## 바로 체험하기
 
@@ -18,7 +57,7 @@ cd console-canvas
 python3 scripts/install_skill.py
 ```
 
-기본 설치 위치는 `$CODEX_HOME/skills/console-canvas` 또는 `~/.codex/skills/console-canvas`입니다. 이미 같은 이름의 스킬이 있으면 덮어쓰지 않습니다. 다른 경로는 `--target /absolute/path/to/skills/console-canvas`로 지정합니다. 스킬 목록이 갱신된 대화에서 다음처럼 요청합니다.
+기본 설치 위치는 `$CODEX_HOME/skills/console-canvas` 또는 `~/.codex/skills/console-canvas`입니다. 이미 같은 이름의 스킬이 있으면 덮어쓰지 않습니다. 업데이트는 기존 설치본을 확인한 후 `python3 scripts/install_skill.py --update`로 수행합니다. 다른 경로는 `--target /absolute/path/to/skills/console-canvas`로 지정합니다. 스킬 목록이 갱신된 대화에서 다음처럼 요청합니다.
 
 > $console-canvas로 실제 콘솔 화면을 편집할 수 있게 준비해 줘.
 
@@ -92,7 +131,7 @@ ZIP에는 다음 파일이 들어갑니다.
 
 ## 개발 및 검증
 
-외부 패키지와 빌드 도구 없이 HTML·CSS·JavaScript만 사용합니다.
+HTML 편집기는 외부 npm 의존성이 없고 MCP 서버는 Python 표준 라이브러리만 사용합니다. 독립 앱은 Electron을 내장하며 공식 MCP SDK를 개발 검증에 사용합니다.
 
 ```sh
 python3 -m http.server 8848 --bind 127.0.0.1 --directory /absolute/path/to/console-canvas
@@ -108,6 +147,19 @@ python3 -m http.server 8848 --bind 127.0.0.1 --directory /absolute/path/to/conso
 
 이전 프로토타입의 실제 브라우저 검사에서 수집·편집·전달 25개 검사가 통과했고, 358개 표시 요소의 이동·삭제·복원을 확인했습니다. **개인 Chrome에 확장을 설치한 뒤 탭 권한으로 실제 사이트를 가져오는 경계는 아직 검증하지 않았습니다.**
 
-기본 권한은 `activeTab`, `scripting`, `storage`, `unlimitedStorage`입니다. 원격 서버나 AI API에 데이터를 전송하는 기능은 없습니다.
+Chrome 확장의 권한은 `activeTab`, `scripting`, `storage`, `unlimitedStorage`와 로컬 MCP 연결용 `http://127.0.0.1/*` 접근입니다. 원격 서버나 AI API에 데이터를 전송하는 기능은 없습니다.
 
 구조: `capture.js`(화면 수집) → `background.js`(확장 버튼·저장) → `engine.js`(독립 레이어 편집) → `editor.js`(편집기) → `export.js`(ZIP·비교 화면).
+
+### 독립 앱 빌드·검증
+
+```sh
+python3 scripts/build_desktop.py
+python3 scripts/install_desktop.py
+```
+
+공식 Electron 릴리스의 SHA-256을 확인한 뒤 `dist/Console Canvas.app`과 `dist/console-canvas-desktop-macos-arm64.zip`을 생성합니다. `--download-only`는 런타임 준비만 수행합니다. 설치 위치는 기본 `~/Applications/Console Canvas.app`이며 기존 앱은 `--update`를 지정한 Console Canvas만 교체합니다.
+
+Node.js 개발 환경에서는 `npm install` 후 `npm start`로 소스를 실행할 수 있습니다. Python 실행 파일은 `CONSOLE_CANVAS_PYTHON`, 로컬 상태 폴더는 `CONSOLE_CANVAS_STATE_DIR`로 지정할 수 있습니다. 일반 CLI 서버의 상태 폴더는 `--state-dir`로 지정합니다.
+
+독립 앱에서 가상 **샘플 콘솔**을 가져온 뒤 `node scripts/verify_mcp.mjs`를 실행하면 공식 SDK가 실제 stdio MCP 서버와 통신해 이동·삭제·주석 수정·실행 취소·재전송·버전 충돌을 검증합니다. 사용자 실제 데이터에는 이 검증 스크립트를 사용하지 않습니다.

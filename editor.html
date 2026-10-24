@@ -5,7 +5,7 @@
   <header class="app-header">
     <a class="brand" href="editor.html" aria-label="Console Canvas 시작 화면"><span class="brand-mark">▧</span><span>Console <strong>Canvas</strong><small>PROTOTYPE</small></span></a>
     <div class="document-title"><span class="status-dot"></span><span id="document-title">화면을 가져와 편집 방향을 보여주세요</span></div>
-    <div class="header-actions"><button id="import-button">화면 파일 열기</button><button id="export-button" class="primary" disabled>변경 내용 전달 <span aria-hidden="true">↗</span></button></div>
+    <div class="header-actions"><button id="mcp-button">MCP 연결</button><button id="import-button">화면 파일 열기</button><button id="export-button" class="primary" disabled>변경 내용 전달 <span aria-hidden="true">↗</span></button></div>
   </header>
   <div id="notice" class="notice" role="status" hidden></div>
   <main class="workspace" id="workspace">
@@ -29,7 +29,7 @@
         </div>
         <div id="artboard-space" class="artboard-space" hidden><div id="artboard-label" class="artboard-label"></div><div id="artboard" class="artboard"><iframe id="scene-frame" title="편집할 복제 화면" sandbox="allow-same-origin" referrerpolicy="no-referrer"></iframe></div></div>
       </div>
-      <div class="canvas-footer"><span id="canvas-hint">클릭해서 선택 · 드래그해서 이동 · Shift+클릭으로 상위 요소 선택</span><span id="canvas-dimensions">독립된 복제본</span></div>
+      <div class="canvas-footer"><span id="canvas-hint">클릭해서 선택 · 드래그해서 이동 · Shift+클릭으로 상위 요소 선택</span><span id="canvas-dimensions">독립된 복제본</span><span id="mcp-state" role="status">MCP 연결 안 됨</span></div>
     </section>
     <aside class="right-panel">
       <div class="panel-heading"><strong>선택한 요소</strong><span class="panel-badge">INSPECT</span></div>
@@ -53,6 +53,7 @@
     <div id="export-summary" class="export-summary"></div><label class="review-note-label">추가 설명 <span>선택</span><textarea id="review-note" rows="3" placeholder="예: 검색 조건을 위로 모으고 작업 버튼을 오른쪽에 정렬하고 싶어요."></textarea></label>
     <div class="export-actions"><button id="copy-summary">지시문 복사</button><button id="download-session">편집 파일 저장</button><button id="download-review" class="primary">전달용 ZIP 다운로드 ↓</button></div><div id="export-status" class="export-status" aria-live="polite"></div>
   </dialog>
+  <dialog id="mcp-dialog"><form method="dialog"><button class="dialog-close" aria-label="MCP 창 닫기">×</button></form><div class="eyebrow">CONNECT YOUR AGENT</div><h2>에이전트와 함께 편집</h2><p>연결한 이 화면의 복제본만 에이전트가 읽고 편집합니다.<br>독립 앱에서는 자동으로 연결됩니다.</p><label class="review-note-label">로컬 서버 주소<input id="mcp-address" value="http://127.0.0.1:8849" type="url"></label><label class="review-note-label">연결 코드<input id="mcp-code" type="password" autocomplete="off" placeholder="에이전트가 준비한 연결 코드"></label><div class="export-actions"><button id="mcp-disconnect">연결 끊기</button><button id="mcp-connect" class="primary">연결</button></div><div id="mcp-message" class="export-status" role="status"></div></dialog>
   <input id="file-input" type="file" accept=".json,.uiclone" hidden>
   <div id="toast" class="toast" role="status" hidden></div>
   <script src="capture.js"></script><script type="module" src="editor.js"></script>

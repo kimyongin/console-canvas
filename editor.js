@@ -1,10 +1,13 @@
 import {saveDocument,getDocument,listDocuments} from './db.js';
 import {CanvasScene,copy,validateSnapshot} from './engine.js';
 import {download,instructionText,reviewPayload,buildReview} from './export.js';
+import {createEditorController} from './editor-controller.js';
+import {createMcpBridge} from './bridge-client.js';
 
 const $=selector=>document.querySelector(selector);
 const isExtension=typeof chrome!=='undefined'&&!!chrome.runtime?.id;
-const state={snapshot:null,scene:null,undo:[],redo:[],expanded:new Set(),zoom:1,size:{width:1280,height:900},saving:Promise.resolve(),generation:0,commentTarget:null,mode:'edit'};
+const state={snapshot:null,scene:null,undo:[],redo:[],expanded:new Set(),zoom:1,size:{width:1280,height:900},saving:Promise.resolve(),generation:0,commentTarget:null,mode:'edit',ready:false,revision:0,lastAction:null,lastSaveError:null,mcpStatus:{connected:false}};
+const editorId=globalThis.crypto?.randomUUID?.()||('editor-'+Date.now()+'-'+Math.random().toString(36).slice(2));
 const kinds={text:'텍스트',pseudo:'생성된 문구',icon:'아이콘',raster:'이미지 레이어',element:'요소'};
 let toastTimer;
 function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,4000);}
@@ -13,18 +16,18 @@ function checkpoint(){return {edits:copy(state.scene.edits),annotations:copy(sta
 function historyBefore(){state.undo.push(checkpoint());if(state.undo.length>100)state.undo.shift();state.redo=[];}
 function commitCommentDraft(){if(state.scene&&state.commentTarget)state.scene.setComment(state.commentTarget,$('#component-comment').value);}
 function changeCommitted(detail={}) {
-  if(detail.cancel)state.undo.pop();renderInspector();renderLayers();renderChanges();renderHistory();save();
+  if(detail.cancel)state.undo.pop();else {state.revision++;state.lastAction={actor:detail.actor||'user',label:detail.label||'화면 편집'};}renderInspector();renderLayers();renderChanges();renderHistory();renderMcpStatus();save();
 }
 function renderHistory(){$('#undo').disabled=!state.undo.length;$('#redo').disabled=!state.redo.length;}
-function undo(direction='undo') {
+function undo(direction='undo',detail={}) {
   if(!state.scene)return;const from=state[direction],to=state[direction==='undo'?'redo':'undo'],previous=from.pop();if(!previous)return;
-  to.push(checkpoint());state.commentTarget=null;state.scene.setComments(previous.annotations);state.scene.setEdits(previous.edits);state.scene.select(previous.selected);renderLayers();renderChanges();renderHistory();save();
+  to.push(checkpoint());state.commentTarget=null;state.scene.setComments(previous.annotations);state.scene.setEdits(previous.edits);state.scene.select(previous.selected);state.revision++;state.lastAction={actor:detail.actor||'user',label:direction==='undo'?'실행 취소':'다시 실행'};renderLayers();renderChanges();renderHistory();renderMcpStatus();save();
 }
 function save() {
   if(!state.snapshot||!state.scene)return;
   const value={...state.snapshot,edits:copy(state.scene.edits),annotations:copy(state.scene.annotations),note:$('#review-note').value,updatedAt:new Date().toISOString()};
   $('#save-status').textContent='저장 중…';
-  state.saving=state.saving.catch(()=>{}).then(()=>saveDocument(value)).then(()=>{$('#save-status').textContent='이 브라우저에 저장됨';}).catch(()=>{$('#save-status').textContent='자동 저장 실패 · 파일로 저장해 주세요';});
+  state.saving=state.saving.catch(()=>{}).then(()=>saveDocument(value)).then(()=>{state.lastSaveError=null;$('#save-status').textContent='이 기기에 저장됨';}).catch(error=>{state.lastSaveError=error.message;$('#save-status').textContent='자동 저장 실패 · 파일로 저장해 주세요';});
 }
 function sizeChanged(size){state.size=size;updateZoom();}
 function updateZoom() {
@@ -104,7 +107,7 @@ function onKey(event) {
 }
 async function openSnapshot(snapshot,edits={},note='',annotations={}) {
   validateSnapshot(snapshot);const generation=++state.generation;
-  commitCommentDraft();state.commentTarget=null;
+  commitCommentDraft();state.commentTarget=null;state.ready=false;state.revision++;
   $('#welcome').hidden=true;$('#artboard-space').hidden=false;$('#export-button').disabled=true;
   state.snapshot=snapshot;state.undo=[];state.redo=[];state.expanded=new Set(snapshot.nodes.filter(node=>!node.parentId).map(node=>node.id));
   $('#source-title').textContent=snapshot.source.title||'가져온 화면';$('#document-title').textContent=snapshot.source.title||'가져온 화면';$('#source-url').textContent=snapshot.source.url;
@@ -116,7 +119,7 @@ async function openSnapshot(snapshot,edits={},note='',annotations={}) {
   try {await scene.mount();if(generation!==state.generation)return;scene.interactionMode=state.mode;scene.setComments(annotations);scene.setEdits(edits);fit();$('#viewport').scrollLeft=(snapshot.source.scroll?.x||0)*state.zoom;$('#viewport').scrollTop=(snapshot.source.scroll?.y||0)*state.zoom;renderInspector();renderLayers();renderChanges();renderHistory();$('#export-button').disabled=false;
     $('#capture-notes').hidden=!snapshot.warnings.length;$('#capture-notes-title').textContent='가져오기 참고 '+snapshot.warnings.length+'건';$('#capture-notes-list').replaceChildren();
     for(const warning of snapshot.warnings){const li=document.createElement('li');li.textContent=warning.message;$('#capture-notes-list').append(li);}
-    save();toast('화면을 가져왔어요. 요소를 옮기거나 주석으로 수정 방향을 남겨 보세요.');
+    state.ready=true;connectDesktopIfReady();renderMcpStatus();save();toast('화면을 가져왔어요. 요소를 옮기거나 주석으로 수정 방향을 남겨 보세요.');
   }catch(error){notice(error.message);$('#welcome').hidden=false;$('#artboard-space').hidden=true;throw error;}
 }
 async function loadSample() {
@@ -164,10 +167,27 @@ $('#download-review').addEventListener('click',async()=>{
 });
 window.addEventListener('dragover',event=>{if(event.dataTransfer?.types.includes('Files'))event.preventDefault();});
 window.addEventListener('drop',event=>{if(event.dataTransfer?.files.length){event.preventDefault();importFile(event.dataTransfer.files[0]).catch(error=>notice(error.message));}});
+function renderMcpStatus() {
+  const status=state.mcpStatus;$('#mcp-button').textContent=status.connected?'MCP 연결됨':'MCP 연결';$('#mcp-button').classList.toggle('connected',!!status.connected);
+  $('#mcp-state').textContent=(status.connected?'MCP 연결됨 · r'+state.revision:status.message||'MCP 연결 안 됨')+(state.lastAction?' · '+(state.lastAction.actor==='agent'?'에이전트':'직접 편집')+' '+state.lastAction.label:'');
+}
+const controller=createEditorController({state,editorId,checkpoint,historyBefore,changeCommitted,undo,
+  isBusy:()=>$('#export-dialog').open||!!(state.commentTarget&&$('#component-comment').value.trim()!==(state.scene?.annotations[state.commentTarget]||'')),
+  render:()=>{renderInspector();renderLayers();renderChanges();renderHistory();},flush:async()=>{await state.saving;return !state.lastSaveError;}});
+const mcpBridge=createMcpBridge({metadata:controller.metadata,execute:controller.execute,onStatus:status=>{state.mcpStatus=status;renderMcpStatus();}});
+$('#mcp-button').addEventListener('click',()=>$('#mcp-dialog').showModal());
+$('#mcp-connect').addEventListener('click',async()=>{const button=$('#mcp-connect');button.disabled=true;try{commitCommentDraft();await mcpBridge.connect($('#mcp-address').value.trim(),$('#mcp-code').value.trim());$('#mcp-code').value='';$('#mcp-dialog').close();}catch(error){$('#mcp-message').textContent=error.message;}finally{button.disabled=false;}});
+$('#mcp-disconnect').addEventListener('click',async()=>{await mcpBridge.disconnect();$('#mcp-dialog').close();});
+if(window.ConsoleCanvasDesktop){
+  document.body.classList.add('desktop-editor');
+  window.ConsoleCanvasDesktop.onSnapshot(value=>openSnapshot(value).catch(error=>notice(error.message)));
+  window.ConsoleCanvasDesktop.getConnection().then(connection=>{if(connection){state.desktopConnection=connection;connectDesktopIfReady();}}).catch(error=>notice(error.message));
+}
 const params=new URLSearchParams(location.search);
 if(params.has('error'))notice(params.get('error'));
 if(params.has('id'))getDocument(params.get('id')).then(value=>{if(!value)throw new Error('저장된 화면을 찾을 수 없습니다. 웹사이트에서 다시 가져와 주세요.');return openSnapshot(value,value.edits,value.note,value.annotations);}).catch(error=>notice(error.message));
 else if(params.has('sample'))loadSample();
 else listDocuments().then(values=>{for(const snapshot of values.slice(0,4)){const button=document.createElement('button');button.className='recent-item';const title=document.createElement('span');title.textContent=snapshot.source.title;const date=document.createElement('small');date.textContent=new Date(snapshot.capturedAt).toLocaleDateString('ko-KR');button.append(title,date);button.addEventListener('click',()=>openSnapshot(snapshot,snapshot.edits,snapshot.note,snapshot.annotations));$('#recent-documents').append(button);}}).catch(()=>{});
 // Exposed for the local integration harness; contains only this editor's current document.
-window.ConsoleCanvas={state,openSnapshot,importFile,undo,selectNode,buildReview:()=>buildReview(state.snapshot,state.scene,$('#review-note').value)};
+window.ConsoleCanvas={state,openSnapshot,importFile,undo,selectNode,controller,buildReview:()=>buildReview(state.snapshot,state.scene,$('#review-note').value)};
+function connectDesktopIfReady(){if(state.desktopConnection&&state.ready&&!mcpBridge.isConnected()){const connection=state.desktopConnection;state.desktopConnection=null;mcpBridge.connect(connection.url,connection.token).catch(error=>notice(error.message));}}

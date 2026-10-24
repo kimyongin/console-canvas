@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Prepare the bundled editor or summarize a Console Canvas review. Stdlib only."""
 import argparse
+import hashlib
 from collections import Counter, deque
 import json
 import math
+import os
 from pathlib import Path, PurePosixPath
 import re
 import sys
@@ -17,6 +19,9 @@ RUNTIME_FILES = {
     'export.js', 'editor.js', 'editor.css', 'editor.html', 'README.md',
     'preview.html', 'sample.uiclone.json', 'fixtures/console.html',
     'fixtures/console.css', 'fixtures/console.js',
+    'bridge-client.js', 'editor-controller.js', 'mcp/server.py', 'mcp/bridge.py',
+    'package.json', 'desktop/main.cjs', 'desktop/preload.cjs', 'desktop/shell-preload.cjs',
+    'desktop/shell.html', 'desktop/shell.css', 'desktop/shell.cjs',
 }
 REVIEW_FILES = {
     'review.json', 'changes.json', 'instructions.txt', 'before.png', 'after.png',
@@ -295,8 +300,24 @@ def main():
     review_parser = commands.add_parser('review', help='Summarize a review ZIP or JSON without executing HTML')
     review_parser.add_argument('input', type=Path)
     review_parser.add_argument('--output', required=True, type=Path)
+    mcp_parser = commands.add_parser('mcp', help='Start the installed MCP stdio server; runtime is bundled')
+    mcp_parser.add_argument('--state-dir', type=Path, default=Path(os.environ.get('CODEX_HOME', str(Path.home() / '.codex'))) / 'console-canvas')
+    mcp_parser.add_argument('--port', type=int, default=8849)
+    mcp_parser.add_argument('--start', action='store_true', help='Start bridge and print connection file location')
+    mcp_parser.add_argument('--stop', action='store_true', help='Stop local bridge')
     args = parser.parse_args()
     try:
+        if args.command == 'mcp':
+            asset = SKILL_ROOT / 'assets' / 'console-canvas-extension.zip'
+            key = hashlib.sha256(asset.read_bytes()).hexdigest()[:16]
+            runtime = args.state_dir.expanduser().resolve() / 'runtimes' / key
+            if not runtime.exists():
+                prepare(runtime)
+            server = runtime / 'console-canvas' / 'mcp' / 'server.py'
+            options = [sys.executable, str(server), '--state-dir', str(args.state_dir.expanduser().resolve()), '--port', str(args.port)]
+            if args.start:options.append('--start')
+            if args.stop:options.append('--stop')
+            os.execv(sys.executable, options)
         result = prepare(args.output) if args.command == 'prepare' else review(args.input, args.output)
     except (ValueError, OSError, zipfile.BadZipFile, RuntimeError) as error:
         print(json.dumps({'error': str(error)}, ensure_ascii=False), file=sys.stderr)
