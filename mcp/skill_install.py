@@ -23,6 +23,19 @@ def default_target():
     return modern
 
 
+def installed_targets():
+    """Find existing user installations only; never turn an app launch into first install."""
+    candidates = [Path.home() / '.codex/skills/console-canvas', Path.home() / '.agents/skills/console-canvas']
+    if os.environ.get('CODEX_HOME'):
+        candidates.insert(0, Path(os.environ['CODEX_HOME']) / 'skills/console-canvas')
+    found = []
+    for candidate in candidates:
+        target = candidate.expanduser().resolve()
+        if target not in found and (target / 'SKILL.md').is_file():
+            found.append(target)
+    return found
+
+
 def packaged_files(archive):
     with zipfile.ZipFile(archive) as bundle:
         expected = {'console-canvas/' + name for name in MANAGED}
@@ -68,19 +81,51 @@ def install(archive, target):
             destination = backup / name
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(target / name, destination)
-    for name in changed:
-        path = target / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        descriptor, temporary = tempfile.mkstemp(prefix='.console-canvas-', dir=path.parent)
-        try:
+    prepared, applied = {}, []
+    try:
+        # Stage every file before replacing anything, including on an existing install.
+        for name in changed:
+            path = target / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            descriptor, temporary = tempfile.mkstemp(prefix='.console-canvas-', dir=path.parent)
+            prepared[name] = Path(temporary)
             with os.fdopen(descriptor, 'wb') as output:
                 output.write(values[name])
             os.chmod(temporary, 0o644)
-            os.replace(temporary, path)
-        finally:
-            if os.path.exists(temporary):
-                os.unlink(temporary)
+        for name, temporary in prepared.items():
+            os.replace(temporary, target / name)
+            applied.append(name)
+    except OSError:
+        for name in reversed(applied):
+            path = target / name
+            if name in old:
+                descriptor, temporary = tempfile.mkstemp(prefix='.console-canvas-rollback-', dir=path.parent)
+                try:
+                    with os.fdopen(descriptor, 'wb') as output:
+                        output.write((backup / name).read_bytes())
+                    os.replace(temporary, path)
+                finally:
+                    if os.path.exists(temporary):
+                        os.unlink(temporary)
+            else:
+                path.unlink(missing_ok=True)
+        raise
+    finally:
+        for temporary in prepared.values():
+            temporary.unlink(missing_ok=True)
     return {**status(archive, target), 'changed_files': changed, 'backup': str(backup) if backup else None}
+
+
+def sync_installed(archive):
+    packaged_files(archive)
+    results, errors = [], []
+    for target in installed_targets():
+        try:
+            results.append(install(archive, target))
+        except (OSError, ValueError, zipfile.BadZipFile) as error:
+            errors.append({'path': str(target), 'message': str(error)})
+    return {'updated': [r for r in results if r['changed_files']],
+            'current': [r for r in results if not r['changed_files']], 'errors': errors}
 
 
 def main():
@@ -88,9 +133,10 @@ def main():
     parser.add_argument('--archive', required=True, type=Path)
     parser.add_argument('--target', type=Path, default=default_target())
     parser.add_argument('--status', action='store_true')
+    parser.add_argument('--sync-installed', action='store_true')
     args = parser.parse_args()
     try:
-        result = status(args.archive, args.target) if args.status else install(args.archive, args.target)
+        result = sync_installed(args.archive) if args.sync_installed else status(args.archive, args.target) if args.status else install(args.archive, args.target)
         print(json.dumps(result, ensure_ascii=False))
     except (OSError, ValueError, zipfile.BadZipFile) as error:
         parser.exit(1, str(error) + '\n')

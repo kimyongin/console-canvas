@@ -1,9 +1,9 @@
 const fs=require('node:fs'),path=require('node:path'),{spawn}=require('node:child_process');
 
 // Only the trusted shell can call this controller. All URLs and paths are fixed here.
-function createUpdater({app,root,python,version,notify,flush}){
+function createUpdater({app,root,python,version,skillSync,notify,flush}){
   const cache=path.join(app.getPath('userData'),'updates'),helper=path.join(root,'mcp/app_update.py');
-  let value={phase:'idle',current_version:version,message:'GitHub에서 새 버전을 확인하세요.'},running=false,plan;
+  let value={phase:'idle',current_version:version,message:'GitHub에서 새 버전을 확인하세요.',skill_update:skillSync},running=false,plan;
   const send=patch=>{value={...value,...patch};notify(value);return value;};
   async function run(action){
     if(running)throw new Error('업데이트 작업이 진행 중입니다.');

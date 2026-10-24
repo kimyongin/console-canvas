@@ -3,6 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{exe
 const run=promisify(execFile),ROOT=path.resolve(__dirname,'..');
 const {createUpdater}=require('./updater.cjs');
 let win,source,editor,connection,current='source',busy=false,editorReady=false,pendingCapture=null;
+let skillSync={updated:[],current:[],errors:[]};
 app.setName('Console Canvas');
 const stateDir=process.env.CONSOLE_CANVAS_STATE_DIR||path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'console-canvas');
 const python=process.env.CONSOLE_CANVAS_PYTHON||(process.platform==='darwin'?'/usr/bin/python3':'python3');
@@ -10,7 +11,7 @@ const appVersion=JSON.parse(fs.readFileSync(path.join(ROOT,'package.json'),'utf8
 const bundledSkill=fs.existsSync(path.join(ROOT,'..','console-canvas-skill.zip'))?path.join(ROOT,'..','console-canvas-skill.zip'):path.join(ROOT,'dist','console-canvas-skill.zip');
 const quote=value=>"'"+value.replace(/'/g,"'\\''")+"'";
 const mcpCommand=['codex','mcp','add','console-canvas','--',python,path.join(ROOT,'mcp/server.py'),'--state-dir',stateDir].map(quote).join(' ');
-async function skillInfo(install=false){const result=await run(python,[path.join(ROOT,'mcp/skill_install.py'),'--archive',bundledSkill,...(install?[]:['--status'])],{timeout:15000,maxBuffer:1024*1024});return {...JSON.parse(result.stdout),version:appVersion,mcp_command:mcpCommand};}
+async function skillInfo(install=false){const result=await run(python,[path.join(ROOT,'mcp/skill_install.py'),'--archive',bundledSkill,...(install?[]:['--status'])],{timeout:15000,maxBuffer:1024*1024});return {...JSON.parse(result.stdout),version:appVersion,mcp_command:mcpCommand,auto_update:skillSync};}
 function webUrl(value){const parsed=new URL(value);if(!['https:','http:'].includes(parsed.protocol)||parsed.username||parsed.password)throw new Error('HTTP 또는 HTTPS 주소를 입력해 주세요.');return parsed.href;}
 function state(message){return {url:source?.webContents.getURL()||'',view:current,busy,message:message|| (current==='source'?'로그인한 뒤 원하는 화면에서 가져오기를 누르세요.':'요소를 옮기거나 주석을 남기세요. MCP는 가져온 화면에 자동 연결됩니다.'),demo_url:connection.url+'/fixtures/console.html'};}
 function notify(message){if(win&&!win.isDestroyed())win.webContents.send('canvas:state',state(message));}
@@ -19,6 +20,9 @@ function show(which){if(!['source','editor','agent','update'].includes(which))th
 function trusted(event,kind){const expected=kind==='editor'?editor.webContents:win.webContents;if(event.sender!==expected||event.senderFrame!==expected.mainFrame)throw new Error('허용되지 않은 앱 요청');}
 function secure(contents){contents.on('will-navigate',(event,url)=>{try{webUrl(url);}catch{event.preventDefault();}});contents.setWindowOpenHandler(({url})=>{try{webUrl(url);return {action:'allow',overrideBrowserWindowOptions:{parent:win,width:850,height:750,webPreferences:{session:source.webContents.session,nodeIntegration:false,contextIsolation:true,sandbox:true}}};}catch{return {action:'deny'};}});contents.on('did-create-window',child=>secure(child.webContents));}
 async function start(){
+  // Run the new app's installer, so this also works when upgrading from an older updater or a DMG.
+  try{const result=await run(python,[path.join(ROOT,'mcp/skill_install.py'),'--archive',bundledSkill,'--sync-installed'],{timeout:15000,maxBuffer:1024*1024});skillSync=JSON.parse(result.stdout);}catch(error){skillSync.errors.push({message:error.message});}
+  try{await fs.promises.mkdir(app.getPath('userData'),{recursive:true});await fs.promises.writeFile(path.join(app.getPath('userData'),'skill-sync-result.json'),JSON.stringify({version:appVersion,...skillSync}),{mode:0o600});}catch{}
   await run(python,[path.join(ROOT,'mcp/server.py'),'--state-dir',stateDir,'--app-dir',ROOT,'--start'],{timeout:15000});
   connection=JSON.parse(fs.readFileSync(path.join(stateDir,'connection.json'),'utf8'));
   const browsing=session.fromPartition('persist:console-canvas-websites');browsing.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));browsing.setPermissionCheckHandler(()=>false);
@@ -33,7 +37,7 @@ async function start(){
   source.webContents.on('did-fail-load',(_event,code,description,_url,isMain)=>{if(isMain&&code!==-3)notify('사이트를 열지 못했습니다: '+description);});
   ipcMain.handle('canvas:connection',event=>{trusted(event,'editor');return {url:connection.url,token:connection.token};});
   ipcMain.on('canvas:editor-ready',event=>{trusted(event,'editor');editorReady=true;if(pendingCapture){editor.webContents.send('canvas:snapshot',pendingCapture);pendingCapture=null;}});
-  const updater=createUpdater({app,root:ROOT,python,version:appVersion,notify:value=>{if(win&&!win.isDestroyed())win.webContents.send('canvas:update-state',value);},flush:()=>new Promise((resolve,reject)=>{
+  const updater=createUpdater({app,root:ROOT,python,version:appVersion,skillSync,notify:value=>{if(win&&!win.isDestroyed())win.webContents.send('canvas:update-state',value);},flush:()=>new Promise((resolve,reject)=>{
     if(busy){reject(new Error('화면 가져오기를 마친 뒤 다시 시도해 주세요.'));return;}
     if(!editorReady){resolve({document_id:null});return;}
     const id=require('node:crypto').randomUUID();
