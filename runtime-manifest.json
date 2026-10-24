@@ -44,8 +44,8 @@
     "ui/workspace-layout.js"
   ],
   "files": {
-    "README.md": "602a740d2d66e7d28fe96b33ec3f7cb59324818bd7f52951d65571c9772131f9",
-    "agent-guide.md": "6de7d79b9ccc63f7fa41a3add756fb6293f9c74cf565b5269e73127c12c7fcff",
+    "README.md": "01341e5cb31a46cb8f273bf08af23349b2a0c251ca310e0c0e97add750966934",
+    "agent-guide.md": "8e08757b1b3c742b7f23bc2b7f2e9e425b5bcaf5641250ec6400a26b0cc06e7c",
     "background.js": "c080c9df87f3689050f4b4063b22d5d1838e7c607e652b32a44344713efb44d9",
     "bridge-client.js": "628bb8d75bcdcac87c63bbf83a358a0a9a8afce380fa0b186536dced06446aed",
     "capture.js": "1fb993f9eec1f6de0f967bd3ac4c0baa6aad2e154bcf7b56e1f038677582ac0a",
@@ -70,21 +70,21 @@
     "editor-controller.js": "35bf4402294bf730b59801b1382d5fe1b91522f0b99214e4c7de4bd17134cd1a",
     "editor-session.js": "7333352f59af53254dabf7184822253a3e66686b1a9a201d158ea1ae13f44ba8",
     "editor.css": "11e029a00355f181f03b70d4c15166605651edd56e3b129e7d005c5aea93d07e",
-    "editor.html": "4b0d3dcd755c1c9e658370197bf8bf7d04f79b17f4b5a39d29e7b67f461dae2e",
+    "editor.html": "cb3b4e670adf818b47173e3c464a16d9c787bd03b8137acca15a20ff52d9cfe7",
     "editor.js": "cf88e3a0a28d01dbdf6da8453954cc876d1d1ab325138ab6f1a3a574aacca609",
     "engine.js": "ecf09cf889ff0e40da3e16906d76d1d6d1e8954a575df34ec44511b4dc3b931d",
     "export.js": "7cae6d8e23fedd34f2cf6770c5cf9668a185875de5ca5b7a8162cc3b42857bf8",
     "fixtures/console.css": "fd222a7e731ffafd8eacd78b45eb1111d1a18369e1e1cca638d56d0f66cf23ea",
     "fixtures/console.html": "a8802e78c4cb71b73fa404e3707a9cfe382efa2aa8b7820c1049dc54d31bd77b",
     "fixtures/console.js": "2fdf91284b91a9465b165c778a481b0c0745c1508a895bc108393c101fdb8d94",
-    "manifest.json": "429af205db88942fd669e038da9628210772b33e7d04e11435092e30e2b6e97c",
+    "manifest.json": "1849ed808029e2a70282460fd5cd4f6143675e327c78646bd0238c92ef1d7420",
     "mcp/app_update.py": "6b0caa949e6abc80d158408d39d3756803f31b10b8998f50e0e569996ef07d6c",
     "mcp/bridge.py": "a5403a2a89a6a56efafe553c23efa0ed83cb9c61a584c5a6ccad7d50d8a08d74",
     "mcp/server.py": "d94b2d0ee60b2d0287c94216ce0d76570b5a07c68d3dc1175bf79415508aa6d6",
     "mcp/skill_install.py": "5fa7b457bf234d8020ebf2b9d3181c8ba1b22bce1f955775322a31a75da05397",
     "node-index.js": "c6f454f9ec03fede28a554f1eac9a337a8eb3ca93bffa76726a82afebc2ba573",
-    "package.json": "f45089ec2dc6af4ecfd7510c3a0d84535ad6bff44a1c0230eb6453f281e06ca4",
-    "preview.html": "54d285e873cb23490ba8f986cdfea5d84348c93e58cd658d6304335485068377",
+    "package.json": "753af7586818bd7a37c2aae44ee25504aa54722a29d4e3ea2a1e282e587a523a",
+    "preview.html": "89e385705fd870401ce3d07b0e8b1e991989aad1bb7f32a7bff05568c66f3388",
     "sample.uiclone.json": "a90e333b7ff628b0a41f7ef6091c5731096d360ffdb7acebe564b081691c0cb1",
     "save-queue.js": "9630700e81bfc47bf6f88b7a645426d0c3557b0ab701a7dc2860a3d0f77c1319",
     "selection-tools.js": "0083e7b954053168ee2277b31eeecdd5e30c6d93916d080dd2457ce97743ad50",
@@ -105,9 +105,9 @@
     "ui/styles/base.css": "475f9d973fa64709521ab73e5c6075c797a79d714d88d4f964d24cedbb619f98",
     "ui/styles/product.css": "5d70de593486ada3d083352c10d3a0d501a1e34d9df2389f99b4cf2ec9bb78a4",
     "ui/styles/snapshots.css": "271418e0b5595faaa4fcb9c0ac0d4c692163fbe43786c938440f30b27cfbe45e",
-    "ui/styles/workspace.css": "7a4e582bc6b92584cf2a94107934664b325dc5be2b2fb7ec5c050e2688f200bc",
+    "ui/styles/workspace.css": "7c443718cd01c8a3fbffec251dedce8b1c326ca915c58acd6559d974a4f2e924",
     "ui/toast.js": "3e9a58728fad38e1bbe28e13c35af56cfb9057ec25ecbd09452b12fb07be92ab",
     "ui/version-preview.js": "ddc9565ecafaa8fe185b5aadf2bd3f6f7655a0b5c6d002ba762cd2e402be81bf",
-    "ui/workspace-layout.js": "c50931d0ddfa152dd30902d51a33163220216207d86018218855afa60389510c"
+    "ui/workspace-layout.js": "54b50b37f5f800e58bb9bd3bad402b9e5b9c5575f9efba129b82b337be045f74"
   }
 }

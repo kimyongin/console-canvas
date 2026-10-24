@@ -21,6 +21,8 @@ export function createWorkspaceLayout({ $, commitCommentDraft }) {
       localStorage.setItem(panelStorageKey, JSON.stringify({ ...panels, widths: panelWidths }));
     } catch {}
   }
+  const railWidth = () =>
+    parseFloat(getComputedStyle($('#workspace')).getPropertyValue('--panel-rail-width')) || 36;
   function renderPanelWidths() {
     const workspace = $('#workspace'),
       width = workspace.clientWidth || window.innerWidth || 1440;
@@ -30,7 +32,7 @@ export function createWorkspaceLayout({ $, commitCommentDraft }) {
     };
     const visible = Object.keys(panels).filter((key) => panels[key]),
       minimum = visible.reduce((sum, key) => sum + panelMinimum[key], 0),
-      budget = Math.max(minimum, width - 320);
+      budget = Math.max(minimum, width - 320 - (2 - visible.length) * railWidth());
     const wanted = visible.reduce((sum, key) => sum + display[key], 0);
     if (wanted > budget) {
       const flexible = wanted - minimum;
@@ -50,7 +52,7 @@ export function createWorkspaceLayout({ $, commitCommentDraft }) {
         String(
           Math.max(
             panelMinimum[key],
-            Math.min(520, width - 320 - (panels[other] ? display[other] : 0)),
+            Math.min(520, width - 320 - (panels[other] ? display[other] : railWidth())),
           ),
         ),
       );
@@ -63,9 +65,10 @@ export function createWorkspaceLayout({ $, commitCommentDraft }) {
       const label = key === 'layers' ? '레이어' : '속성',
         button = $('#toggle-' + key);
       const focused = document.activeElement === button;
-      const home = $('#' + key + (visible ? '-toggle-home' : '-toggle-canvas'));
+      const home = $('#' + key + (visible ? '-toggle-home' : '-toggle-rail'));
       if (button.parentElement !== home) home.append(button);
       $('#' + key + '-panel').hidden = !visible;
+      $('#' + key + '-rail').hidden = visible;
       $('#workspace').classList.toggle(key + '-collapsed', !visible);
       button.setAttribute('aria-expanded', String(visible));
       button.setAttribute('aria-label', label + ' 패널 ' + (visible ? '접기' : '펼치기'));
@@ -92,7 +95,10 @@ export function createWorkspaceLayout({ $, commitCommentDraft }) {
     const other = key === 'layers' ? 'properties' : 'layers',
       maximum = Math.max(
         panelMinimum[key],
-        Math.min(520, $('#workspace').clientWidth - 320 - otherWidth),
+        Math.min(
+          520,
+          $('#workspace').clientWidth - 320 - (panels[other] ? otherWidth : railWidth()),
+        ),
       );
     panelWidths[key] = Math.round(Math.max(panelMinimum[key], Math.min(maximum, width)));
     if (panels[other]) panelWidths[other] = otherWidth;

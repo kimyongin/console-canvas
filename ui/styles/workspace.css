@@ -155,10 +155,10 @@
     grid-row: 1;
   }
   .workspace.layers-collapsed {
-    --layers-width: 0px;
+    --layers-width: var(--panel-rail-width);
   }
   .workspace.properties-collapsed {
-    --properties-width: 0px;
+    --properties-width: var(--panel-rail-width);
   }
 }
 @media (min-width: 581px) and (max-width: 1100px) {
@@ -223,4 +223,99 @@
   background: transparent;
   border-color: transparent;
   color: #5b8f7c;
+}
+
+/* Collapsed panels leave a full-height landmark on the original edge. */
+.workspace {
+  --panel-rail-width: 36px;
+}
+.panel-rail {
+  min-width: 0;
+  min-height: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #f7f8fc;
+}
+.layers-rail {
+  grid-column: 1;
+  grid-row: 1;
+  border-right: 1px solid var(--line);
+}
+.properties-rail {
+  grid-column: 3;
+  grid-row: 1;
+  border-left: 1px solid var(--line);
+}
+.panel-rail .panel-toggle-slot {
+  width: 100%;
+  height: 44px;
+  justify-content: center;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--line);
+}
+.panel-rail .panel-toggle {
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  margin: 0;
+  border: 1px solid transparent;
+  color: #696782;
+}
+.panel-rail .panel-toggle:hover {
+  background: #eeedf9;
+  color: var(--accent);
+  border-color: #d8d4f2;
+}
+.panel-rail .panel-toggle > span {
+  display: none;
+}
+.panel-rail-label {
+  writing-mode: vertical-rl;
+  margin-top: 16px;
+  font-size: 11px;
+  color: #8a8c9d;
+  letter-spacing: 2px;
+  user-select: none;
+}
+.panel-open-chevron {
+  display: none;
+}
+.panel-rail .panel-toggle svg > :not(.panel-open-chevron) {
+  display: none;
+}
+.panel-rail .panel-open-chevron {
+  display: block;
+}
+.properties-rail .panel-open-chevron {
+  transform: translateX(20px) scaleX(-1);
+}
+@media (max-width: 580px) {
+  .workspace {
+    display: grid;
+    height: calc(100dvh - 100px);
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .workspace > .left-panel {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .workspace > .canvas-panel {
+    grid-column: 2;
+    grid-row: 1;
+    height: auto;
+    min-height: 0;
+  }
+  .workspace > .right-panel {
+    grid-column: 3;
+    grid-row: 1;
+    display: flex;
+  }
+  .workspace.layers-collapsed {
+    --layers-width: var(--panel-rail-width);
+  }
+  .workspace.properties-collapsed {
+    --properties-width: var(--panel-rail-width);
+  }
 }

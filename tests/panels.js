@@ -26,7 +26,8 @@ try {
     doc = frame.contentDocument;
   let click = (id) => doc.querySelector('#' + id).click(),
     width = () => doc.querySelector('#viewport').getBoundingClientRect().width;
-  const initialWidth = width(),
+  const railWidth = 36,
+    initialWidth = width(),
     leftWidth = doc.querySelector('#layers-panel').getBoundingClientRect().width,
     rightWidth = doc.querySelector('#properties-panel').getBoundingClientRect().width,
     zoom = app.state.zoom;
@@ -62,19 +63,26 @@ try {
   );
   click('toggle-layers');
   check(
-    'Collapsing layers gives its full width to the canvas',
-    doc.querySelector('#layers-panel').hidden && Math.abs(width() - initialWidth - leftWidth) < 1,
+    'Collapsing layers leaves a narrow rail and gives the remaining width to the canvas',
+    doc.querySelector('#layers-panel').hidden &&
+      Math.abs(width() - initialWidth - leftWidth + railWidth) < 1,
   );
   const focusedAfterCollapse = doc.activeElement.id === 'toggle-layers';
   click('toggle-properties');
   check(
     'Both panels can collapse while their reopen buttons stay visible',
-    Math.abs(width() - initialWidth - leftWidth - rightWidth) < 1 &&
+    Math.abs(width() - initialWidth - leftWidth - rightWidth + 2 * railWidth) < 1 &&
       ['toggle-layers', 'toggle-properties'].every((id) => {
         const button = doc.querySelector('#' + id);
         return (
           button.getBoundingClientRect().width > 0 &&
-          button.closest('.canvas-tools') &&
+          button.closest('.panel-rail') &&
+          Math.abs(
+            button.closest('.panel-rail').getBoundingClientRect().height -
+              doc.querySelector('.canvas-panel').getBoundingClientRect().height,
+          ) < 1 &&
+          button.getBoundingClientRect().top <
+            doc.querySelector('.canvas-panel').getBoundingClientRect().top + 44 &&
           button.getAttribute('aria-expanded') === 'false'
         );
       }),
@@ -82,7 +90,7 @@ try {
   check('Panel changes preserve the current canvas zoom', app.state.zoom === zoom);
   click('toggle-layers');
   check(
-    'Moving the toggle between panel and canvas preserves keyboard focus',
+    'Moving the toggle between panel and rail preserves keyboard focus',
     focusedAfterCollapse && doc.activeElement.id === 'toggle-layers',
   );
   click('toggle-properties');
@@ -211,7 +219,10 @@ try {
   doc = frame.contentDocument;
   check(
     'Both collapsed preferences survive reopening the app page',
-    doc.querySelector('#layers-panel').hidden && doc.querySelector('#properties-panel').hidden,
+    doc.querySelector('#layers-panel').hidden &&
+      doc.querySelector('#properties-panel').hidden &&
+      !doc.querySelector('#layers-rail').hidden &&
+      !doc.querySelector('#properties-rail').hidden,
   );
   click('toggle-layers');
   click('toggle-properties');

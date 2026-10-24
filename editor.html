@@ -51,6 +51,28 @@
           <span class="status-dot"></span><span id="save-status">이 브라우저에 저장</span>
         </div>
       </aside>
+
+      <aside id="layers-rail" class="panel-rail layers-rail" aria-label="접힌 레이어 패널" hidden>
+        <div id="layers-toggle-rail" class="panel-toggle-slot">
+          <button
+            id="toggle-layers"
+            class="panel-toggle"
+            type="button"
+            aria-controls="layers-panel"
+            aria-expanded="true"
+            aria-label="레이어 패널 접기"
+            title="레이어 패널 접기"
+          >
+            <svg aria-hidden="true" viewBox="0 0 20 20">
+              <rect x="2" y="3" width="16" height="14" rx="2" />
+              <path d="M7 3v14" />
+              <path class="panel-open-chevron" d="M8 6l4 4-4 4" />
+              <path class="panel-fill" d="M3 4h3v12H3z" /></svg
+            ><span>레이어</span>
+          </button>
+        </div>
+        <span class="panel-rail-label" aria-hidden="true">레이어</span>
+      </aside>
       <section class="canvas-panel" aria-label="복제 화면 편집 공간">
         <div
           id="resize-layers"
@@ -101,23 +123,7 @@
               </button>
             </div>
           </div>
-          <div id="layers-toggle-canvas" class="panel-toggle-slot">
-            <button
-              id="toggle-layers"
-              class="panel-toggle"
-              type="button"
-              aria-controls="layers-panel"
-              aria-expanded="true"
-              aria-label="레이어 패널 접기"
-              title="레이어 패널 접기"
-            >
-              <svg aria-hidden="true" viewBox="0 0 20 20">
-                <rect x="2" y="3" width="16" height="14" rx="2" />
-                <path d="M7 3v14" />
-                <path class="panel-fill" d="M3 4h3v12H3z" /></svg
-              ><span>레이어</span>
-            </button>
-          </div>
+
           <div class="canvas-toolbar">
             <div class="history-controls">
               <button id="undo" aria-label="실행 취소" disabled>↶</button
@@ -144,23 +150,6 @@
               ><button id="zoom-in" aria-label="확대">＋</button><button id="fit">맞춤</button
               ><button id="zoom-selection" title="선택한 요소에 맞추기" disabled>선택 맞춤</button>
             </div>
-          </div>
-          <div id="properties-toggle-canvas" class="panel-toggle-slot">
-            <button
-              id="toggle-properties"
-              class="panel-toggle"
-              type="button"
-              aria-controls="properties-panel"
-              aria-expanded="true"
-              aria-label="속성 패널 접기"
-              title="속성·주석·스냅샷 패널 접기"
-            >
-              <svg aria-hidden="true" viewBox="0 0 20 20">
-                <rect x="2" y="3" width="16" height="14" rx="2" />
-                <path d="M13 3v14" />
-                <path class="panel-fill" d="M14 4h3v12h-3z" /></svg
-              ><span>속성</span>
-            </button>
           </div>
         </div>
         <div id="viewport" class="canvas-viewport">
@@ -340,6 +329,33 @@
             <ul id="capture-notes-list"></ul>
           </details>
         </div>
+      </aside>
+
+      <aside
+        id="properties-rail"
+        class="panel-rail properties-rail"
+        aria-label="접힌 속성 패널"
+        hidden
+      >
+        <div id="properties-toggle-rail" class="panel-toggle-slot">
+          <button
+            id="toggle-properties"
+            class="panel-toggle"
+            type="button"
+            aria-controls="properties-panel"
+            aria-expanded="true"
+            aria-label="속성 패널 접기"
+            title="속성·주석·스냅샷 패널 접기"
+          >
+            <svg aria-hidden="true" viewBox="0 0 20 20">
+              <rect x="2" y="3" width="16" height="14" rx="2" />
+              <path d="M13 3v14" />
+              <path class="panel-open-chevron" d="M8 6l4 4-4 4" />
+              <path class="panel-fill" d="M14 4h3v12h-3z" /></svg
+            ><span>속성</span>
+          </button>
+        </div>
+        <span class="panel-rail-label" aria-hidden="true">속성</span>
       </aside>
     </main>
     <dialog id="rename-dialog" aria-labelledby="rename-title">
