@@ -61,6 +61,20 @@ async function run() {
   const originalEdits=JSON.stringify(scene.edits),originalPosition=scene.rect(text.id);
   scene.setComment(text.id,'제목 문구를 고객 목록으로 바꾸고\n설명은 한 줄로 줄여 주세요.');
   check('Comment-only requests preserve the visual layout and original locator',()=>JSON.stringify(scene.edits)===originalEdits&&near(scene.rect(text.id).x,originalPosition.x)&&scene.comments()[0].locator.selector===text.locator.selector);
+  const marker=scene.commentMarkers.get(text.id);
+  check('Commented elements display a numbered canvas marker with preview text',()=>marker?.textContent==='1'&&marker.title.includes('제목 문구를 고객 목록으로')&&marker.dataset.uicComment===text.id);
+  let openedComment=null;scene.callbacks.onCommentSelect=id=>{openedComment=id;};
+  marker.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerId:30,button:0}));
+  check('Clicking a comment marker opens its target without moving it',()=>openedComment===text.id&&scene.selected===text.id&&!scene.drag&&JSON.stringify(scene.edits)===originalEdits);
+  openedComment=null;marker.dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,key:'Enter'}));
+  check('Comment markers support keyboard activation',()=>openedComment===text.id);
+  scene.setDisplayScale(.5);
+  check('Canvas comment markers stay readable when the artboard is zoomed out',()=>near(marker.getBoundingClientRect().width*scene.displayScale,24));
+  scene.setDisplayScale(1);
+  const markerX=parseFloat(marker.style.left);scene.setEdits({...scene.edits,[text.id]:{dx:150,dy:80}});
+  check('Comment markers follow their elements when moved',()=>near(parseFloat(marker.style.left)-markerX,40));
+  scene.setEdits(JSON.parse(originalEdits));
+  check('Canvas comment markers are excluded from exported page HTML',()=>!scene.serialize().includes('data-uic-comment')&&!scene.serialize().includes('data-uic-editor="comment-markers"'));
   scene.interactionMode='comment';
   target.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerId:8,button:0,clientX:r.x+5,clientY:r.y+5}));
   scene.doc.documentElement.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,pointerId:8,clientX:r.x+200,clientY:r.y+200}));
@@ -69,7 +83,9 @@ async function run() {
   scene.interactionMode='edit';
   scene.setComment(label.id,'버튼 문구를 바꿔 주세요.');scene.setEdits({[button.id]:{deleted:true}});
   check('Comments survive deleted ancestors and mark the missing target',()=>scene.comments().some(c=>c.id===label.id&&c.targetDeleted&&c.after===null));
+  check('Deleted targets retain a clickable canvas comment marker',()=>scene.commentMarkers.has(label.id)&&scene.commentMarkers.get(label.id).title.includes('삭제된 대상'));
   scene.setEdits(moved);scene.setComment(label.id,'');
+  check('Deleting a comment removes its canvas marker',()=>!scene.commentMarkers.has(label.id));
   const savedComments=copy(scene.annotations);scene.setComments({...savedComments,n999999:'unknown',bad:123});
   check('Imported comments exclude unknown IDs and invalid values',()=>JSON.stringify(scene.annotations)===JSON.stringify(savedComments));
   scene.select(icon.id);scene.remove();
@@ -78,6 +94,7 @@ async function run() {
   check('Review JSON preserves comments separately from visual changes',()=>payload.comments.length===2&&payload.annotations[text.id].includes('\n')&&payload.comments.some(c=>c.id===icon.id&&c.targetDeleted));
   scene.setComments({});scene.setComments(payload.annotations);
   check('Reopened comments retain text, targets, and delete status',()=>JSON.stringify(scene.comments())===JSON.stringify(payload.comments));
+  check('Reopening comments rebuilds their canvas markers',()=>scene.commentMarkers.size===2&&scene.commentMarkers.has(text.id)&&scene.commentMarkers.has(icon.id));
   check('Human-readable handoff includes component comment text and identity',()=>instructionText(snapshot,scene.changes(),'',scene.comments()).includes('제목 문구를 고객 목록으로')&&instructionText(snapshot,scene.changes(),'',scene.comments()).includes('원본 식별 정보:'));
   const result=await buildReview(snapshot,scene,'제목은 오른쪽으로 옮기고 등록 버튼의 아이콘은 삭제해 주세요.');
   check('Review contains reopenable JSON, changes, and visual comparison',()=>['review.json','changes.json','review.html','before.html','after.html'].every(name=>result.fileNames.includes(name)));

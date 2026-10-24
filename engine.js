@@ -46,7 +46,7 @@ export function cleanComments(value,nodes) {
 export class CanvasScene {
   constructor(frame,snapshot,callbacks={}) {
     validateSnapshot(snapshot);this.frame=frame;this.snapshot=snapshot;this.callbacks=callbacks;
-    this.nodes=new Map(snapshot.nodes.map(node=>[node.id,node]));this.edits={};this.annotations={};this.interactionMode='edit';this.elements=new Map();this.lifts=new Map();this.selected=null;this.drag=null;
+    this.nodes=new Map(snapshot.nodes.map(node=>[node.id,node]));this.edits={};this.annotations={};this.interactionMode='edit';this.elements=new Map();this.lifts=new Map();this.selected=null;this.drag=null;this.commentMarkers=new Map();this.displayScale=1;
   }
   async mount() {
     this.frame.width=Math.max(this.snapshot.source.width,this.snapshot.source.viewport.width);this.frame.height=this.snapshot.source.height;
@@ -70,6 +70,7 @@ export class CanvasScene {
     this.portal=this.doc.createElement('div');this.portal.dataset.uicEditor='portal';this.portal.style.cssText='position:absolute!important;left:0!important;top:0!important;width:0!important;height:0!important;z-index:2147480000!important;overflow:visible!important';this.doc.documentElement.append(this.portal);
     this.outline=this.doc.createElement('div');this.outline.dataset.uicEditor='selection';this.outline.style.cssText='position:absolute!important;pointer-events:none!important;box-sizing:border-box!important;outline:2px solid #5a55d9!important;outline-offset:2px!important;z-index:2147483646!important;display:none';this.doc.documentElement.append(this.outline);
     this.hover=this.doc.createElement('div');this.hover.dataset.uicEditor='hover';this.hover.style.cssText='position:absolute!important;pointer-events:none!important;box-sizing:border-box!important;outline:1px dashed #7771dc!important;outline-offset:1px!important;z-index:2147483645!important;display:none';this.doc.documentElement.append(this.hover);
+    this.commentLayer=this.doc.createElement('div');this.commentLayer.dataset.uicEditor='comment-markers';this.commentLayer.style.cssText='position:absolute!important;left:0!important;top:0!important;width:0!important;height:0!important;overflow:visible!important;pointer-events:none!important;z-index:2147483647!important';this.doc.documentElement.append(this.commentLayer);
     for(const node of this.nodes.values())if(node.position==='fixed'&&node.visible&&this.elements.has(node.id))this.lift(node.id,node.rect);
     this.doc.addEventListener('pointerdown',event=>this.begin(event),true);
     this.doc.addEventListener('pointermove',event=>this.move(event),true);
@@ -78,7 +79,7 @@ export class CanvasScene {
     this.doc.addEventListener('lostpointercapture',event=>{if(this.drag)this.finish(event,true);},true);
     this.doc.addEventListener('click',event=>{event.preventDefault();event.stopImmediatePropagation();},true);
     this.doc.addEventListener('submit',event=>event.preventDefault(),true);
-    this.doc.addEventListener('keydown',event=>{this.callbacks.onKey?.(event);if(!event.ctrlKey&&!event.metaKey&&event.key!=='Tab')event.preventDefault();},true);
+    this.doc.addEventListener('keydown',event=>{const marker=event.target.closest?.('[data-uic-comment]');if(marker&&(event.key==='Enter'||event.key===' ')){event.preventDefault();this.openComment(marker.dataset.uicComment);return;}this.callbacks.onKey?.(event);if(!event.ctrlKey&&!event.metaKey&&event.key!=='Tab')event.preventDefault();},true);
     this.doc.addEventListener('focusin',event=>{if(!this.drag){const id=event.target.closest?.('[data-uic-id]')?.dataset.uicId;if(id)this.select(id);}},true);
     this.doc.addEventListener('pointerleave',()=>{this.hover.style.display='none';});
     this.apply();return this;
@@ -113,7 +114,7 @@ export class CanvasScene {
   }
   drawSelection() {
     const r=this.selected&&!this.hidden(this.selected)?this.rect(this.selected):null;
-    this.setOutline(this.outline,r);this.hover.style.display='none';
+    this.setOutline(this.outline,r);this.hover.style.display='none';this.renderCommentMarkers();
   }
   setOutline(element,rect) {
     element.style.display=rect&&rect.width&&rect.height?'block':'none';
@@ -148,13 +149,35 @@ export class CanvasScene {
     lift.element.setAttribute('style',lift.originalStyle);lift.placeholder.replaceWith(lift.element);lift.wrapper.remove();this.lifts.delete(id);
   }
   setEdits(edits) {this.edits=cleanEdits(edits,this.nodes);this.apply();}
-  setComments(value) {this.annotations=cleanComments(value,this.nodes);}
+  setComments(value) {this.annotations=cleanComments(value,this.nodes);this.renderCommentMarkers();}
   setComment(id,text) {
     if(!this.nodes.has(id)||typeof text!=='string')return;
     const next=text.trim().slice(0,4000);if((this.annotations[id]||'')===next)return;
     this.callbacks.onBeforeChange?.();
     if(next)this.annotations[id]=next;else delete this.annotations[id];
+    this.renderCommentMarkers();
     this.callbacks.onCommit?.();
+  }
+  setDisplayScale(value) {if(Number.isFinite(value)&&value>0&&value!==this.displayScale){this.displayScale=value;this.renderCommentMarkers();}}
+  openComment(id) {if(!this.annotations[id])return;this.select(id);this.callbacks.onCommentSelect?.(id);}
+  renderCommentMarkers() {
+    if(!this.commentLayer)return;
+    for(const [id,marker] of this.commentMarkers)if(!this.annotations[id]){marker.remove();this.commentMarkers.delete(id);}
+    const size=24/this.displayScale,gap=4/this.displayScale,bounds=this.contentSize(),occupied=[];
+    Object.entries(this.annotations).forEach(([id,text],index)=>{
+      const node=this.nodes.get(id),offset=this.offset(id),deleted=this.hidden(id);
+      const rect=(!deleted&&this.rect(id))||{...node.rect,x:node.rect.x+offset.x,y:node.rect.y+offset.y};
+      let marker=this.commentMarkers.get(id);
+      if(!marker){marker=this.doc.createElement('button');marker.type='button';marker.dataset.uicComment=id;this.commentLayer.append(marker);this.commentMarkers.set(id,marker);}
+      let x=Math.max(0,Math.min(bounds.width-size,rect.x+rect.width-size*.45)),y=Math.max(0,Math.min(bounds.height-size,rect.y-size*.6));
+      for(let tries=0;tries<occupied.length&&occupied.some(r=>Math.abs(r.x-x)<size+gap&&Math.abs(r.y-y)<size+gap);tries++)y+=size+gap;
+      occupied.push({x,y});
+      marker.textContent=String(index+1);marker.setAttribute('aria-label','주석 '+(index+1)+' · '+node.name+' 편집');marker.setAttribute('aria-pressed',String(this.selected===id));
+      marker.title='주석 '+(index+1)+' · '+node.name+(deleted?' (삭제된 대상)':'')+'\n'+text+'\n클릭해서 주석 편집';
+      marker.style.cssText='all:initial!important;position:absolute!important;display:grid!important;place-items:center!important;box-sizing:border-box!important;pointer-events:auto!important;cursor:pointer!important;border-radius:50% 50% 50% 4px!important;'+
+        'background:'+(this.selected===id?'#4036ae':'#6557dc')+'!important;color:#fff!important;border:'+2/this.displayScale+'px '+(deleted?'dashed':'solid')+' #fff!important;box-shadow:0 2px 8px #31236e55!important;'+
+        'font:700 '+12/this.displayScale+'px system-ui,sans-serif!important;line-height:1!important;left:'+x+'px!important;top:'+y+'px!important;width:'+size+'px!important;height:'+size+'px!important;';
+    });
   }
   comments() {
     return Object.entries(this.annotations).map(([id,text])=>{
@@ -184,6 +207,7 @@ export class CanvasScene {
   begin(event) {
     if(event.button!==0)return;
     event.preventDefault();event.stopPropagation();
+    const marker=event.target.closest?.('[data-uic-comment]');if(marker){this.openComment(marker.dataset.uicComment);return;}
     let element=event.target.closest?.('[data-uic-id]'),id=element?.dataset.uicId;
     if(event.shiftKey&&id)id=this.parent(id)||id;
     if(!id||!this.elements.has(id)||this.hidden(id)){this.select(null);return;}
@@ -235,7 +259,7 @@ export class CanvasScene {
     return result;
   }
   serialize() {
-    const clone=this.doc.documentElement.cloneNode(true);clone.querySelectorAll('[data-uic-editor="selection"],[data-uic-editor="hover"]').forEach(el=>el.remove());
+    const clone=this.doc.documentElement.cloneNode(true);clone.querySelectorAll('[data-uic-editor="selection"],[data-uic-editor="hover"],[data-uic-editor="comment-markers"]').forEach(el=>el.remove());
     return '<!doctype html>'+clone.outerHTML;
   }
   async beforeHtml() {const edits=copy(this.edits);this.setEdits({});const result=this.serialize();this.setEdits(edits);return result;}

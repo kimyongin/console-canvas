@@ -30,6 +30,7 @@ function sizeChanged(size){state.size=size;updateZoom();}
 function updateZoom() {
   if(!state.scene)return;
   const {width,height}=state.size,zoom=state.zoom;
+  state.scene.setDisplayScale(zoom);
   $('#scene-frame').width=width;$('#scene-frame').height=height;$('#scene-frame').style.transform='scale('+zoom+')';
   $('#artboard').style.width=width*zoom+'px';$('#artboard').style.height=height*zoom+'px';
   const select=$('#zoom');let option=[...select.options].find(option=>Number(option.value)===zoom);
@@ -63,6 +64,7 @@ function selectNode(id,{reveal=false}={}) {
 function renderLayers() {
   const scene=state.scene,container=$('#layers');if(!scene)return;
   const query=$('#layer-search').value.trim().toLowerCase(),fragment=document.createDocumentFragment();
+  const commentNumbers=new Map(Object.keys(scene.annotations).map((id,index)=>[id,index+1]));
   const children=new Map();for(const node of scene.nodes.values()){if(!children.has(node.parentId))children.set(node.parentId,[]);children.get(node.parentId).push(node);}
   let matches=null;
   if(query){matches=new Set();for(const node of scene.nodes.values())if((node.name+' '+node.tag+' '+node.id).toLowerCase().includes(query)){matches.add(node.id);scene.ancestors(node.id).forEach(id=>matches.add(id));}}
@@ -75,7 +77,7 @@ function renderLayers() {
     const pick=document.createElement('button');pick.className='layer-pick';pick.setAttribute('aria-pressed',String(scene.selected===node.id));
     const icon=document.createElement('span');icon.className='layer-icon';icon.textContent=node.kind==='text'?'T':node.kind==='icon'?'◇':node.kind==='raster'?'▧':'▱';
     const label=document.createElement('span');label.className='layer-label';label.textContent=node.name||node.tag;pick.title=node.name+' · '+node.tag+' · '+node.id;pick.append(icon,label);pick.addEventListener('click',()=>selectNode(node.id,{reveal:true}));row.append(toggle,pick);
-    if(scene.annotations[node.id]){const mark=document.createElement('span');mark.className='layer-comment';mark.textContent='주석';mark.title=scene.annotations[node.id];row.append(mark);}
+    if(scene.annotations[node.id]){const mark=document.createElement('span');mark.className='layer-comment';mark.textContent='주석 '+commentNumbers.get(node.id);mark.title=scene.annotations[node.id];row.append(mark);}
     if(scene.edits[node.id]?.deleted||scene.edits[node.id]?.dx||scene.edits[node.id]?.dy){const mark=document.createElement('span');mark.className='layer-mark';mark.textContent=scene.edits[node.id]?.deleted?'×':'•';row.append(mark);}
     fragment.append(row);if(expanded)descendants.forEach(child=>add(child,depth+1));
   }
@@ -86,8 +88,9 @@ function renderChanges() {
   if(!state.scene)return;const changes=state.scene.changes(),comments=state.scene.comments(),container=$('#changes');container.replaceChildren();$('#change-count').textContent=changes.length+comments.length;
   if(!changes.length&&!comments.length){const empty=document.createElement('div');empty.className='empty-small';empty.textContent='이동·삭제 기록과 요소별 주석을 모읍니다.';container.append(empty);}
   for(const change of changes){const item=document.createElement('div');item.className='change-item';const title=document.createElement('strong');title.textContent=change.name;const detail=document.createElement('span');detail.textContent=change.action==='delete'?'삭제'+(change.affectedDescendants?' · 하위 '+change.affectedDescendants+'개 포함':''):'X '+change.delta.x+' · Y '+change.delta.y;item.append(title,detail);container.append(item);}
-  for(const comment of comments){const item=document.createElement('div');item.className='change-item';const pick=document.createElement('button');pick.type='button';const title=document.createElement('strong');title.textContent='주석 · '+comment.name;pick.append(title);pick.addEventListener('click',()=>selectNode(comment.id,{reveal:true}));const text=document.createElement('span');text.className='comment-text';text.textContent=comment.text;item.append(pick,text);if(comment.targetDeleted){const deleted=document.createElement('span');deleted.className='comment-target-deleted';deleted.textContent='대상이 삭제된 상태 · 요청 내용 확인 필요';item.append(deleted);}container.append(item);}
+  comments.forEach((comment,index)=>{const item=document.createElement('div');item.className='change-item';const pick=document.createElement('button');pick.type='button';const title=document.createElement('strong');title.textContent='주석 '+(index+1)+' · '+comment.name;pick.append(title);pick.addEventListener('click',()=>{selectNode(comment.id,{reveal:true});focusComment();});const text=document.createElement('span');text.className='comment-text';text.textContent=comment.text;item.append(pick,text);if(comment.targetDeleted){const deleted=document.createElement('span');deleted.className='comment-target-deleted';deleted.textContent='대상이 삭제된 상태 · 요청 내용 확인 필요';item.append(deleted);}container.append(item);});
 }
+function focusComment(){const field=$('#component-comment');field.focus({preventScroll:true});field.scrollIntoView({block:'nearest'});}
 function onKey(event) {
   if(!state.scene||$('#export-dialog').open)return;
   const editing=event.target.closest?.('input,textarea,select');if(editing&&event.target.ownerDocument===document)return;
@@ -108,7 +111,7 @@ async function openSnapshot(snapshot,edits={},note='',annotations={}) {
   try {const url=new URL(snapshot.source.url);$('#source-url').href=/^https?:$/.test(url.protocol)?url.href:'#';}catch{$('#source-url').href='#';}
   $('#source-url').hidden=false;$('#source-meta').textContent=snapshot.source.viewport.width+' × '+snapshot.source.viewport.height+' · '+snapshot.nodes.length.toLocaleString()+'개 요소';$('#review-note').value=note;
   $('#artboard-label').textContent=(snapshot.source.title||'화면')+' / '+snapshot.source.viewport.width+' px';
-  const scene=new CanvasScene($('#scene-frame'),snapshot,{onSelect:id=>{if(id!==state.commentTarget)commitCommentDraft();if(state.scene&&id)for(const parent of state.scene.ancestors(id))state.expanded.add(parent);renderInspector();renderLayers();},onSize:sizeChanged,onBeforeChange:historyBefore,onLiveChange:renderInspector,onCommit:changeCommitted,onKey});
+  const scene=new CanvasScene($('#scene-frame'),snapshot,{onSelect:id=>{if(id!==state.commentTarget)commitCommentDraft();if(state.scene&&id)for(const parent of state.scene.ancestors(id))state.expanded.add(parent);renderInspector();renderLayers();},onCommentSelect:focusComment,onSize:sizeChanged,onBeforeChange:historyBefore,onLiveChange:renderInspector,onCommit:changeCommitted,onKey});
   state.scene=scene;
   try {await scene.mount();if(generation!==state.generation)return;scene.interactionMode=state.mode;scene.setComments(annotations);scene.setEdits(edits);fit();$('#viewport').scrollLeft=(snapshot.source.scroll?.x||0)*state.zoom;$('#viewport').scrollTop=(snapshot.source.scroll?.y||0)*state.zoom;renderInspector();renderLayers();renderChanges();renderHistory();$('#export-button').disabled=false;
     $('#capture-notes').hidden=!snapshot.warnings.length;$('#capture-notes-title').textContent='가져오기 참고 '+snapshot.warnings.length+'건';$('#capture-notes-list').replaceChildren();

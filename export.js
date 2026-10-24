@@ -50,7 +50,7 @@ export function makeReport(snapshot,before,after,instructions,size) {
 }
 export async function renderPng(html,width,height) {
   const parsed=new DOMParser().parseFromString(html,'text/html');
-  parsed.querySelectorAll('[data-uic-editor="selection"],[data-uic-editor="hover"]').forEach(el=>el.remove());
+  parsed.querySelectorAll('[data-uic-editor="selection"],[data-uic-editor="hover"],[data-uic-editor="comment-markers"]').forEach(el=>el.remove());
   const root=document.createElementNS('http://www.w3.org/1999/xhtml','div');root.style.cssText='position:relative;width:'+width+'px;height:'+height+'px;overflow:hidden;background:white';
   for(const style of parsed.head.querySelectorAll('style'))root.append(document.importNode(style,true));
   const body=document.createElementNS('http://www.w3.org/1999/xhtml','div');
