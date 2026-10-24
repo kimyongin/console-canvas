@@ -508,3 +508,7 @@
   gap: 8px;
   justify-content: flex-end;
 }
+.snapshot-entry:disabled {
+  opacity: 1;
+  cursor: default;
+}
