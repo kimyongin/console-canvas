@@ -7,7 +7,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const client=new Client({name:'console-canvas-real-connection-test',version:'0.7.0'});
+const client=new Client({name:'console-canvas-real-connection-test',version:'0.7.1'});
 const transport=new StdioClientTransport({command:process.env.CONSOLE_CANVAS_MCP_COMMAND||process.env.CONSOLE_CANVAS_PYTHON||'/usr/bin/python3',args:process.env.CONSOLE_CANVAS_MCP_ARGS?JSON.parse(process.env.CONSOLE_CANVAS_MCP_ARGS):[path.join(root,'mcp/server.py')],stderr:'pipe'});
 const checks=[];
 function check(name,value){assert.ok(value,name);checks.push(name);}

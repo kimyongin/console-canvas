@@ -1,6 +1,6 @@
 const api=window.ConsoleCanvasShell,$=selector=>document.querySelector(selector);
 let info;
-function showState(value){if(value.url&&document.activeElement!==$('#address'))$('#address').value=value.url;$('#status').textContent=value.message||'';$('#capture').disabled=!!value.busy;for(const view of ['source','editor','agent','update'])$('#show-'+view).classList.toggle('active',value.view===view);$('#agent-setup').hidden=value.view!=='agent';$('#update-setup').hidden=value.view!=='update';$('#fallback').hidden=['agent','update'].includes(value.view);}
+function showState(value){document.body.dataset.view=value.view;$('#navigation').hidden=value.view!=='source';if(value.url&&document.activeElement!==$('#address'))$('#address').value=value.url;$('#status').textContent=value.message||'';$('#capture').disabled=!!value.busy;for(const view of ['source','editor','agent','update'])$('#show-'+view).classList.toggle('active',value.view===view);$('#agent-setup').hidden=value.view!=='agent';$('#update-setup').hidden=value.view!=='update';$('#fallback').hidden=['agent','update'].includes(value.view);}
 api.onState(showState);api.info().then(value=>{info=value;showState(value);});
 $('#navigation').addEventListener('submit',async event=>{event.preventDefault();try{await api.navigate($('#address').value);}catch(error){$('#status').textContent=error.message;}});
 $('#capture').addEventListener('click',async()=>{try{await api.capture();}catch(error){$('#status').textContent=error.message;$('#capture').disabled=false;}});
