@@ -7,6 +7,8 @@ function showState(value) {
   $('#navigation').hidden = value.view !== 'source';
   if (value.url && document.activeElement !== $('#address')) $('#address').value = value.url;
   $('#status').textContent = value.message || '';
+  $('#capture').hidden = value.view !== 'source';
+  if (['agent', 'update'].includes(value.view)) $('#settings-menu').open = false;
   $('#capture').disabled = !!value.busy;
   for (const view of ['source', 'editor', 'agent', 'update'])
     $('#show-' + view).classList.toggle('active', value.view === view);
@@ -32,6 +34,8 @@ $('#capture').addEventListener('click', async () => {
     await api.capture();
   } catch (error) {
     $('#status').textContent = error.message;
+    $('#capture').hidden = value.view !== 'source';
+    if (['agent', 'update'].includes(value.view)) $('#settings-menu').open = false;
     $('#capture').disabled = false;
   }
 });

@@ -1,5 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('ConsoleCanvasDesktop', {
+  showSource: () => ipcRenderer.invoke('canvas:show-source'),
+  saveFile: (value) => ipcRenderer.invoke('canvas:save-file', value),
   getConnection: () => ipcRenderer.invoke('canvas:connection'),
   onFlush: (callback) =>
     ipcRenderer.on('canvas:flush', async (_event, id) => {

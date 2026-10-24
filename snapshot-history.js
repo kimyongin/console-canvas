@@ -6,6 +6,11 @@ function snapshotPoint(value, nodes) {
     edits: cleanEdits(value?.edits, nodes),
     annotations: cleanComments(value?.annotations, nodes),
     selected: nodes.has(value?.selected) ? value.selected : null,
+    selection: Array.isArray(value?.selection)
+      ? value.selection.filter((id) => nodes.has(id)).slice(0, 100)
+      : value?.selected && nodes.has(value.selected)
+        ? [value.selected]
+        : [],
     note: typeof value?.note === 'string' ? value.note : '',
   };
 }

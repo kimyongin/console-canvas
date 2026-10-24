@@ -276,3 +276,43 @@ h1 {
 .update-card .setup-actions {
   justify-content: flex-start;
 }
+
+#settings-menu {
+  position: relative;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+#settings-menu summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 7px 10px;
+  border-radius: 6px;
+  color: #687086;
+}
+#settings-menu[open] summary {
+  background: #eeedf9;
+}
+#settings-menu > div {
+  position: absolute;
+  right: 0;
+  top: 34px;
+  z-index: 50;
+  background: white;
+  padding: 6px;
+  border: 1px solid #e3e5ef;
+  border-radius: 8px;
+  box-shadow: 0 8px 25px #20263720;
+  min-width: 150px;
+  display: grid;
+  gap: 4px;
+}
+#settings-menu button {
+  text-align: left;
+  border: 0;
+}
+.top strong {
+  flex-shrink: 0;
+}
+.top {
+  gap: 14px;
+}

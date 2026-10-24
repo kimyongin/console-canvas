@@ -176,6 +176,19 @@ async function start() {
   source.webContents.on('did-fail-load', (_event, code, description, _url, isMain) => {
     if (isMain && code !== -3) notify('사이트를 열지 못했습니다: ' + description);
   });
+  const saveFile = require('./files.cjs').createFileSaver({
+    dialog,
+    getWindow: () => win,
+    downloads: app.getPath('downloads'),
+  });
+  ipcMain.handle('canvas:save-file', (event, value) => {
+    trusted(event, 'editor');
+    return saveFile(value);
+  });
+  ipcMain.handle('canvas:show-source', (event) => {
+    trusted(event, 'editor');
+    show('source');
+  });
   ipcMain.handle('canvas:connection', (event) => {
     trusted(event, 'editor');
     return { url: connection.url, token: connection.token };

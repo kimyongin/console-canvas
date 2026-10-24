@@ -177,7 +177,9 @@ export function createEditorController(options) {
         state.redo = redo;
         scene.setComments(previous.annotations);
         scene.setEdits(previous.edits);
-        scene.select(previous.selected);
+        scene.select(previous.selected, {
+          ids: previous.selection || (previous.selected ? [previous.selected] : []),
+        });
         options.render?.();
         return failure('apply_failed', error.message);
       }

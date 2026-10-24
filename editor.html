@@ -19,7 +19,6 @@
       <div class="header-actions">
         <button id="snapshots-button" disabled aria-expanded="false" aria-controls="snapshot-panel">
           스냅샷 <span id="snapshot-count">0</span></button
-        ><button id="mcp-button">MCP 연결</button><button id="import-button">화면 파일 열기</button
         ><button id="export-button" class="primary" disabled>
           변경 내용 전달 <span aria-hidden="true">↗</span>
         </button>
@@ -35,20 +34,26 @@
             <div id="layers-toggle-home" class="panel-toggle-slot"></div>
           </div>
         </div>
-        <section class="source-section">
-          <div class="eyebrow">SOURCE SCREEN</div>
-          <h1 id="source-title">가져온 화면</h1>
-          <a id="source-url" target="_blank" rel="noreferrer" hidden></a>
-          <div id="source-meta" class="source-meta">소스코드 없이, 보이는 화면 그대로.</div>
-        </section>
-
+        <details class="source-section" id="document-menu">
+          <summary>
+            <span id="source-title">가져온 화면</span><span aria-hidden="true">⌄</span>
+          </summary>
+          <div class="document-details">
+            <a id="source-url" target="_blank" rel="noreferrer" hidden></a>
+            <div id="source-meta" class="source-meta">소스코드 없이, 보이는 화면 그대로.</div>
+            <button id="import-button" type="button">화면 파일 열기…</button>
+            <button id="recapture-button" type="button" hidden>원본에서 다시 가져오기</button>
+          </div>
+        </details>
         <div class="layer-search">
           <input
             id="layer-search"
             type="search"
             placeholder="텍스트·버튼·요소 찾기"
             aria-label="레이어 검색"
-          />
+          /><label class="layer-filter"
+            ><input type="checkbox" id="major-layers" /> 주요 요소만</label
+          >
         </div>
         <div id="layers" class="layers" aria-label="화면 요소 목록">
           <div class="empty-small">화면을 가져오면 요소가 여기에 표시됩니다.</div>
@@ -102,7 +107,8 @@
               ><button id="redo" aria-label="다시 실행" disabled>↷</button
               ><span class="toolbar-divider"></span
               ><button id="comment-mode" aria-pressed="false">주석 모드</button
-              ><button id="select-parent" disabled>상위 요소 ↑</button
+              ><button id="select-parent" title="상위 요소 선택 · Shift+클릭" disabled>
+                상위 ↑</button
               ><button id="delete" class="delete-action" disabled>삭제</button>
             </div>
             <div class="zoom-controls">
@@ -115,7 +121,8 @@
                 <option value="1.25">125%</option>
                 <option value="1.5">150%</option>
                 <option value="2">200%</option></select
-              ><button id="zoom-in" aria-label="확대">＋</button><button id="fit">너비 맞춤</button>
+              ><button id="zoom-in" aria-label="확대">＋</button><button id="fit">맞춤</button
+              ><button id="zoom-selection" title="선택한 요소에 맞추기" disabled>선택 맞춤</button>
             </div>
           </div>
           <div id="properties-toggle-canvas" class="panel-toggle-slot">
@@ -176,8 +183,11 @@
           </div>
         </div>
         <div class="canvas-footer">
+          <button id="mcp-button" class="connection-badge" title="에이전트 연결 상태">
+            연결 확인</button
+          ><span id="version-status"></span>
           <span id="canvas-hint"
-            >클릭해서 선택 · 드래그해서 이동 · Shift+클릭으로 상위 요소 선택</span
+            >⌘/Ctrl+클릭 다중 선택 · Alt+클릭 세부 요소 · Shift+클릭 상위 요소</span
           ><span id="canvas-dimensions">독립된 복제본</span
           ><span id="mcp-state" role="status">MCP 연결 안 됨</span>
         </div>
@@ -185,7 +195,13 @@
       <aside class="right-panel" id="properties-panel" aria-label="속성·주석·스냅샷 패널">
         <div class="panel-heading panel-topbar">
           <div id="properties-toggle-home" class="panel-toggle-slot"></div>
-          <strong id="properties-panel-title">선택한 요소</strong>
+          <strong id="properties-panel-title" class="sr-only">선택한 요소</strong>
+          <nav class="inspector-tabs" aria-label="오른쪽 패널">
+            <button id="tab-inspect" aria-pressed="true">속성</button
+            ><button id="tab-comments" aria-pressed="false">
+              주석 <span id="comments-count">0</span></button
+            ><button id="tab-snapshots" aria-pressed="false">스냅샷</button>
+          </nav>
           <button id="close-snapshots" aria-label="스냅샷 목록 닫기" hidden>×</button>
         </div>
         <section id="snapshot-panel" class="snapshot-panel" hidden aria-label="스냅샷 기록">
@@ -209,33 +225,55 @@
             ><button id="next-snapshot" aria-label="다음 스냅샷">다음 →</button>
           </div>
           <div id="snapshot-current" class="snapshot-current" role="status"></div>
+          <button id="compare-button" class="compare-launch">원본·스냅샷 비교</button>
           <div id="snapshot-list" class="snapshot-list" aria-label="저장된 스냅샷 목록"></div>
+        </section>
+        <section id="comments-panel" hidden aria-label="요소별 주석 목록">
+          <input id="comment-search" type="search" placeholder="주석 검색" aria-label="주석 검색" />
+          <div id="comments-list"></div>
         </section>
         <div id="inspect-panel">
           <div id="no-selection" class="no-selection">
-            <span>⌖</span><strong>어떤 요소든 선택하세요</strong>
-            <p>문구, 아이콘, 버튼부터<br />카드 전체까지 주석을 남길 수 있어요.</p>
+            <strong>요소를 선택해 편집하세요</strong>
+            <p>⌘/Ctrl+클릭으로 여러 요소 선택 · Alt+클릭으로 세부 요소 선택</p>
           </div>
           <section id="inspector" class="inspector" hidden>
             <div class="element-kind" id="element-kind"></div>
             <h2 id="element-name"></h2>
             <div id="element-path" class="element-path"></div>
-            <div class="component-comment">
-              <label for="component-comment">이 요소에 주석 남기기</label>
-              <p>어떻게 바꾸고 싶은지 자유롭게 적어 주세요.</p>
-              <textarea
-                id="component-comment"
-                rows="4"
-                maxlength="4000"
-                placeholder="예: 버튼을 오른쪽 위로 옮기고, 문구를 ‘고객 추가’로 바꿔 주세요."
-              ></textarea>
-              <div class="comment-actions">
-                <button id="clear-comment">주석 삭제</button
-                ><button id="save-comment" class="primary">주석 저장</button>
+            <div id="inspector-comment-host">
+              <div class="component-comment">
+                <label for="component-comment">이 요소에 주석 남기기</label>
+                <p>어떻게 바꾸고 싶은지 자유롭게 적어 주세요.</p>
+                <textarea
+                  id="component-comment"
+                  rows="4"
+                  maxlength="4000"
+                  placeholder="예: 버튼을 오른쪽 위로 옮기고, 문구를 ‘고객 추가’로 바꿔 주세요."
+                ></textarea>
+                <div class="comment-actions">
+                  <button id="clear-comment">주석 삭제</button
+                  ><button id="save-comment" class="primary">주석 저장</button>
+                </div>
+                <span id="comment-status" role="status"></span>
               </div>
-              <span id="comment-status" role="status"></span>
             </div>
             <div id="direct-edit-controls">
+              <div id="batch-controls" hidden>
+                <strong id="selection-count"></strong>
+                <div class="batch-actions">
+                  <button data-align="left">왼쪽 정렬</button
+                  ><button data-align="top">위쪽 정렬</button
+                  ><button data-align="center-x">가로 중앙</button
+                  ><button data-align="center-y">세로 중앙</button
+                  ><button data-align="distribute-x">가로 간격</button
+                  ><button data-align="distribute-y">세로 간격</button>
+                </div>
+              </div>
+              <label class="snap-setting"
+                ><input type="checkbox" id="snap-enabled" /> 정렬선에 맞추기
+                <small>Alt로 일시 해제</small></label
+              >
               <div class="inspector-divider"></div>
               <div class="field-heading">원래 위치에서 이동</div>
               <div class="coordinate-fields">
@@ -279,6 +317,8 @@
         이동·삭제 기록, 주석과 전후 화면을 함께 저장합니다.<br />편집 파일과 ZIP에는 과거 스냅샷도
         포함됩니다.
       </p>
+      <label class="handoff-label">전달 기준<select id="handoff-version"></select></label>
+      <div id="handoff-items" class="handoff-items"></div>
       <div id="export-summary" class="export-summary"></div>
       <label class="review-note-label"
         >추가 설명 <span>선택</span
@@ -295,6 +335,31 @@
       </div>
       <div id="export-status" class="export-status" aria-live="polite"></div>
     </dialog>
+    <dialog id="compare-dialog" aria-label="화면 버전 비교">
+      <form method="dialog"><button class="dialog-close" aria-label="비교 닫기">×</button></form>
+      <h2>화면 비교</h2>
+      <p>비교는 현재 작업이나 스냅샷을 변경하지 않습니다.</p>
+      <div class="compare-grid">
+        <section>
+          <select id="compare-left" aria-label="비교할 첫 번째 버전"></select>
+          <div class="compare-view" id="compare-left-view"></div>
+          <p id="compare-left-summary"></p>
+        </section>
+        <section>
+          <select id="compare-right" aria-label="비교할 두 번째 버전"></select>
+          <div class="compare-view" id="compare-right-view"></div>
+          <p id="compare-right-summary"></p>
+        </section>
+      </div>
+      <div id="compare-diff" role="status"></div>
+    </dialog>
+    <aside id="comment-popover" class="comment-popover" aria-label="선택한 요소에 주석 작성" hidden>
+      <div class="popover-heading">
+        <strong id="floating-comment-title">주석</strong
+        ><button id="close-comment-popover" aria-label="주석 입력 닫기">×</button>
+      </div>
+      <div id="floating-comment-host"></div>
+    </aside>
     <dialog id="mcp-dialog">
       <form method="dialog"><button class="dialog-close" aria-label="MCP 창 닫기">×</button></form>
       <div class="eyebrow">CONNECT YOUR AGENT</div>

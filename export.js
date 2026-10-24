@@ -4,14 +4,19 @@ const escapeHtml = (value) =>
     /[&<>"']/g,
     (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
   );
-export function download(name, data, type = 'application/octet-stream') {
+export async function download(name, data, type = 'application/octet-stream') {
   const blob = data instanceof Blob ? data : new Blob([data], { type }),
     url = URL.createObjectURL(blob),
     a = document.createElement('a');
+  if (window.ConsoleCanvasDesktop?.saveFile) {
+    URL.revokeObjectURL(url);
+    return window.ConsoleCanvasDesktop.saveFile({ name, bytes: await blob.arrayBuffer() });
+  }
   a.href = url;
   a.download = name;
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 30000);
+  setTimeout(() => URL.revokeObjectURL(url), 300000);
+  return { requested: true };
 }
 export function instructionText(snapshot, changes, note = '', comments = []) {
   const lines = [
@@ -137,9 +142,7 @@ export function makeReport(snapshot, before, after, instructions, size) {
 export async function renderPng(html, width, height) {
   const parsed = new DOMParser().parseFromString(html, 'text/html');
   parsed
-    .querySelectorAll(
-      '[data-uic-editor="selection"],[data-uic-editor="hover"],[data-uic-editor="comment-markers"]',
-    )
+    .querySelectorAll('[data-uic-editor]:not([data-uic-editor="portal"])')
     .forEach((el) => el.remove());
   const root = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
   root.style.cssText =

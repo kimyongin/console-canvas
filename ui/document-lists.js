@@ -1,3 +1,4 @@
+import { elementLabel, isMajorElement } from './element-labels.js';
 export function createDocumentLists({ $, state, selectNode, focusComment }) {
   function renderLayers() {
     const scene = state.scene,
@@ -9,6 +10,7 @@ export function createDocumentLists({ $, state, selectNode, focusComment }) {
       Object.keys(scene.annotations).map((id, index) => [id, index + 1]),
     );
     const children = scene.children;
+    const majorOnly = $('#major-layers').checked;
     let matches = null;
     if (query) {
       matches = new Set();
@@ -20,12 +22,16 @@ export function createDocumentLists({ $, state, selectNode, focusComment }) {
     }
     function add(node, depth) {
       if (matches && !matches.has(node.id)) return;
+      if (majorOnly && !query && !isMajorElement(node) && !scene.selection.has(node.id)) {
+        for (const child of children.get(node.id) || []) add(child, depth);
+        return;
+      }
       const descendants = children.get(node.id) || [],
         expanded = state.expanded.has(node.id) || !!query;
       const row = document.createElement('div');
       row.className =
         'layer-row' +
-        (scene.selected === node.id ? ' selected' : '') +
+        (scene.selection.has(node.id) ? ' selected' : '') +
         (scene.hidden(node.id) ? ' deleted' : '');
       row.style.paddingLeft = Math.min(depth * 12, 96) + 'px';
       row.dataset.layerId = node.id;
@@ -42,7 +48,7 @@ export function createDocumentLists({ $, state, selectNode, focusComment }) {
       });
       const pick = document.createElement('button');
       pick.className = 'layer-pick';
-      pick.setAttribute('aria-pressed', String(scene.selected === node.id));
+      pick.setAttribute('aria-pressed', String(scene.selection.has(node.id)));
       const icon = document.createElement('span');
       icon.className = 'layer-icon';
       icon.textContent =
@@ -55,10 +61,12 @@ export function createDocumentLists({ $, state, selectNode, focusComment }) {
               : '▱';
       const label = document.createElement('span');
       label.className = 'layer-label';
-      label.textContent = node.name || node.tag;
+      label.textContent = elementLabel(node);
       pick.title = node.name + ' · ' + node.tag + ' · ' + node.id;
       pick.append(icon, label);
-      pick.addEventListener('click', () => selectNode(node.id, { reveal: true }));
+      pick.addEventListener('click', (event) =>
+        selectNode(node.id, { reveal: true, additive: event.metaKey || event.ctrlKey }),
+      );
       row.append(toggle, pick);
       if (scene.annotations[node.id]) {
         const mark = document.createElement('span');
@@ -87,6 +95,7 @@ export function createDocumentLists({ $, state, selectNode, focusComment }) {
       container = $('#changes');
     container.replaceChildren();
     $('#change-count').textContent = changes.length + comments.length;
+    renderComments();
     if (!changes.length && !comments.length) {
       const empty = document.createElement('div');
       empty.className = 'empty-small';
@@ -133,5 +142,37 @@ export function createDocumentLists({ $, state, selectNode, focusComment }) {
     });
   }
 
-  return { renderLayers, renderChanges };
+  function renderComments() {
+    const comments = state.scene?.comments() || [],
+      query = $('#comment-search').value.trim().toLowerCase();
+    $('#comments-count').textContent = comments.length;
+    const list = $('#comments-list');
+    list.replaceChildren();
+    for (const [index, comment] of comments.entries()) {
+      const name = elementLabel(state.scene.nodes.get(comment.id));
+      if (query && !`${name} ${comment.text}`.toLowerCase().includes(query)) continue;
+      const button = document.createElement('button');
+      button.className = 'comment-list-item';
+      const title = document.createElement('strong'),
+        text = document.createElement('span');
+      title.textContent = index + 1 + '. ' + name + (comment.targetDeleted ? ' · 삭제된 대상' : '');
+      text.textContent = comment.text;
+      button.append(title, text);
+      button.addEventListener('click', () => {
+        selectNode(comment.id, { reveal: true });
+        focusComment();
+      });
+      list.append(button);
+    }
+    if (!list.children.length) {
+      const empty = document.createElement('p');
+      empty.className = 'empty-small';
+      empty.textContent = comments.length
+        ? '검색 결과가 없습니다.'
+        : '주석 모드에서 요소를 클릭해 수정 방향을 남겨 보세요.';
+      list.append(empty);
+    }
+  }
+  $('#comment-search').addEventListener('input', renderComments);
+  return { renderLayers, renderChanges, renderComments };
 }

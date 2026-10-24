@@ -1,3 +1,5 @@
+import { createCommentEditor } from './ui/comment-editor.js';
+import { createVersionPreview } from './ui/version-preview.js';
 import { createWorkspaceLayout } from './ui/workspace-layout.js';
 import { createInspector } from './ui/inspector.js';
 import { createDocumentLists } from './ui/document-lists.js';
@@ -98,11 +100,11 @@ function commitCommentDraft() {
   if (state.scene && state.commentTarget)
     state.scene.setComment(state.commentTarget, $('#component-comment').value);
 }
-const { sizeChanged, zoomTo, fit } = createCanvasViewport({ $, state });
-const { renderInspector } = createInspector({ $, state, kinds });
-function selectNode(id, { reveal = false } = {}) {
+const { sizeChanged, zoomTo, fit, fitSelection } = createCanvasViewport({ $, state });
+const { renderInspector } = createInspector({ $, state, kinds, selectNode });
+function selectNode(id, { reveal = false, additive = false } = {}) {
   if (!state.scene) return;
-  state.scene.select(id);
+  state.scene.select(id, { additive });
   for (const parent of state.scene.ancestors(id)) state.expanded.add(parent);
   renderLayers();
   if (reveal) {
@@ -117,13 +119,19 @@ function selectNode(id, { reveal = false } = {}) {
   }
 }
 const { renderLayers, renderChanges } = createDocumentLists({ $, state, selectNode, focusComment });
-function focusComment() {
-  setPanelVisibility('properties', true);
-  showSnapshots(false);
-  const field = $('#component-comment');
-  field.focus({ preventScroll: true });
-  field.scrollIntoView({ block: 'nearest' });
+const commentEditor = createCommentEditor({
+  $,
+  state,
+  commit: commitCommentDraft,
+  showInspector: () => {
+    setPanelVisibility('properties', true);
+    showSnapshots(false);
+  },
+});
+function focusComment(options) {
+  commentEditor.open(options);
 }
+const preview = createVersionPreview({ $, state, commitCommentDraft });
 const snapshotHistory = createSnapshotHistory({
   state,
   checkpoint,
@@ -139,6 +147,7 @@ const { showSnapshots, renderSnapshots } = createSnapshotPanel({
   setPanelVisibility,
   panels,
   toast,
+  preview,
 });
 function onKey(event) {
   if (!state.scene || $('#export-dialog').open) return;
@@ -186,6 +195,8 @@ function openSnapshot(...args) {
 async function openDocument(snapshot, edits = {}, note = '', annotations = {}, timeline = null) {
   validateSnapshot(snapshot);
   await flushEditor();
+  commentEditor.reset();
+  for (const id of ['#compare-dialog', '#export-dialog']) if ($(id).open) $(id).close();
   await saveCapture(snapshot);
   const generation = ++state.generation;
   commitCommentDraft();
@@ -230,17 +241,25 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
   $('#artboard-label').textContent =
     (snapshot.source.title || '화면') + ' / ' + snapshot.source.viewport.width + ' px';
   const scene = new CanvasScene($('#scene-frame'), snapshot, {
+    smartSelection: true,
+    onMessage: toast,
     onSelect: (id) => {
-      if (id !== state.commentTarget) commitCommentDraft();
+      if (id !== state.commentTarget) {
+        commitCommentDraft();
+        commentEditor.reset();
+      }
       if (state.scene && id)
         for (const parent of state.scene.ancestors(id)) state.expanded.add(parent);
       renderInspector();
       renderLayers();
     },
-    onCommentSelect: focusComment,
+    onCommentSelect: (_id, options) => focusComment(options),
     onSize: sizeChanged,
     onBeforeChange: historyBefore,
-    onLiveChange: renderInspector,
+    onLiveChange: () => {
+      renderInspector();
+      commentEditor.position();
+    },
     onCommit: changeCommitted,
     onKey,
   });
@@ -351,6 +370,15 @@ $('#installation-button').addEventListener('click', () => {
 });
 $('#sample-button').addEventListener('click', loadSample);
 $('#layer-search').addEventListener('input', renderLayers);
+$('#major-layers').addEventListener('change', renderLayers);
+$('#snap-enabled').addEventListener('change', (event) => {
+  if (state.scene) state.scene.snapEnabled = event.target.checked;
+});
+for (const button of document.querySelectorAll('[data-align]'))
+  button.addEventListener('click', () =>
+    editSafely(() => state.scene?.align(button.dataset.align)),
+  );
+$('#zoom-selection').addEventListener('click', fitSelection);
 $('#component-comment').addEventListener('input', () => {
   $('#comment-status').textContent = '작성 중 · 저장하거나 다른 요소를 선택하면 기록됩니다.';
   $('#clear-comment').disabled =
@@ -369,12 +397,13 @@ $('#clear-comment').addEventListener('click', () => {
 $('#comment-mode').addEventListener('click', () => {
   commitCommentDraft();
   state.mode = state.mode === 'comment' ? 'edit' : 'comment';
+  commentEditor.reset();
   if (state.scene) state.scene.interactionMode = state.mode;
   $('#comment-mode').setAttribute('aria-pressed', String(state.mode === 'comment'));
   $('#canvas-hint').textContent =
     state.mode === 'comment'
-      ? '요소 클릭 → 오른쪽에 주석 작성 · 드래그로 이동하지 않습니다.'
-      : '클릭해서 선택 · 드래그해서 이동 · Shift+클릭으로 상위 요소 선택';
+      ? '요소 클릭 → 바로 주석 작성 · ⌘/Ctrl+Enter로 저장'
+      : '⌘/Ctrl+클릭 다중 선택 · Alt+클릭 세부 요소 · Shift+클릭 상위 요소';
   renderInspector();
 });
 $('#undo').addEventListener('click', () => undo());
@@ -404,14 +433,17 @@ $('#viewport').addEventListener(
   (event) => {
     if (event.ctrlKey || event.metaKey) {
       event.preventDefault();
-      zoomTo(state.zoom + (event.deltaY > 0 ? -0.05 : 0.05));
+      zoomTo(state.zoom + (event.deltaY > 0 ? -0.05 : 0.05), {
+        x: event.clientX,
+        y: event.clientY,
+      });
     }
   },
   { passive: false },
 );
 document.addEventListener('keydown', onKey);
 $('#review-note').addEventListener('change', () => changeCommitted({ label: '추가 설명 수정' }));
-createExportDialog({ $, state, commitCommentDraft });
+createExportDialog({ $, state, commitCommentDraft, editorId });
 window.addEventListener('dragover', (event) => {
   if (event.dataTransfer?.types.includes('Files')) event.preventDefault();
 });
@@ -423,7 +455,7 @@ window.addEventListener('drop', (event) => {
 });
 function renderMcpStatus() {
   const status = state.mcpStatus;
-  $('#mcp-button').textContent = status.connected ? 'MCP 연결됨' : 'MCP 연결';
+  $('#mcp-button').textContent = status.connected ? '● 에이전트 연결됨' : '○ 에이전트 연결';
   $('#mcp-button').classList.toggle('connected', !!status.connected);
   $('#mcp-state').textContent =
     (status.connected ? 'MCP 연결됨 · r' + state.revision : status.message || 'MCP 연결 안 됨') +
@@ -443,6 +475,7 @@ const controller = createEditorController({
   undo,
   snapshotHistory,
   isBusy: () =>
+    $('#compare-dialog').open ||
     $('#export-dialog').open ||
     $('#mcp-dialog').open ||
     document.activeElement === $('#snapshot-name') ||
@@ -496,7 +529,9 @@ if (window.ConsoleCanvasDesktop) {
   const actions = $('.header-actions');
   actions.setAttribute('role', 'group');
   actions.setAttribute('aria-label', '스냅샷과 화면 파일');
-  tools.append(actions);
+  $('.canvas-tools').append(actions);
+  $('#recapture-button').hidden = false;
+  $('#recapture-button').addEventListener('click', () => window.ConsoleCanvasDesktop.showSource());
   $('.app-header').hidden = true;
   window.ConsoleCanvasDesktop.onFlush(flushEditor);
   window.ConsoleCanvasDesktop.onSnapshot((value) =>

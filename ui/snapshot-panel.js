@@ -6,28 +6,43 @@ export function createSnapshotPanel({
   setPanelVisibility,
   panels,
   toast,
+  preview,
 }) {
-  function showSnapshots(show = true) {
-    if (show) setPanelVisibility('properties', true);
-    $('#properties-panel-title').textContent = show ? '스냅샷' : '선택한 요소';
-    $('#close-snapshots').hidden = !show;
-    $('#snapshot-panel').hidden = !show;
-    $('#inspect-panel').hidden = show;
-    $('#snapshots-button').setAttribute('aria-expanded', String(show));
-    if (show) renderSnapshots();
+  function showPanel(tab) {
+    setPanelVisibility('properties', true);
+    $('#properties-panel-title').textContent =
+      tab === 'snapshots' ? '스냅샷' : tab === 'comments' ? '주석' : '선택한 요소';
+    $('#close-snapshots').hidden = tab !== 'snapshots';
+    $('#snapshot-panel').hidden = tab !== 'snapshots';
+    $('#inspect-panel').hidden = tab !== 'inspect';
+    $('#comments-panel').hidden = tab !== 'comments';
+    $('#snapshots-button').setAttribute('aria-expanded', String(tab === 'snapshots'));
+    for (const name of ['inspect', 'comments', 'snapshots'])
+      $('#tab-' + name).setAttribute('aria-pressed', String(tab === name));
+    if (tab === 'snapshots') renderSnapshots();
   }
+  function showSnapshots(show = true) {
+    showPanel(show ? 'snapshots' : 'inspect');
+  }
+  for (const name of ['inspect', 'comments', 'snapshots'])
+    $('#tab-' + name).addEventListener('click', () => {
+      commitCommentDraft();
+      showPanel(name);
+    });
   function renderSnapshots() {
     if (!state.timeline) return;
     const entries = snapshotHistory.list(),
       index = entries.findIndex((e) => e.active),
       dirty = snapshotHistory.dirty();
     $('#snapshot-count').textContent = entries.length;
+    $('#version-status').textContent = dirty ? '스냅샷 이후 변경 있음' : '스냅샷과 같음';
     $('#snapshot-position').textContent = index + 1 + ' / ' + entries.length;
     $('#previous-snapshot').disabled = index <= 0;
     $('#next-snapshot').disabled = index < 0 || index >= entries.length - 1;
     $('#snapshot-current').textContent = dirty
       ? '현재 작업 중 · 다른 버전으로 이동하면 자동 보관됩니다.'
       : '저장된 버전을 보고 있습니다.';
+    if ($('#snapshot-panel').hidden) return;
     const fragment = document.createDocumentFragment();
     entries.forEach((entry, i) => {
       const button = document.createElement('button');
@@ -59,11 +74,22 @@ export function createSnapshotPanel({
           : entry.kind === 'initial'
             ? '시작점'
             : '저장된 버전';
-      button.append(title, meta, badge);
+      const image = document.createElement('img');
+      image.alt = '배치 미리보기 · ' + entry.name;
+      image.dataset.previewId = entry.id;
+      button.append(image, title, meta, badge);
       button.addEventListener('click', () => restoreSnapshot(entry.id));
-      fragment.append(button);
+      const card = document.createElement('div');
+      card.className = 'snapshot-card';
+      const compare = document.createElement('button');
+      compare.className = 'snapshot-compare';
+      compare.textContent = '현재 작업과 비교';
+      compare.addEventListener('click', () => preview.open(entry.id, '@current'));
+      card.append(button, compare);
+      fragment.append(card);
     });
     $('#snapshot-list').replaceChildren(fragment);
+    preview.thumbnails();
   }
   function restoreSnapshot(id) {
     try {
@@ -104,5 +130,5 @@ export function createSnapshotPanel({
       if (entries[index + delta]) restoreSnapshot(entries[index + delta].id);
     });
 
-  return { showSnapshots, renderSnapshots };
+  return { showSnapshots, renderSnapshots, showPanel };
 }

@@ -14,6 +14,7 @@ export function createEditorSession({
       edits: copy(state.scene.edits),
       annotations: copy(state.scene.annotations),
       selected: state.scene.selected,
+      selection: [...state.scene.selection],
       note: getNote(),
       activeSnapshotId: state.timeline?.activeId || null,
     };
@@ -22,17 +23,22 @@ export function createEditorSession({
     state.commentTarget = null;
     state.scene.setComments(point.annotations);
     state.scene.setEdits(point.edits);
-    state.scene.select(point.selected);
+    state.scene.select(point.selected, {
+      ids: point.selection || (point.selected ? [point.selected] : []),
+    });
     setNote(point.note || '');
   }
   function historyBefore() {
     state.undo.push(checkpoint());
     if (state.undo.length > 100) state.undo.shift();
+    state.pendingRedo = state.redo;
     state.redo = [];
   }
   function changeCommitted(detail = {}) {
-    if (detail.cancel) state.undo.pop();
-    else {
+    if (detail.cancel) {
+      state.undo.pop();
+      state.redo = state.pendingRedo || [];
+    } else {
       state.revision++;
       state.lastAction = { actor: detail.actor || 'user', label: detail.label || '화면 편집' };
     }

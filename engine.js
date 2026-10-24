@@ -1,5 +1,6 @@
+import { selectionRoots, alignmentOperations, snapDelta } from './selection-tools.js';
 import { indexNodes } from './node-index.js';
-import { cleanEdits, cleanComments, boundedPosition, prepareEdits } from './edit-commands.js';
+import { cleanEdits, cleanComments, EDIT_LIMITS, prepareEdits } from './edit-commands.js';
 export { cleanEdits, cleanComments } from './edit-commands.js';
 export const copy = (value) => JSON.parse(JSON.stringify(value));
 const POLICY =
@@ -97,6 +98,9 @@ export class CanvasScene {
     this.elements = new Map();
     this.lifts = new Map();
     this.selected = null;
+    this.selection = new Set();
+    this.selectionOutlines = [];
+    this.snapEnabled = false;
     this.drag = null;
     this.commentMarkers = new Map();
     this.displayScale = 1;
@@ -305,16 +309,75 @@ export class CanvasScene {
       height: rect.height,
     };
   }
-  select(id) {
-    this.selected = this.elements.has(id) ? id : null;
+  select(id, { additive = false, ids = null } = {}) {
+    if (ids) this.selection = new Set(ids.filter((key) => this.elements.has(key)).slice(0, 100));
+    else if (additive && this.elements.has(id)) {
+      if (this.selection.has(id)) this.selection.delete(id);
+      else if (this.selection.size < 100) this.selection.add(id);
+      else this.callbacks.onMessage?.('한 번에 100개까지 선택할 수 있습니다.');
+    } else this.selection = new Set(this.elements.has(id) ? [id] : []);
+    this.selected = this.selection.has(id) ? id : [...this.selection].at(-1) || null;
     this.drawSelection();
     this.callbacks.onSelect?.(this.selected);
   }
   drawSelection() {
     const r = this.selected && !this.hidden(this.selected) ? this.rect(this.selected) : null;
     this.setOutline(this.outline, r);
+    for (const outline of this.selectionOutlines) outline.remove();
+    this.selectionOutlines = [];
+    for (const id of this.selection)
+      if (id !== this.selected && !this.hidden(id)) {
+        const outline = this.outline.cloneNode();
+        outline.dataset.uicEditor = 'multi-selection';
+        this.doc.documentElement.append(outline);
+        this.setOutline(outline, this.rect(id));
+        this.selectionOutlines.push(outline);
+      }
     this.hover.style.display = 'none';
     this.renderCommentMarkers();
+  }
+  selectionRoots() {
+    return selectionRoots(this);
+  }
+  align(kind) {
+    this.commitOperations(alignmentOperations(this, kind));
+  }
+  targetId(event) {
+    let id = event.target.closest?.('[data-uic-id]')?.dataset.uicId;
+    if (this.callbacks.smartSelection && !event.altKey && id) {
+      const semantic = [id, ...this.ancestors(id)].find((key) =>
+        ['button', 'a', 'input', 'select', 'textarea', 'svg'].includes(this.nodes.get(key)?.tag),
+      );
+      if (semantic) id = semantic;
+    }
+    return event.shiftKey && id ? this.parent(id) || id : id;
+  }
+  clearGuides() {
+    for (const guide of this.guides || []) guide.remove();
+    this.guides = [];
+  }
+  drawGuides(guides) {
+    this.clearGuides();
+    for (const guide of guides) {
+      const line = this.doc.createElement('div');
+      line.dataset.uicEditor = 'guides';
+      const vertical = guide.axis === 'x';
+      line.style.cssText =
+        'position:absolute!important;pointer-events:none!important;background:#d64dc1!important;z-index:2147483647!important;' +
+        (vertical
+          ? 'width:1px!important;height:' +
+            this.snapshot.source.height +
+            'px!important;top:0!important;left:' +
+            guide.position +
+            'px!important'
+          : 'height:1px!important;width:' +
+            this.snapshot.source.width +
+            'px!important;left:0!important;top:' +
+            guide.position +
+            'px!important');
+      this.doc.documentElement.append(line);
+      this.guides.push(line);
+    }
   }
   setOutline(element, rect) {
     element.style.display = rect && rect.width && rect.height ? 'block' : 'none';
@@ -562,28 +625,61 @@ export class CanvasScene {
       this.openComment(marker.dataset.uicComment);
       return;
     }
-    let element = event.target.closest?.('[data-uic-id]'),
-      id = element?.dataset.uicId;
-    if (event.shiftKey && id) id = this.parent(id) || id;
+    const id = this.targetId(event);
     if (!id || !this.elements.has(id) || this.hidden(id)) {
       this.select(null);
       return;
     }
-    this.select(id);
-    if (this.interactionMode === 'comment') return;
+    if (event.metaKey || event.ctrlKey) {
+      this.select(id, { additive: true });
+      return;
+    }
+    if (!this.selection.has(id) || this.interactionMode === 'comment') this.select(id);
+    if (this.interactionMode === 'comment') {
+      this.callbacks.onCommentSelect?.(id, { floating: true });
+      return;
+    }
+    const ids = this.selectionRoots(),
+      selectedSet = new Set(ids),
+      boxes = ids.map((key) => this.rect(key)),
+      left = Math.min(...boxes.map((r) => r.x)),
+      top = Math.min(...boxes.map((r) => r.y)),
+      moving = {
+        x: left,
+        y: top,
+        width: Math.max(...boxes.map((r) => r.x + r.width)) - left,
+        height: Math.max(...boxes.map((r) => r.y + r.height)) - top,
+      };
     this.drag = {
       id,
+      ids,
       pointerId: event.pointerId,
       x: event.clientX,
       y: event.clientY,
       before: copy(this.edits),
       started: false,
+      moving,
+      candidates: this.snapEnabled
+        ? [...this.nodes.values()]
+            .filter(
+              (n) =>
+                !selectedSet.has(n.id) &&
+                !this.ancestors(n.id).some((p) => selectedSet.has(p)) &&
+                !ids.some((key) => this.ancestors(key).includes(n.id)) &&
+                !this.hidden(n.id) &&
+                n.visible &&
+                n.kind !== 'text',
+            )
+            .slice(0, 1500)
+            .map((n) => this.rect(n.id))
+            .filter(Boolean)
+        : [],
     };
     this.doc.documentElement.setPointerCapture(event.pointerId);
   }
   move(event) {
     if (!this.drag) {
-      const id = event.target.closest?.('[data-uic-id]')?.dataset.uicId;
+      const id = this.targetId(event);
       this.setOutline(
         this.hover,
         id && id !== this.selected && !this.hidden(id) ? this.rect(id) : null,
@@ -597,14 +693,35 @@ export class CanvasScene {
     if (!d.started && Math.hypot(dx, dy) < 3) return;
     if (!d.started) {
       this.callbacks.onBeforeChange?.();
-      this.lift(d.id);
+      for (const id of d.ids) this.lift(id);
       d.started = true;
     }
-    const previous = d.before[d.id] || {};
-    this.edits[d.id] = {
-      ...previous,
-      ...boundedPosition((previous.dx || 0) + Math.round(dx), (previous.dy || 0) + Math.round(dy)),
-    };
+    const snapped =
+      this.snapEnabled && !event.altKey
+        ? snapDelta(d.moving, d.candidates, Math.round(dx), Math.round(dy), 6 / this.displayScale)
+        : { dx: Math.round(dx), dy: Math.round(dy), guides: [] };
+    let moveX = snapped.dx,
+      moveY = snapped.dy;
+    for (const id of d.ids) {
+      const previous = d.before[id] || {};
+      moveX = Math.max(
+        -EDIT_LIMITS.x - (previous.dx || 0),
+        Math.min(EDIT_LIMITS.x - (previous.dx || 0), moveX),
+      );
+      moveY = Math.max(
+        -EDIT_LIMITS.y - (previous.dy || 0),
+        Math.min(EDIT_LIMITS.y - (previous.dy || 0), moveY),
+      );
+    }
+    for (const id of d.ids) {
+      const previous = d.before[id] || {};
+      this.edits[id] = {
+        ...previous,
+        dx: (previous.dx || 0) + moveX,
+        dy: (previous.dy || 0) + moveY,
+      };
+    }
+    this.drawGuides(snapped.guides);
     this.apply();
     this.callbacks.onLiveChange?.();
   }
@@ -612,23 +729,29 @@ export class CanvasScene {
     if (!this.drag || this.drag.pointerId !== event.pointerId) return;
     const d = this.drag;
     this.drag = null;
+    this.clearGuides();
     if (this.doc.documentElement.hasPointerCapture(event.pointerId))
       this.doc.documentElement.releasePointerCapture(event.pointerId);
     if (cancel) this.setEdits(d.before);
     if (d.started) this.callbacks.onCommit?.({ cancel });
   }
   nudge(dx, dy) {
-    if (!this.selected || this.hidden(this.selected)) return;
-    this.commitOperations([{ type: 'move', element_id: this.selected, dx, dy, mode: 'relative' }]);
+    const ids = selectionRoots(this);
+    if (!ids.length) return;
+    this.commitOperations(
+      ids.map((id) => ({ type: 'move', element_id: id, dx, dy, mode: 'relative' })),
+    );
   }
   setPosition(dx, dy) {
     if (!this.selected) return;
     this.commitOperations([{ type: 'move', element_id: this.selected, dx, dy, mode: 'absolute' }]);
   }
-  remove(id = this.selected) {
-    if (!id || this.hidden(id)) return;
-    this.commitOperations([{ type: 'delete', element_id: id }]);
-    this.select(this.parent(id));
+  remove(id) {
+    const ids = id ? [id] : this.selectionRoots();
+    const visible = ids.filter((key) => !this.hidden(key));
+    if (!visible.length) return;
+    this.commitOperations(visible.map((key) => ({ type: 'delete', element_id: key })));
+    this.select(visible.length === 1 ? this.parent(visible[0]) : null);
   }
   changes() {
     const result = [];
@@ -660,9 +783,7 @@ export class CanvasScene {
   serialize() {
     const clone = this.doc.documentElement.cloneNode(true);
     clone
-      .querySelectorAll(
-        '[data-uic-editor="selection"],[data-uic-editor="hover"],[data-uic-editor="comment-markers"]',
-      )
+      .querySelectorAll('[data-uic-editor]:not([data-uic-editor="portal"])')
       .forEach((el) => el.remove());
     return '<!doctype html>' + clone.outerHTML;
   }
