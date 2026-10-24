@@ -1,6 +1,7 @@
 const {app,BrowserWindow,WebContentsView,ipcMain,session,Menu,dialog,clipboard}=require('electron');
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{execFile}=require('node:child_process'),{promisify}=require('node:util');
 const run=promisify(execFile),ROOT=path.resolve(__dirname,'..');
+const {createUpdater}=require('./updater.cjs');
 let win,source,editor,connection,current='source',busy=false,editorReady=false,pendingCapture=null;
 app.setName('Console Canvas');
 const stateDir=process.env.CONSOLE_CANVAS_STATE_DIR||path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'console-canvas');
@@ -14,7 +15,7 @@ function webUrl(value){const parsed=new URL(value);if(!['https:','http:'].includ
 function state(message){return {url:source?.webContents.getURL()||'',view:current,busy,message:message|| (current==='source'?'로그인한 뒤 원하는 화면에서 가져오기를 누르세요.':'요소를 옮기거나 주석을 남기세요. MCP는 가져온 화면에 자동 연결됩니다.'),demo_url:connection.url+'/fixtures/console.html'};}
 function notify(message){if(win&&!win.isDestroyed())win.webContents.send('canvas:state',state(message));}
 function layout(){if(!win)return;const [width,height]=win.getContentSize();for(const view of [source,editor])view?.setBounds({x:0,y:100,width,height:Math.max(1,height-100)});}
-function show(which){if(!['source','editor','agent'].includes(which))throw new Error('알 수 없는 화면');current=which;source.setVisible(which==='source');editor.setVisible(which==='editor');layout();notify(which==='agent'?'앱에 포함된 스킬과 MCP 연결 정보를 준비하세요.':undefined);}
+function show(which){if(!['source','editor','agent','update'].includes(which))throw new Error('알 수 없는 화면');current=which;source.setVisible(which==='source');editor.setVisible(which==='editor');layout();notify(which==='agent'?'앱에 포함된 스킬과 MCP 연결 정보를 준비하세요.':which==='update'?'GitHub Releases에서 앱의 새 버전을 가져옵니다.':undefined);}
 function trusted(event,kind){const expected=kind==='editor'?editor.webContents:win.webContents;if(event.sender!==expected||event.senderFrame!==expected.mainFrame)throw new Error('허용되지 않은 앱 요청');}
 function secure(contents){contents.on('will-navigate',(event,url)=>{try{webUrl(url);}catch{event.preventDefault();}});contents.setWindowOpenHandler(({url})=>{try{webUrl(url);return {action:'allow',overrideBrowserWindowOptions:{parent:win,width:850,height:750,webPreferences:{session:source.webContents.session,nodeIntegration:false,contextIsolation:true,sandbox:true}}};}catch{return {action:'deny'};}});contents.on('did-create-window',child=>secure(child.webContents));}
 async function start(){
@@ -32,6 +33,15 @@ async function start(){
   source.webContents.on('did-fail-load',(_event,code,description,_url,isMain)=>{if(isMain&&code!==-3)notify('사이트를 열지 못했습니다: '+description);});
   ipcMain.handle('canvas:connection',event=>{trusted(event,'editor');return {url:connection.url,token:connection.token};});
   ipcMain.on('canvas:editor-ready',event=>{trusted(event,'editor');editorReady=true;if(pendingCapture){editor.webContents.send('canvas:snapshot',pendingCapture);pendingCapture=null;}});
+  const updater=createUpdater({app,root:ROOT,python,version:appVersion,notify:value=>{if(win&&!win.isDestroyed())win.webContents.send('canvas:update-state',value);},flush:()=>new Promise((resolve,reject)=>{
+    if(busy){reject(new Error('화면 가져오기를 마친 뒤 다시 시도해 주세요.'));return;}
+    if(!editorReady){resolve({document_id:null});return;}
+    const id=require('node:crypto').randomUUID();
+    const timer=setTimeout(()=>{ipcMain.removeListener('canvas:update-saved',saved);reject(new Error('편집 내용 저장 응답이 없습니다. 다시 시도해 주세요.'));},15000);
+    function saved(event,request,result){try{trusted(event,'editor');}catch{return;}if(request!==id)return;clearTimeout(timer);ipcMain.removeListener('canvas:update-saved',saved);result.ok?resolve({document_id:result.document_id}):reject(new Error(result.message));}
+    ipcMain.on('canvas:update-saved',saved);editor.webContents.send('canvas:before-update',id);
+  })});
+  for(const [name,method] of [['info','info'],['check','check'],['download','download'],['install','install']])ipcMain.handle('canvas:update-'+name,event=>{trusted(event);return updater[method]();});
   ipcMain.handle('canvas:info',event=>{trusted(event);return state();});
   ipcMain.handle('canvas:skill-info',event=>{trusted(event);return skillInfo();});
   ipcMain.handle('canvas:skill-install',event=>{trusted(event);return skillInfo(true);});
@@ -52,8 +62,9 @@ async function start(){
       return {id:snapshot.id,nodes:snapshot.nodes.length};
     }finally{busy=false;notify();}
   });
-  Menu.setApplicationMenu(Menu.buildFromTemplate([{label:'Console Canvas',submenu:[{role:'about'},{type:'separator'},{role:'quit'}]},{label:'편집',submenu:[{role:'undo'},{role:'redo'},{type:'separator'},{role:'cut'},{role:'copy'},{role:'paste'},{role:'selectAll'}]},{label:'보기',submenu:[{role:'toggleDevTools'},{role:'togglefullscreen'}]}]));
-  await win.loadFile(path.join(__dirname,'shell.html'));await editor.webContents.loadURL(connection.url+'/editor.html');await source.webContents.loadURL(connection.url+'/fixtures/console.html');notify();
+  Menu.setApplicationMenu(Menu.buildFromTemplate([{label:'Console Canvas',submenu:[{role:'about'},{label:'업데이트 확인…',click:()=>{show('update');updater.check().catch(()=>{});}},{type:'separator'},{role:'quit'}]},{label:'편집',submenu:[{role:'undo'},{role:'redo'},{type:'separator'},{role:'cut'},{role:'copy'},{role:'paste'},{role:'selectAll'}]},{label:'보기',submenu:[{role:'toggleDevTools'},{role:'togglefullscreen'}]}]));
+  let reopen=null;const reopenPath=path.join(app.getPath('userData'),'updates/reopen.json');try{reopen=JSON.parse(fs.readFileSync(reopenPath,'utf8'));fs.unlinkSync(reopenPath);}catch{}
+  await win.loadFile(path.join(__dirname,'shell.html'));await editor.webContents.loadURL(connection.url+'/editor.html'+(reopen?.document_id?'?id='+encodeURIComponent(reopen.document_id):''));await source.webContents.loadURL(connection.url+'/fixtures/console.html');if(reopen?.document_id)show('editor');notify();
 }
 if(!app.requestSingleInstanceLock())app.quit();else{app.on('second-instance',()=>{if(win){if(win.isMinimized())win.restore();win.focus();}});app.whenReady().then(start).catch(error=>{require('electron').dialog.showErrorBox('Console Canvas 실행 오류',error.message);app.quit();});}
 app.on('window-all-closed',()=>app.quit());

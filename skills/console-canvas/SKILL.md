@@ -15,7 +15,7 @@ MCP만 연결한 경우 `get_agent_guide`로 앱에 포함된 이 지침을 직�
 
 ## 독립 앱과 MCP
 
-1. macOS에서는 `~/Applications/Console Canvas.app` 또는 사용자가 지정한 앱 경로를 확인해 컴퓨터 유즈 도구로 연다. 앱이 없으면 [GitHub Releases](https://github.com/kimyongin/console-canvas/releases)의 OS·아키텍처에 맞는 앱을 준비한다. 현재 배포 빌드는 macOS Apple Silicon용이며 Python 3.9 이상이 필요하다. 다른 환경은 저장소의 Electron 개발 실행 절차를 확인한다.
+1. macOS에서는 `/Applications/Console Canvas.app` 또는 `~/Applications/Console Canvas.app` 또는 사용자가 지정한 앱 경로를 확인해 컴퓨터 유즈 도구로 연다. 앱이 없으면 [GitHub Releases](https://github.com/kimyongin/console-canvas/releases)의 OS·아키텍처에 맞는 앱을 준비한다. 현재 배포 빌드는 macOS Apple Silicon용이며 Python 3.9 이상이 필요하다. 다른 환경은 저장소의 Electron 개발 실행 절차를 확인한다.
 2. 앱의 주소창에서 요청된 사이트를 연다. 로그인은 앱의 별도 브라우저 세션을 사용한다. 원하는 상태에서 **이 화면 가져오기**를 누르고 **MCP 연결됨**을 확인한다. 기존 Chrome 로그인 상태가 자동 공유된다고 가정하지 않는다.
 3. 사용 가능한 도구 중 Console Canvas MCP를 찾는다. 설정 요청을 받은 경우 `codex mcp get console-canvas --json`으로 기존 설정을 확인하고, 없으면 아래 절대 경로로 등록한다. 기존의 다른 설정을 덮어쓰지 않는다.
 
@@ -40,6 +40,12 @@ codex mcp add console-canvas -- python3 <SKILL_ROOT>/scripts/console_canvas.py m
 ```sh
 python3 <SKILL_ROOT>/scripts/console_canvas.py mcp --start
 ```
+
+## 앱 설치와 업데이트
+
+공개 [GitHub Releases](https://github.com/kimyongin/console-canvas/releases)의 macOS arm64 DMG를 열고 앱을 Applications로 드래그한다. 현재 Apple Silicon·Python 3.9 이상 대상이며 Developer ID 서명·공증 전 개발판이다. macOS의 실행 보안 검사를 우회하지 않는다.
+
+이후 앱의 **업데이트 → 업데이트 확인 → 업데이트 다운로드 → 업데이트하고 다시 시작**을 사용한다. 공개 릴리스이므로 GitHub 토큰은 필요 없다. Git 소스를 실행 앱에 덮어쓰지 않는다. 체크섬과 앱 무결성·버전을 검증하고 현재 편집을 저장한 뒤 앱만 교체한다. 사용자 데이터·스냅샷·로그인 프로필은 유지하며 기존 앱을 백업한다. 0.x 개발판은 다음 시험 릴리스도 제안한다. 설치 경로에 쓰기 권한이 없으면 DMG 교체를 안내한다. 업데이트 후 **에이전트 연결 → Codex 스킬 설치·업데이트**로 스킬을 맞추며, MCP 지침은 `get_agent_guide`에서 최신 앱 버전을 확인한다. 업데이트 적용 로그는 사용자 데이터 폴더의 `updates/apply.log`에 있다.
 
 ## 스냅샷과 저장
 

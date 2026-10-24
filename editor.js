@@ -205,6 +205,7 @@ $('#mcp-connect').addEventListener('click',async()=>{const button=$('#mcp-connec
 $('#mcp-disconnect').addEventListener('click',async()=>{await mcpBridge.disconnect();$('#mcp-dialog').close();});
 if(window.ConsoleCanvasDesktop){
   document.body.classList.add('desktop-editor');
+  window.ConsoleCanvasDesktop.onBeforeUpdate(async()=>{if(state.scene?.drag)throw new Error('요소 드래그를 마친 뒤 다시 시도해 주세요.');if(state.snapshot&&!state.ready)throw new Error('화면을 여는 중입니다. 잠시 후 다시 시도해 주세요.');commitCommentDraft();save();await state.saving;if(state.lastSaveError)throw new Error('편집 내용을 저장하지 못했습니다. 파일로 백업한 뒤 다시 시도해 주세요.');return {document_id:state.snapshot?.id||null};});
   window.ConsoleCanvasDesktop.onSnapshot(value=>openSnapshot(value).catch(error=>notice(error.message)));
   window.ConsoleCanvasDesktop.getConnection().then(connection=>{if(connection){state.desktopConnection=connection;connectDesktopIfReady();}}).catch(error=>notice(error.message));
 }

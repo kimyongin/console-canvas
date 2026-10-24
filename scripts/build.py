@@ -30,6 +30,7 @@ html=html.replace('</body>',bootstrap+'</body>')
 (OUT/'Console Canvas.html').write_text(html)
 files=['manifest.json','background.js','capture.js','db.js','engine.js','export.js','editor.js','editor.css','editor.html','README.md','preview.html','sample.uiclone.json','fixtures/console.html','fixtures/console.css','fixtures/console.js']
 files+=['bridge-client.js','editor-controller.js','snapshot-history.js','agent-guide.md','mcp/server.py','mcp/bridge.py','mcp/skill_install.py','package.json','desktop/main.cjs','desktop/preload.cjs','desktop/shell-preload.cjs','desktop/shell.html','desktop/shell.css','desktop/shell.cjs']
+files+=['mcp/app_update.py','desktop/updater.cjs']
 archive=OUT/'console-canvas-extension.zip'
 with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as package:
     for filename in files:

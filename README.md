@@ -4,7 +4,9 @@
 
 ## 독립 앱으로 사용하기
 
-[Releases](https://github.com/kimyongin/console-canvas/releases)에서 `console-canvas-desktop-macos-arm64.zip`을 내려받아 압축을 풀고 **Console Canvas.app**을 엽니다. 현재 배포 대상은 macOS Apple Silicon이며 Python 3.9 이상이 필요합니다. 개발용 서명을 사용하며 배포용 공증은 아직 적용하지 않았습니다.
+[공개 Releases](https://github.com/kimyongin/console-canvas/releases)에서 `console-canvas-desktop-macos-arm64.dmg`를 내려받아 엽니다. **Console Canvas.app을 Applications로 드래그**하고 DMG를 꺼낸 뒤 응용 프로그램 폴더에서 앱을 실행합니다. GitHub 로그인이나 토큰은 필요하지 않습니다. ZIP도 보조 배포합니다. 현재 macOS Apple Silicon 대상이며 Python 3.9 이상이 필요합니다. 개발용 ad-hoc 서명이며 Apple Developer ID 서명·공증은 아직 적용하지 않아 처음 실행할 때 macOS에서 차단될 수 있습니다. 일반 사용자용 배포를 위해서는 배포 서명·공증이 추가로 필요합니다.
+
+앱 상단 **업데이트** 또는 앱 메뉴 **업데이트 확인…** → **업데이트 다운로드** → **업데이트하고 다시 시작**으로 이후 버전을 적용합니다. Git 소스를 실행 중인 앱에 덮어쓰지 않고 GitHub Releases의 완성된 앱을 가져옵니다. GitHub SHA-256, 앱 서명 무결성, 번들 ID·버전·아키텍처를 검증하며 적용 실패 시 이전 앱을 복원합니다. 현재 0.x 개발판은 다음 0.x 시험 릴리스도 표시하고, 1.x 이후는 정식 릴리스만 자동 제안합니다. 편집 데이터·스냅샷·로그인 세션은 사용자 데이터 폴더에 유지하고, 다시 시작할 때 편집하던 문서를 엽니다. 앱이 설치된 폴더에 쓰기 권한이 없거나 DMG 안에서 실행하면 드래그 설치를 안내합니다. 업데이트 후 **에이전트 연결 → Codex 스킬 설치·업데이트**로 로컬 스킬도 갱신하세요.
 
 1. 앱 주소창에 실제 웹사이트 URL을 입력합니다. 앱의 별도 세션에서 로그인할 수 있습니다.
 2. 원하는 화면에서 **이 화면 가져오기**를 누르면 복제본 편집기가 열리고 **MCP 연결됨**이 표시됩니다.

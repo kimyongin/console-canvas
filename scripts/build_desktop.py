@@ -86,6 +86,7 @@ def main():
     subprocess.run(['/usr/bin/codesign', '--force', '--deep', '--sign', '-', str(app)], check=True)
     output = ROOT / 'dist' / ('console-canvas-desktop-macos-' + arch + '.zip')
     subprocess.run(['/usr/bin/ditto', '-c', '-k', '--sequesterRsrc', '--keepParent', str(app), str(output)], check=True)
+    subprocess.run([sys.executable, str(ROOT / 'scripts/build_dmg.py'), '--app', str(app)], check=True)
     print(json.dumps({'app': str(app), 'archive': str(output), 'electron': version, 'arch': arch}, ensure_ascii=False), flush=True)
 
 

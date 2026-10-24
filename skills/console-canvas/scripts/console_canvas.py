@@ -22,6 +22,7 @@ RUNTIME_FILES = {
     'bridge-client.js', 'editor-controller.js', 'snapshot-history.js', 'agent-guide.md', 'mcp/server.py', 'mcp/bridge.py', 'mcp/skill_install.py',
     'package.json', 'desktop/main.cjs', 'desktop/preload.cjs', 'desktop/shell-preload.cjs',
     'desktop/shell.html', 'desktop/shell.css', 'desktop/shell.cjs',
+    'mcp/app_update.py', 'desktop/updater.cjs',
 }
 REVIEW_FILES = {
     'review.json', 'changes.json', 'instructions.txt', 'before.png', 'after.png',

@@ -11,5 +11,10 @@ contextBridge.exposeInMainWorld('ConsoleCanvasShell',{
   installSkill:()=>ipcRenderer.invoke('canvas:skill-install'),
   saveSkill:()=>ipcRenderer.invoke('canvas:skill-save'),
   copyMcpCommand:()=>ipcRenderer.invoke('canvas:mcp-copy'),
+  updateInfo:()=>ipcRenderer.invoke('canvas:update-info'),
+  checkUpdate:()=>ipcRenderer.invoke('canvas:update-check'),
+  downloadUpdate:()=>ipcRenderer.invoke('canvas:update-download'),
+  installUpdate:()=>ipcRenderer.invoke('canvas:update-install'),
+  onUpdate:callback=>ipcRenderer.on('canvas:update-state',(_event,value)=>callback(value)),
   onState:callback=>ipcRenderer.on('canvas:state',(_event,value)=>callback(value))
 });
