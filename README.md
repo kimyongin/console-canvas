@@ -32,6 +32,8 @@ codex mcp get console-canvas --json
 | `list_comments` | 요소별 주석과 원본 식별 정보 조회 |
 | `apply_edits` | 이동·삭제·주석 수정·주석 삭제를 원자적으로 적용 |
 | `undo`, `redo` | 사람과 에이전트가 공유하는 실행 기록 취소·복원 |
+| `list_snapshots` | 저장한 스냅샷 목록·현재 버전·미저장 변경 조회 |
+| `create_snapshot`, `restore_snapshot` | 스냅샷 저장·복원, 이동 전 작업 자동 보관 |
 
 예: “가져온 고객 관리 화면의 주석을 읽고, 등록 버튼을 왼쪽으로 120px·아래로 50px 이동해 줘.”
 
@@ -96,6 +98,20 @@ python3 scripts/install_skill.py
 - 확대 비율과 **너비 맞춤**을 사용하고, 작업 공간을 스크롤해서 긴 페이지를 확인합니다.
 - 편집 결과는 해당 브라우저의 IndexedDB에 자동 저장됩니다. 확장을 제거하면 저장 데이터도 없어질 수 있으므로 편집 파일을 따로 저장할 수 있습니다.
 
+## 스냅샷으로 버전 오가기
+
+상단 **스냅샷**을 열고 이름을 적어 **저장**합니다. 이동·삭제·요소별 주석·추가 설명을 한 버전으로 저장합니다. 목록의 버전 또는 **이전 / 다음**을 누르면 그 상태로 돌아갑니다. **가져온 상태**도 시작점으로 남습니다.
+
+과거로 돌아가도 이후 버전은 지워지지 않습니다. 과거에서 새 시안을 저장하면 기존 시안들과 함께 목록에 추가됩니다. 저장하지 않은 작업이 있으면 이동 직전에 **이동 전 작업** 자동 스냅샷으로 보관합니다. 스냅샷 복원 자체도 실행 취소·다시 실행할 수 있습니다. 화면당 최대 500개이며 자동으로 오래된 버전을 지우지 않습니다.
+
+스냅샷은 원본 화면 HTML을 매번 복사하지 않고 편집 데이터만 저장합니다. 화면별 IndexedDB 자동 저장, `.uiclone.json` 편집 파일, 전달 ZIP의 `review.json`에 목록과 현재 버전을 함께 보존합니다. 파일을 다시 열어도 과거·미래 버전을 오갈 수 있습니다. 목록에는 저장 시각, 변경·주석 개수, 현재 버전이 표시됩니다.
+
+## 데이터 저장 위치
+
+독립 앱의 편집 데이터는 macOS의 `~/Library/Application Support/Console Canvas/Partitions/console-canvas-editor/IndexedDB`에 저장됩니다. 브라우저판·확장판은 각각의 출처에 속한 IndexedDB에 저장합니다. 서버나 GitHub로 화면·편집 기록을 자동 업로드하지 않습니다. MCP 연결 정보가 있는 `~/.codex/console-canvas`는 편집 데이터 저장소와 별개입니다.
+
+앱 업데이트는 사용자 데이터 폴더를 유지합니다. 앱 데이터 초기화나 폴더 삭제는 편집 내용을 없애므로 백업·다른 기기로 이동할 때는 **편집 파일 저장** 또는 **전달용 ZIP 다운로드**를 사용합니다. 현재 편집 내용뿐 아니라 과거 스냅샷의 문구·주석도 파일에 포함됩니다.
+
 ## 변경 내용을 Codex에 전달하기
 
 1. **변경 내용 전달**을 누릅니다.
@@ -113,7 +129,7 @@ ZIP에는 다음 파일이 들어갑니다.
 | `before.html`, `after.html` | 원본 복제본과 편집본 |
 | `before.png`, `after.png` | 비교 이미지. 생성 가능한 경우 포함 |
 | `source-viewport.png` | 가져올 때 실제 Chrome 탭의 화면. 캡처 가능한 경우 포함 |
-| `review.json` | 복제본과 편집 상태를 모두 보존한 재편집 파일 |
+| `review.json` | 복제본·현재 편집 상태·스냅샷 목록을 보존한 재편집 파일 |
 
 **편집 파일 저장**은 ZIP 대신 `.uiclone.json` 하나를 저장합니다. **화면 파일 열기** 또는 파일 드래그로 다시 열 수 있습니다. 내보내기는 원래 화면의 보이는 문구·이미지·입력값을 포함하며, 비밀번호 입력값은 복제하지 않습니다. 대화로의 전송은 사용자가 파일을 첨부할 때 이루어집니다.
 
@@ -139,13 +155,14 @@ python3 -m http.server 8848 --bind 127.0.0.1 --directory /absolute/path/to/conso
 
 - `http://127.0.0.1:8848/editor.html?sample=1`: 편집기
 - `http://127.0.0.1:8848/tests/integration.html`: 실제 DOM 수집·편집·내보내기 통합 검사
+- `http://127.0.0.1:8848/tests/snapshots.html`: 스냅샷 UI·IndexedDB 재실행·파일 재가져오기 검사
 - `python3 scripts/build.py`: 포함된 샘플로 독립 실행 데모와 확장 ZIP 생성
 - `python3 scripts/build.py --output /absolute/path/to/output`: 배포 출력 위치 지정
 - `python3 -m unittest discover -s tests -p 'test_*.py'`: 스킬의 부모·자식 변경 해석, ZIP 처리, 독립 설치·준비 검사
 
 빌드 결과는 `dist/Console Canvas.html`, `dist/console-canvas-extension.zip`, `dist/console-canvas-skill.zip`입니다. 스킬 런타임 자산도 같은 빌드에서 갱신합니다. 저장소에 포함된 `sample.uiclone.json`은 가상 데이터만 사용합니다. 실제 캡처 파일과 사용자 전달 ZIP은 커밋하지 않습니다.
 
-이전 프로토타입의 실제 브라우저 검사에서 수집·편집·전달 25개 검사가 통과했고, 358개 표시 요소의 이동·삭제·복원을 확인했습니다. **개인 Chrome에 확장을 설치한 뒤 탭 권한으로 실제 사이트를 가져오는 경계는 아직 검증하지 않았습니다.**
+브라우저 엔진 통합 검사 61개와 스냅샷 UI·저장 검사 11개를 통과했고, 358개 표시 요소의 이동·삭제·복원을 확인했습니다. 상세 검증 범위는 [docs/verification.md](docs/verification.md)에 있습니다. **개인 Chrome에 확장을 설치한 뒤 탭 권한으로 실제 사이트를 가져오는 경계는 아직 검증하지 않았습니다.**
 
 Chrome 확장의 권한은 `activeTab`, `scripting`, `storage`, `unlimitedStorage`와 로컬 MCP 연결용 `http://127.0.0.1/*` 접근입니다. 원격 서버나 AI API에 데이터를 전송하는 기능은 없습니다.
 

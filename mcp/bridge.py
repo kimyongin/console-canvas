@@ -228,7 +228,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({'service': 'console-canvas', 'version': VERSION})
         # The local editor and fixtures are public static assets; no captured user data is served.
         path = unquote(urlsplit(self.path).path).lstrip('/') or 'editor.html'
-        allowed = {'editor.html', 'editor.css', 'editor.js', 'capture.js', 'db.js', 'engine.js', 'export.js', 'preview.html', 'bridge-client.js', 'editor-controller.js', 'sample.uiclone.json', 'fixtures/console.html', 'fixtures/console.css', 'fixtures/console.js'}
+        allowed = {'editor.html', 'editor.css', 'editor.js', 'capture.js', 'db.js', 'engine.js', 'export.js', 'preview.html', 'bridge-client.js', 'editor-controller.js', 'snapshot-history.js', 'sample.uiclone.json', 'fixtures/console.html', 'fixtures/console.css', 'fixtures/console.js'}
         if path not in allowed:
             return self.send_json(error('not_found', 'Static asset not found'), 404)
         file = self.server.app_dir / path
@@ -266,8 +266,9 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == '/agent/call':
                 value = self.server.broker.call(body.get('name'), body.get('arguments', {}))
             elif self.path == '/admin/stop':
-                value = {'ok': True}
+                self.send_json({'ok': True})
                 threading.Thread(target=self.server.shutdown, daemon=True).start()
+                return
             else:
                 return self.send_json(error('not_found', 'Unknown endpoint'), 404)
             self.send_json(value)

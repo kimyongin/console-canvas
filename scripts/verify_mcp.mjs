@@ -7,14 +7,14 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const client=new Client({name:'console-canvas-real-connection-test',version:'0.3.0'});
+const client=new Client({name:'console-canvas-real-connection-test',version:'0.4.0'});
 const transport=new StdioClientTransport({command:process.env.CONSOLE_CANVAS_MCP_COMMAND||process.env.CONSOLE_CANVAS_PYTHON||'/usr/bin/python3',args:process.env.CONSOLE_CANVAS_MCP_ARGS?JSON.parse(process.env.CONSOLE_CANVAS_MCP_ARGS):[path.join(root,'mcp/server.py')],stderr:'pipe'});
 const checks=[];
 function check(name,value){assert.ok(value,name);checks.push(name);}
 async function tool(name,args={},allowError=false){const result=await client.callTool({name,arguments:args});const value=result.structuredContent||JSON.parse(result.content[0].text);if(!allowError)assert.equal(result.isError,false,JSON.stringify(value));return value;}
 try{
   await client.connect(transport);
-  const tools=await client.listTools();check('Official SDK discovers seven MCP tools',tools.tools.length===7);
+  const tools=await client.listTools();check('Official SDK discovers ten MCP tools',tools.tools.length===10);
   const screens=(await tool('list_screens')).screens;
   const screen=screens.find(s=>{const u=new URL(s.url);return u.hostname==='127.0.0.1'&&u.pathname==='/fixtures/console.html';});
   assert.ok(screen,'Capture the disposable sample in the desktop app first');
@@ -46,6 +46,22 @@ try{
   current=(await tool('undo',{...base,expected_revision:current.revision,operation_id:randomUUID()})).screen;
   const invalid=await tool('apply_edits',{...base,expected_revision:current.revision,operation_id:randomUUID(),operations:[{type:'move',element_id:button.id,mode:'relative',dx:40,dy:0},{type:'delete',element_id:'n999999'}]},true);
   check('Invalid batch applies nothing',invalid.error?.code==='unknown_element'&&(await tool('get_screen',base)).screen.revision===current.revision);
+  const initialVersion=(await tool('list_snapshots',base)).snapshots[0];assert.ok(initialVersion);
+  const saved=await tool('create_snapshot',{...base,expected_revision:current.revision,operation_id:randomUUID(),name:'MCP 시안 B'});current=saved.screen;
+  const snapshotBatch={...base,expected_revision:current.revision,operation_id:randomUUID(),operations:[{type:'move',element_id:button.id,mode:'absolute',dx:-40,dy:90},{type:'comment',element_id:button.id,text:'스냅샷으로 보호할 미저장 작업'}]};
+  current=(await tool('apply_edits',snapshotBatch)).screen;
+  const restored=await tool('restore_snapshot',{...base,expected_revision:current.revision,operation_id:randomUUID(),snapshot_id:initialVersion.id});current=restored.screen;
+  let versions=await tool('list_snapshots',base);
+  check('MCP restores initial state while retaining future and automatic snapshots',!!restored.automatic_snapshot_id&&versions.total===3&&!(await tool('list_comments',base)).comments.length);
+  const savedReplay={...base,expected_revision:current.revision,operation_id:randomUUID(),snapshot_id:saved.snapshot_id};
+  current=(await tool('restore_snapshot',savedReplay)).screen;
+  check('MCP returns from the past to saved future geometry and comment',(await tool('list_comments',base)).comments.find(c=>c.id===button.id)?.text===edited&&(await tool('list_elements',{...base,query:'new-customer'})).elements.find(e=>e.id===button.id).offset.dx===-120);
+  const replayRestore=await tool('restore_snapshot',savedReplay);check('Snapshot restoration retries do not create extra versions',replayRestore.screen.revision===current.revision&&(await tool('list_snapshots',base)).total===3);
+  current=(await tool('restore_snapshot',{...base,expected_revision:current.revision,operation_id:randomUUID(),snapshot_id:restored.automatic_snapshot_id})).screen;
+  check('Automatic snapshot recovers unsaved work',(await tool('list_comments',base)).comments.find(c=>c.id===button.id)?.text==='스냅샷으로 보호할 미저장 작업');
+  current=(await tool('undo',{...base,expected_revision:current.revision,operation_id:randomUUID()})).screen;
+  check('Undoing a snapshot jump restores the prior version and keeps all snapshots',current.active_snapshot_id===saved.snapshot_id&&(await tool('list_snapshots',base)).total===3);
+  const finalRestore=await tool('restore_snapshot',{...base,expected_revision:current.revision,operation_id:randomUUID(),snapshot_id:initialVersion.id});current=finalRestore.screen;
   const report={officialSdk:true,transport:'stdio',passed:checks.length,checks,editor_id,document_id:screen.document_id,final_revision:current.revision};
   await fs.mkdir(path.join(root,'local'),{recursive:true});await fs.writeFile(path.join(root,'local/mcp-native-verification.json'),JSON.stringify(report,null,2)+'\n');
   console.log(JSON.stringify(report,null,2));

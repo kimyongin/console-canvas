@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Console Canvas MCP stdio adapter (Python 3.9+, no dependencies)."""
 import argparse
+import http.client
 import json
 import os
 from pathlib import Path
@@ -10,7 +11,7 @@ import time
 import urllib.error
 import urllib.request
 
-VERSION = '0.3.0'
+VERSION = '0.4.0'
 PROTOCOLS = ('2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05')
 APP = Path(__file__).resolve().parents[1]
 DEFAULT_STATE = Path(os.environ.get('CODEX_HOME', str(Path.home() / '.codex'))) / 'console-canvas'
@@ -41,12 +42,18 @@ TOOLS = [
      ]}}}, [*WRITE, 'operations'])),
     ('undo', 'Undo the latest shared editor history step, whether made by a person or agent. Check get_screen first.', schema(WRITE, WRITE)),
     ('redo', 'Redo the latest undone shared editor history step.', schema(WRITE, WRITE)),
+    ('list_snapshots', 'List saved versions of this capture, including the active version and unsaved-work status. No full DOM or snapshot state is returned.',
+     schema({**BASE, 'offset': {'type': 'integer', 'minimum': 0}, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 200}}, BASE)),
+    ('create_snapshot', 'Save the current edits, comments and handoff note as a named version. Other versions remain available.',
+     schema({**WRITE, 'name': {'type': 'string', 'maxLength': 120}}, WRITE)),
+    ('restore_snapshot', 'Return to a saved version without removing later versions. Unsaved current work is automatically saved as another snapshot first. Restoration is one undo step.',
+     schema({**WRITE, 'snapshot_id': {'type': 'string', 'minLength': 1, 'maxLength': 100}}, [*WRITE, 'snapshot_id'])),
 ]
 
 
 def definitions():
     return [{'name': name, 'description': description, 'inputSchema': inputs,
-             'annotations': {'readOnlyHint': name not in ('apply_edits', 'undo', 'redo'),
+             'annotations': {'readOnlyHint': name not in ('apply_edits', 'undo', 'redo', 'create_snapshot', 'restore_snapshot'),
                              'destructiveHint': False, 'openWorldHint': False}}
             for name, description, inputs in TOOLS]
 
@@ -76,6 +83,23 @@ def ensure_bridge(state_dir, app_dir, port):
     connection = connected()
     if connection:
         return connection
+    # An app update can encounter the previous authenticated local bridge.
+    # Only replace our own older version; an old client must not stop a newer one.
+    try:
+        previous = json.loads(connection_file.read_text())
+        if previous.get('url') == 'http://127.0.0.1:' + str(port):
+            health = request(previous, '/health', timeout=1)
+            old_version = tuple(int(part) for part in health.get('version', '').split('.'))
+            if health.get('service') == 'console-canvas' and old_version < tuple(int(part) for part in VERSION.split('.')):
+                request(previous, '/admin/stop', {}, timeout=2)
+                for _ in range(30):
+                    try:
+                        request(previous, '/health', timeout=.2)
+                    except OSError:
+                        break
+                    time.sleep(.1)
+    except (OSError, ValueError, KeyError, http.client.HTTPException):
+        pass
     log = open(state_dir / 'bridge.log', 'a', encoding='utf-8')
     os.chmod(state_dir / 'bridge.log', 0o600)
     process = subprocess.Popen([sys.executable, str(APP / 'mcp' / 'bridge.py'), '--state-dir', str(state_dir),

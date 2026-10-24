@@ -27,8 +27,8 @@ export function instructionText(snapshot,changes,note='',comments=[]) {
   lines.push('','ZIP의 changes.json에 상세 변경 사항, review.html에 비교 화면, review.json에 다시 편집할 수 있는 전체 화면이 있습니다.');
   return lines.join('\n');
 }
-export function reviewPayload(snapshot,scene,note='') {
-  return {format:'console-canvas-review',version:1,createdAt:new Date().toISOString(),snapshot,edits:scene.edits,annotations:scene.annotations,comments:scene.comments(),changes:scene.changes(),note};
+export function reviewPayload(snapshot,scene,note='',timeline=null) {
+  return {format:'console-canvas-review',version:1,createdAt:new Date().toISOString(),snapshot,edits:scene.edits,annotations:scene.annotations,comments:scene.comments(),changes:scene.changes(),note,...(timeline?{timeline}: {})};
 }
 function reportRuntime() {
   const data=JSON.parse(document.getElementById('review-data').textContent),frame=document.getElementById('screen'),host=document.getElementById('screen-host');
@@ -86,10 +86,10 @@ export async function zipFiles(files) {
   ev.setUint32(0,0x06054b50,true);ev.setUint16(8,directory.length,true);ev.setUint16(10,directory.length,true);ev.setUint32(12,size,true);ev.setUint32(16,offset,true);
   return new Blob([...chunks,...directory,end],{type:'application/zip'});
 }
-export async function buildReview(snapshot,scene,note,onProgress=()=>{}) {
+export async function buildReview(snapshot,scene,note,onProgress=()=>{},timeline=null) {
   onProgress('변경 전후 화면을 정리하고 있어요.');
   const before=await scene.beforeHtml(),after=scene.serialize(),changes=scene.changes(),size=scene.contentSize();
-  const comments=scene.comments(),instructions=instructionText(snapshot,changes,note,comments),payload=reviewPayload(snapshot,scene,note),warnings=[];
+  const comments=scene.comments(),instructions=instructionText(snapshot,changes,note,comments),payload=reviewPayload(snapshot,scene,note,timeline),warnings=[];
   const files={'changes.json':JSON.stringify({format:'console-canvas-changes',version:1,source:snapshot.source,note,changes,comments},null,2),
     'instructions.txt':instructions,'review.json':JSON.stringify(payload),'before.html':before,'after.html':after,
     'review.html':makeReport(snapshot,before,after,instructions,size)};

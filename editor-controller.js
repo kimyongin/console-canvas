@@ -11,7 +11,7 @@ export function createEditorController(options) {
   }
   function screen() {
     return {...metadata(),undo_count:state.undo.length,redo_count:state.redo.length,change_count:state.scene.changes().length,
-      busy:!!state.scene.drag||!!options.isBusy?.(),last_action:state.lastAction||null};
+      busy:!!state.scene.drag||!!options.isBusy?.(),last_action:state.lastAction||null,snapshot_count:state.timeline?.entries.length||0,active_snapshot_id:state.timeline?.activeId||null,snapshot_dirty:options.snapshotHistory?.dirty()||false};
   }
   function nodeInfo(node) {
     const scene=state.scene,deleted=scene.hidden(node.id),offset=scene.offset(node.id),current=(!deleted&&scene.rect(node.id))||{...node.rect,x:node.rect.x+offset.x,y:node.rect.y+offset.y};
@@ -35,10 +35,18 @@ export function createEditorController(options) {
       const comments=scene.comments().map((comment,index)=>({...comment,number:index+1})).filter(c=>!args.element_id||c.id===args.element_id),offset=args.offset||0,limit=args.limit||50;
       return {ok:true,revision:state.revision,total:comments.length,offset,comments:comments.slice(offset,offset+limit)};
     }
-    if(!['apply_edits','undo','redo'].includes(name))return failure('unknown_tool','지원하지 않는 편집 명령입니다.');
+    if(name==='list_snapshots') {
+      const entries=options.snapshotHistory.list(),offset=args.offset||0,limit=args.limit||50;
+      return {ok:true,revision:state.revision,total:entries.length,offset,active_snapshot_id:state.timeline.activeId,dirty:options.snapshotHistory.dirty(),snapshots:entries.slice(offset,offset+limit)};
+    }
+    if(!['apply_edits','undo','redo','create_snapshot','restore_snapshot'].includes(name))return failure('unknown_tool','지원하지 않는 편집 명령입니다.');
     if(args.expected_revision!==state.revision)return failure('revision_conflict','화면이 변경되었습니다. 최신 상태를 조회한 뒤 수정해 주세요.');
     if(scene.drag||options.isBusy?.())return failure('editor_busy','사용자가 편집 중입니다. 입력을 마친 후 최신 버전으로 다시 요청해 주세요.');
-    if(name==='undo'||name==='redo') {
+    let snapshotResult={};
+    if(name==='create_snapshot'||name==='restore_snapshot') {
+      try{snapshotResult=name==='create_snapshot'?{snapshot_id:options.snapshotHistory.create(args.name||'',{actor:'agent'}).id}:options.snapshotHistory.restore(args.snapshot_id,{actor:'agent'});}
+      catch(error){return failure('snapshot_error',error.message);}
+    } else if(name==='undo'||name==='redo') {
       if(!state[name].length)return failure('nothing_to_'+name,'실행 '+(name==='undo'?'취소':'복원')+'할 작업이 없습니다.');
       options.undo(name,{actor:'agent'});
     } else {
@@ -70,7 +78,7 @@ export function createEditorController(options) {
         options.render?.();return failure('apply_failed',error.message);
       }
     }
-    const result={ok:true,screen:screen()};
+    const result={ok:true,...snapshotResult,screen:screen()};
     if(options.flush)result.persisted=await options.flush();
     return result;
   }

@@ -78,7 +78,7 @@ def main():
     value = plistlib.loads(plist.read_bytes())
     value.update({'CFBundleName': 'Console Canvas', 'CFBundleDisplayName': 'Console Canvas',
                   'CFBundleIdentifier': 'com.consolecanvas.desktop',
-                  'CFBundleShortVersionString': '0.3.0', 'CFBundleVersion': '0.3.0'})
+                  'CFBundleShortVersionString': '0.4.0', 'CFBundleVersion': '0.4.0'})
     plist.write_bytes(plistlib.dumps(value))
     subprocess.run(['/usr/bin/codesign', '--force', '--deep', '--sign', '-', str(app)], check=True)
     output = ROOT / 'dist' / ('console-canvas-desktop-macos-' + arch + '.zip')

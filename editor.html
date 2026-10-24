@@ -5,7 +5,7 @@
   <header class="app-header">
     <a class="brand" href="editor.html" aria-label="Console Canvas 시작 화면"><span class="brand-mark">▧</span><span>Console <strong>Canvas</strong><small>PROTOTYPE</small></span></a>
     <div class="document-title"><span class="status-dot"></span><span id="document-title">화면을 가져와 편집 방향을 보여주세요</span></div>
-    <div class="header-actions"><button id="mcp-button">MCP 연결</button><button id="import-button">화면 파일 열기</button><button id="export-button" class="primary" disabled>변경 내용 전달 <span aria-hidden="true">↗</span></button></div>
+    <div class="header-actions"><button id="snapshots-button" disabled aria-expanded="false" aria-controls="snapshot-panel">스냅샷 <span id="snapshot-count">0</span></button><button id="mcp-button">MCP 연결</button><button id="import-button">화면 파일 열기</button><button id="export-button" class="primary" disabled>변경 내용 전달 <span aria-hidden="true">↗</span></button></div>
   </header>
   <div id="notice" class="notice" role="status" hidden></div>
   <main class="workspace" id="workspace">
@@ -32,6 +32,15 @@
       <div class="canvas-footer"><span id="canvas-hint">클릭해서 선택 · 드래그해서 이동 · Shift+클릭으로 상위 요소 선택</span><span id="canvas-dimensions">독립된 복제본</span><span id="mcp-state" role="status">MCP 연결 안 됨</span></div>
     </section>
     <aside class="right-panel">
+      <section id="snapshot-panel" class="snapshot-panel" hidden aria-label="스냅샷 기록">
+        <div class="panel-heading"><strong>스냅샷</strong><button id="close-snapshots" aria-label="스냅샷 목록 닫기">×</button></div>
+        <p class="snapshot-help">저장한 버전을 자유롭게 오가세요.<br>이후 버전도 그대로 남습니다.</p>
+        <form id="snapshot-form"><label for="snapshot-name">현재 상태 저장</label><div class="snapshot-create"><input id="snapshot-name" maxlength="120" placeholder="예: 검색 영역 정리" autocomplete="off"><button id="save-snapshot" class="primary" type="submit">저장</button></div></form>
+        <div class="snapshot-navigation"><button id="previous-snapshot" aria-label="이전 스냅샷">← 이전</button><span id="snapshot-position"></span><button id="next-snapshot" aria-label="다음 스냅샷">다음 →</button></div>
+        <div id="snapshot-current" class="snapshot-current" role="status"></div>
+        <div id="snapshot-list" class="snapshot-list" aria-label="저장된 스냅샷 목록"></div>
+      </section>
+      <div id="inspect-panel">
       <div class="panel-heading"><strong>선택한 요소</strong><span class="panel-badge">INSPECT</span></div>
       <div id="no-selection" class="no-selection"><span>⌖</span><strong>어떤 요소든 선택하세요</strong><p>문구, 아이콘, 버튼부터<br>카드 전체까지 주석을 남길 수 있어요.</p></div>
       <section id="inspector" class="inspector" hidden>
@@ -46,10 +55,11 @@
       </section>
       <section class="changes-section"><div class="panel-heading"><strong>변경 기록</strong><span id="change-count">0</span></div><div id="changes" class="changes"><div class="empty-small">이동·삭제 기록과<br>요소별 주석을 모읍니다.</div></div></section>
       <details id="capture-notes" class="capture-notes" hidden><summary id="capture-notes-title">가져오기 참고사항</summary><ul id="capture-notes-list"></ul></details>
+      </div>
     </aside>
   </main>
   <dialog id="export-dialog">
-    <form method="dialog"><button class="dialog-close" aria-label="닫기">×</button></form><div class="eyebrow">HAND OFF YOUR CHANGES</div><h2>편집 방향을 전달하세요.</h2><p>이동·삭제 기록, 요소별 주석과 전후 화면을 함께 저장합니다.<br>다운로드한 ZIP 파일을 이 대화에 첨부해 주세요.</p>
+    <form method="dialog"><button class="dialog-close" aria-label="닫기">×</button></form><div class="eyebrow">HAND OFF YOUR CHANGES</div><h2>편집 방향을 전달하세요.</h2><p>이동·삭제 기록, 주석과 전후 화면을 함께 저장합니다.<br>편집 파일과 ZIP에는 과거 스냅샷도 포함됩니다.</p>
     <div id="export-summary" class="export-summary"></div><label class="review-note-label">추가 설명 <span>선택</span><textarea id="review-note" rows="3" placeholder="예: 검색 조건을 위로 모으고 작업 버튼을 오른쪽에 정렬하고 싶어요."></textarea></label>
     <div class="export-actions"><button id="copy-summary">지시문 복사</button><button id="download-session">편집 파일 저장</button><button id="download-review" class="primary">전달용 ZIP 다운로드 ↓</button></div><div id="export-status" class="export-status" aria-live="polite"></div>
   </dialog>

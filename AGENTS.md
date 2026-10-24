@@ -12,3 +12,5 @@
 - 쓰기에는 화면 버전과 고유 operation_id를 요구한다. 작업 묶음은 한 실행 취소 단계이며, 사람의 편집과 같은 기록을 사용한다. 토큰·실제 캡처·로그인 프로필을 커밋하지 않는다.
 - 데스크톱 원본 사이트는 Node 없이 contextIsolation·sandbox·webSecurity를 유지한다. 로컬 편집기에만 제한된 preload API를 제공하고 IPC 호출자의 프레임을 검증한다.
 - MCP 변경은 실제 SDK 클라이언트로 검증한다. `node scripts/verify_mcp.mjs`는 독립 앱에 연결한 가상 샘플에만 사용한다. 앱 배포는 `python3 scripts/build_desktop.py`로 공식 Electron SHA-256 검증 후 생성한다.
+
+- `snapshot-history.js`는 캡처 HTML을 중복 저장하지 않는 버전 목록이다. 과거 이동이나 분기 편집으로 이후 버전을 잘라내지 않고 이동 전 미저장 작업을 보존한다. 목록·활성 버전은 IndexedDB와 전달 파일에 함께 저장한다. 스냅샷 변경 시 `tests/snapshots.html`에서 재실행·파일 왕복도 확인한다.

@@ -1,7 +1,7 @@
 const {app,BrowserWindow,WebContentsView,ipcMain,session,Menu}=require('electron');
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{execFile}=require('node:child_process'),{promisify}=require('node:util');
 const run=promisify(execFile),ROOT=path.resolve(__dirname,'..');
-let win,source,editor,connection,current='source',busy=false;
+let win,source,editor,connection,current='source',busy=false,editorReady=false,pendingCapture=null;
 app.setName('Console Canvas');
 const stateDir=process.env.CONSOLE_CANVAS_STATE_DIR||path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'console-canvas');
 function webUrl(value){const parsed=new URL(value);if(!['https:','http:'].includes(parsed.protocol)||parsed.username||parsed.password)throw new Error('HTTP 또는 HTTPS 주소를 입력해 주세요.');return parsed.href;}
@@ -26,6 +26,7 @@ async function start(){
   for(const event of ['did-navigate','did-navigate-in-page','did-finish-load'])source.webContents.on(event,()=>notify());
   source.webContents.on('did-fail-load',(_event,code,description,_url,isMain)=>{if(isMain&&code!==-3)notify('사이트를 열지 못했습니다: '+description);});
   ipcMain.handle('canvas:connection',event=>{trusted(event,'editor');return {url:connection.url,token:connection.token};});
+  ipcMain.on('canvas:editor-ready',event=>{trusted(event,'editor');editorReady=true;if(pendingCapture){editor.webContents.send('canvas:snapshot',pendingCapture);pendingCapture=null;}});
   ipcMain.handle('canvas:info',event=>{trusted(event);return state();});
   ipcMain.handle('canvas:show',(event,which)=>{trusted(event);show(which);});
   ipcMain.handle('canvas:navigate',async(event,input)=>{trusted(event);let value=String(input).trim();if(!/^https?:\/\//i.test(value))value='https://'+value;const url=webUrl(value);show('source');await source.webContents.loadURL(url);});
@@ -37,7 +38,8 @@ async function start(){
     try{const captureCode=fs.readFileSync(path.join(ROOT,'capture.js'),'utf8');
       const snapshot=await source.webContents.executeJavaScriptInIsolatedWorld(1001,[{code:captureCode+'\n;globalThis.UICloneCapture.capture(document);'}]);
       snapshot.screenshot=(await source.webContents.capturePage()).toDataURL();
-      editor.webContents.send('canvas:snapshot',snapshot);show('editor');notify('화면을 가져왔어요. 요소를 옮기거나 주석을 남겨 보세요.');
+      if(editorReady)editor.webContents.send('canvas:snapshot',snapshot);else pendingCapture=snapshot;
+      show('editor');notify('화면을 가져왔어요. 요소를 옮기거나 주석을 남겨 보세요.');
       return {id:snapshot.id,nodes:snapshot.nodes.length};
     }finally{busy=false;notify();}
   });

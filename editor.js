@@ -3,6 +3,7 @@ import {CanvasScene,copy,validateSnapshot} from './engine.js';
 import {download,instructionText,reviewPayload,buildReview} from './export.js';
 import {createEditorController} from './editor-controller.js';
 import {createMcpBridge} from './bridge-client.js';
+import {createSnapshotHistory} from './snapshot-history.js';
 
 const $=selector=>document.querySelector(selector);
 const isExtension=typeof chrome!=='undefined'&&!!chrome.runtime?.id;
@@ -12,20 +13,21 @@ const kinds={text:'텍스트',pseudo:'생성된 문구',icon:'아이콘',raster:
 let toastTimer;
 function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,4000);}
 function notice(message){$('#notice').textContent=message;$('#notice').hidden=!message;}
-function checkpoint(){return {edits:copy(state.scene.edits),annotations:copy(state.scene.annotations),selected:state.scene.selected};}
+function checkpoint(){return {edits:copy(state.scene.edits),annotations:copy(state.scene.annotations),selected:state.scene.selected,note:$('#review-note').value,activeSnapshotId:state.timeline?.activeId||null};}
+function applyCheckpoint(point){state.commentTarget=null;state.scene.setComments(point.annotations);state.scene.setEdits(point.edits);state.scene.select(point.selected);$('#review-note').value=point.note||'';}
 function historyBefore(){state.undo.push(checkpoint());if(state.undo.length>100)state.undo.shift();state.redo=[];}
 function commitCommentDraft(){if(state.scene&&state.commentTarget)state.scene.setComment(state.commentTarget,$('#component-comment').value);}
 function changeCommitted(detail={}) {
-  if(detail.cancel)state.undo.pop();else {state.revision++;state.lastAction={actor:detail.actor||'user',label:detail.label||'화면 편집'};}renderInspector();renderLayers();renderChanges();renderHistory();renderMcpStatus();save();
+  if(detail.cancel)state.undo.pop();else {state.revision++;state.lastAction={actor:detail.actor||'user',label:detail.label||'화면 편집'};}renderInspector();renderLayers();renderChanges();renderHistory();renderSnapshots();renderMcpStatus();save();
 }
 function renderHistory(){$('#undo').disabled=!state.undo.length;$('#redo').disabled=!state.redo.length;}
 function undo(direction='undo',detail={}) {
   if(!state.scene)return;const from=state[direction],to=state[direction==='undo'?'redo':'undo'],previous=from.pop();if(!previous)return;
-  to.push(checkpoint());state.commentTarget=null;state.scene.setComments(previous.annotations);state.scene.setEdits(previous.edits);state.scene.select(previous.selected);state.revision++;state.lastAction={actor:detail.actor||'user',label:direction==='undo'?'실행 취소':'다시 실행'};renderLayers();renderChanges();renderHistory();renderMcpStatus();save();
+  to.push(checkpoint());applyCheckpoint(previous);if(state.timeline)state.timeline.activeId=previous.activeSnapshotId||null;state.revision++;state.lastAction={actor:detail.actor||'user',label:direction==='undo'?'실행 취소':'다시 실행'};renderInspector();renderLayers();renderChanges();renderHistory();renderSnapshots();renderMcpStatus();save();
 }
 function save() {
   if(!state.snapshot||!state.scene)return;
-  const value={...state.snapshot,edits:copy(state.scene.edits),annotations:copy(state.scene.annotations),note:$('#review-note').value,updatedAt:new Date().toISOString()};
+  const value={...state.snapshot,edits:copy(state.scene.edits),annotations:copy(state.scene.annotations),timeline:copy(state.timeline),note:$('#review-note').value,updatedAt:new Date().toISOString()};
   $('#save-status').textContent='저장 중…';
   state.saving=state.saving.catch(()=>{}).then(()=>saveDocument(value)).then(()=>{state.lastSaveError=null;$('#save-status').textContent='이 기기에 저장됨';}).catch(error=>{state.lastSaveError=error.message;$('#save-status').textContent='자동 저장 실패 · 파일로 저장해 주세요';});
 }
@@ -94,6 +96,28 @@ function renderChanges() {
   comments.forEach((comment,index)=>{const item=document.createElement('div');item.className='change-item';const pick=document.createElement('button');pick.type='button';const title=document.createElement('strong');title.textContent='주석 '+(index+1)+' · '+comment.name;pick.append(title);pick.addEventListener('click',()=>{selectNode(comment.id,{reveal:true});focusComment();});const text=document.createElement('span');text.className='comment-text';text.textContent=comment.text;item.append(pick,text);if(comment.targetDeleted){const deleted=document.createElement('span');deleted.className='comment-target-deleted';deleted.textContent='대상이 삭제된 상태 · 요청 내용 확인 필요';item.append(deleted);}container.append(item);});
 }
 function focusComment(){const field=$('#component-comment');field.focus({preventScroll:true});field.scrollIntoView({block:'nearest'});}
+const snapshotHistory=createSnapshotHistory({state,checkpoint,historyBefore,apply:applyCheckpoint,changed:changeCommitted});
+function showSnapshots(show=true){$('#snapshot-panel').hidden=!show;$('#inspect-panel').hidden=show;$('#snapshots-button').setAttribute('aria-expanded',String(show));if(show)renderSnapshots();}
+function renderSnapshots() {
+  if(!state.timeline)return;
+  const entries=snapshotHistory.list(),index=entries.findIndex(e=>e.active),dirty=snapshotHistory.dirty();
+  $('#snapshot-count').textContent=entries.length;$('#snapshot-position').textContent=(index+1)+' / '+entries.length;
+  $('#previous-snapshot').disabled=index<=0;$('#next-snapshot').disabled=index<0||index>=entries.length-1;
+  $('#snapshot-current').textContent=dirty?'현재 작업 중 · 다른 버전으로 이동하면 자동 보관됩니다.':'저장된 버전을 보고 있습니다.';
+  const fragment=document.createDocumentFragment();
+  entries.forEach((entry,i)=>{
+    const button=document.createElement('button');button.type='button';button.className='snapshot-entry';button.dataset.snapshotId=entry.id;button.setAttribute('aria-pressed',String(entry.active));
+    const title=document.createElement('strong');title.textContent=(i+1)+'. '+entry.name;
+    const meta=document.createElement('span');meta.textContent=new Date(entry.created_at).toLocaleString('ko-KR',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})+' · 변경 '+entry.change_count+' · 주석 '+entry.comment_count;
+    const badge=document.createElement('small');badge.textContent=entry.active?(dirty?'현재 버전 + 편집 중':'현재 버전'):entry.kind==='automatic'?'이동 전 자동 보관':entry.kind==='initial'?'시작점':'저장된 버전';
+    button.append(title,meta,badge);button.addEventListener('click',()=>restoreSnapshot(entry.id));fragment.append(button);
+  });$('#snapshot-list').replaceChildren(fragment);
+}
+function restoreSnapshot(id){try{commitCommentDraft();const result=snapshotHistory.restore(id);toast(result.automatic_snapshot_id?'현재 작업을 자동 보관하고 스냅샷으로 이동했어요.':'저장한 스냅샷으로 이동했어요.');}catch(error){toast(error.message);}}
+$('#snapshots-button').addEventListener('click',()=>{commitCommentDraft();showSnapshots($('#snapshot-panel').hidden);});
+$('#close-snapshots').addEventListener('click',()=>showSnapshots(false));
+$('#snapshot-form').addEventListener('submit',event=>{event.preventDefault();try{commitCommentDraft();snapshotHistory.create($('#snapshot-name').value);$('#snapshot-name').value='';toast('현재 화면과 주석을 스냅샷으로 저장했어요.');}catch(error){toast(error.message);}});
+for(const [id,delta] of [['#previous-snapshot',-1],['#next-snapshot',1]])$(id).addEventListener('click',()=>{const entries=snapshotHistory.list(),index=entries.findIndex(e=>e.active);if(entries[index+delta])restoreSnapshot(entries[index+delta].id);});
 function onKey(event) {
   if(!state.scene||$('#export-dialog').open)return;
   const editing=event.target.closest?.('input,textarea,select');if(editing&&event.target.ownerDocument===document)return;
@@ -105,18 +129,19 @@ function onKey(event) {
   const delta={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[event.key];
   if(delta&&state.scene.selected){event.preventDefault();state.scene.nudge(delta[0]*(event.shiftKey?10:1),delta[1]*(event.shiftKey?10:1));}
 }
-async function openSnapshot(snapshot,edits={},note='',annotations={}) {
+async function openSnapshot(snapshot,edits={},note='',annotations={},timeline=null) {
   validateSnapshot(snapshot);const generation=++state.generation;
   commitCommentDraft();state.commentTarget=null;state.ready=false;state.revision++;
-  $('#welcome').hidden=true;$('#artboard-space').hidden=false;$('#export-button').disabled=true;
-  state.snapshot=snapshot;state.undo=[];state.redo=[];state.expanded=new Set(snapshot.nodes.filter(node=>!node.parentId).map(node=>node.id));
+  $('#welcome').hidden=true;$('#artboard-space').hidden=false;$('#export-button').disabled=true;$('#snapshots-button').disabled=true;
+  const {timeline:storedTimeline,edits:storedEdits,annotations:storedComments,note:storedNote,...capture}=snapshot;
+  timeline=timeline||storedTimeline;state.timeline=null;state.snapshot=capture;state.undo=[];state.redo=[];state.expanded=new Set(snapshot.nodes.filter(node=>!node.parentId).map(node=>node.id));
   $('#source-title').textContent=snapshot.source.title||'가져온 화면';$('#document-title').textContent=snapshot.source.title||'가져온 화면';$('#source-url').textContent=snapshot.source.url;
   try {const url=new URL(snapshot.source.url);$('#source-url').href=/^https?:$/.test(url.protocol)?url.href:'#';}catch{$('#source-url').href='#';}
   $('#source-url').hidden=false;$('#source-meta').textContent=snapshot.source.viewport.width+' × '+snapshot.source.viewport.height+' · '+snapshot.nodes.length.toLocaleString()+'개 요소';$('#review-note').value=note;
   $('#artboard-label').textContent=(snapshot.source.title||'화면')+' / '+snapshot.source.viewport.width+' px';
   const scene=new CanvasScene($('#scene-frame'),snapshot,{onSelect:id=>{if(id!==state.commentTarget)commitCommentDraft();if(state.scene&&id)for(const parent of state.scene.ancestors(id))state.expanded.add(parent);renderInspector();renderLayers();},onCommentSelect:focusComment,onSize:sizeChanged,onBeforeChange:historyBefore,onLiveChange:renderInspector,onCommit:changeCommitted,onKey});
   state.scene=scene;
-  try {await scene.mount();if(generation!==state.generation)return;scene.interactionMode=state.mode;scene.setComments(annotations);scene.setEdits(edits);fit();$('#viewport').scrollLeft=(snapshot.source.scroll?.x||0)*state.zoom;$('#viewport').scrollTop=(snapshot.source.scroll?.y||0)*state.zoom;renderInspector();renderLayers();renderChanges();renderHistory();$('#export-button').disabled=false;
+  try {await scene.mount();if(generation!==state.generation)return;scene.interactionMode=state.mode;scene.setComments(annotations);scene.setEdits(edits);snapshotHistory.initialise(timeline);fit();$('#viewport').scrollLeft=(snapshot.source.scroll?.x||0)*state.zoom;$('#viewport').scrollTop=(snapshot.source.scroll?.y||0)*state.zoom;renderInspector();renderLayers();renderChanges();renderHistory();renderSnapshots();$('#export-button').disabled=false;$('#snapshots-button').disabled=false;
     $('#capture-notes').hidden=!snapshot.warnings.length;$('#capture-notes-title').textContent='가져오기 참고 '+snapshot.warnings.length+'건';$('#capture-notes-list').replaceChildren();
     for(const warning of snapshot.warnings){const li=document.createElement('li');li.textContent=warning.message;$('#capture-notes-list').append(li);}
     state.ready=true;connectDesktopIfReady();renderMcpStatus();save();toast('화면을 가져왔어요. 요소를 옮기거나 주석으로 수정 방향을 남겨 보세요.');
@@ -135,8 +160,8 @@ async function loadSample() {
 async function importFile(file) {
   if(!file)return;if(file.size>85_000_000)throw new Error('파일이 너무 큽니다. 85MB 이하의 화면 파일을 선택해 주세요.');
   const data=JSON.parse(await file.text());
-  if(data.format==='console-canvas-review'){await openSnapshot(data.snapshot,data.edits,data.note||'',data.annotations||{});}
-  else await openSnapshot(data,data.edits||{},data.note||'',data.annotations||{});
+  if(data.format==='console-canvas-review'){await openSnapshot(data.snapshot,data.edits,data.note||'',data.annotations||{},data.timeline);}
+  else await openSnapshot(data,data.edits||{},data.note||'',data.annotations||{},data.timeline);
 }
 $('#file-input').addEventListener('change',event=>{importFile(event.target.files[0]).catch(error=>notice('파일을 열지 못했습니다: '+error.message));event.target.value='';});
 for(const id of ['#import-button','#welcome-import'])$(id).addEventListener('click',()=>$('#file-input').click());
@@ -156,13 +181,13 @@ for(const id of ['#offset-x','#offset-y'])$(id).addEventListener('change',()=>st
 $('#zoom').addEventListener('change',event=>zoomTo(Number(event.target.value)));$('#zoom-in').addEventListener('click',()=>zoomTo(state.zoom+.1));$('#zoom-out').addEventListener('click',()=>zoomTo(state.zoom-.1));$('#fit').addEventListener('click',fit);
 $('#viewport').addEventListener('wheel',event=>{if(event.ctrlKey||event.metaKey){event.preventDefault();zoomTo(state.zoom+(event.deltaY>0?-.05:.05));}},{passive:false});
 document.addEventListener('keydown',onKey);
-$('#review-note').addEventListener('change',save);
+$('#review-note').addEventListener('change',()=>changeCommitted({label:'추가 설명 수정'}));
 $('#export-button').addEventListener('click',()=>{commitCommentDraft();const changes=state.scene.changes(),deleted=changes.filter(c=>c.action==='delete').length;$('#export-summary').textContent='이동 '+(changes.length-deleted)+'개 · 삭제 '+deleted+'개 · 주석 '+state.scene.comments().length+'개 · 원본과 편집본 포함';$('#export-status').textContent='주석은 수정 요청으로 전달되며 화면에 자동 반영되지 않습니다. ZIP을 이 대화에 첨부해 주세요.';$('#export-dialog').showModal();});
 $('#copy-summary').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(instructionText(state.snapshot,state.scene.changes(),$('#review-note').value,state.scene.comments()));$('#export-status').textContent='지시문을 복사했어요. 이 대화에 붙여넣을 수 있습니다.';}catch{$('#export-status').textContent='클립보드에 접근하지 못했습니다. ZIP의 instructions.txt를 사용해 주세요.';}});
-$('#download-session').addEventListener('click',()=>{download('console-canvas-'+state.snapshot.id.slice(0,8)+'.uiclone.json',JSON.stringify(reviewPayload(state.snapshot,state.scene,$('#review-note').value)),'application/json');$('#export-status').textContent='편집 파일을 저장했어요. 화면 파일 열기로 다시 편집할 수 있습니다.';});
+$('#download-session').addEventListener('click',()=>{download('console-canvas-'+state.snapshot.id.slice(0,8)+'.uiclone.json',JSON.stringify(reviewPayload(state.snapshot,state.scene,$('#review-note').value,state.timeline)),'application/json');$('#export-status').textContent='스냅샷 목록을 포함해 편집 파일을 저장했어요. 화면 파일 열기로 다시 편집할 수 있습니다.';});
 $('#download-review').addEventListener('click',async()=>{
   const button=$('#download-review');button.disabled=true;
-  try {const result=await buildReview(state.snapshot,state.scene,$('#review-note').value,message=>$('#export-status').textContent=message);download('console-canvas-review-'+state.snapshot.id.slice(0,8)+'.zip',result.blob);$('#export-status').textContent='ZIP을 저장했어요. 이 대화에 첨부하고 “이 편집 결과를 기준으로 수정해 줘”라고 보내 주세요.'+(result.warnings.length?' 비교 이미지 일부를 생성하지 못해 HTML 비교 화면을 포함했습니다.':'');}
+  try {const result=await buildReview(state.snapshot,state.scene,$('#review-note').value,message=>$('#export-status').textContent=message,state.timeline);download('console-canvas-review-'+state.snapshot.id.slice(0,8)+'.zip',result.blob);$('#export-status').textContent='ZIP을 저장했어요. 이 대화에 첨부하고 “이 편집 결과를 기준으로 수정해 줘”라고 보내 주세요.'+(result.warnings.length?' 비교 이미지 일부를 생성하지 못해 HTML 비교 화면을 포함했습니다.':'');}
   catch(error){$('#export-status').textContent='내보내지 못했습니다: '+error.message;}finally{button.disabled=false;}
 });
 window.addEventListener('dragover',event=>{if(event.dataTransfer?.types.includes('Files'))event.preventDefault();});
@@ -171,8 +196,8 @@ function renderMcpStatus() {
   const status=state.mcpStatus;$('#mcp-button').textContent=status.connected?'MCP 연결됨':'MCP 연결';$('#mcp-button').classList.toggle('connected',!!status.connected);
   $('#mcp-state').textContent=(status.connected?'MCP 연결됨 · r'+state.revision:status.message||'MCP 연결 안 됨')+(state.lastAction?' · '+(state.lastAction.actor==='agent'?'에이전트':'직접 편집')+' '+state.lastAction.label:'');
 }
-const controller=createEditorController({state,editorId,checkpoint,historyBefore,changeCommitted,undo,
-  isBusy:()=>$('#export-dialog').open||!!(state.commentTarget&&$('#component-comment').value.trim()!==(state.scene?.annotations[state.commentTarget]||'')),
+const controller=createEditorController({state,editorId,checkpoint,historyBefore,changeCommitted,undo,snapshotHistory,
+  isBusy:()=>$('#export-dialog').open||$('#mcp-dialog').open||document.activeElement===$('#snapshot-name')||!!(state.commentTarget&&$('#component-comment').value.trim()!==(state.scene?.annotations[state.commentTarget]||'')),
   render:()=>{renderInspector();renderLayers();renderChanges();renderHistory();},flush:async()=>{await state.saving;return !state.lastSaveError;}});
 const mcpBridge=createMcpBridge({metadata:controller.metadata,execute:controller.execute,onStatus:status=>{state.mcpStatus=status;renderMcpStatus();}});
 $('#mcp-button').addEventListener('click',()=>$('#mcp-dialog').showModal());
@@ -189,5 +214,5 @@ if(params.has('id'))getDocument(params.get('id')).then(value=>{if(!value)throw n
 else if(params.has('sample'))loadSample();
 else listDocuments().then(values=>{for(const snapshot of values.slice(0,4)){const button=document.createElement('button');button.className='recent-item';const title=document.createElement('span');title.textContent=snapshot.source.title;const date=document.createElement('small');date.textContent=new Date(snapshot.capturedAt).toLocaleDateString('ko-KR');button.append(title,date);button.addEventListener('click',()=>openSnapshot(snapshot,snapshot.edits,snapshot.note,snapshot.annotations));$('#recent-documents').append(button);}}).catch(()=>{});
 // Exposed for the local integration harness; contains only this editor's current document.
-window.ConsoleCanvas={state,openSnapshot,importFile,undo,selectNode,controller,buildReview:()=>buildReview(state.snapshot,state.scene,$('#review-note').value)};
+window.ConsoleCanvas={state,openSnapshot,importFile,undo,selectNode,controller,snapshotHistory,buildReview:()=>buildReview(state.snapshot,state.scene,$('#review-note').value,undefined,state.timeline)};
 function connectDesktopIfReady(){if(state.desktopConnection&&state.ready&&!mcpBridge.isConnected()){const connection=state.desktopConnection;state.desktopConnection=null;mcpBridge.connect(connection.url,connection.token).catch(error=>notice(error.message));}}

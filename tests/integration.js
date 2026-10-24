@@ -1,6 +1,7 @@
 import {CanvasScene,copy,validateSnapshot,sanitizeHtml} from '../engine.js';
 import {buildReview,download,zipFiles,reviewPayload,instructionText} from '../export.js';
 import {createEditorController} from '../editor-controller.js';
+import {createSnapshotHistory} from '../snapshot-history.js';
 const results=[],output=document.getElementById('results'),status=document.getElementById('status');
 function check(name,predicate) {let passed=false,error='';try{passed=!!predicate();}catch(e){error=e.message;}results.push({name,passed,error});output.textContent=results.map(r=>(r.passed?'PASS ':'FAIL ')+r.name+(r.error?' · '+r.error:'')).join('\n');}
 function near(a,b){return Math.abs(a-b)<.75;}
@@ -122,6 +123,43 @@ async function run() {
   check('MCP redo restores the batch without losing comments',()=>scene.annotations[button.id]==='MCP controller comment'&&scene.edits[text.id].dx===80);
   const wrong=await control.execute({name:'get_screen',arguments:{editor_id:'integration-editor'},document_id:'different',deadline:Date.now()/1000+30});
   check('MCP commands are bound to the captured document identity',()=>wrong.error?.code==='wrong_document');
+  let note='초기 설명';
+  const versionPoint=()=>({...point(),note,activeSnapshotId:controlState.timeline?.activeId});
+  const versionHistory=createSnapshotHistory({state:controlState,checkpoint:versionPoint,
+    historyBefore:()=>{controlState.undo.push(versionPoint());controlState.redo=[];},
+    apply:p=>{scene.setComments(p.annotations);scene.setEdits(p.edits);scene.select(p.selected);note=p.note;},
+    changed:()=>controlState.revision++});
+  versionHistory.initialise();const firstVersion=controlState.timeline.activeId;
+  scene.setEdits({...scene.edits,[text.id]:{dx:180,dy:50},[icon.id]:{deleted:true}});scene.setComments({[button.id]:'두 번째 버전의 주석'});note='두 번째 설명';
+  const secondVersion=versionHistory.create('시안 B').id;
+  versionHistory.restore(firstVersion);
+  check('Saved versions restore movements, comments and handoff notes',()=>scene.edits[text.id].dx===80&&scene.annotations[button.id]==='MCP controller comment'&&note==='초기 설명');
+  versionHistory.restore(secondVersion);
+  check('Navigating to the past retains future versions and deleted elements',()=>scene.edits[text.id].dx===180&&scene.hidden(icon.id)&&note==='두 번째 설명'&&versionHistory.list().length===2);
+  scene.setEdits({...scene.edits,[text.id]:{dx:290,dy:60}});scene.setComments({[button.id]:'저장하지 않은 작업'});note='작업 중 설명';
+  const restored=versionHistory.restore(firstVersion);
+  check('Unsaved work is automatically preserved before navigation',()=>!!restored.automatic_snapshot_id&&versionHistory.list().length===3);
+  versionHistory.restore(restored.automatic_snapshot_id);
+  check('Automatically preserved work is recoverable including notes',()=>scene.edits[text.id].dx===290&&scene.annotations[button.id]==='저장하지 않은 작업'&&note==='작업 중 설명');
+  versionHistory.restore(firstVersion);scene.setEdits({...scene.edits,[text.id]:{dx:350,dy:80}});const branch=versionHistory.create('과거에서 만든 시안 C').id;
+  check('Editing in the past creates a branch without truncating later snapshots',()=>versionHistory.list().some(e=>e.id===secondVersion)&&controlState.timeline.entries.find(e=>e.id===branch).parentId===firstVersion);
+  const persisted=JSON.parse(JSON.stringify(controlState.timeline));versionHistory.initialise(persisted);versionHistory.restore(secondVersion);
+  check('Serialized snapshot history can reopen and navigate forward',()=>scene.edits[text.id].dx===180&&controlState.timeline.entries.length===4);
+  const beforeInvalid=JSON.stringify(controlState.timeline);let invalidHistory=false;
+  try{versionHistory.initialise({...persisted,entries:[persisted.entries[0],persisted.entries[0]]});}catch{invalidHistory=true;}
+  check('Invalid imported history is rejected without changing the timeline',()=>invalidHistory&&JSON.stringify(controlState.timeline)===beforeInvalid);
+  const versionControl=createEditorController({state:controlState,editorId:'integration-editor',snapshotHistory:versionHistory,isBusy:()=>false});
+  const versionInvoke=(name,args={})=>versionControl.execute({name,arguments:{editor_id:'integration-editor',...args},document_id:snapshot.id,deadline:Date.now()/1000+30});
+  const savedRevision=controlState.revision;
+  const savedViaMcp=await versionInvoke('create_snapshot',{expected_revision:savedRevision,name:'MCP로 저장'});
+  check('MCP creates named snapshots with monotonic revision checks',()=>savedViaMcp.ok&&savedViaMcp.snapshot_id&&controlState.revision===savedRevision+1);
+  const staleSnapshot=await versionInvoke('restore_snapshot',{expected_revision:savedRevision,snapshot_id:firstVersion});
+  check('Stale MCP snapshot restoration cannot overwrite current work',()=>staleSnapshot.error?.code==='revision_conflict');
+  await versionInvoke('restore_snapshot',{expected_revision:controlState.revision,snapshot_id:firstVersion});
+  const snapshotPage=await versionInvoke('list_snapshots',{offset:1,limit:2});
+  check('MCP snapshot listing is paginated and restoration keeps every saved version',()=>snapshotPage.ok&&snapshotPage.snapshots.length===2&&snapshotPage.total===5&&snapshotPage.active_snapshot_id===firstVersion);
+  const portable=reviewPayload(snapshot,scene,note,controlState.timeline);
+  check('Portable review JSON includes immutable snapshot history',()=>JSON.parse(JSON.stringify(portable)).timeline.entries.length===5);
   scene.setComments(initial.annotations);scene.setEdits(initial.edits);scene.select(initial.selected);
   const result=await buildReview(snapshot,scene,'제목은 오른쪽으로 옮기고 등록 버튼의 아이콘은 삭제해 주세요.');
   check('Review contains reopenable JSON, changes, and visual comparison',()=>['review.json','changes.json','review.html','before.html','after.html'].every(name=>result.fileNames.includes(name)));

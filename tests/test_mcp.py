@@ -1,18 +1,35 @@
 """Protocol schemas, scoped delivery, replay protection and loopback HTTP boundary."""
 import importlib.util
+import http.client
 import json
 from pathlib import Path
 import sys
 import threading
+import tempfile
 import time
 import unittest
+from unittest.mock import patch, Mock
 import urllib.error
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'mcp'))
 from bridge import Broker, Handler, ThreadingHTTPServer, allowed_origin, validate
-from server import TOOLS
+from server import TOOLS, VERSION, ensure_bridge
+
+
+class UpgradeTests(unittest.TestCase):
+    def test_upgrade_tolerates_an_old_bridge_closing_before_acknowledgement(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state_dir = Path(directory)
+            (state_dir / 'connection.json').write_text(json.dumps({'url': 'http://127.0.0.1:8849', 'token': 'test-token'}))
+            old = {'service': 'console-canvas', 'version': '0.3.0'}
+            new = {'service': 'console-canvas', 'version': VERSION}
+            with patch('server.request', side_effect=[old, old, http.client.IncompleteRead(b'', 12), new]) as request, patch('server.subprocess.Popen', return_value=Mock()) as process:
+                connection = ensure_bridge(state_dir, ROOT, 8849)
+            self.assertEqual(connection['url'], 'http://127.0.0.1:8849')
+            self.assertEqual(request.call_args_list[2].args[1], '/admin/stop')
+            process.assert_called_once()
 
 
 class BrokerTests(unittest.TestCase):
@@ -66,6 +83,17 @@ class BrokerTests(unittest.TestCase):
         for origin in ('https://evil.example', 'http://127.0.0.1.evil.example:8849', 'http://user@127.0.0.1:8849', 'chrome-extension://invalid'):
             self.assertFalse(allowed_origin(origin))
 
+    def test_snapshot_tools_require_revision_and_operation_identity(self):
+        from server import definitions
+        definitions_by_name = {item['name']: item for item in definitions()}
+        self.assertTrue(definitions_by_name['list_snapshots']['annotations']['readOnlyHint'])
+        for name in ('create_snapshot', 'restore_snapshot'):
+            self.assertFalse(definitions_by_name[name]['annotations']['readOnlyHint'])
+            rule = definitions_by_name[name]['inputSchema']
+            with self.assertRaises(ValueError):
+                validate({'editor_id': 'test-editor'}, rule)
+        validate({'editor_id': 'test-editor', 'expected_revision': 2, 'operation_id': 'once', 'snapshot_id': 'version-a'}, definitions_by_name['restore_snapshot']['inputSchema'])
+
 
 class HttpBoundaryTests(unittest.TestCase):
     def setUp(self):
@@ -100,6 +128,11 @@ class HttpBoundaryTests(unittest.TestCase):
         for path in ('/../mcp/server.py', '/connection.json', '/README.md', '/%2e%2e/config.toml'):
             with self.subTest(path=path), self.assertRaises(urllib.error.HTTPError):
                 self.request(path)
+
+    def test_stop_returns_a_complete_response_before_shutdown(self):
+        request = urllib.request.Request(self.url + '/admin/stop', data=b'{}', headers={'Authorization': 'Bearer ' + self.server.token, 'Content-Type': 'application/json'})
+        with urllib.request.urlopen(request) as response:
+            self.assertEqual(json.load(response), {'ok': True})
 
 
 if __name__ == '__main__':
