@@ -113,5 +113,10 @@ export function createMcpBridge({ metadata, execute, onStatus }) {
     onStatus({ connected: true, message: 'MCP 연결됨' });
     void loop(connection, version);
   }
-  return { connect, disconnect, isConnected: () => !!current };
+  async function suspend() {
+    const connection = current ? { url: current.url, token: current.token } : null;
+    await disconnect();
+    return connection;
+  }
+  return { connect, disconnect, suspend, isConnected: () => !!current };
 }

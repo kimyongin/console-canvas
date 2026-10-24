@@ -458,3 +458,53 @@
 .document-item small {
   font-size: 10px;
 }
+
+.list-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0;
+}
+.list-tabs button[aria-pressed='true'] {
+  color: var(--accent);
+  background: #efedff;
+  border-color: #d6d1fa;
+}
+.item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px;
+}
+.item-actions button {
+  font-size: 11px;
+}
+.document-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.document-card .document-item {
+  border: 0;
+  border-radius: 0;
+}
+.document-item:disabled {
+  opacity: 1;
+  cursor: default;
+}
+#rename-dialog {
+  width: min(420px, calc(100vw - 48px));
+}
+#rename-name {
+  width: 100%;
+  margin-top: 10px;
+}
+#rename-error {
+  color: #ae536c;
+  font-size: 12px;
+  min-height: 18px;
+}
+.rename-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}

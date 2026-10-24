@@ -14,7 +14,7 @@ export function createEditorController(options) {
     return {
       editor_id: options.editorId,
       document_id: state.snapshot.id,
-      title: state.snapshot.source.title || '가져온 화면',
+      title: state.snapshot.documentName || state.snapshot.source.title || '가져온 화면',
       url: state.snapshot.source.url,
       revision: state.revision,
       element_count: state.scene.nodes.size,
@@ -29,7 +29,7 @@ export function createEditorController(options) {
       change_count: state.scene.changes().length,
       busy: !!state.scene.drag || !!state.scene.areaSelecting || !!options.isBusy?.(),
       last_action: state.lastAction || null,
-      snapshot_count: state.timeline?.entries.length || 0,
+      snapshot_count: options.snapshotHistory?.list().length || 0,
       active_snapshot_id: state.timeline?.activeId || null,
       snapshot_dirty: options.snapshotHistory?.dirty() || false,
     };

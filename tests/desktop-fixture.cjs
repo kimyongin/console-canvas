@@ -211,19 +211,23 @@ async function main() {
     );
     const expected = await evaluate(
       editor,
-      `(() => {
+      `(async() => {
       const app=window.ConsoleCanvas,doc=document,node=[...app.state.scene.nodes.values()].find(n=>n.locator.id==='new-customer');
       app.selectNode(node.id);app.state.scene.setPosition(23,31);
       doc.querySelector('#component-comment').value='comment in saved snapshot';doc.querySelector('#save-comment').click();
       const copyId=app.state.scene.pasteSelection(app.state.scene.copySelection())[0];
       app.selectNode(node.id);
       const saved=app.snapshotHistory.create('refactor persistence');
+      app.state.snapshot.documentName='종료 후 보존할 문서';app.snapshotHistory.rename(saved.id,'이름 바꾼 시안');
+      const trashId=app.state.timeline.entries[0].id;app.snapshotHistory.trash(trashId);
+      const db=await import('/db.js'),trashed=structuredClone(app.state.snapshot);trashed.id=crypto.randomUUID();
+      await db.saveCapture(trashed);await db.saveSession(trashed.id,{note:'document trash survives quit',timeline:app.state.timeline});await db.trashDocument(trashed.id);
       doc.querySelector('#component-comment').value='draft saved on normal quit';doc.querySelector('#review-note').value='note saved on normal quit';
       const left=doc.querySelector('#resize-layers'),right=doc.querySelector('#resize-properties');
       left.dispatchEvent(new KeyboardEvent('keydown',{key:'Home',bubbles:true}));right.dispatchEvent(new KeyboardEvent('keydown',{key:'Home',bubbles:true}));
       for(let i=0;i<10;i++)left.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));
       for(let i=0;i<12;i++)right.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true}));
-      return {document_id:app.state.snapshot.id,node:node.id,copyId,dx:23,dy:31,snapshotId:saved.id,snapshots:app.state.timeline.entries.length};
+      return {document_id:app.state.snapshot.id,node:node.id,copyId,dx:23,dy:31,snapshotId:saved.id,trashId,trashedDocumentId:trashed.id,snapshots:app.state.timeline.entries.length};
     })()`,
     );
     await fs.writeFile(path.join(directory, 'expected.json'), JSON.stringify(expected));
@@ -239,9 +243,20 @@ async function main() {
     const expected = JSON.parse(await fs.readFile(path.join(directory, 'expected.json')));
     const actual = await evaluate(
       editor,
-      `(() => {const app=window.ConsoleCanvas;return {document_id:app.state.snapshot.id,edits:app.state.scene.edits,annotations:app.state.scene.annotations,note:document.querySelector('#review-note').value,entries:app.state.timeline.entries.map(e=>e.id),active:app.state.timeline.activeId,panels:JSON.parse(localStorage.getItem('console-canvas-panels-v1'))};})()`,
+      `(() => {const app=window.ConsoleCanvas;return {document_id:app.state.snapshot.id,documentName:app.state.snapshot.documentName,trash:app.snapshotHistory.list({deleted:true}),visible:app.snapshotHistory.list(),edits:app.state.scene.edits,annotations:app.state.scene.annotations,note:document.querySelector('#review-note').value,entries:app.state.timeline.entries.map(e=>e.id),active:app.state.timeline.activeId,panels:JSON.parse(localStorage.getItem('console-canvas-panels-v1'))};})()`,
     );
     assert.equal(actual.document_id, expected.document_id);
+    assert.equal(actual.documentName, '종료 후 보존할 문서');
+    const trashedDocument = await evaluate(
+      editor,
+      `(async()=>{const db=await import('/db.js');return {hidden:!(await db.getDocument(${JSON.stringify(expected.trashedDocumentId)})),value:await db.getDocument(${JSON.stringify(expected.trashedDocumentId)},{includeDeleted:true})};})()`,
+    );
+    assert.equal(trashedDocument.hidden, true);
+    assert.equal(trashedDocument.value.note, 'document trash survives quit');
+    assert.ok(trashedDocument.value.timeline.entries.some((e) => e.deletedAt));
+    assert.ok(actual.trash.some((e) => e.id === expected.trashId));
+    assert.ok(!actual.visible.some((e) => e.id === expected.trashId));
+    assert.equal(actual.visible.find((e) => e.id === expected.snapshotId).name, '이름 바꾼 시안');
     assert.equal(actual.edits[expected.node].dx, expected.dx);
     assert.equal(actual.edits[expected.node].dy, expected.dy);
     assert.equal(actual.annotations[expected.node], 'draft saved on normal quit');
@@ -272,6 +287,9 @@ async function main() {
         restored: true,
         comments: true,
         snapshots: true,
+        snapshotTrash: true,
+        documentTrash: true,
+        documentName: true,
         panels: true,
         sandbox: true,
       }),

@@ -53,7 +53,12 @@ export function createEditorSession({
     if (!previous) return;
     to.push(checkpoint());
     applyCheckpoint(previous);
-    if (state.timeline) state.timeline.activeId = previous.activeSnapshotId || null;
+    if (state.timeline)
+      state.timeline.activeId = state.timeline.entries.some(
+        (e) => e.id === previous.activeSnapshotId && !e.deletedAt,
+      )
+        ? previous.activeSnapshotId
+        : null;
     state.revision++;
     state.lastAction = {
       actor: detail.actor || 'user',
@@ -80,6 +85,7 @@ export function createEditorSession({
     if (!state.snapshot || !state.scene || !state.ready) return;
     status('저장 중…');
     state.saving = saveQueue.enqueue(state.snapshot.id, {
+      documentName: state.snapshot.documentName,
       edits: state.scene.edits,
       annotations: state.scene.annotations,
       timeline: state.timeline,

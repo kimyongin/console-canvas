@@ -7,7 +7,10 @@ export function createSnapshotPanel({
   panels,
   toast,
   preview,
+  renameDialog,
+  flushEditor,
 }) {
+  let trashView = false;
   function showPanel(tab) {
     setPanelVisibility('properties', true);
     $('#properties-panel-title').textContent =
@@ -36,19 +39,36 @@ export function createSnapshotPanel({
       dirty = snapshotHistory.dirty();
     $('#snapshot-count').textContent = entries.length;
     $('#version-status').textContent = dirty ? '스냅샷 이후 변경 있음' : '스냅샷과 같음';
-    $('#snapshot-position').textContent = index + 1 + ' / ' + entries.length;
+    $('#snapshot-position').textContent =
+      (index < 0 ? '현재 작업' : index + 1) + ' / ' + entries.length;
     $('#previous-snapshot').disabled = index <= 0;
-    $('#next-snapshot').disabled = index < 0 || index >= entries.length - 1;
+    $('#next-snapshot').disabled = !entries.length || index >= entries.length - 1;
     $('#snapshot-current').textContent = dirty
       ? '현재 작업 중 · 다른 버전으로 이동하면 자동 보관됩니다.'
       : '저장된 버전을 보고 있습니다.';
     if ($('#snapshot-panel').hidden) return;
     const fragment = document.createDocumentFragment();
-    entries.forEach((entry, i) => {
+    const trashEntries = snapshotHistory.list({ deleted: true });
+    $('#snapshots-live').textContent = '저장된 버전 ' + entries.length;
+    $('#snapshots-trash').textContent = '휴지통 ' + trashEntries.length;
+    $('#snapshots-live').setAttribute('aria-pressed', String(!trashView));
+    $('#snapshots-trash').setAttribute('aria-pressed', String(trashView));
+    $('#snapshot-trash-help').hidden = !trashView;
+    const shown = trashView ? trashEntries : entries;
+    if (!shown.length) {
+      const empty = document.createElement('p');
+      empty.className = 'empty-small';
+      empty.textContent = trashView
+        ? '휴지통이 비어 있습니다.'
+        : '저장된 스냅샷이 없습니다. 현재 상태를 저장해 보세요.';
+      fragment.append(empty);
+    }
+    shown.forEach((entry, i) => {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'snapshot-entry';
       button.dataset.snapshotId = entry.id;
+      button.disabled = trashView;
       button.setAttribute('aria-pressed', String(entry.active));
       const title = document.createElement('strong');
       title.textContent = i + 1 + '. ' + entry.name;
@@ -65,15 +85,17 @@ export function createSnapshotPanel({
         ' · 주석 ' +
         entry.comment_count;
       const badge = document.createElement('small');
-      badge.textContent = entry.active
-        ? dirty
-          ? '현재 버전 + 편집 중'
-          : '현재 버전'
-        : entry.kind === 'automatic'
-          ? '이동 전 자동 보관'
-          : entry.kind === 'initial'
-            ? '시작점'
-            : '저장된 버전';
+      badge.textContent = entry.deleted_at
+        ? '휴지통 · ' + new Date(entry.deleted_at).toLocaleDateString('ko-KR')
+        : entry.active
+          ? dirty
+            ? '현재 버전 + 편집 중'
+            : '현재 버전'
+          : entry.kind === 'automatic'
+            ? '이동 전 자동 보관'
+            : entry.kind === 'initial'
+              ? '시작점'
+              : '저장된 버전';
       const image = document.createElement('img');
       image.alt = '배치 미리보기 · ' + entry.name;
       image.dataset.previewId = entry.id;
@@ -85,12 +107,63 @@ export function createSnapshotPanel({
       compare.className = 'snapshot-compare';
       compare.textContent = '현재 작업과 비교';
       compare.addEventListener('click', () => preview.open(entry.id, '@current'));
-      card.append(button, compare);
+      const actions = document.createElement('div');
+      actions.className = 'item-actions';
+      function control(text, kind, run) {
+        const b = document.createElement('button');
+        b.textContent = text;
+        b.dataset.snapshotAction = kind;
+        b.setAttribute('aria-label', entry.name + ' · ' + text);
+        b.addEventListener('click', run);
+        actions.append(b);
+      }
+      control('이름 변경', 'rename', () =>
+        renameDialog.open('스냅샷 이름 변경', entry.name, async (name) => {
+          snapshotHistory.rename(entry.id, name);
+          await flushEditor();
+          toast('스냅샷 이름을 변경했습니다.');
+        }),
+      );
+      if (trashView)
+        control('복구', 'recover', () =>
+          manage(
+            () => snapshotHistory.recover(entry.id),
+            '스냅샷을 목록에 복구했습니다. 현재 화면은 유지됩니다.',
+          ),
+        );
+      else
+        control('휴지통으로 이동', 'trash', () =>
+          manage(
+            () => snapshotHistory.trash(entry.id),
+            '스냅샷을 휴지통으로 이동했습니다. 현재 편집 내용은 유지됩니다.',
+          ),
+        );
+      card.append(button);
+      if (!trashView) card.append(compare);
+      card.append(actions);
       fragment.append(card);
     });
     $('#snapshot-list').replaceChildren(fragment);
     preview.thumbnails();
   }
+  async function manage(run, message) {
+    try {
+      commitCommentDraft();
+      run();
+      await flushEditor();
+      toast(message);
+    } catch (error) {
+      toast(error.message);
+    }
+  }
+  for (const [id, value] of [
+    ['#snapshots-live', false],
+    ['#snapshots-trash', true],
+  ])
+    $(id).addEventListener('click', () => {
+      trashView = value;
+      renderSnapshots();
+    });
   function restoreSnapshot(id) {
     try {
       commitCommentDraft();

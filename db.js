@@ -36,7 +36,8 @@ async function transact(stores, mode, action) {
   }
 }
 export function captureFromDocument(value) {
-  const { edits, annotations, timeline, note, updatedAt, ...capture } = value;
+  const { edits, annotations, timeline, note, updatedAt, documentName, deletedAt, ...capture } =
+    value;
   return capture;
 }
 export async function saveCapture(value) {
@@ -49,7 +50,7 @@ export async function saveCapture(value) {
       store.add(capture);
       tx.objectStore('documents').add({
         id: capture.id,
-        title: capture.source.title,
+        title: value.documentName || capture.source.title,
         url: capture.source.url,
         capturedAt: capture.capturedAt,
         updatedAt: new Date().toISOString(),
@@ -65,45 +66,96 @@ export async function saveSession(id, value) {
     timeline = null,
     note = '',
     updatedAt = new Date().toISOString(),
+    documentName,
   } = value;
   const session = { edits, annotations, timeline, note, updatedAt };
   return transact(['sessions', 'documents'], 'readwrite', (tx) => {
     const metadata = tx.objectStore('documents');
     const request = metadata.get(id);
     request.onsuccess = () => {
-      if (!request.result) {
+      if (!request.result || request.result.deletedAt) {
         tx.abort();
         return;
       }
       tx.objectStore('sessions').put({ ...session, id });
-      metadata.put({ ...request.result, updatedAt: session.updatedAt });
+      metadata.put({
+        ...request.result,
+        ...(typeof documentName === 'string' ? { title: documentName } : {}),
+        updatedAt: session.updatedAt,
+      });
     };
   });
 }
-export async function getDocument(id) {
-  return transact(['captures', 'sessions'], 'readonly', (tx, done) => {
-    let capture, session;
-    const source = tx.objectStore('captures').get(id),
-      edits = tx.objectStore('sessions').get(id);
-    source.onsuccess = () => {
-      capture = source.result;
-      done(capture && { ...capture, ...session });
-    };
-    edits.onsuccess = () => {
-      session = edits.result;
-      done(capture && { ...capture, ...session });
-    };
+export async function getDocumentMetadata(id) {
+  return transact(['documents'], 'readonly', (tx, done) => {
+    const request = tx.objectStore('documents').get(id);
+    request.onsuccess = () => done(request.result);
   });
 }
-export async function listDocuments(limit = 4) {
+export async function getDocument(id, { includeDeleted = false } = {}) {
+  return transact(['captures', 'sessions', 'documents'], 'readonly', (tx, done) => {
+    const values = {};
+    for (const name of ['captures', 'sessions', 'documents']) {
+      const request = tx.objectStore(name).get(id);
+      request.onsuccess = () => {
+        values[name] = request.result;
+        if (Object.keys(values).length === 3) {
+          const meta = values.documents;
+          done(
+            values.captures && meta && (includeDeleted || !meta.deletedAt)
+              ? {
+                  ...values.captures,
+                  ...values.sessions,
+                  ...(meta.title !== values.captures.source.title
+                    ? { documentName: meta.title }
+                    : {}),
+                  ...(meta.deletedAt ? { deletedAt: meta.deletedAt } : {}),
+                }
+              : undefined,
+          );
+        }
+      };
+    }
+  });
+}
+export async function listDocuments(limit = 4, { deleted = false } = {}) {
   return transact(['documents'], 'readonly', (tx, done) => {
     const result = [];
     const request = tx.objectStore('documents').index('updatedAt').openCursor(null, 'prev');
     request.onsuccess = () => {
       const cursor = request.result;
       if (!cursor || result.length >= limit) return done(result);
-      result.push(cursor.value);
+      if (!!cursor.value.deletedAt === deleted) result.push(cursor.value);
       cursor.continue();
     };
   });
+}
+function updateMetadata(id, patch) {
+  return transact(['documents'], 'readwrite', (tx, done) => {
+    const store = tx.objectStore('documents'),
+      request = store.get(id);
+    request.onsuccess = () => {
+      if (!request.result) {
+        tx.abort();
+        return;
+      }
+      const next = { ...request.result, ...patch, updatedAt: new Date().toISOString() };
+      store.put(next);
+      done(next);
+    };
+  });
+}
+export function cleanDocumentName(name) {
+  if (typeof name !== 'string' || !name.trim() || name.trim().length > 120)
+    throw new Error('이름은 1~120자로 입력해 주세요.');
+  return name.trim();
+}
+export function renameDocument(id, name) {
+  return updateMetadata(id, { title: cleanDocumentName(name) });
+}
+export function trashDocument(id) {
+  return updateMetadata(id, { deletedAt: new Date().toISOString() });
+}
+export function restoreDocument(id) {
+  return updateMetadata(id, { deletedAt: null });
 }

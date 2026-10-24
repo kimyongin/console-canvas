@@ -43,7 +43,8 @@ export function createSnapshotHistory(options) {
           !entry.name.trim() ||
           entry.name.length > 120 ||
           !Number.isFinite(Date.parse(entry.createdAt)) ||
-          !entry.state
+          !entry.state ||
+          (entry.deletedAt != null && !Number.isFinite(Date.parse(entry.deletedAt)))
         )
           throw new Error('스냅샷 정보가 올바르지 않습니다.');
         ids.add(entry.id);
@@ -54,12 +55,15 @@ export function createSnapshotHistory(options) {
           kind: ['initial', 'automatic', 'manual'].includes(entry.kind) ? entry.kind : 'manual',
           parentId: typeof entry.parentId === 'string' ? entry.parentId : null,
           state: snapshotPoint(entry.state, nodes),
+          ...(entry.deletedAt ? { deletedAt: entry.deletedAt } : {}),
         };
       });
       state.timeline = {
         version: 1,
         entries,
-        activeId: ids.has(value.activeId) ? value.activeId : null,
+        activeId: entries.some((e) => e.id === value.activeId && !e.deletedAt)
+          ? value.activeId
+          : null,
       };
     } else state.timeline = { version: 1, entries: [], activeId: null };
     if (!state.timeline.entries.length) {
@@ -89,19 +93,22 @@ export function createSnapshotHistory(options) {
       !!state.scene && (!entry || snapshotSignature(current()) !== snapshotSignature(entry.state))
     );
   }
-  function list() {
-    return (state.timeline?.entries || []).map((entry) => ({
-      id: entry.id,
-      name: entry.name,
-      created_at: entry.createdAt,
-      kind: entry.kind,
-      parent_id: entry.parentId,
-      active: entry.id === state.timeline.activeId,
-      change_count: Object.values(entry.state.edits).filter(
-        (e) => e.dx || e.dy || e.deleted || e.copy,
-      ).length,
-      comment_count: Object.keys(entry.state.annotations).length,
-    }));
+  function list({ deleted = false } = {}) {
+    return (state.timeline?.entries || [])
+      .filter((entry) => !!entry.deletedAt === deleted)
+      .map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        created_at: entry.createdAt,
+        kind: entry.kind,
+        parent_id: entry.parentId,
+        ...(entry.deletedAt ? { deleted_at: entry.deletedAt } : {}),
+        active: entry.id === state.timeline.activeId,
+        change_count: Object.values(entry.state.edits).filter(
+          (e) => e.dx || e.dy || e.deleted || e.copy,
+        ).length,
+        comment_count: Object.keys(entry.state.annotations).length,
+      }));
   }
   function create(name = '', detail = {}) {
     if (typeof name !== 'string' || name.length > 120)
@@ -113,7 +120,8 @@ export function createSnapshotHistory(options) {
   }
   function restore(id, detail = {}) {
     const entry = state.timeline.entries.find((e) => e.id === id);
-    if (!entry) throw new Error('해당 스냅샷을 찾을 수 없습니다.');
+    if (!entry || entry.deletedAt)
+      throw new Error('해당 스냅샷을 찾을 수 없습니다. 휴지통에 있다면 먼저 복구해 주세요.');
     if (!dirty() && state.timeline.activeId === id) return { unchanged: true };
     // Protect the current draft without deleting any later or parallel versions.
     const automatic = dirty()
@@ -129,5 +137,37 @@ export function createSnapshotHistory(options) {
     options.changed({ ...detail, label: '스냅샷 복원 · ' + entry.name });
     return { restored_id: id, automatic_snapshot_id: automatic?.id || null };
   }
-  return { initialise, dirty, list, create, restore };
+  function manage(id, action, name) {
+    const entry = state.timeline.entries.find((e) => e.id === id);
+    if (!entry) throw new Error('해당 스냅샷을 찾을 수 없습니다.');
+    if (action === 'rename') {
+      if (typeof name !== 'string' || !name.trim() || name.trim().length > 120)
+        throw new Error('이름은 1~120자로 입력해 주세요.');
+      entry.name = name.trim();
+    } else if (action === 'trash') {
+      if (entry.deletedAt) return;
+      entry.deletedAt = new Date().toISOString();
+      if (state.timeline.activeId === id) state.timeline.activeId = null;
+    } else {
+      delete entry.deletedAt;
+    }
+    options.changed({
+      label:
+        action === 'rename'
+          ? '스냅샷 이름 변경'
+          : action === 'trash'
+            ? '스냅샷을 휴지통으로 이동'
+            : '스냅샷 휴지통 복구',
+    });
+  }
+  return {
+    initialise,
+    dirty,
+    list,
+    create,
+    restore,
+    rename: (id, name) => manage(id, 'rename', name),
+    trash: (id) => manage(id, 'trash'),
+    recover: (id) => manage(id, 'recover'),
+  };
 }

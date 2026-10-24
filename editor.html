@@ -229,6 +229,13 @@
           </div>
           <div id="snapshot-current" class="snapshot-current" role="status"></div>
           <button id="compare-button" class="compare-launch">원본·스냅샷 비교</button>
+          <div class="list-tabs">
+            <button id="snapshots-live" aria-pressed="true">저장된 버전</button
+            ><button id="snapshots-trash" aria-pressed="false">휴지통</button>
+          </div>
+          <p id="snapshot-trash-help" class="snapshot-help" hidden>
+            복구하면 버전 목록으로 돌아갑니다. 복구만으로 현재 화면을 바꾸지는 않습니다.
+          </p>
           <div id="snapshot-list" class="snapshot-list" aria-label="저장된 스냅샷 목록"></div>
         </section>
         <section id="comments-panel" hidden aria-label="요소별 주석 목록">
@@ -312,12 +319,28 @@
         </div>
       </aside>
     </main>
+    <dialog id="rename-dialog" aria-labelledby="rename-title">
+      <form id="rename-form">
+        <h2 id="rename-title">이름 변경</h2>
+        <label for="rename-name">새 이름</label
+        ><input id="rename-name" maxlength="120" required autocomplete="off" />
+        <p id="rename-error" role="status"></p>
+        <div class="rename-actions">
+          <button id="rename-cancel" type="button">취소</button
+          ><button id="rename-save" class="primary" type="submit">저장</button>
+        </div>
+      </form>
+    </dialog>
     <dialog id="documents-dialog" aria-label="저장된 화면">
       <form method="dialog">
         <button class="dialog-close" aria-label="문서 목록 닫기">×</button>
       </form>
       <h2>저장된 화면</h2>
-      <p>현재 작업은 자동 저장한 뒤 전환합니다.</p>
+      <p>작업은 자동 저장됩니다. 삭제한 화면은 휴지통에서 복구할 수 있습니다.</p>
+      <div class="list-tabs">
+        <button id="documents-live" aria-pressed="true">저장된 화면</button
+        ><button id="documents-trash" aria-pressed="false">휴지통</button>
+      </div>
       <input
         id="document-search"
         type="search"

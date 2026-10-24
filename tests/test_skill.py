@@ -35,6 +35,17 @@ def review():
 
 
 class HandoffTests(unittest.TestCase):
+    def test_named_document_and_trashed_versions_are_separate_from_current_requests(self):
+        data = review()
+        data['snapshot']['documentName'] = '고객 화면 시안'
+        data['timeline'] = {'entries': [{'id': 'a'}, {'id': 'b', 'deletedAt': '2026-10-25T00:00:00Z'}]}
+        summary, changes = tool.summarize(data)
+        self.assertEqual(summary['documentName'], '고객 화면 시안')
+        self.assertEqual(summary['source']['title'], 'Fixture')
+        self.assertEqual((summary['snapshotCount'], summary['trashedSnapshotCount']), (1, 1))
+        self.assertEqual(summary['moves'], 2)
+
+
     def test_copy_handoff_and_comments_retain_source_identity(self):
         data = review()
         data['edits'] = {'n50': {'dx': 8, 'copy': {'nodes': [

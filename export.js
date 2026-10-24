@@ -30,7 +30,7 @@ export async function download(name, data, type = 'application/octet-stream') {
 export function instructionText(snapshot, changes, note = '', comments = []) {
   const lines = [
     '다음 콘솔 UI 편집 결과를 기준으로 화면을 수정하거나 구현 방향을 정리해 주세요.',
-    '화면: ' + snapshot.source.title,
+    '화면: ' + (snapshot.documentName || snapshot.source.title),
     '주소: ' + snapshot.source.url,
     '가져온 시각: ' + snapshot.capturedAt,
     '원본 화면 크기: ' + snapshot.source.viewport.width + ' × ' + snapshot.source.viewport.height,
@@ -143,7 +143,7 @@ export function makeReport(snapshot, before, after, instructions, size) {
   return (
     '<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Console Canvas · 편집 결과</title><style>' +
     'body{margin:0;color:#303549;background:#f4f5f9;font:14px/1.7 system-ui,sans-serif}header{padding:18px 25px;background:white;border-bottom:1px solid #e0e3ec;display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap}h1{font-size:17px;margin:0}header p{margin:3px 0 0;color:#939aae;font-size:11px}button{font:inherit;border:1px solid #dddfea;background:white;border-radius:6px;padding:8px 14px;color:#777e91;cursor:pointer}button[aria-pressed=true]{background:#5a55d9;border-color:#5a55d9;color:white}#viewport{overflow:auto;padding:32px;max-height:75vh}#screen-host{position:relative;margin:0 auto;background:white;box-shadow:0 5px 30px #30354915}iframe{border:0;position:absolute;left:0;top:0;transform-origin:0 0;background:white}details{margin:20px 25px;background:white;border:1px solid #e0e3ec;border-radius:9px;padding:15px}summary{cursor:pointer}pre{white-space:pre-wrap;font:12px/1.9 system-ui,sans-serif;overflow-wrap:anywhere}</style></head><body><header><div><h1>' +
-    escapeHtml(snapshot.source.title || '콘솔 화면') +
+    escapeHtml(snapshot.documentName || snapshot.source.title || '콘솔 화면') +
     ' · 편집 결과</h1><p>' +
     escapeHtml(snapshot.source.url) +
     '</p></div><div><button data-view="before" aria-pressed="false">변경 전</button> <button data-view="after" aria-pressed="true">변경 후</button></div></header><div id="viewport"><div id="screen-host"><iframe id="screen" title="변경 전후 화면" sandbox="allow-same-origin" referrerpolicy="no-referrer"></iframe></div></div><details open><summary>전달할 편집 방향</summary><pre id="notes"></pre></details><script type="application/json" id="review-data">' +

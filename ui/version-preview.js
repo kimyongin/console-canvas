@@ -28,10 +28,12 @@ export function versionOptions(state) {
         note: document.querySelector('#review-note').value,
       },
     },
-    ...(state.timeline?.entries || []).map((entry) => ({
-      ...entry,
-      name: '스냅샷 · ' + entry.name,
-    })),
+    ...(state.timeline?.entries || [])
+      .filter((entry) => !entry.deletedAt)
+      .map((entry) => ({
+        ...entry,
+        name: '스냅샷 · ' + entry.name,
+      })),
   ];
 }
 export function createVersionPreview({ $, state, commitCommentDraft }) {

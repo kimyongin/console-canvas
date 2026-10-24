@@ -275,7 +275,13 @@ def summarize(data):
         comments = data.get('comments', [])
         if not isinstance(comments, list) or any(not isinstance(c, dict) or not isinstance(c.get('text'), str) for c in comments):
             fail('Invalid component comments')
+    timeline = data.get('timeline')
+    entries = timeline.get('entries', []) if isinstance(timeline, dict) else []
+    entries = [e for e in entries if isinstance(e, dict)] if isinstance(entries, list) else []
     summary = {
+        'documentName': snapshot.get('documentName', source.get('title')) if snapshot else source.get('title'),
+        'snapshotCount': sum(not e.get('deletedAt') for e in entries),
+        'trashedSnapshotCount': sum(bool(e.get('deletedAt')) for e in entries),
         'format': kind, 'source': source, 'note': data.get('note', ''),
         'capturedAt': snapshot.get('capturedAt') if snapshot else None,
         'nodeCount': len(nodes) if snapshot else None,
