@@ -9,6 +9,8 @@ export function createSnapshotPanel({
 }) {
   function showSnapshots(show = true) {
     if (show) setPanelVisibility('properties', true);
+    $('#properties-panel-title').textContent = show ? '스냅샷' : '선택한 요소';
+    $('#close-snapshots').hidden = !show;
     $('#snapshot-panel').hidden = !show;
     $('#inspect-panel').hidden = show;
     $('#snapshots-button').setAttribute('aria-expanded', String(show));

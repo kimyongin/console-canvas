@@ -37,6 +37,22 @@ try {
       doc.querySelector('#toggle-layers').getAttribute('aria-expanded') === 'true',
   );
   check(
+    'Expanded toggles sit inside the top row of their respective panels',
+    ['layers', 'properties'].every((key) => {
+      const panel = doc.querySelector('#' + key + '-panel'),
+        button = doc.querySelector('#toggle-' + key),
+        r = button.getBoundingClientRect(),
+        p = panel.getBoundingClientRect();
+      return (
+        panel.contains(button) &&
+        r.top >= p.top &&
+        r.bottom <= p.top + 44 &&
+        frame.contentWindow.getComputedStyle(button.querySelector('span')).display === 'none'
+      );
+    }),
+  );
+  doc.querySelector('#toggle-layers').focus();
+  check(
     'Both sides of each resize boundary receive pointer input',
     ['layers', 'properties'].every((key) => {
       const handle = doc.querySelector('#resize-' + key),
@@ -49,16 +65,26 @@ try {
     'Collapsing layers gives its full width to the canvas',
     doc.querySelector('#layers-panel').hidden && Math.abs(width() - initialWidth - leftWidth) < 1,
   );
+  const focusedAfterCollapse = doc.activeElement.id === 'toggle-layers';
   click('toggle-properties');
   check(
     'Both panels can collapse while their reopen buttons stay visible',
     Math.abs(width() - initialWidth - leftWidth - rightWidth) < 1 &&
-      ['toggle-layers', 'toggle-properties'].every(
-        (id) => doc.querySelector('#' + id).getBoundingClientRect().width > 0,
-      ),
+      ['toggle-layers', 'toggle-properties'].every((id) => {
+        const button = doc.querySelector('#' + id);
+        return (
+          button.getBoundingClientRect().width > 0 &&
+          button.closest('.canvas-tools') &&
+          button.getAttribute('aria-expanded') === 'false'
+        );
+      }),
   );
   check('Panel changes preserve the current canvas zoom', app.state.zoom === zoom);
   click('toggle-layers');
+  check(
+    'Moving the toggle between panel and canvas preserves keyboard focus',
+    focusedAfterCollapse && doc.activeElement.id === 'toggle-layers',
+  );
   click('toggle-properties');
   const panelWidth = (key) => doc.querySelector('#' + key + '-panel').getBoundingClientRect().width;
   const pointer = (key, type, x) =>
@@ -163,6 +189,13 @@ try {
   check(
     'Snapshots reopen a collapsed properties panel',
     !doc.querySelector('#properties-panel').hidden && !doc.querySelector('#snapshot-panel').hidden,
+  );
+  check(
+    'Snapshot mode keeps the collapse toggle visible in the same shared heading',
+    !doc.querySelector('#properties-panel-title').closest('[hidden]') &&
+      doc.querySelector('#properties-panel-title').textContent === '스냅샷' &&
+      !doc.querySelector('#toggle-properties').closest('[hidden]') &&
+      !doc.querySelector('#close-snapshots').hidden,
   );
   click('toggle-properties');
   click('snapshots-button');

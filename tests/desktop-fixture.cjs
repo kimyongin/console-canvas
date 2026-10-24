@@ -136,6 +136,12 @@ async function main() {
       }),
     );
   }
+  if (phase === 'reopen') {
+    await fs.writeFile(
+      path.join(__dirname, '../dist/editor-panel-controls.png'),
+      (await editor.capturePage()).toPNG(),
+    );
+  }
   window.close();
 }
 main().catch((error) => {

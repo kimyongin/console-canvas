@@ -28,13 +28,20 @@
     <div id="notice" class="notice" role="status" hidden></div>
     <main class="workspace" id="workspace">
       <aside class="left-panel" id="layers-panel" aria-label="레이어 패널">
+        <div class="panel-heading panel-topbar">
+          <strong>레이어</strong>
+          <div class="panel-heading-actions">
+            <span id="layer-count">0</span>
+            <div id="layers-toggle-home" class="panel-toggle-slot"></div>
+          </div>
+        </div>
         <section class="source-section">
           <div class="eyebrow">SOURCE SCREEN</div>
           <h1 id="source-title">가져온 화면</h1>
           <a id="source-url" target="_blank" rel="noreferrer" hidden></a>
           <div id="source-meta" class="source-meta">소스코드 없이, 보이는 화면 그대로.</div>
         </section>
-        <div class="panel-heading"><strong>레이어</strong><span id="layer-count">0</span></div>
+
         <div class="layer-search">
           <input
             id="layer-search"
@@ -72,21 +79,23 @@
           title="드래그로 속성 너비 조절 · 방향키로 미세 조절"
         ></div>
         <div class="canvas-tools">
-          <button
-            id="toggle-layers"
-            class="panel-toggle"
-            type="button"
-            aria-controls="layers-panel"
-            aria-expanded="true"
-            aria-label="레이어 패널 접기"
-            title="레이어 패널 접기"
-          >
-            <svg aria-hidden="true" viewBox="0 0 20 20">
-              <rect x="2" y="3" width="16" height="14" rx="2" />
-              <path d="M7 3v14" />
-              <path class="panel-fill" d="M3 4h3v12H3z" /></svg
-            ><span>레이어</span>
-          </button>
+          <div id="layers-toggle-canvas" class="panel-toggle-slot">
+            <button
+              id="toggle-layers"
+              class="panel-toggle"
+              type="button"
+              aria-controls="layers-panel"
+              aria-expanded="true"
+              aria-label="레이어 패널 접기"
+              title="레이어 패널 접기"
+            >
+              <svg aria-hidden="true" viewBox="0 0 20 20">
+                <rect x="2" y="3" width="16" height="14" rx="2" />
+                <path d="M7 3v14" />
+                <path class="panel-fill" d="M3 4h3v12H3z" /></svg
+              ><span>레이어</span>
+            </button>
+          </div>
           <div class="canvas-toolbar">
             <div class="history-controls">
               <button id="undo" aria-label="실행 취소" disabled>↶</button
@@ -109,21 +118,23 @@
               ><button id="zoom-in" aria-label="확대">＋</button><button id="fit">너비 맞춤</button>
             </div>
           </div>
-          <button
-            id="toggle-properties"
-            class="panel-toggle"
-            type="button"
-            aria-controls="properties-panel"
-            aria-expanded="true"
-            aria-label="속성 패널 접기"
-            title="속성·주석·스냅샷 패널 접기"
-          >
-            <svg aria-hidden="true" viewBox="0 0 20 20">
-              <rect x="2" y="3" width="16" height="14" rx="2" />
-              <path d="M13 3v14" />
-              <path class="panel-fill" d="M14 4h3v12h-3z" /></svg
-            ><span>속성</span>
-          </button>
+          <div id="properties-toggle-canvas" class="panel-toggle-slot">
+            <button
+              id="toggle-properties"
+              class="panel-toggle"
+              type="button"
+              aria-controls="properties-panel"
+              aria-expanded="true"
+              aria-label="속성 패널 접기"
+              title="속성·주석·스냅샷 패널 접기"
+            >
+              <svg aria-hidden="true" viewBox="0 0 20 20">
+                <rect x="2" y="3" width="16" height="14" rx="2" />
+                <path d="M13 3v14" />
+                <path class="panel-fill" d="M14 4h3v12h-3z" /></svg
+              ><span>속성</span>
+            </button>
+          </div>
         </div>
         <div id="viewport" class="canvas-viewport">
           <div id="welcome" class="welcome">
@@ -172,11 +183,12 @@
         </div>
       </section>
       <aside class="right-panel" id="properties-panel" aria-label="속성·주석·스냅샷 패널">
+        <div class="panel-heading panel-topbar">
+          <div id="properties-toggle-home" class="panel-toggle-slot"></div>
+          <strong id="properties-panel-title">선택한 요소</strong>
+          <button id="close-snapshots" aria-label="스냅샷 목록 닫기" hidden>×</button>
+        </div>
         <section id="snapshot-panel" class="snapshot-panel" hidden aria-label="스냅샷 기록">
-          <div class="panel-heading">
-            <strong>스냅샷</strong
-            ><button id="close-snapshots" aria-label="스냅샷 목록 닫기">×</button>
-          </div>
           <p class="snapshot-help">
             저장한 버전을 자유롭게 오가세요.<br />이후 버전도 그대로 남습니다.
           </p>
@@ -200,9 +212,6 @@
           <div id="snapshot-list" class="snapshot-list" aria-label="저장된 스냅샷 목록"></div>
         </section>
         <div id="inspect-panel">
-          <div class="panel-heading">
-            <strong>선택한 요소</strong><span class="panel-badge">INSPECT</span>
-          </div>
           <div id="no-selection" class="no-selection">
             <span>⌖</span><strong>어떤 요소든 선택하세요</strong>
             <p>문구, 아이콘, 버튼부터<br />카드 전체까지 주석을 남길 수 있어요.</p>

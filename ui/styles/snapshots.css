@@ -1,7 +1,7 @@
 .snapshot-panel {
   padding-bottom: 16px;
 }
-.snapshot-panel .panel-heading button {
+#close-snapshots {
   border: 0;
   background: transparent;
   padding: 0 3px;

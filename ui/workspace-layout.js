@@ -62,6 +62,9 @@ export function createWorkspaceLayout({ $, commitCommentDraft }) {
     for (const [key, visible] of Object.entries(panels)) {
       const label = key === 'layers' ? '레이어' : '속성',
         button = $('#toggle-' + key);
+      const focused = document.activeElement === button;
+      const home = $('#' + key + (visible ? '-toggle-home' : '-toggle-canvas'));
+      if (button.parentElement !== home) home.append(button);
       $('#' + key + '-panel').hidden = !visible;
       $('#workspace').classList.toggle(key + '-collapsed', !visible);
       button.setAttribute('aria-expanded', String(visible));
@@ -70,6 +73,7 @@ export function createWorkspaceLayout({ $, commitCommentDraft }) {
         (key === 'properties' ? '속성·주석·스냅샷' : label) +
         ' 패널 ' +
         (visible ? '접기' : '펼치기');
+      if (focused) button.focus({ preventScroll: true });
     }
     renderPanelWidths();
   }
