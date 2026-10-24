@@ -19,15 +19,24 @@
 .panel-toggle[aria-expanded=false] .panel-fill{display:none}
 .desktop-editor .canvas-tools{height:44px;background:#fafbfe}
 .desktop-editor .canvas-tools>.canvas-toolbar{flex:1 1 auto}
+.canvas-panel{position:relative;z-index:1;overflow:visible}
+.panel-resizer{position:absolute;top:0;bottom:0;width:8px;z-index:25;cursor:col-resize;touch-action:none;outline-offset:-2px}
+.layers-resizer{left:-4px}.properties-resizer{right:-4px}
+.panel-resizer::before{content:"";position:absolute;top:0;bottom:0;left:3px;width:2px;background:transparent}
+.panel-resizer::after{content:"";position:absolute;left:3px;top:calc(50% - 12px);height:24px;width:2px;border-radius:2px;background:#a8adc0}
+.panel-resizer:hover::before,.panel-resizer:focus-visible::before,.panel-resizer.active::before{background:var(--accent)}
+.panel-resizer:focus-visible{outline:2px solid var(--accent)}
+.resizing-panels,.resizing-panels *{cursor:col-resize!important;user-select:none!important}
+.resizing-panels iframe{pointer-events:none}
 @media(min-width:581px){
-  .workspace{--layers-width:228px;--properties-width:250px;grid-template-columns:var(--layers-width) minmax(0,1fr) var(--properties-width)}
+  .workspace{--layers-width:var(--layers-open-width,228px);--properties-width:var(--properties-open-width,250px);grid-template-columns:var(--layers-width) minmax(0,1fr) var(--properties-width)}
   .workspace>.left-panel{grid-column:1;display:flex}
   .workspace>.canvas-panel{grid-column:2;grid-row:1}
   .workspace>.right-panel{grid-column:3;grid-row:1}
   .workspace.layers-collapsed{--layers-width:0px}
   .workspace.properties-collapsed{--properties-width:0px}
 }
-@media(min-width:581px) and (max-width:1100px){.workspace:not(.layers-collapsed){--layers-width:190px}.workspace:not(.properties-collapsed){--properties-width:220px}}
+@media(min-width:581px) and (max-width:1100px){.workspace:not(.layers-collapsed){--layers-width:var(--layers-open-width,190px)}.workspace:not(.properties-collapsed){--properties-width:var(--properties-open-width,220px)}}
 .desktop-editor .workspace{height:100dvh;min-height:0}
 .desktop-editor .canvas-toolbar{background:#fafbfe;flex:0 0 44px;height:44px;min-height:44px;max-height:44px;padding:4px 12px;gap:12px;flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
 .desktop-editor .canvas-toolbar>div{flex-shrink:0}
