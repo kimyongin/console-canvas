@@ -75,6 +75,10 @@ export function createWorkspaceLayout({ $, commitCommentDraft }) {
         (visible ? '접기' : '펼치기');
       if (focused) button.focus({ preventScroll: true });
     }
+    $('#snapshots-button').setAttribute(
+      'aria-expanded',
+      String(panels.properties && !$('#snapshot-panel').hidden),
+    );
     renderPanelWidths();
   }
   function setPanelVisibility(key, visible) {

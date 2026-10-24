@@ -1,11 +1,11 @@
 import { elementLabel } from './element-labels.js';
-export function createCommentEditor({ $, state, commit, showInspector }) {
+export function createCommentEditor({ $, state, commit, showComments }) {
   const form = $('.component-comment'),
     field = $('#component-comment');
   let timer;
   function close() {
     $('#comment-popover').hidden = true;
-    $('#inspector-comment-host').append(form);
+    $('#comment-editor-host').append(form);
   }
   function position() {
     if ($('#comment-popover').hidden || !state.scene?.selected) return;
@@ -26,6 +26,7 @@ export function createCommentEditor({ $, state, commit, showInspector }) {
   }
   function open({ floating = false } = {}) {
     if (!state.scene?.selected) return;
+    $('#comment-editor-host').hidden = false;
     if (floating) {
       $('#floating-comment-title').textContent = elementLabel(
         state.scene.nodes.get(state.scene.selected),
@@ -35,7 +36,7 @@ export function createCommentEditor({ $, state, commit, showInspector }) {
       position();
     } else {
       close();
-      showInspector();
+      showComments();
     }
     field.focus({ preventScroll: true });
     if (!floating) field.scrollIntoView({ block: 'nearest' });
@@ -58,6 +59,7 @@ export function createCommentEditor({ $, state, commit, showInspector }) {
   function reset() {
     clearTimeout(timer);
     close();
+    $('#comment-editor-host').hidden = true;
   }
   field.addEventListener('input', schedule);
   field.addEventListener('keydown', (event) => {

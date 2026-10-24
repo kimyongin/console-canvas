@@ -193,7 +193,7 @@ try {
   check(
     'Multi-selection inspector presents group controls first and labels its delete scope and bounds',
     doc.querySelector('#direct-edit-controls').getBoundingClientRect().top <
-      doc.querySelector('#inspector-comment-host').getBoundingClientRect().top &&
+      doc.querySelector('.inspector-comment-summary').getBoundingClientRect().top &&
       doc.querySelector('#inspector-delete').textContent === '선택한 2개 삭제' &&
       doc.querySelector('#element-size').textContent.startsWith('선택 영역'),
   );
@@ -231,7 +231,7 @@ try {
   );
   doc.querySelector('#comment-mode').click();
   check('Comment mode hides group movement handle', scene.groupBox.style.display === 'none');
-  doc.querySelector('#comment-mode').click();
+  doc.querySelector('#select-mode').click();
   root.setPointerCapture = oldSet;
   root.hasPointerCapture = oldHas;
   sceneRoot.setPointerCapture = oldSceneSet;

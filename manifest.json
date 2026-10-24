@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Console Canvas · 화면 복제 편집기",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "현재 웹 화면을 소스코드 없이 복제하고 요소 이동·삭제와 자유 텍스트 주석을 전달합니다.",
   "permissions": [
     "activeTab",

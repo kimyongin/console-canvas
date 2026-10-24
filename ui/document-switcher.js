@@ -5,6 +5,7 @@ import {
   trashDocument,
   restoreDocument,
 } from '../db.js';
+import { createActionMenu } from './action-menu.js';
 export function createDocumentSwitcher({
   $,
   state,
@@ -18,7 +19,8 @@ export function createDocumentSwitcher({
 }) {
   const dialog = $('#documents-dialog'),
     list = $('#document-list'),
-    status = $('#document-list-status');
+    status = $('#document-list-status'),
+    menu = $('#document-menu-content');
   let documents = [],
     loading = false,
     deleted = false,
@@ -32,13 +34,10 @@ export function createDocumentSwitcher({
   }
   function setLoading(value) {
     loading = value;
-    for (const id of [
-      '#documents-live',
-      '#documents-trash',
-      '#documents-import',
-      '#documents-dialog .dialog-close',
-    ])
+    for (const id of ['#documents-live', '#documents-trash', '#documents-dialog .dialog-close'])
       $(id).disabled = value;
+    for (const button of menu.querySelectorAll('button'))
+      button.disabled = value || (button.hasAttribute('data-current-document') && !state.ready);
   }
   async function action(run, rethrow = false) {
     if (loading) return;
@@ -49,12 +48,50 @@ export function createDocumentSwitcher({
       if (dialog.open) await reload();
     } catch (error) {
       status.textContent = error.message;
+      toast(error.message);
       if (rethrow) throw error;
     } finally {
       setLoading(false);
-      for (const b of list.querySelectorAll('button'))
-        b.disabled = deleted && b.classList.contains('document-item');
+      if (dialog.open) render();
     }
+  }
+  async function openDocument(id) {
+    const doc = await getDocument(id);
+    if (!doc) throw new Error('저장된 화면을 찾을 수 없습니다.');
+    await openSnapshot(doc, doc.edits, doc.note, doc.annotations);
+    if (dialog.open) dialog.close();
+  }
+  function rename(value) {
+    renameDialog.open('문서 이름 변경', value.title, (name) =>
+      action(async () => {
+        await flushEditor();
+        await renameDocument(value.id, name);
+        if (value.id === state.snapshot?.id) renameCurrent(name);
+        toast('문서 이름을 변경했습니다.');
+      }, true),
+    );
+  }
+  function recover(value, open = false) {
+    return action(async () => {
+      await restoreDocument(value.id);
+      if (open) await openDocument(value.id);
+      toast(
+        open ? '문서를 복구하고 열었습니다.' : '문서를 복구했습니다.',
+        open ? null : { label: '문서 열기', run: () => action(() => openDocument(value.id)) },
+      );
+    });
+  }
+  function trash(value) {
+    const wasCurrent = value.id === state.snapshot?.id;
+    return action(async () => {
+      await flushEditor();
+      await trashDocument(value.id);
+      if (wasCurrent) await closeDocument(value.id);
+      toast('문서를 휴지통으로 이동했습니다.', {
+        label: '되돌리기',
+        run: () => recover(value, wasCurrent && !state.snapshot),
+      });
+    });
   }
   function render() {
     const query = $('#document-search').value.trim().toLocaleLowerCase();
@@ -72,10 +109,10 @@ export function createDocumentSwitcher({
           ? '휴지통이 비어 있습니다.'
           : '저장된 화면이 없습니다.';
     for (const value of matches) {
-      const card = document.createElement('div');
+      const card = document.createElement('div'),
+        button = document.createElement('button');
       card.className = 'document-card';
       card.dataset.documentCard = value.id;
-      const button = document.createElement('button');
       button.className = 'document-item';
       button.disabled = loading || deleted;
       button.dataset.documentId = value.id;
@@ -88,67 +125,51 @@ export function createDocumentSwitcher({
       url.textContent = value.url;
       date.textContent = deleted
         ? '휴지통 이동 ' + new Date(value.deletedAt).toLocaleString('ko-KR')
-        : '가져옴 ' +
-          new Date(value.capturedAt).toLocaleString('ko-KR') +
-          ' · 최근 저장 ' +
-          new Date(value.updatedAt).toLocaleString('ko-KR');
+        : '최근 저장 ' + new Date(value.updatedAt).toLocaleString('ko-KR');
+      button.title = '가져옴 ' + new Date(value.capturedAt).toLocaleString('ko-KR');
       button.append(title, url, date);
       button.addEventListener('click', () => {
-        if (current) {
-          dialog.close();
-          return;
-        }
-        action(async () => {
-          const doc = await getDocument(value.id);
-          if (!doc) throw new Error('저장된 화면을 찾을 수 없습니다.');
-          await openSnapshot(doc, doc.edits, doc.note, doc.annotations);
-          dialog.close();
-        });
+        if (current) dialog.close();
+        else action(() => openDocument(value.id));
       });
-      const controls = document.createElement('div');
-      controls.className = 'item-actions';
-      function control(text, kind, run) {
-        const b = document.createElement('button');
-        b.textContent = text;
-        b.dataset.documentAction = kind;
-        b.disabled = loading;
-        b.setAttribute('aria-label', value.title + ' · ' + text);
-        b.addEventListener('click', run);
-        controls.append(b);
+      const actions = [
+        { label: '이름 변경', scope: 'document', kind: 'rename', run: () => rename(value) },
+      ];
+      if (!deleted)
+        actions.push({
+          label: '휴지통으로 이동',
+          scope: 'document',
+          kind: 'trash',
+          className: 'danger-menu',
+          run: () => trash(value),
+        });
+      card.append(button, createActionMenu({ label: value.title, actions }));
+      if (deleted) {
+        const controls = document.createElement('div');
+        controls.className = 'recovery-actions';
+        for (const [label, kind, open] of [
+          ['복구', 'recover', false],
+          ['복구하고 열기', 'recover-open', true],
+        ]) {
+          const b = document.createElement('button');
+          b.textContent = label;
+          b.setAttribute('aria-label', value.title + ' · ' + label);
+          b.dataset.documentAction = kind;
+          b.disabled = loading;
+          b.addEventListener('click', () => recover(value, open));
+          controls.append(b);
+        }
+        card.append(controls);
       }
-      control('이름 변경', 'rename', () =>
-        renameDialog.open('문서 이름 변경', value.title, (name) =>
-          action(async () => {
-            await flushEditor();
-            await renameDocument(value.id, name);
-            if (current) renameCurrent(name);
-            toast('문서 이름을 변경했습니다.');
-          }, true),
-        ),
-      );
-      if (deleted)
-        control('복구', 'recover', () =>
-          action(async () => {
-            await restoreDocument(value.id);
-            toast('문서를 복구했습니다. 저장된 화면에서 열 수 있습니다.');
-          }),
-        );
-      else
-        control('휴지통으로 이동', 'trash', () =>
-          action(async () => {
-            await flushEditor();
-            await trashDocument(value.id);
-            if (current) await closeDocument(value.id);
-            toast('문서를 휴지통으로 이동했습니다. 편집과 스냅샷도 함께 보관됩니다.');
-          }),
-        );
-      card.append(button, controls);
+      if (loading) for (const b of card.querySelectorAll('button')) b.disabled = true;
       list.append(card);
     }
   }
-  $('#documents-button').addEventListener('click', async () => {
+  async function show(trashView = false) {
     if (state.scene?.drag || state.scene?.areaSelecting || loading) return;
     commitCommentDraft();
+    menu.hidePopover();
+    deleted = trashView;
     $('#document-search').value = '';
     list.replaceChildren();
     status.textContent = '저장된 화면을 불러오는 중…';
@@ -159,14 +180,24 @@ export function createDocumentSwitcher({
     } catch (error) {
       status.textContent = error.message;
     }
+  }
+  $('#documents-button').addEventListener('click', () => show());
+  $('#documents-trash-button').addEventListener('click', () => show(true));
+  $('#rename-current').addEventListener('click', () => {
+    menu.hidePopover();
+    if (state.ready) rename({ id: state.snapshot.id, title: $('#source-title').textContent });
   });
-  for (const [id, trash] of [
+  $('#trash-current').addEventListener('click', () => {
+    menu.hidePopover();
+    if (state.ready) trash({ id: state.snapshot.id, title: $('#source-title').textContent });
+  });
+  for (const [id, value] of [
     ['#documents-live', false],
     ['#documents-trash', true],
   ])
     $(id).addEventListener('click', async () => {
       if (loading) return;
-      deleted = trash;
+      deleted = value;
       $('#document-search').value = '';
       try {
         await reload();
@@ -175,13 +206,14 @@ export function createDocumentSwitcher({
       }
     });
   $('#document-search').addEventListener('input', render);
-  $('#documents-import').addEventListener('click', () => {
-    if (!loading) {
-      dialog.close();
-      $('#file-input').click();
-    }
-  });
   dialog.addEventListener('cancel', (event) => {
     if (loading) event.preventDefault();
+  });
+  menu.addEventListener('beforetoggle', (event) => {
+    if (event.newState !== 'open') return;
+    commitCommentDraft();
+    const rect = $('#document-menu-button').getBoundingClientRect();
+    menu.style.left = Math.max(8, Math.min(innerWidth - 298, rect.left)) + 'px';
+    menu.style.top = rect.bottom + 4 + 'px';
   });
 }

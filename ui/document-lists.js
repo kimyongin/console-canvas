@@ -174,7 +174,7 @@ export function createDocumentLists({ $, state, selectNode, focusComment }) {
       empty.className = 'empty-small';
       empty.textContent = comments.length
         ? '검색 결과가 없습니다.'
-        : '주석 모드에서 요소를 클릭해 수정 방향을 남겨 보세요.';
+        : '아직 저장된 주석이 없습니다.';
       list.append(empty);
     }
   }

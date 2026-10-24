@@ -26,6 +26,10 @@ export function createInspector({ $, state, kinds, selectNode }) {
       return;
     }
     const comment = scene.annotations[id] || '';
+    $('#comment-target-title').textContent = elementLabel(node);
+    $('#selected-comment-summary').textContent =
+      comment || '수정 방향을 주석으로 남길 수 있습니다.';
+    $('#edit-selected-comment').textContent = comment ? '주석 편집' : '주석 남기기';
     if (state.commentTarget !== id || document.activeElement !== $('#component-comment'))
       $('#component-comment').value = comment;
     state.commentTarget = id;

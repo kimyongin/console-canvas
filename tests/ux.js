@@ -25,7 +25,7 @@ try {
     text = (scene.children.get(first.id) || []).find((n) => n.kind === 'text');
   check(
     'Document details are compact and file/connection controls live outside the editing toolbar',
-    !doc.querySelector('#document-menu').open &&
+    !doc.querySelector('#document-menu-content').matches(':popover-open') &&
       !doc.querySelector('.canvas-toolbar').contains(doc.querySelector('#import-button')) &&
       !doc.querySelector('.canvas-toolbar').contains(doc.querySelector('#mcp-button')),
   );
@@ -135,8 +135,8 @@ try {
   );
   click('close-comment-popover');
   check(
-    'Closing the popover preserves the draft and returns the editor to the inspector',
-    doc.querySelector('#inspector-comment-host').contains(field) &&
+    'Closing the popover preserves the draft and returns the draft to the comments panel',
+    doc.querySelector('#comment-editor-host').contains(field) &&
       scene.annotations[first.id] === field.value,
   );
   click('tab-comments');
@@ -151,10 +151,10 @@ try {
   check(
     'Picking a comment reveals its target and input',
     scene.selected === first.id &&
-      !doc.querySelector('#inspect-panel').hidden &&
+      !doc.querySelector('#comments-panel').hidden &&
       doc.activeElement.id === 'component-comment',
   );
-  click('comment-mode');
+  click('select-mode');
   const a = app.snapshotHistory.create('비교 A');
   scene.nudge(35, 20);
   const b = app.snapshotHistory.create('비교 B');

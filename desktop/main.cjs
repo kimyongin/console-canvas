@@ -54,7 +54,7 @@ function state(message) {
       message ||
       (current === 'source'
         ? '로그인한 뒤 원하는 화면에서 가져오기를 누르세요.'
-        : '요소를 옮기거나 주석을 남기세요. MCP는 가져온 화면에 자동 연결됩니다.'),
+        : '복제본 편집 · 원본 사이트에는 적용되지 않습니다.'),
     demo_url: connection.url + '/fixtures/console.html',
   };
 }

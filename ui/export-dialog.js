@@ -7,7 +7,7 @@ import {
 } from '../export.js';
 import { withVersionScene, versionOptions } from './version-preview.js';
 import { elementLabel } from './element-labels.js';
-export function createExportDialog({ $, state, commitCommentDraft, editorId }) {
+export function createExportDialog({ $, state, commitCommentDraft, editorId, flushEditor, toast }) {
   let generation = 0;
   function chosen() {
     return versionOptions(state).find((v) => v.id === $('#handoff-version').value);
@@ -144,23 +144,36 @@ export function createExportDialog({ $, state, commitCommentDraft, editorId }) {
       button.disabled = false;
     }
   }
-  $('#download-session').addEventListener('click', () =>
-    perform($('#download-session'), async () => {
-      const payload = await useVersion((scene, version) =>
-        reviewPayload(state.snapshot, scene, version.state.note, timelineFor(version)),
+  $('#save-document').addEventListener('click', async () => {
+    if (!state.ready) return;
+    $('#document-menu-content').hidePopover();
+    const button = $('#save-document');
+    button.disabled = true;
+    try {
+      commitCommentDraft();
+      await flushEditor();
+      const payload = reviewPayload(
+        state.snapshot,
+        state.scene,
+        $('#review-note').value,
+        state.timeline,
       );
       const result = await download(
         'console-canvas-' + state.snapshot.id.slice(0, 8) + '.uiclone.json',
         JSON.stringify(payload),
         'application/json',
       );
-      $('#export-status').textContent = result?.canceled
-        ? '저장을 취소했습니다.'
-        : result?.path
-          ? '편집 파일을 저장했습니다. 스냅샷 목록도 포함됩니다.'
-          : '편집 파일 다운로드를 요청했습니다.';
-    }),
-  );
+      toast(
+        result?.canceled
+          ? '저장을 취소했습니다.'
+          : '편집 파일을 저장했습니다. 스냅샷과 휴지통도 포함됩니다.',
+      );
+    } catch (error) {
+      toast('편집 파일을 저장하지 못했습니다: ' + error.message);
+    } finally {
+      button.disabled = !state.ready;
+    }
+  });
   $('#download-review').addEventListener('click', () =>
     perform($('#download-review'), async () => {
       const result = await useVersion((scene, version) =>

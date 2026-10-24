@@ -34,17 +34,6 @@
             <div id="layers-toggle-home" class="panel-toggle-slot"></div>
           </div>
         </div>
-        <details class="source-section" id="document-menu">
-          <summary>
-            <span id="source-title">가져온 화면</span><span aria-hidden="true">⌄</span>
-          </summary>
-          <div class="document-details">
-            <a id="source-url" target="_blank" rel="noreferrer" hidden></a>
-            <div id="source-meta" class="source-meta">소스코드 없이, 보이는 화면 그대로.</div>
-            <button id="import-button" type="button">화면 파일 열기…</button>
-            <button id="recapture-button" type="button" hidden>원본에서 다시 가져오기</button>
-          </div>
-        </details>
         <div class="layer-search">
           <input
             id="layer-search"
@@ -84,6 +73,34 @@
           title="드래그로 속성 너비 조절 · 방향키로 미세 조절"
         ></div>
         <div class="canvas-tools">
+          <div id="document-menu" class="document-menu">
+            <button
+              id="document-menu-button"
+              popovertarget="document-menu-content"
+              aria-label="문서 메뉴"
+            >
+              <span id="source-title">문서 열기</span><span aria-hidden="true">⌄</span>
+            </button>
+            <div id="document-menu-content" class="document-menu-content" popover="auto">
+              <button id="documents-button">저장된 화면 전환…</button>
+              <button id="rename-current" data-current-document disabled>이름 변경…</button>
+              <button id="import-button">편집 파일 열기…</button>
+              <button id="save-document" data-current-document disabled>편집 파일 저장…</button>
+              <p class="document-save-help">
+                작업은 자동 저장됩니다. 스냅샷은 시안 보관, 편집 파일은 기기 밖 백업에 사용하세요.
+              </p>
+              <details id="source-details">
+                <summary>원본 정보</summary>
+                <a id="source-url" target="_blank" rel="noreferrer" hidden></a>
+                <div id="source-meta" class="source-meta">편집할 화면을 열어 주세요.</div>
+                <button id="recapture-button" hidden>원본에서 다시 가져오기</button>
+              </details>
+              <button id="documents-trash-button">문서 휴지통…</button>
+              <button id="trash-current" data-current-document class="danger-menu" disabled>
+                이 문서를 휴지통으로 이동
+              </button>
+            </div>
+          </div>
           <div id="layers-toggle-canvas" class="panel-toggle-slot">
             <button
               id="toggle-layers"
@@ -103,16 +120,16 @@
           </div>
           <div class="canvas-toolbar">
             <div class="history-controls">
-              <button id="documents-button" title="저장된 화면 전환 · 파일 열기">문서 ⌄</button>
               <button id="undo" aria-label="실행 취소" disabled>↶</button
               ><button id="redo" aria-label="다시 실행" disabled>↷</button
               ><span class="toolbar-divider"></span
-              ><button id="comment-mode" aria-pressed="false">주석 모드</button
-              ><button id="select-parent" title="상위 요소 선택 · Shift+클릭" disabled>
-                상위 ↑</button
-              ><button id="delete" class="delete-action" disabled>삭제</button>
+              ><button id="select-mode" aria-pressed="true" title="선택·이동 · Esc">선택</button
+              ><button id="comment-mode" aria-pressed="false" title="요소별 수정 요청 작성">
+                주석
+              </button>
               <button id="copy" title="선택 요소 복사 · ⌘/Ctrl+C" disabled>복사</button>
-              <button id="paste" title="이 화면에 요소 붙여넣기 · ⌘/Ctrl+V">붙여넣기</button>
+              <button id="paste" title="이 화면에 요소 붙여넣기 · ⌘/Ctrl+V">붙여넣기</button
+              ><button id="delete" disabled>삭제</button>
             </div>
             <div class="zoom-controls">
               <button id="zoom-out" aria-label="축소">−</button
@@ -205,30 +222,28 @@
               주석 <span id="comments-count">0</span></button
             ><button id="tab-snapshots" aria-pressed="false">스냅샷</button>
           </nav>
-          <button id="close-snapshots" aria-label="스냅샷 목록 닫기" hidden>×</button>
         </div>
         <section id="snapshot-panel" class="snapshot-panel" hidden aria-label="스냅샷 기록">
-          <p class="snapshot-help">
-            저장한 버전을 자유롭게 오가세요.<br />이후 버전도 그대로 남습니다.
-          </p>
-          <form id="snapshot-form">
-            <label for="snapshot-name">현재 상태 저장</label>
-            <div class="snapshot-create">
-              <input
-                id="snapshot-name"
-                maxlength="120"
-                placeholder="예: 검색 영역 정리"
-                autocomplete="off"
-              /><button id="save-snapshot" class="primary" type="submit">저장</button>
+          <div id="snapshot-tools">
+            <form id="snapshot-form">
+              <label for="snapshot-name">현재 상태 저장</label>
+              <div class="snapshot-create">
+                <input
+                  id="snapshot-name"
+                  maxlength="120"
+                  placeholder="예: 검색 영역 정리"
+                  autocomplete="off"
+                /><button id="save-snapshot" class="primary" type="submit">저장</button>
+              </div>
+            </form>
+            <div class="snapshot-navigation">
+              <button id="previous-snapshot" aria-label="이전 스냅샷">← 이전</button
+              ><span id="snapshot-position"></span
+              ><button id="next-snapshot" aria-label="다음 스냅샷">다음 →</button>
             </div>
-          </form>
-          <div class="snapshot-navigation">
-            <button id="previous-snapshot" aria-label="이전 스냅샷">← 이전</button
-            ><span id="snapshot-position"></span
-            ><button id="next-snapshot" aria-label="다음 스냅샷">다음 →</button>
+            <div id="snapshot-current" class="snapshot-current" role="status"></div>
+            <button id="compare-button" class="compare-launch">원본·스냅샷 비교</button>
           </div>
-          <div id="snapshot-current" class="snapshot-current" role="status"></div>
-          <button id="compare-button" class="compare-launch">원본·스냅샷 비교</button>
           <div class="list-tabs">
             <button id="snapshots-live" aria-pressed="true">저장된 버전</button
             ><button id="snapshots-trash" aria-pressed="false">휴지통</button>
@@ -240,6 +255,24 @@
         </section>
         <section id="comments-panel" hidden aria-label="요소별 주석 목록">
           <input id="comment-search" type="search" placeholder="주석 검색" aria-label="주석 검색" />
+          <div id="comment-editor-host" hidden>
+            <strong id="comment-target-title"></strong>
+            <div class="component-comment">
+              <label for="component-comment">이 요소에 주석 남기기</label>
+              <p>어떻게 바꾸고 싶은지 자유롭게 적어 주세요.</p>
+              <textarea
+                id="component-comment"
+                rows="4"
+                maxlength="4000"
+                placeholder="예: 버튼을 오른쪽 위로 옮기고, 문구를 ‘고객 추가’로 바꿔 주세요."
+              ></textarea>
+              <div class="comment-actions">
+                <button id="clear-comment">주석 삭제</button
+                ><button id="save-comment" class="primary">주석 저장</button>
+              </div>
+              <span id="comment-status" role="status"></span>
+            </div>
+          </div>
           <div id="comments-list"></div>
         </section>
         <div id="inspect-panel">
@@ -251,23 +284,9 @@
             <div class="element-kind" id="element-kind"></div>
             <h2 id="element-name"></h2>
             <div id="element-path" class="element-path"></div>
-            <div id="inspector-comment-host">
-              <div class="component-comment">
-                <label for="component-comment">이 요소에 주석 남기기</label>
-                <p>어떻게 바꾸고 싶은지 자유롭게 적어 주세요.</p>
-                <textarea
-                  id="component-comment"
-                  rows="4"
-                  maxlength="4000"
-                  placeholder="예: 버튼을 오른쪽 위로 옮기고, 문구를 ‘고객 추가’로 바꿔 주세요."
-                ></textarea>
-                <div class="comment-actions">
-                  <button id="clear-comment">주석 삭제</button
-                  ><button id="save-comment" class="primary">주석 저장</button>
-                </div>
-                <span id="comment-status" role="status"></span>
-              </div>
-            </div>
+            <button id="select-parent" disabled title="상위 요소 선택 · Shift+클릭">
+              상위 요소 선택 ↑
+            </button>
             <div id="direct-edit-controls">
               <div id="batch-controls" hidden>
                 <strong id="selection-count"></strong>
@@ -302,6 +321,10 @@
               </div>
               <div class="element-size" id="element-size"></div>
               <button id="inspector-delete" class="danger-outline">이 요소 삭제</button>
+            </div>
+            <div class="inspector-comment-summary">
+              <p id="selected-comment-summary"></p>
+              <button id="edit-selected-comment">주석 남기기</button>
             </div>
           </section>
           <section class="changes-section">
@@ -349,15 +372,14 @@
       />
       <p id="document-list-status" role="status"></p>
       <div id="document-list" class="document-list"></div>
-      <button id="documents-import">화면 파일 열기…</button>
     </dialog>
     <dialog id="export-dialog">
       <form method="dialog"><button class="dialog-close" aria-label="닫기">×</button></form>
       <div class="eyebrow">HAND OFF YOUR CHANGES</div>
       <h2>편집 방향을 전달하세요.</h2>
       <p>
-        이동·삭제 기록, 주석과 전후 화면을 함께 저장합니다.<br />편집 파일과 ZIP에는 과거 스냅샷도
-        포함됩니다.
+        이동·삭제 기록, 주석과 전후 화면을 전달합니다.<br />ZIP에는 과거 스냅샷도 포함됩니다. 파일
+        백업은 문서 메뉴에서 저장하세요.
       </p>
       <label class="handoff-label">전달 기준<select id="handoff-version"></select></label>
       <div id="handoff-items" class="handoff-items"></div>
@@ -372,7 +394,6 @@
       </label>
       <div class="export-actions">
         <button id="copy-summary">지시문 복사</button
-        ><button id="download-session">편집 파일 저장</button
         ><button id="download-review" class="primary">전달용 ZIP 다운로드 ↓</button>
       </div>
       <div id="export-status" class="export-status" aria-live="polite"></div>

@@ -1,13 +1,6 @@
 .snapshot-panel {
   padding-bottom: 16px;
 }
-#close-snapshots {
-  border: 0;
-  background: transparent;
-  padding: 0 3px;
-  font-size: 20px;
-  color: #9098ab;
-}
 .snapshot-help {
   margin: 0 18px 18px;
   font-size: 11px;

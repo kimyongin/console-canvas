@@ -195,7 +195,7 @@ try {
     !doc.querySelector('#properties-panel-title').closest('[hidden]') &&
       doc.querySelector('#properties-panel-title').textContent === '스냅샷' &&
       !doc.querySelector('#toggle-properties').closest('[hidden]') &&
-      !doc.querySelector('#close-snapshots').hidden,
+      !doc.querySelector('#close-snapshots'),
   );
   click('toggle-properties');
   click('snapshots-button');

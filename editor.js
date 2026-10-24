@@ -1,3 +1,4 @@
+import { createToast } from './ui/toast.js';
 import { createRenameDialog } from './ui/rename-dialog.js';
 import { createDocumentSwitcher } from './ui/document-switcher.js';
 import { createCommentEditor } from './ui/comment-editor.js';
@@ -54,7 +55,7 @@ const kinds = {
   raster: '이미지 레이어',
   element: '요소',
 };
-let toastTimer;
+const toast = createToast({ $ });
 const {
   checkpoint,
   applyCheckpoint,
@@ -84,12 +85,6 @@ const {
   },
 });
 const { panels, setPanelVisibility } = createWorkspaceLayout({ $, commitCommentDraft });
-function toast(message) {
-  $('#toast').textContent = message;
-  $('#toast').hidden = false;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => ($('#toast').hidden = true), 4000);
-}
 function editSafely(action) {
   try {
     action();
@@ -129,9 +124,12 @@ function renameCurrent(name) {
   save();
 }
 function renderDocumentName() {
-  const name = state.snapshot?.documentName || state.snapshot?.source.title || '가져온 화면';
+  const name = state.snapshot?.documentName || state.snapshot?.source.title || '문서 열기';
   $('#source-title').textContent = name;
   $('#document-title').textContent = name;
+  $('#document-menu-button').title = name;
+  for (const button of document.querySelectorAll('[data-current-document]'))
+    button.disabled = !state.snapshot;
   $('#artboard-label').textContent = state.snapshot
     ? name + ' / ' + state.snapshot.source.viewport.width + ' px'
     : '';
@@ -173,6 +171,7 @@ function closeDocument(id) {
       $('#snapshot-current').textContent = '';
       $('#save-status').textContent = '휴지통에 보관됨';
       renderDocumentName();
+      renderSnapshots();
       renderInspector();
       renderHistory();
       renderRecentDocuments();
@@ -204,10 +203,7 @@ const commentEditor = createCommentEditor({
   $,
   state,
   commit: commitCommentDraft,
-  showInspector: () => {
-    setPanelVisibility('properties', true);
-    showSnapshots(false);
-  },
+  showComments: () => showPanel('comments'),
 });
 function focusComment(options) {
   commentEditor.open(options);
@@ -220,7 +216,7 @@ const snapshotHistory = createSnapshotHistory({
   apply: applyCheckpoint,
   changed: changeCommitted,
 });
-const { showSnapshots, renderSnapshots } = createSnapshotPanel({
+const { showSnapshots, renderSnapshots, showPanel } = createSnapshotPanel({
   $,
   state,
   snapshotHistory,
@@ -248,6 +244,7 @@ function onKey(event) {
     return;
   }
   if (event.key === 'Escape') {
+    setMode('edit');
     state.scene.select(null);
     renderLayers();
     return;
@@ -338,6 +335,7 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
     onAreaStart: areaSelection.beginScene,
     onMessage: toast,
     onSelect: (id) => {
+      $('#document-menu-content').hidePopover();
       if (id !== state.commentTarget) {
         commitCommentDraft();
         commentEditor.reset();
@@ -460,7 +458,10 @@ $('#file-input').addEventListener('change', (event) => {
   event.target.value = '';
 });
 for (const id of ['#import-button', '#welcome-import'])
-  $(id).addEventListener('click', () => $('#file-input').click());
+  $(id).addEventListener('click', () => {
+    $('#document-menu-content').hidePopover();
+    $('#file-input').click();
+  });
 $('#installation-button').addEventListener('click', () => {
   $('#import-guide').hidden = !$('#import-guide').hidden;
 });
@@ -490,20 +491,33 @@ $('#clear-comment').addEventListener('click', () => {
   commitCommentDraft();
   renderInspector();
 });
-$('#comment-mode').addEventListener('click', () => {
+function setMode(mode) {
   commitCommentDraft();
-  state.mode = state.mode === 'comment' ? 'edit' : 'comment';
+  state.mode = mode;
   commentEditor.reset();
   if (state.scene) {
     state.scene.interactionMode = state.mode;
     state.scene.drawSelection();
   }
-  $('#comment-mode').setAttribute('aria-pressed', String(state.mode === 'comment'));
+  $('#select-mode').setAttribute('aria-pressed', String(mode === 'edit'));
+  $('#comment-mode').setAttribute('aria-pressed', String(mode === 'comment'));
   $('#canvas-hint').textContent =
-    state.mode === 'comment'
-      ? '요소 클릭 → 바로 주석 작성 · ⌘/Ctrl+Enter로 저장'
+    mode === 'comment'
+      ? '주석 모드 · 요소 클릭으로 작성 · Esc로 선택 모드'
       : '빈 곳 드래그로 영역 선택 · ⌘/Ctrl+클릭 추가 선택 · ⌘/Ctrl+C / V 복사·붙여넣기';
   renderInspector();
+}
+$('#select-mode').addEventListener('click', () => setMode('edit'));
+$('#comment-mode').addEventListener('click', () => setMode('comment'));
+$('#edit-selected-comment').addEventListener('click', () => focusComment());
+// Escape must also leave comment mode when its textarea has focus.
+$('#component-comment').addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    event.stopPropagation();
+    setMode('edit');
+    $('#select-mode').focus();
+  }
 });
 $('#undo').addEventListener('click', () => undo());
 $('#redo').addEventListener('click', () => undo('redo'));
@@ -542,7 +556,7 @@ $('#viewport').addEventListener(
 );
 document.addEventListener('keydown', onKey);
 $('#review-note').addEventListener('change', () => changeCommitted({ label: '추가 설명 수정' }));
-createExportDialog({ $, state, commitCommentDraft, editorId });
+createExportDialog({ $, state, commitCommentDraft, editorId, flushEditor, toast });
 window.addEventListener('dragover', (event) => {
   if (event.dataTransfer?.types.includes('Files')) event.preventDefault();
 });
