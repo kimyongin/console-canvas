@@ -7,6 +7,8 @@ export function createInspector({ $, state, kinds, selectNode }) {
     $('#no-selection').hidden = !!node;
     $('#inspector').hidden = !node;
     $('#delete').disabled = !node || scene.hidden(id) || state.mode === 'comment';
+    $('#copy').disabled = !node || scene.hidden(id) || state.mode === 'comment';
+    $('#paste').disabled = !scene || state.mode === 'comment';
     $('#select-parent').disabled = !node || !scene.parent(id);
     $('#direct-edit-controls').hidden = state.mode === 'comment';
     const count = scene?.selection.size || 0;

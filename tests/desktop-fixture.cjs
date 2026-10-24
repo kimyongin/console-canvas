@@ -85,13 +85,15 @@ async function main() {
       const app=window.ConsoleCanvas,doc=document,node=[...app.state.scene.nodes.values()].find(n=>n.locator.id==='new-customer');
       app.selectNode(node.id);app.state.scene.setPosition(23,31);
       doc.querySelector('#component-comment').value='comment in saved snapshot';doc.querySelector('#save-comment').click();
+      const copyId=app.state.scene.pasteSelection(app.state.scene.copySelection())[0];
+      app.selectNode(node.id);
       const saved=app.snapshotHistory.create('refactor persistence');
       doc.querySelector('#component-comment').value='draft saved on normal quit';doc.querySelector('#review-note').value='note saved on normal quit';
       const left=doc.querySelector('#resize-layers'),right=doc.querySelector('#resize-properties');
       left.dispatchEvent(new KeyboardEvent('keydown',{key:'Home',bubbles:true}));right.dispatchEvent(new KeyboardEvent('keydown',{key:'Home',bubbles:true}));
       for(let i=0;i<10;i++)left.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));
       for(let i=0;i<12;i++)right.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true}));
-      return {document_id:app.state.snapshot.id,node:node.id,dx:23,dy:31,snapshotId:saved.id,snapshots:app.state.timeline.entries.length};
+      return {document_id:app.state.snapshot.id,node:node.id,copyId,dx:23,dy:31,snapshotId:saved.id,snapshots:app.state.timeline.entries.length};
     })()`,
     );
     await fs.writeFile(path.join(directory, 'expected.json'), JSON.stringify(expected));
@@ -113,6 +115,15 @@ async function main() {
     assert.equal(actual.edits[expected.node].dx, expected.dx);
     assert.equal(actual.edits[expected.node].dy, expected.dy);
     assert.equal(actual.annotations[expected.node], 'draft saved on normal quit');
+    assert.ok(actual.edits[expected.copyId].copy);
+    assert.equal(actual.annotations[expected.copyId], 'comment in saved snapshot');
+    assert.equal(
+      await evaluate(
+        editor,
+        `window.ConsoleCanvas.state.scene.elements.has(${JSON.stringify(expected.copyId)})`,
+      ),
+      true,
+    );
     assert.equal(actual.note, 'note saved on normal quit');
     assert.equal(actual.entries.length, expected.snapshots);
     assert.equal(actual.active, expected.snapshotId);

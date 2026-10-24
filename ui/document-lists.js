@@ -109,10 +109,14 @@ export function createDocumentLists({ $, state, selectNode, focusComment }) {
       title.textContent = change.name;
       const detail = document.createElement('span');
       detail.textContent =
-        change.action === 'delete'
-          ? '삭제' +
-            (change.affectedDescendants ? ' · 하위 ' + change.affectedDescendants + '개 포함' : '')
-          : 'X ' + change.delta.x + ' · Y ' + change.delta.y;
+        change.action === 'copy'
+          ? '복사본 추가'
+          : change.action === 'delete'
+            ? '삭제' +
+              (change.affectedDescendants
+                ? ' · 하위 ' + change.affectedDescendants + '개 포함'
+                : '')
+            : 'X ' + change.delta.x + ' · Y ' + change.delta.y;
       item.append(title, detail);
       container.append(item);
     }

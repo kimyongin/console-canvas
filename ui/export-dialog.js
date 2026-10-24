@@ -35,12 +35,15 @@ export function createExportDialog({ $, state, commitCommentDraft, editorId }) {
         if (token !== generation) return;
         const changes = scene.changes(),
           comments = scene.comments(),
-          deleted = changes.filter((c) => c.action === 'delete').length;
+          deleted = changes.filter((c) => c.action === 'delete').length,
+          copied = changes.filter((c) => c.action === 'copy').length;
         $('#export-summary').textContent =
           '이동 ' +
-          (changes.length - deleted) +
+          (changes.length - deleted - copied) +
           '개 · 삭제 ' +
           deleted +
+          '개 · 복사본 ' +
+          copied +
           '개 · 주석 ' +
           comments.length +
           '개 · ' +
@@ -51,7 +54,11 @@ export function createExportDialog({ $, state, commitCommentDraft, editorId }) {
           const item = document.createElement('div');
           item.className = 'handoff-item';
           item.textContent =
-            (change.action === 'delete' ? '삭제 · ' : '이동 · ') +
+            (change.action === 'delete'
+              ? '삭제 · '
+              : change.action === 'copy'
+                ? '복사본 추가 · '
+                : '이동 · ') +
             elementLabel(scene.nodes.get(change.id)) +
             (change.action === 'move' ? ' · X ' + change.delta.x + ' / Y ' + change.delta.y : '');
           list.append(item);

@@ -27,7 +27,7 @@ export function createEditorController(options) {
       undo_count: state.undo.length,
       redo_count: state.redo.length,
       change_count: state.scene.changes().length,
-      busy: !!state.scene.drag || !!options.isBusy?.(),
+      busy: !!state.scene.drag || !!state.scene.areaSelecting || !!options.isBusy?.(),
       last_action: state.lastAction || null,
       snapshot_count: state.timeline?.entries.length || 0,
       active_snapshot_id: state.timeline?.activeId || null,
@@ -49,12 +49,19 @@ export function createEditorController(options) {
       tag: node.tag,
       kind: node.kind,
       parent_id: node.parentId,
+      ...(node.copiedFrom ? { copied_from: node.copiedFrom } : {}),
       locator: node.locator,
       captured_visible: node.visible,
       deleted,
       original_rect: node.rect,
       current_rect: current,
-      offset: scene.edits[node.id] || {},
+      offset: scene.edits[node.id]
+        ? {
+            dx: scene.edits[node.id].dx || 0,
+            dy: scene.edits[node.id].dy || 0,
+            deleted: !!scene.edits[node.id].deleted,
+          }
+        : {},
       comment: scene.annotations[node.id] || '',
     };
   }
@@ -125,7 +132,7 @@ export function createEditorController(options) {
         'revision_conflict',
         '화면이 변경되었습니다. 최신 상태를 조회한 뒤 수정해 주세요.',
       );
-    if (scene.drag || options.isBusy?.())
+    if (scene.drag || scene.areaSelecting || options.isBusy?.())
       return failure(
         'editor_busy',
         '사용자가 편집 중입니다. 입력을 마친 후 최신 버전으로 다시 요청해 주세요.',
@@ -168,15 +175,15 @@ export function createEditorController(options) {
       options.historyBefore();
       state.commentTarget = null;
       try {
-        scene.setComments(annotations);
         scene.setEdits(edits);
+        scene.setComments(annotations);
         scene.select(operations[operations.length - 1].element_id);
         options.changeCommitted({ actor: 'agent', label: operations.length + '개 변경 적용' });
       } catch (error) {
         state.undo.pop();
         state.redo = redo;
-        scene.setComments(previous.annotations);
         scene.setEdits(previous.edits);
+        scene.setComments(previous.annotations);
         scene.select(previous.selected, {
           ids: previous.selection || (previous.selected ? [previous.selected] : []),
         });

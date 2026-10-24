@@ -40,9 +40,11 @@ export function instructionText(snapshot, changes, note = '', comments = []) {
         ' (' +
         change.tag +
         '): ' +
-        (change.action === 'delete'
-          ? '삭제'
-          : '가로 ' + change.delta.x + 'px, 세로 ' + change.delta.y + 'px 이동') +
+        (change.action === 'copy'
+          ? '복사본 추가 (원본 ' + change.copiedFrom + ')'
+          : change.action === 'delete'
+            ? '삭제'
+            : '가로 ' + change.delta.x + 'px, 세로 ' + change.delta.y + 'px 이동') +
         (change.affectedDescendants
           ? ' · 하위 ' + change.affectedDescendants + '개 요소 포함'
           : ''),

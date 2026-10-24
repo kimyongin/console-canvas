@@ -1,4 +1,5 @@
 import policy from './edit-policy.json' with { type: 'json' };
+import { expandCopyNodes } from './copy-model.js';
 export const EDIT_LIMITS = Object.freeze(policy);
 function invalid(code, message) {
   throw Object.assign(new Error(message), { code });
@@ -14,6 +15,8 @@ export function boundedPosition(dx, dy) {
 export function cleanEdits(value, nodes) {
   const result = {};
   if (!value || typeof value !== 'object' || Array.isArray(value)) return result;
+  const expanded = expandCopyNodes(value, new Map([...nodes].filter(([, n]) => !n.copiedFrom)));
+  nodes = expanded.nodes;
   for (const [id, edit] of Object.entries(value))
     if (nodes.has(id) && edit && typeof edit === 'object') {
       result[id] = {
@@ -22,6 +25,7 @@ export function cleanEdits(value, nodes) {
           Number.isFinite(edit.dy) ? edit.dy : 0,
         ),
         deleted: edit.deleted === true,
+        ...(expanded.copies[id] ? { copy: expanded.copies[id] } : {}),
       };
     }
   return result;

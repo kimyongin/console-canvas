@@ -1,9 +1,12 @@
 import { copy, cleanEdits, cleanComments } from './engine.js';
+import { expandCopyNodes } from './copy-model.js';
 
 // Versions share the captured DOM; only editing data is copied into each entry.
 function snapshotPoint(value, nodes) {
+  const edits = cleanEdits(value?.edits, nodes);
+  nodes = expandCopyNodes(edits, new Map([...nodes].filter(([, n]) => !n.copiedFrom))).nodes;
   return {
-    edits: cleanEdits(value?.edits, nodes),
+    edits,
     annotations: cleanComments(value?.annotations, nodes),
     selected: nodes.has(value?.selected) ? value.selected : null,
     selection: Array.isArray(value?.selection)
@@ -16,7 +19,7 @@ function snapshotPoint(value, nodes) {
 }
 function snapshotSignature(point) {
   const edits = Object.entries(point.edits)
-    .filter(([, e]) => e.dx || e.dy || e.deleted)
+    .filter(([, e]) => e.dx || e.dy || e.deleted || e.copy)
     .sort(([a], [b]) => a.localeCompare(b));
   const comments = Object.entries(point.annotations).sort(([a], [b]) => a.localeCompare(b));
   return JSON.stringify([edits, comments, point.note]);
@@ -94,8 +97,9 @@ export function createSnapshotHistory(options) {
       kind: entry.kind,
       parent_id: entry.parentId,
       active: entry.id === state.timeline.activeId,
-      change_count: Object.values(entry.state.edits).filter((e) => e.dx || e.dy || e.deleted)
-        .length,
+      change_count: Object.values(entry.state.edits).filter(
+        (e) => e.dx || e.dy || e.deleted || e.copy,
+      ).length,
       comment_count: Object.keys(entry.state.annotations).length,
     }));
   }

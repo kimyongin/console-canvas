@@ -380,3 +380,27 @@
     gap: 4px;
   }
 }
+.area-selection {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  border: 1px solid #6557dc;
+  background: #6557dc18;
+  box-sizing: border-box;
+}
+.area-selection > span {
+  position: absolute;
+  left: 0;
+  top: -25px;
+  white-space: nowrap;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: #6557dc;
+  color: white;
+  font-size: 11px;
+}
+.selecting-area,
+.selecting-area * {
+  user-select: none !important;
+  cursor: crosshair !important;
+}

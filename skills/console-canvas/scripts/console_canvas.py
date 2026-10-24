@@ -98,6 +98,43 @@ def rect(value):
     return {k: value[k] for k in ('x', 'y', 'width', 'height')}
 
 
+def expanded_nodes(snapshot, raw_edits):
+    originals = {n['id']: n for n in snapshot['nodes']}
+    nodes = dict(originals)
+    if not isinstance(raw_edits, dict):
+        fail('Expected an edits object')
+    for root_id, edit in raw_edits.items():
+        if not isinstance(edit, dict) or not edit.get('copy'):
+            continue
+        descriptor = edit['copy']
+        records = descriptor.get('nodes') if isinstance(descriptor, dict) else None
+        if (root_id in originals or not re.fullmatch(r'n\d+', str(root_id))
+                or not isinstance(records, list) or not records or len(records) > 5000
+                or len(nodes) + len(records) > 40000):
+            fail('Invalid copied element list')
+        mapped = {}
+        for index, record in enumerate(records):
+            if not isinstance(record, dict):
+                fail('Invalid copied element')
+            source = originals.get(record.get('sourceId'))
+            node_id, parent = record.get('id'), record.get('parentId')
+            if (not source or not re.fullmatch(r'n\d+', str(node_id)) or node_id in nodes
+                    or record.get('sourceId') in mapped):
+                fail('Invalid copied element identity')
+            bounds = rect(record.get('rect'))
+            if any(abs(bounds[k]) > 1000000 for k in ('x', 'y', 'width', 'height')) or bounds['width'] < 0 or bounds['height'] < 0:
+                fail('Invalid copied element coordinates')
+            if index == 0:
+                if node_id != root_id or parent is not None:
+                    fail('Invalid copied root')
+            elif source.get('parentId') not in mapped or parent != mapped[source['parentId']]:
+                fail('Invalid copied element parent')
+            mapped[source['id']] = node_id
+            nodes[node_id] = {**source, 'id': node_id, 'parentId': parent, 'rect': bounds,
+                              'copiedFrom': source['id'], 'copyHidden': record.get('hidden') is True}
+    return nodes
+
+
 def calculate_changes(snapshot, raw_edits):
     if (not isinstance(snapshot, dict) or snapshot.get('format') != 'console-canvas-snapshot'
             or snapshot.get('version') != 1 or not isinstance(snapshot.get('html'), str)):
@@ -117,6 +154,8 @@ def calculate_changes(snapshot, raw_edits):
         rect(node.get('rect'))
         nodes[node_id] = node
         children[node_id] = []
+    nodes = expanded_nodes(snapshot, raw_edits)
+    children = {node_id: [] for node_id in nodes}
     for node_id, node in nodes.items():
         parent = node.get('parentId')
         if parent:
@@ -136,6 +175,7 @@ def calculate_changes(snapshot, raw_edits):
             'dx': max(-60000, min(60000, dx)) if finite(dx) else 0,
             'dy': max(-200000, min(200000, dy)) if finite(dy) else 0,
             'deleted': edit.get('deleted') is True,
+            'copy': bool(edit.get('copy')),
         }
     queue = deque(roots)
     order, offsets, hidden, ancestor_hidden = [], {}, {}, {}
@@ -148,7 +188,7 @@ def calculate_changes(snapshot, raw_edits):
         offsets[node_id] = {'x': previous['x'] + edit.get('dx', 0),
                             'y': previous['y'] + edit.get('dy', 0)}
         ancestor_hidden[node_id] = hidden.get(parent, False)
-        hidden[node_id] = ancestor_hidden[node_id] or edit.get('deleted', False)
+        hidden[node_id] = ancestor_hidden[node_id] or edit.get('deleted', False) or nodes[node_id].get('copyHidden', False)
         queue.extend(children[node_id])
     if len(order) != len(nodes):
         fail('Snapshot parent tree contains a cycle')
@@ -159,7 +199,7 @@ def calculate_changes(snapshot, raw_edits):
             descendants[parent] += descendants[node_id] + 1
     changes = []
     for node_id, edit in edits.items():
-        if ancestor_hidden[node_id] or not (edit['deleted'] or edit['dx'] or edit['dy']):
+        if ancestor_hidden[node_id] or not (edit['deleted'] or edit['dx'] or edit['dy'] or edit['copy']):
             continue
         node = nodes[node_id]
         before = rect(node['rect'])
@@ -171,7 +211,8 @@ def calculate_changes(snapshot, raw_edits):
             'id': node_id, 'name': node.get('name', ''), 'kind': node.get('kind'),
             'tag': node.get('tag'), 'parentId': node.get('parentId'),
             'locator': node.get('locator', {}),
-            'action': 'delete' if edit['deleted'] else 'move',
+            'action': 'delete' if edit['deleted'] else 'copy' if edit['copy'] else 'move',
+            **({'copiedFrom': node['copiedFrom']} if node.get('copiedFrom') else {}),
             'delta': {'x': edit['dx'], 'y': edit['dy']},
             'effectiveDelta': offsets[node_id], 'before': before, 'after': after,
             'affectedDescendants': descendants[node_id],
@@ -195,7 +236,7 @@ def summarize(data):
         if not isinstance(changes, list) or len(changes) > 40000:
             fail('Invalid changes list')
         for change in changes:
-            if not isinstance(change, dict) or change.get('action') not in ('move', 'delete'):
+            if not isinstance(change, dict) or change.get('action') not in ('move', 'delete', 'copy'):
                 fail('Invalid change entry')
         source = data.get('source', {})
     else:
@@ -205,7 +246,7 @@ def summarize(data):
     counts = Counter(change['action'] for change in changes)
     comments = []
     if snapshot:
-        nodes = {node['id']: node for node in snapshot['nodes']}
+        nodes = expanded_nodes(snapshot, data.get('edits', {}))
         annotations = data.get('annotations', {})
         edits = data.get('edits', {})
         if isinstance(annotations, dict):
@@ -220,7 +261,7 @@ def summarize(data):
                         x, y = edit.get('dx'), edit.get('dy')
                         dx += max(-60000, min(60000, x)) if finite(x) else 0
                         dy += max(-200000, min(200000, y)) if finite(y) else 0
-                        deleted = deleted or edit.get('deleted') is True
+                        deleted = deleted or edit.get('deleted') is True or nodes[current].get('copyHidden', False)
                     current = nodes[current].get('parentId')
                 before = rect(node['rect'])
                 comments.append({'id': node_id, 'name': node.get('name', ''),
@@ -236,8 +277,8 @@ def summarize(data):
     summary = {
         'format': kind, 'source': source, 'note': data.get('note', ''),
         'capturedAt': snapshot.get('capturedAt') if snapshot else None,
-        'nodeCount': len(snapshot['nodes']) if snapshot else None,
-        'changes': len(changes), 'moves': counts['move'], 'deletions': counts['delete'],
+        'nodeCount': len(nodes) if snapshot else None,
+        'changes': len(changes), 'moves': counts['move'], 'deletions': counts['delete'], 'copies': counts['copy'],
         'warnings': snapshot.get('warnings', []) if snapshot else [],
         'canReopen': snapshot is not None,
         'changeBasis': 'snapshot+edits' if snapshot else 'changes-only',

@@ -21,8 +21,8 @@ export function createEditorSession({
   }
   function applyCheckpoint(point) {
     state.commentTarget = null;
-    state.scene.setComments(point.annotations);
     state.scene.setEdits(point.edits);
+    state.scene.setComments(point.annotations);
     state.scene.select(point.selected, {
       ids: point.selection || (point.selected ? [point.selected] : []),
     });
@@ -88,7 +88,8 @@ export function createEditorSession({
     });
   }
   async function flushEditor() {
-    if (state.scene?.drag) throw new Error('요소 드래그를 마친 뒤 다시 시도해 주세요.');
+    if (state.scene?.drag || state.scene?.areaSelecting)
+      throw new Error('드래그를 마친 뒤 다시 시도해 주세요.');
     if (state.snapshot && !state.ready)
       throw new Error('화면을 여는 중입니다. 잠시 후 다시 시도해 주세요.');
     commitCommentDraft();

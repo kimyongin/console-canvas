@@ -35,6 +35,22 @@ def review():
 
 
 class HandoffTests(unittest.TestCase):
+    def test_copy_handoff_and_comments_retain_source_identity(self):
+        data = review()
+        data['edits'] = {'n50': {'dx': 8, 'copy': {'nodes': [
+            {'id': 'n50', 'sourceId': 'n2', 'parentId': None, 'rect': {'x': 50, 'y': 60, 'width': 100, 'height': 30}},
+            {'id': 'n51', 'sourceId': 'n3', 'parentId': 'n50', 'rect': {'x': 55, 'y': 60, 'width': 100, 'height': 30}},
+        ]}}}
+        data['annotations'] = {'n51': '복사본 주석'}
+        summary, changes = tool.summarize(data)
+        self.assertEqual(summary['copies'], 1)
+        self.assertEqual(changes[0]['copiedFrom'], 'n2')
+        self.assertEqual(summary['componentComments'][0]['after']['x'], 63)
+        self.assertEqual(summary['componentComments'][0]['locator']['selector'], '#n3')
+        data['edits']['n50']['copy']['nodes'][1]['parentId'] = 'n1'
+        with self.assertRaises(ValueError):
+            tool.summarize(data)
+
     def test_nested_offsets_and_original_selectors(self):
         summary, changes = tool.summarize(review())
         self.assertEqual((summary['moves'], summary['deletions']), (2, 0))

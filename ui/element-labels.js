@@ -15,6 +15,8 @@ const regionNames = {
 };
 export function elementLabel(node) {
   if (!node) return '요소';
+  if (node.copiedFrom && node.copyRoot === node.id)
+    return elementLabel({ ...node, copiedFrom: null }) + ' · 복사본';
   const name = (node.locator?.label || node.name || '').replace(/\s+/g, ' ').trim();
   if (regionNames[node.tag]) return regionNames[node.tag];
   const suffix =

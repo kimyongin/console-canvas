@@ -2,6 +2,8 @@
 
 현재 보고 있는 콘솔 웹 화면을 **소스코드 없이** 가져와 독립된 편집 공간에서 수정하거나 요소별 주석으로 변경 방향을 남기는 로컬 프로토타입입니다. 주 사용 경로는 Chromium을 내장한 독립 앱이며 Chrome 확장은 보조 방식으로 유지합니다. 원본 사이트와 복제본 편집기는 분리되고, AI API 키 없이 로컬 MCP로 에이전트와 연결할 수 있습니다.
 
+캔버스 빈 곳을 드래그해 영역 안의 요소를 한 번에 선택할 수 있습니다. ⌘/Ctrl을 누르면 기존 선택에 추가하고 Esc로 취소합니다. 선택 요소는 복사·붙여넣기 버튼 또는 ⌘/Ctrl+C / V로 같은 화면에 복제합니다. 하위 요소와 주석도 함께 복사되며 실행 취소·스냅샷·파일 내보내기 및 MCP 편집을 지원합니다.
+
 ## 독립 앱으로 사용하기
 
 [공개 Releases](https://github.com/kimyongin/console-canvas/releases)에서 `console-canvas-desktop-macos-arm64.dmg`를 내려받아 엽니다. **Console Canvas.app을 Applications로 드래그**하고 DMG를 꺼낸 뒤 응용 프로그램 폴더에서 앱을 실행합니다. GitHub 로그인이나 토큰은 필요하지 않습니다. ZIP도 보조 배포합니다. 현재 macOS Apple Silicon 대상이며 Python 3.9 이상이 필요합니다. 개발용 ad-hoc 서명이며 Apple Developer ID 서명·공증은 아직 적용하지 않아 처음 실행할 때 macOS에서 차단될 수 있습니다. 일반 사용자용 배포를 위해서는 배포 서명·공증이 추가로 필요합니다.
