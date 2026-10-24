@@ -11,7 +11,7 @@ import time
 import urllib.error
 import urllib.request
 
-VERSION = '0.7.2'
+VERSION = '0.7.3'
 PROTOCOLS = ('2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05')
 APP = Path(__file__).resolve().parents[1]
 DEFAULT_STATE = Path(os.environ.get('CODEX_HOME', str(Path.home() / '.codex'))) / 'console-canvas'

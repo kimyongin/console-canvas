@@ -11,6 +11,22 @@ const state={snapshot:null,scene:null,undo:[],redo:[],expanded:new Set(),zoom:1,
 const editorId=globalThis.crypto?.randomUUID?.()||('editor-'+Date.now()+'-'+Math.random().toString(36).slice(2));
 const kinds={text:'텍스트',pseudo:'생성된 문구',icon:'아이콘',raster:'이미지 레이어',element:'요소'};
 let toastTimer;
+const panelStorageKey='console-canvas-panels-v1';
+const panels={layers:window.innerWidth>850,properties:true};
+try {const stored=JSON.parse(localStorage.getItem(panelStorageKey));for(const key of Object.keys(panels))if(typeof stored?.[key]==='boolean')panels[key]=stored[key];}catch{}
+function renderPanels(){
+  for(const [key,visible] of Object.entries(panels)){
+    const label=key==='layers'?'레이어':'속성',button=$('#toggle-'+key);
+    $('#'+key+'-panel').hidden=!visible;$('#workspace').classList.toggle(key+'-collapsed',!visible);
+    button.setAttribute('aria-expanded',String(visible));button.setAttribute('aria-label',label+' 패널 '+(visible?'접기':'펼치기'));button.title=(key==='properties'?'속성·주석·스냅샷':label)+' 패널 '+(visible?'접기':'펼치기');
+  }
+}
+function setPanelVisibility(key,visible){
+  if(key==='properties'&&!visible)commitCommentDraft();
+  panels[key]=visible;renderPanels();try{localStorage.setItem(panelStorageKey,JSON.stringify(panels));}catch{}
+}
+for(const key of Object.keys(panels))$('#toggle-'+key).addEventListener('click',()=>setPanelVisibility(key,!panels[key]));
+renderPanels();
 function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,4000);}
 function notice(message){$('#notice').textContent=message;$('#notice').hidden=!message;}
 function checkpoint(){return {edits:copy(state.scene.edits),annotations:copy(state.scene.annotations),selected:state.scene.selected,note:$('#review-note').value,activeSnapshotId:state.timeline?.activeId||null};}
@@ -95,9 +111,9 @@ function renderChanges() {
   for(const change of changes){const item=document.createElement('div');item.className='change-item';const title=document.createElement('strong');title.textContent=change.name;const detail=document.createElement('span');detail.textContent=change.action==='delete'?'삭제'+(change.affectedDescendants?' · 하위 '+change.affectedDescendants+'개 포함':''):'X '+change.delta.x+' · Y '+change.delta.y;item.append(title,detail);container.append(item);}
   comments.forEach((comment,index)=>{const item=document.createElement('div');item.className='change-item';const pick=document.createElement('button');pick.type='button';const title=document.createElement('strong');title.textContent='주석 '+(index+1)+' · '+comment.name;pick.append(title);pick.addEventListener('click',()=>{selectNode(comment.id,{reveal:true});focusComment();});const text=document.createElement('span');text.className='comment-text';text.textContent=comment.text;item.append(pick,text);if(comment.targetDeleted){const deleted=document.createElement('span');deleted.className='comment-target-deleted';deleted.textContent='대상이 삭제된 상태 · 요청 내용 확인 필요';item.append(deleted);}container.append(item);});
 }
-function focusComment(){const field=$('#component-comment');field.focus({preventScroll:true});field.scrollIntoView({block:'nearest'});}
+function focusComment(){setPanelVisibility('properties',true);showSnapshots(false);const field=$('#component-comment');field.focus({preventScroll:true});field.scrollIntoView({block:'nearest'});}
 const snapshotHistory=createSnapshotHistory({state,checkpoint,historyBefore,apply:applyCheckpoint,changed:changeCommitted});
-function showSnapshots(show=true){$('#snapshot-panel').hidden=!show;$('#inspect-panel').hidden=show;$('#snapshots-button').setAttribute('aria-expanded',String(show));if(show)renderSnapshots();}
+function showSnapshots(show=true){if(show)setPanelVisibility('properties',true);$('#snapshot-panel').hidden=!show;$('#inspect-panel').hidden=show;$('#snapshots-button').setAttribute('aria-expanded',String(show));if(show)renderSnapshots();}
 function renderSnapshots() {
   if(!state.timeline)return;
   const entries=snapshotHistory.list(),index=entries.findIndex(e=>e.active),dirty=snapshotHistory.dirty();
@@ -114,7 +130,7 @@ function renderSnapshots() {
   });$('#snapshot-list').replaceChildren(fragment);
 }
 function restoreSnapshot(id){try{commitCommentDraft();const result=snapshotHistory.restore(id);toast(result.automatic_snapshot_id?'현재 작업을 자동 보관하고 스냅샷으로 이동했어요.':'저장한 스냅샷으로 이동했어요.');}catch(error){toast(error.message);}}
-$('#snapshots-button').addEventListener('click',()=>{commitCommentDraft();showSnapshots($('#snapshot-panel').hidden);});
+$('#snapshots-button').addEventListener('click',()=>{commitCommentDraft();showSnapshots(!panels.properties||$('#snapshot-panel').hidden);});
 $('#close-snapshots').addEventListener('click',()=>showSnapshots(false));
 $('#snapshot-form').addEventListener('submit',event=>{event.preventDefault();try{commitCommentDraft();snapshotHistory.create($('#snapshot-name').value);$('#snapshot-name').value='';toast('현재 화면과 주석을 스냅샷으로 저장했어요.');}catch(error){toast(error.message);}});
 for(const [id,delta] of [['#previous-snapshot',-1],['#next-snapshot',1]])$(id).addEventListener('click',()=>{const entries=snapshotHistory.list(),index=entries.findIndex(e=>e.active);if(entries[index+delta])restoreSnapshot(entries[index+delta].id);});
