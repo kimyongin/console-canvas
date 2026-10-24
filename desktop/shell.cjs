@@ -1,20 +1,30 @@
 const api = window.ConsoleCanvasShell,
   $ = (selector) => document.querySelector(selector);
-let info;
+let info,
+  currentState,
+  returnView = 'source';
 function showState(value) {
+  if (['source', 'editor'].includes(value.view)) returnView = value.view;
+  currentState = value;
   document.body.dataset.view = value.view;
   document.documentElement.style.setProperty('--shell-height', value.header_height + 'px');
   $('#navigation').hidden = value.view !== 'source';
   if (value.url && document.activeElement !== $('#address')) $('#address').value = value.url;
   $('#status').textContent = value.message || '';
   $('#capture').hidden = value.view !== 'source';
-  if (['agent', 'update'].includes(value.view)) $('#settings-menu').open = false;
   $('#capture').disabled = !!value.busy;
-  for (const view of ['source', 'editor', 'agent', 'update'])
+  for (const view of ['source', 'editor', 'settings', 'agent', 'update'])
     $('#show-' + view).classList.toggle('active', value.view === view);
+  $('#back').disabled = !value.can_go_back;
+  $('#forward').disabled = !value.can_go_forward;
+  $('#settings-setup').hidden = value.view !== 'settings';
+  $('#show-settings').classList.toggle(
+    'active',
+    ['settings', 'agent', 'update'].includes(value.view),
+  );
   $('#agent-setup').hidden = value.view !== 'agent';
   $('#update-setup').hidden = value.view !== 'update';
-  $('#fallback').hidden = ['agent', 'update'].includes(value.view);
+  $('#fallback').hidden = ['settings', 'agent', 'update'].includes(value.view);
 }
 api.onState(showState);
 api.info().then((value) => {
@@ -34,17 +44,22 @@ $('#capture').addEventListener('click', async () => {
     await api.capture();
   } catch (error) {
     $('#status').textContent = error.message;
-    $('#capture').hidden = value.view !== 'source';
-    if (['agent', 'update'].includes(value.view)) $('#settings-menu').open = false;
+    $('#capture').hidden = currentState.view !== 'source';
     $('#capture').disabled = false;
   }
 });
+$('#show-settings').addEventListener('click', () => api.show('settings'));
+$('#settings-return').addEventListener('click', () => api.show(returnView));
+for (const button of document.querySelectorAll('.settings-back'))
+  button.addEventListener('click', () => api.show('settings'));
 $('#show-source').addEventListener('click', () => api.show('source'));
 $('#show-editor').addEventListener('click', () => api.show('editor'));
 $('#back').addEventListener('click', () => api.back());
 $('#forward').addEventListener('click', () => api.forward());
 $('#reload').addEventListener('click', () => api.reload());
-$('#demo').addEventListener('click', () => api.navigate(info.demo_url));
+$('#demo').addEventListener('click', () =>
+  api.navigate(info.demo_url).catch((error) => ($('#status').textContent = error.message)),
+);
 function skillSyncText(value) {
   if (value?.errors?.length)
     return (
@@ -129,8 +144,12 @@ function displayUpdate(value) {
 api.onUpdate(displayUpdate);
 api.updateInfo().then(displayUpdate);
 $('#show-update').addEventListener('click', async () => {
-  await api.show('update');
-  displayUpdate(await api.updateInfo());
+  try {
+    await api.show('update');
+    displayUpdate(await api.updateInfo());
+  } catch (error) {
+    $('#update-message').textContent = error.message;
+  }
 });
 for (const [id, method] of [
   ['check-update', 'checkUpdate'],

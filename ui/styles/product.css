@@ -418,3 +418,43 @@
   border-left: 3px solid #ba7787;
   background: #fbf4f6;
 }
+
+#documents-dialog {
+  width: min(680px, calc(100vw - 48px));
+}
+#documents-dialog > p {
+  color: var(--muted);
+  font-size: 12px;
+}
+#document-search {
+  width: 100%;
+}
+.document-list {
+  display: grid;
+  gap: 8px;
+  max-height: 52vh;
+  overflow: auto;
+  margin: 12px 0 18px;
+}
+.document-item {
+  display: grid;
+  gap: 7px;
+  text-align: left;
+  padding: 14px;
+  width: 100%;
+}
+.document-item[aria-current] {
+  border-color: var(--accent);
+  background: #f3f1ff;
+}
+.document-item span,
+.document-item small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-weight: 400;
+}
+.document-item small {
+  font-size: 10px;
+}

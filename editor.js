@@ -1,3 +1,4 @@
+import { createDocumentSwitcher } from './ui/document-switcher.js';
 import { createCommentEditor } from './ui/comment-editor.js';
 import { createAreaSelection } from './ui/area-selection.js';
 import { createClipboard } from './ui/clipboard.js';
@@ -103,6 +104,7 @@ function commitCommentDraft() {
     state.scene.setComment(state.commentTarget, $('#component-comment').value);
 }
 const { sizeChanged, zoomTo, fit, fitSelection } = createCanvasViewport({ $, state });
+createDocumentSwitcher({ $, state, openSnapshot, commitCommentDraft });
 const areaSelection = createAreaSelection({ $, state, toast });
 const clipboard = createClipboard({ $, state, toast, commitCommentDraft });
 const { renderInspector } = createInspector({ $, state, kinds, selectNode });
@@ -154,7 +156,7 @@ const { showSnapshots, renderSnapshots } = createSnapshotPanel({
   preview,
 });
 function onKey(event) {
-  if (!state.scene || $('#export-dialog').open) return;
+  if (!state.scene || document.querySelector('dialog[open]')) return;
   if (state.scene.areaSelecting) return;
   const editing = event.target.closest?.('input,textarea,select');
   if (editing && event.target.ownerDocument === document) return;
@@ -408,7 +410,10 @@ $('#comment-mode').addEventListener('click', () => {
   commitCommentDraft();
   state.mode = state.mode === 'comment' ? 'edit' : 'comment';
   commentEditor.reset();
-  if (state.scene) state.scene.interactionMode = state.mode;
+  if (state.scene) {
+    state.scene.interactionMode = state.mode;
+    state.scene.drawSelection();
+  }
   $('#comment-mode').setAttribute('aria-pressed', String(state.mode === 'comment'));
   $('#canvas-hint').textContent =
     state.mode === 'comment'
@@ -488,6 +493,7 @@ const controller = createEditorController({
     $('#compare-dialog').open ||
     $('#export-dialog').open ||
     $('#mcp-dialog').open ||
+    $('#documents-dialog').open ||
     document.activeElement === $('#snapshot-name') ||
     !!(
       state.commentTarget &&
@@ -542,7 +548,32 @@ if (window.ConsoleCanvasDesktop) {
   $('.canvas-tools').append(actions);
   $('#recapture-button').hidden = false;
   $('#recapture-button').addEventListener('click', () => window.ConsoleCanvasDesktop.showSource());
+  $('#source-url').addEventListener('click', (event) => {
+    event.preventDefault();
+    window.ConsoleCanvasDesktop.openSource(state.snapshot.source.url).catch((error) =>
+      notice(error.message),
+    );
+  });
+  $('#installation-button').textContent = '웹사이트에서 화면 가져오기';
+  $('#installation-button').addEventListener('click', () =>
+    window.ConsoleCanvasDesktop.showSource(),
+  );
   $('.app-header').hidden = true;
+  window.ConsoleCanvasDesktop.onHistory((command) => {
+    if (document.activeElement?.closest('input,textarea,[contenteditable="true"]')) {
+      document.execCommand(command);
+      return;
+    }
+    if (
+      !state.ready ||
+      state.scene?.drag ||
+      state.scene?.areaSelecting ||
+      document.querySelector('dialog[open]')
+    )
+      return;
+    commitCommentDraft();
+    undo(command);
+  });
   window.ConsoleCanvasDesktop.onFlush(flushEditor);
   window.ConsoleCanvasDesktop.onSnapshot((value) =>
     openSnapshot(value).catch((error) => notice(error.message)),

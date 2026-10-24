@@ -167,6 +167,19 @@ export class CanvasScene {
     this.outline.style.cssText =
       'position:absolute!important;pointer-events:none!important;box-sizing:border-box!important;outline:2px solid #5a55d9!important;outline-offset:2px!important;z-index:2147483646!important;display:none';
     this.doc.documentElement.append(this.outline);
+    this.groupBox = this.doc.createElement('div');
+    this.groupBox.dataset.uicEditor = 'selection-group';
+    this.groupBox.style.cssText =
+      this.outline.style.cssText +
+      ';outline:1px dashed #7771dc!important;outline-offset:7px!important';
+    this.groupHandle = this.doc.createElement('button');
+    this.groupHandle.type = 'button';
+    this.groupHandle.dataset.uicGroupHandle = 'true';
+    this.groupHandle.style.cssText =
+      'all:initial!important;position:absolute!important;left:0!important;top:-37px!important;display:block!important;pointer-events:auto!important;cursor:move!important;white-space:nowrap!important;background:#5a55d9!important;color:white!important;border-radius:6px!important;padding:6px 10px!important;font:12px/18px system-ui,sans-serif!important;box-shadow:0 2px 8px #302b6630!important';
+    this.groupHandle.title = '드래그로 묶음 이동 · 방향키로 미세 이동 · Shift+방향키 10px';
+    this.groupBox.append(this.groupHandle);
+    this.doc.documentElement.append(this.groupBox);
     this.hover = this.doc.createElement('div');
     this.hover.dataset.uicEditor = 'hover';
     this.hover.style.cssText =
@@ -344,6 +357,23 @@ export class CanvasScene {
         this.setOutline(outline, this.rect(id));
         this.selectionOutlines.push(outline);
       }
+    const boxes = this.selectionRoots()
+      .filter((id) => !this.hidden(id))
+      .map((id) => this.rect(id))
+      .filter(Boolean);
+    if (this.selection.size > 1 && boxes.length && this.interactionMode === 'edit') {
+      const x = Math.min(...boxes.map((r) => r.x)),
+        y = Math.min(...boxes.map((r) => r.y));
+      this.setOutline(this.groupBox, {
+        x,
+        y,
+        width: Math.max(...boxes.map((r) => r.x + r.width)) - x,
+        height: Math.max(...boxes.map((r) => r.y + r.height)) - y,
+      });
+      this.groupHandle.textContent = '⠿ ' + this.selection.size + '개 이동';
+      this.groupHandle.setAttribute('aria-label', '선택한 ' + this.selection.size + '개 요소 이동');
+      this.groupHandle.style.setProperty('top', y < 38 ? '8px' : '-37px', 'important');
+    } else this.setOutline(this.groupBox, null);
     this.hover.style.display = 'none';
     this.renderCommentMarkers();
   }
@@ -819,6 +849,11 @@ export class CanvasScene {
     if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
+    if (event.target.closest?.('[data-uic-group-handle]')) {
+      if (this.interactionMode === 'edit' && this.selection.size > 1)
+        this.beginDrag(event, this.selected);
+      return;
+    }
     const marker = event.target.closest?.('[data-uic-comment]');
     if (marker) {
       this.openComment(marker.dataset.uicComment);
@@ -849,6 +884,9 @@ export class CanvasScene {
       this.callbacks.onCommentSelect?.(id, { floating: true });
       return;
     }
+    this.beginDrag(event, id);
+  }
+  beginDrag(event, id) {
     const ids = this.selectionRoots(),
       selectedSet = new Set(ids),
       boxes = ids.map((key) => this.rect(key)),

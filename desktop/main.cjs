@@ -48,6 +48,8 @@ function state(message) {
     view: current,
     header_height: HEADER_HEIGHT[current],
     busy,
+    can_go_back: !!source?.webContents.navigationHistory.canGoBack(),
+    can_go_forward: !!source?.webContents.navigationHistory.canGoForward(),
     message:
       message ||
       (current === 'source'
@@ -69,17 +71,20 @@ function layout() {
     view?.setBounds({ x: 0, y: top, width, height: Math.max(1, height - top) });
 }
 function show(which) {
-  if (!['source', 'editor', 'agent', 'update'].includes(which)) throw new Error('알 수 없는 화면');
+  if (!['source', 'editor', 'settings', 'agent', 'update'].includes(which))
+    throw new Error('알 수 없는 화면');
   current = which;
   source.setVisible(which === 'source');
   editor.setVisible(which === 'editor');
   layout();
   notify(
-    which === 'agent'
-      ? '앱에 포함된 스킬과 MCP 연결 정보를 준비하세요.'
-      : which === 'update'
-        ? 'GitHub Releases에서 앱의 새 버전을 가져옵니다.'
-        : undefined,
+    which === 'settings'
+      ? '에이전트 연결·스킬 설치와 앱 업데이트를 관리합니다.'
+      : which === 'agent'
+        ? '앱에 포함된 스킬과 MCP 연결 정보를 준비하세요.'
+        : which === 'update'
+          ? 'GitHub Releases에서 앱의 새 버전을 가져옵니다.'
+          : undefined,
   );
 }
 function trusted(event, kind) {
@@ -171,7 +176,12 @@ async function start() {
     if (!editor.webContents.isDestroyed()) editor.webContents.close();
     win = null;
   });
-  for (const event of ['did-navigate', 'did-navigate-in-page', 'did-finish-load'])
+  for (const event of [
+    'did-navigate',
+    'did-navigate-in-page',
+    'did-finish-load',
+    'did-stop-loading',
+  ])
     source.webContents.on(event, () => notify());
   source.webContents.on('did-fail-load', (_event, code, description, _url, isMain) => {
     if (isMain && code !== -3) notify('사이트를 열지 못했습니다: ' + description);
@@ -184,6 +194,12 @@ async function start() {
   ipcMain.handle('canvas:save-file', (event, value) => {
     trusted(event, 'editor');
     return saveFile(value);
+  });
+  ipcMain.handle('canvas:open-source', async (event, url) => {
+    trusted(event, 'editor');
+    const target = require('./security.cjs').webUrl(url);
+    show('source');
+    await source.webContents.loadURL(target);
   });
   ipcMain.handle('canvas:show-source', (event) => {
     trusted(event, 'editor');
@@ -275,8 +291,14 @@ async function start() {
       {
         label: '편집',
         submenu: [
-          { role: 'undo' },
-          { role: 'redo' },
+          ...['undo', 'redo'].map((command, index) => ({
+            label: index ? '다시 실행' : '실행 취소',
+            accelerator: index ? 'CommandOrControl+Shift+Z' : 'CommandOrControl+Z',
+            click: () => {
+              if (current === 'editor') editor.webContents.send('canvas:history', command);
+              else require('electron').webContents.getFocusedWebContents()?.[command]();
+            },
+          })),
           { type: 'separator' },
           { role: 'cut' },
           { role: 'copy' },

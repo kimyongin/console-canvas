@@ -27,8 +27,8 @@ function registerShellIpc({
   handle('info', info);
   handle('skill-info', () => skills.info());
   handle('skill-install', () => skills.info(true));
-  handle('mcp-copy', () => {
-    clipboard.writeText(skills.command);
+  handle('mcp-copy', async () => {
+    await clipboard.writeText(skills.command);
     return { copied: true };
   });
   handle('skill-save', async () => {

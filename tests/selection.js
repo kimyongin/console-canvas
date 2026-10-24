@@ -197,6 +197,41 @@ try {
       doc.querySelector('#inspector-delete').textContent === '선택한 2개 삭제' &&
       doc.querySelector('#element-size').textContent.startsWith('선택 영역'),
   );
+  app.selectNode(first.id);
+  app.selectNode(second.id, { additive: true });
+  const groupBefore = JSON.stringify(scene.edits),
+    groupUndo = app.state.undo.length;
+  check(
+    'Group frame encloses selected roots and exposes a named move handle',
+    scene.groupBox.style.display !== 'none' &&
+      scene.groupHandle.getAttribute('aria-label').includes('2개') &&
+      parseFloat(scene.groupBox.style.width) >= scene.rect(first.id).width,
+  );
+  pointer(scene.groupHandle, 'pointerdown', 100, 100);
+  pointer(sceneRoot, 'pointermove', 122, 117);
+  pointer(sceneRoot, 'pointerup', 122, 117);
+  check(
+    'Group handle moves both roots as one undo entry',
+    scene.edits[first.id].dx === 22 &&
+      scene.edits[second.id].dx === 22 &&
+      app.state.undo.length === groupUndo + 1,
+  );
+  app.undo();
+  check(
+    'Group handle undo restores complete geometry and editor marks never export',
+    JSON.stringify(scene.edits) === groupBefore &&
+      !scene.serialize().includes('data-uic-group-handle'),
+  );
+  pointer(scene.groupHandle, 'pointerdown', 100, 100);
+  pointer(sceneRoot, 'pointermove', 140, 120);
+  pointer(sceneRoot, 'pointercancel', 140, 120);
+  check(
+    'Cancelled group-handle drag leaves no geometry or undo change',
+    JSON.stringify(scene.edits) === groupBefore && app.state.undo.length === groupUndo,
+  );
+  doc.querySelector('#comment-mode').click();
+  check('Comment mode hides group movement handle', scene.groupBox.style.display === 'none');
+  doc.querySelector('#comment-mode').click();
   root.setPointerCapture = oldSet;
   root.hasPointerCapture = oldHas;
   sceneRoot.setPointerCapture = oldSceneSet;
@@ -342,6 +377,59 @@ try {
   check(
     'Real editor input fields retain native text clipboard behavior',
     !textEvent.defaultPrevented,
+  );
+  const savedId = app.state.snapshot.id,
+    savedTimeline = app.state.timeline.entries.length;
+  const other = JSON.parse(JSON.stringify(app.state.snapshot));
+  other.id = crypto.randomUUID();
+  other.source.title = '전환 테스트 두 번째 화면';
+  await app.openSnapshot(other);
+  const otherId = app.state.snapshot.id;
+  app.selectNode(first.id);
+  doc.querySelector('#component-comment').value = '전환 전에 남긴 미저장 주석';
+  doc.querySelector('#review-note').value = '전환 전에 남긴 추가 설명';
+  doc.querySelector('#documents-button').click();
+  await until(() => doc.querySelectorAll('.document-item').length >= 2);
+  check(
+    'Document switcher lists all saved screens and identifies the current document',
+    !!doc.querySelector('.document-item[aria-current]') &&
+      doc.querySelector('#document-list').textContent.includes('전환 테스트 두 번째 화면'),
+  );
+  doc.querySelector('#document-search').value = '검색 결과 없음 928372';
+  doc.querySelector('#document-search').dispatchEvent(new Event('input', { bubbles: true }));
+  check(
+    'Document search has an explicit empty result state',
+    !doc.querySelectorAll('.document-item').length &&
+      doc.querySelector('#document-list-status').textContent.includes('검색 결과가 없습니다'),
+  );
+  doc.querySelector('#document-search').value = '';
+  doc.querySelector('#document-search').dispatchEvent(new Event('input', { bubbles: true }));
+  doc.querySelector('[data-document-id="' + savedId + '"]').click();
+  await until(
+    () =>
+      app.state.ready &&
+      app.state.snapshot.id === savedId &&
+      !doc.querySelector('#documents-dialog').open,
+  );
+  check(
+    'Switching saved documents restores copy geometry, comments and snapshot futures',
+    app.state.scene.nodes.has(copyRoot) &&
+      app.state.scene.annotations[copyRoot] === '복사한 주석' &&
+      app.state.timeline.entries.length === savedTimeline,
+  );
+  doc.querySelector('#documents-button').click();
+  await until(() => doc.querySelectorAll('.document-item').length >= 2);
+  doc.querySelector('[data-document-id="' + otherId + '"]').click();
+  await until(
+    () =>
+      app.state.ready &&
+      app.state.snapshot.id === otherId &&
+      !doc.querySelector('#documents-dialog').open,
+  );
+  check(
+    'Document switch flushes comment drafts and the review note before leaving',
+    app.state.scene.annotations[first.id] === '전환 전에 남긴 미저장 주석' &&
+      doc.querySelector('#review-note').value === '전환 전에 남긴 추가 설명',
   );
   document.querySelector('#status').textContent = JSON.stringify({
     passed: results.length,

@@ -103,6 +103,7 @@
           </div>
           <div class="canvas-toolbar">
             <div class="history-controls">
+              <button id="documents-button" title="저장된 화면 전환 · 파일 열기">문서 ⌄</button>
               <button id="undo" aria-label="실행 취소" disabled>↶</button
               ><button id="redo" aria-label="다시 실행" disabled>↷</button
               ><span class="toolbar-divider"></span
@@ -311,6 +312,22 @@
         </div>
       </aside>
     </main>
+    <dialog id="documents-dialog" aria-label="저장된 화면">
+      <form method="dialog">
+        <button class="dialog-close" aria-label="문서 목록 닫기">×</button>
+      </form>
+      <h2>저장된 화면</h2>
+      <p>현재 작업은 자동 저장한 뒤 전환합니다.</p>
+      <input
+        id="document-search"
+        type="search"
+        aria-label="저장된 화면 검색"
+        placeholder="화면 이름 또는 주소로 검색"
+      />
+      <p id="document-list-status" role="status"></p>
+      <div id="document-list" class="document-list"></div>
+      <button id="documents-import">화면 파일 열기…</button>
+    </dialog>
     <dialog id="export-dialog">
       <form method="dialog"><button class="dialog-close" aria-label="닫기">×</button></form>
       <div class="eyebrow">HAND OFF YOUR CHANGES</div>

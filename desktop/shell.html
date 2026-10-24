@@ -19,12 +19,9 @@
         </nav>
         <small id="status" role="status">원하는 화면을 열어 주세요.</small
         ><button id="capture" class="primary">이 화면 가져오기 →</button>
-        <details id="settings-menu">
-          <summary aria-label="앱 설정">설정 ⌄</summary>
-          <div>
-            <button id="show-agent">에이전트 연결</button><button id="show-update">업데이트</button>
-          </div>
-        </details>
+        <button id="show-settings" title="에이전트 연결·스킬 설치·앱 업데이트" aria-label="앱 설정">
+          앱 설정
+        </button>
       </div>
       <form id="navigation">
         <button id="back" type="button" aria-label="뒤로">←</button
@@ -42,8 +39,31 @@
       <h1>원본 사이트와 편집을 한 곳에서</h1>
       <p>위 주소창에 사이트를 열고, 원하는 화면에서 가져오기를 누르세요.</p>
     </main>
+    <section id="settings-setup" class="agent-setup" hidden aria-label="앱 설정">
+      <div class="agent-intro">
+        <div class="eyebrow">CONSOLE CANVAS</div>
+        <h1>앱 설정</h1>
+        <p>에이전트 연결과 앱 업데이트를 관리합니다. 캔버스의 편집 내용은 유지됩니다.</p>
+      </div>
+      <div class="setup-cards">
+        <article>
+          <h2>에이전트 연결·스킬</h2>
+          <p>Codex 스킬 설치와 MCP 연결 명령을 확인합니다.</p>
+          <button id="show-agent">에이전트 연결 열기 →</button>
+        </article>
+        <article>
+          <h2>앱 업데이트</h2>
+          <p>현재 버전을 확인하고 새 버전을 설치합니다.</p>
+          <button id="show-update">업데이트 열기 →</button>
+        </article>
+      </div>
+      <div class="setup-actions">
+        <button id="settings-return" class="primary">작업으로 돌아가기</button>
+      </div>
+    </section>
     <section id="agent-setup" class="agent-setup" hidden aria-label="에이전트 연결 설정">
       <div class="agent-intro">
+        <button class="settings-back">← 앱 설정</button>
         <div class="eyebrow">CONNECT YOUR AGENT</div>
         <h1>앱에서 스킬까지 한 번에.</h1>
         <p>
@@ -97,6 +117,7 @@
     </section>
     <section id="update-setup" class="agent-setup" hidden aria-label="앱 업데이트">
       <div class="agent-intro">
+        <button class="settings-back">← 앱 설정</button>
         <div class="eyebrow">APP UPDATES</div>
         <h1>편집은 그대로. 앱은 최신으로.</h1>
         <p>

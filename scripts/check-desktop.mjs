@@ -18,7 +18,8 @@ const env = {
   CONSOLE_CANVAS_PORT: String(port),
 };
 await fs.mkdir(env.HOME, { recursive: true });
-let active;
+let active,
+  checking = true;
 function start(command, args, extra = {}) {
   const child = spawn(command, args, {
     cwd: root,
@@ -35,11 +36,17 @@ function start(command, args, extra = {}) {
     );
   });
   done.catch(() => {});
-  return { child, done };
+  return {
+    child,
+    done,
+    get output() {
+      return output;
+    },
+  };
 }
 async function waitFor(filename) {
-  const deadline = Date.now() + 30000;
-  while (Date.now() < deadline) {
+  const deadline = Date.now() + 60000;
+  while (checking && Date.now() < deadline) {
     try {
       return JSON.parse(await fs.readFile(path.join(temporary, filename), 'utf8'));
     } catch {}
@@ -50,7 +57,12 @@ async function waitFor(filename) {
 try {
   const electron = process.env.ELECTRON_BINARY || path.join(root, 'node_modules/.bin/electron');
   active = start(electron, ['tests/desktop-fixture.cjs'], { CONSOLE_CANVAS_TEST_PHASE: 'prepare' });
-  const capture = await waitFor('prepare-ready.json');
+  const capture = await Promise.race([
+    waitFor('prepare-ready.json'),
+    active.done.then(() => {
+      throw new Error('Desktop fixture exited before prepare');
+    }),
+  ]);
   const sdk = start(process.execPath, ['scripts/verify_mcp.mjs'], {
     CONSOLE_CANVAS_MCP_ARGS: JSON.stringify([
       path.join(root, 'mcp/server.py'),
@@ -73,7 +85,12 @@ try {
   if (session.document_id !== expected.document_id)
     throw new Error('Normal quit did not persist last document');
   active = start(electron, ['tests/desktop-fixture.cjs'], { CONSOLE_CANVAS_TEST_PHASE: 'reopen' });
-  const reopened = await waitFor('reopen-ready.json');
+  const reopened = await Promise.race([
+    waitFor('reopen-ready.json'),
+    active.done.then(() => {
+      throw new Error('Desktop fixture exited before reopen');
+    }),
+  ]);
   await active.done;
   active = null;
   const report = {
@@ -88,7 +105,9 @@ try {
   );
   console.log(JSON.stringify(report));
 } finally {
+  checking = false;
   if (active) {
+    if (active.output) console.error(active.output);
     active.child.kill('SIGTERM');
     await active.done.catch(() => {});
   }

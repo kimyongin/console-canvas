@@ -63,6 +63,136 @@ async function main() {
         ),
       'Capture/MCP not ready',
     );
+    await evaluate(shell, "document.querySelector('#show-settings').click()");
+    await until(
+      () => evaluate(shell, "document.body.dataset.view==='settings'"),
+      'Settings not shown',
+    );
+    assert.equal(
+      window.contentView.children.find((v) => v.webContents === editor).getVisible(),
+      false,
+    );
+    assert.equal(await evaluate(shell, "document.querySelector('#settings-setup').hidden"), false);
+    await evaluate(shell, "document.querySelector('#show-agent').click()");
+    await until(
+      () =>
+        evaluate(shell, "document.querySelector('#mcp-command').value.includes('mcp/server.py')"),
+      'Agent command missing',
+    );
+    await evaluate(shell, "document.querySelector('#copy-mcp').click()");
+    await until(
+      () =>
+        evaluate(
+          shell,
+          "document.querySelector('#agent-result').textContent.includes('복사했습니다')",
+        ),
+      'Command copy failed',
+    );
+    assert.ok((await require('electron').clipboard.readText()).includes('mcp/server.py'));
+    await evaluate(shell, "document.querySelector('#install-skill').click()");
+    await until(
+      () =>
+        evaluate(
+          shell,
+          "!document.querySelector('#install-skill').disabled && document.querySelector('#agent-result').textContent.includes('설치했습니다')",
+        ),
+      'Skill install failed',
+    );
+    const originalSave = dialog.showSaveDialog;
+    const skillFile = path.join(directory, 'saved-skill.zip');
+    dialog.showSaveDialog = async () => ({ canceled: false, filePath: skillFile });
+    await evaluate(shell, "document.querySelector('#save-skill').click()");
+    await until(
+      () =>
+        fs.stat(skillFile).then(
+          (s) => s.size > 1000,
+          () => false,
+        ),
+      'Skill ZIP save failed',
+    );
+    dialog.showSaveDialog = originalSave;
+    await evaluate(shell, "document.querySelector('.settings-back').click()");
+    await until(
+      () => evaluate(shell, "document.body.dataset.view==='settings'"),
+      'Settings back failed',
+    );
+    await evaluate(shell, "document.querySelector('#show-update').click()");
+    await until(
+      () =>
+        evaluate(
+          shell,
+          "document.body.dataset.view==='update' && document.querySelector('#update-version').textContent.includes('v')",
+        ),
+      'Update page missing',
+    );
+    assert.equal(
+      await evaluate(
+        shell,
+        "document.querySelector('#download-update').hidden && document.querySelector('#install-update').hidden",
+      ),
+      true,
+    );
+    await evaluate(shell, "window.ConsoleCanvasShell.show('settings')");
+    await evaluate(shell, "document.querySelector('#settings-return').click()");
+    await until(
+      () => evaluate(shell, "document.body.dataset.view==='editor'"),
+      'Settings return lost editor',
+    );
+    // A failed capture must show its error and re-enable the button without a second renderer error.
+    await source.loadURL('about:blank');
+    await evaluate(shell, "document.querySelector('#show-source').click()");
+    await until(() => evaluate(shell, "document.body.dataset.view==='source'"), 'Source not shown');
+    await evaluate(shell, "document.querySelector('#capture').click()");
+    await until(
+      () =>
+        evaluate(
+          shell,
+          "!document.querySelector('#capture').disabled && document.querySelector('#status').textContent.includes('HTTP')",
+        ),
+      'Capture failure did not recover',
+    );
+    await source.loadURL(
+      await evaluate(shell, '(async()=> (await window.ConsoleCanvasShell.info()).demo_url)()'),
+    );
+    assert.equal(await evaluate(shell, "document.querySelector('#forward').disabled"), true);
+    await evaluate(shell, "document.querySelector('#back').click()");
+    await until(() => source.getURL() === 'about:blank', 'Back failed');
+    await until(
+      () => evaluate(shell, "!document.querySelector('#forward').disabled"),
+      'Forward button not enabled',
+    );
+    await evaluate(shell, "document.querySelector('#forward').click()");
+    await until(() => source.getURL().includes('/fixtures/console.html'), 'Forward failed');
+    await evaluate(shell, "document.querySelector('#show-editor').click()");
+    await evaluate(editor, "document.querySelector('#source-url').click()");
+    await until(
+      () => evaluate(shell, "document.body.dataset.view==='source'"),
+      'Source URL did not open in app',
+    );
+    await evaluate(shell, "document.querySelector('#show-editor').click()");
+    const historyNode = await evaluate(
+      editor,
+      `(() => { const a=window.ConsoleCanvas,n=[...a.state.scene.nodes.values()].find(n=>n.locator.id==='new-customer');a.selectNode(n.id);a.state.scene.nudge(9,4); document.activeElement?.blur(); return n.id; })()`,
+    );
+    const editMenu = require('electron')
+      .Menu.getApplicationMenu()
+      .items.find((item) => item.label === '편집').submenu;
+    editMenu.items.find((item) => item.label === '실행 취소').click();
+    await until(
+      () =>
+        evaluate(editor, `!window.ConsoleCanvas.state.scene.edits[${JSON.stringify(historyNode)}]`),
+      'Native undo did not use canvas history',
+    );
+    editMenu.items.find((item) => item.label === '다시 실행').click();
+    await until(
+      () =>
+        evaluate(
+          editor,
+          `window.ConsoleCanvas.state.scene.edits[${JSON.stringify(historyNode)}]?.dx===9`,
+        ),
+      'Native redo did not use canvas history',
+    );
+    await evaluate(editor, 'window.ConsoleCanvas.undo()');
     assert.equal(await evaluate(source, 'document.documentElement.outerHTML'), before);
     assert.equal(await evaluate(shell, "document.querySelector('#navigation').hidden"), true);
     assert.equal(editor.getOwnerBrowserWindow(), window);
