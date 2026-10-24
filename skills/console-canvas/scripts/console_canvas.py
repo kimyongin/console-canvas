@@ -19,7 +19,7 @@ RUNTIME_FILES = {
     'export.js', 'editor.js', 'editor.css', 'editor.html', 'README.md',
     'preview.html', 'sample.uiclone.json', 'fixtures/console.html',
     'fixtures/console.css', 'fixtures/console.js',
-    'bridge-client.js', 'editor-controller.js', 'snapshot-history.js', 'mcp/server.py', 'mcp/bridge.py',
+    'bridge-client.js', 'editor-controller.js', 'snapshot-history.js', 'agent-guide.md', 'mcp/server.py', 'mcp/bridge.py', 'mcp/skill_install.py',
     'package.json', 'desktop/main.cjs', 'desktop/preload.cjs', 'desktop/shell-preload.cjs',
     'desktop/shell.html', 'desktop/shell.css', 'desktop/shell.cjs',
 }

@@ -1,18 +1,23 @@
-const {app,BrowserWindow,WebContentsView,ipcMain,session,Menu}=require('electron');
+const {app,BrowserWindow,WebContentsView,ipcMain,session,Menu,dialog,clipboard}=require('electron');
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{execFile}=require('node:child_process'),{promisify}=require('node:util');
 const run=promisify(execFile),ROOT=path.resolve(__dirname,'..');
 let win,source,editor,connection,current='source',busy=false,editorReady=false,pendingCapture=null;
 app.setName('Console Canvas');
 const stateDir=process.env.CONSOLE_CANVAS_STATE_DIR||path.join(process.env.CODEX_HOME||path.join(os.homedir(),'.codex'),'console-canvas');
+const python=process.env.CONSOLE_CANVAS_PYTHON||(process.platform==='darwin'?'/usr/bin/python3':'python3');
+const appVersion=JSON.parse(fs.readFileSync(path.join(ROOT,'package.json'),'utf8')).version;
+const bundledSkill=fs.existsSync(path.join(ROOT,'..','console-canvas-skill.zip'))?path.join(ROOT,'..','console-canvas-skill.zip'):path.join(ROOT,'dist','console-canvas-skill.zip');
+const quote=value=>"'"+value.replace(/'/g,"'\\''")+"'";
+const mcpCommand=['codex','mcp','add','console-canvas','--',python,path.join(ROOT,'mcp/server.py'),'--state-dir',stateDir].map(quote).join(' ');
+async function skillInfo(install=false){const result=await run(python,[path.join(ROOT,'mcp/skill_install.py'),'--archive',bundledSkill,...(install?[]:['--status'])],{timeout:15000,maxBuffer:1024*1024});return {...JSON.parse(result.stdout),version:appVersion,mcp_command:mcpCommand};}
 function webUrl(value){const parsed=new URL(value);if(!['https:','http:'].includes(parsed.protocol)||parsed.username||parsed.password)throw new Error('HTTP 또는 HTTPS 주소를 입력해 주세요.');return parsed.href;}
 function state(message){return {url:source?.webContents.getURL()||'',view:current,busy,message:message|| (current==='source'?'로그인한 뒤 원하는 화면에서 가져오기를 누르세요.':'요소를 옮기거나 주석을 남기세요. MCP는 가져온 화면에 자동 연결됩니다.'),demo_url:connection.url+'/fixtures/console.html'};}
 function notify(message){if(win&&!win.isDestroyed())win.webContents.send('canvas:state',state(message));}
 function layout(){if(!win)return;const [width,height]=win.getContentSize();for(const view of [source,editor])view?.setBounds({x:0,y:100,width,height:Math.max(1,height-100)});}
-function show(which){if(!['source','editor'].includes(which))throw new Error('알 수 없는 화면');current=which;source.setVisible(which==='source');editor.setVisible(which==='editor');layout();notify();}
+function show(which){if(!['source','editor','agent'].includes(which))throw new Error('알 수 없는 화면');current=which;source.setVisible(which==='source');editor.setVisible(which==='editor');layout();notify(which==='agent'?'앱에 포함된 스킬과 MCP 연결 정보를 준비하세요.':undefined);}
 function trusted(event,kind){const expected=kind==='editor'?editor.webContents:win.webContents;if(event.sender!==expected||event.senderFrame!==expected.mainFrame)throw new Error('허용되지 않은 앱 요청');}
 function secure(contents){contents.on('will-navigate',(event,url)=>{try{webUrl(url);}catch{event.preventDefault();}});contents.setWindowOpenHandler(({url})=>{try{webUrl(url);return {action:'allow',overrideBrowserWindowOptions:{parent:win,width:850,height:750,webPreferences:{session:source.webContents.session,nodeIntegration:false,contextIsolation:true,sandbox:true}}};}catch{return {action:'deny'};}});contents.on('did-create-window',child=>secure(child.webContents));}
 async function start(){
-  const python=process.env.CONSOLE_CANVAS_PYTHON||(process.platform==='darwin'?'/usr/bin/python3':'python3');
   await run(python,[path.join(ROOT,'mcp/server.py'),'--state-dir',stateDir,'--app-dir',ROOT,'--start'],{timeout:15000});
   connection=JSON.parse(fs.readFileSync(path.join(stateDir,'connection.json'),'utf8'));
   const browsing=session.fromPartition('persist:console-canvas-websites');browsing.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));browsing.setPermissionCheckHandler(()=>false);
@@ -28,6 +33,10 @@ async function start(){
   ipcMain.handle('canvas:connection',event=>{trusted(event,'editor');return {url:connection.url,token:connection.token};});
   ipcMain.on('canvas:editor-ready',event=>{trusted(event,'editor');editorReady=true;if(pendingCapture){editor.webContents.send('canvas:snapshot',pendingCapture);pendingCapture=null;}});
   ipcMain.handle('canvas:info',event=>{trusted(event);return state();});
+  ipcMain.handle('canvas:skill-info',event=>{trusted(event);return skillInfo();});
+  ipcMain.handle('canvas:skill-install',event=>{trusted(event);return skillInfo(true);});
+  ipcMain.handle('canvas:mcp-copy',event=>{trusted(event);clipboard.writeText(mcpCommand);return {copied:true};});
+  ipcMain.handle('canvas:skill-save',async event=>{trusted(event);const result=await dialog.showSaveDialog(win,{title:'Console Canvas 스킬 ZIP 저장',defaultPath:path.join(app.getPath('downloads'),'console-canvas-skill-'+appVersion+'.zip'),filters:[{name:'ZIP 파일',extensions:['zip']}]});if(result.canceled)return {canceled:true};await fs.promises.copyFile(bundledSkill,result.filePath);return {path:result.filePath};});
   ipcMain.handle('canvas:show',(event,which)=>{trusted(event);show(which);});
   ipcMain.handle('canvas:navigate',async(event,input)=>{trusted(event);let value=String(input).trim();if(!/^https?:\/\//i.test(value))value='https://'+value;const url=webUrl(value);show('source');await source.webContents.loadURL(url);});
   ipcMain.handle('canvas:back',event=>{trusted(event);if(source.webContents.navigationHistory.canGoBack())source.webContents.navigationHistory.goBack();});

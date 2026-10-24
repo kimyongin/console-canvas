@@ -7,5 +7,9 @@ contextBridge.exposeInMainWorld('ConsoleCanvasShell',{
   forward:()=>ipcRenderer.invoke('canvas:forward'),
   reload:()=>ipcRenderer.invoke('canvas:reload'),
   info:()=>ipcRenderer.invoke('canvas:info'),
+  skillInfo:()=>ipcRenderer.invoke('canvas:skill-info'),
+  installSkill:()=>ipcRenderer.invoke('canvas:skill-install'),
+  saveSkill:()=>ipcRenderer.invoke('canvas:skill-save'),
+  copyMcpCommand:()=>ipcRenderer.invoke('canvas:mcp-copy'),
   onState:callback=>ipcRenderer.on('canvas:state',(_event,value)=>callback(value))
 });

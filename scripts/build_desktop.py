@@ -61,6 +61,8 @@ def main():
         shutil.rmtree(app)
     shutil.copytree(extracted / 'Electron.app', app, symlinks=True)
     resources = app / 'Contents' / 'Resources'
+    # Keep the installable skill outside app/ to avoid recursive runtime archives.
+    shutil.copyfile(ROOT / 'dist' / 'console-canvas-skill.zip', resources / 'console-canvas-skill.zip')
     runtime = resources / 'app'
     # Reuse the exact runtime already verified and packaged by build.py.
     import zipfile
@@ -78,7 +80,8 @@ def main():
     value = plistlib.loads(plist.read_bytes())
     value.update({'CFBundleName': 'Console Canvas', 'CFBundleDisplayName': 'Console Canvas',
                   'CFBundleIdentifier': 'com.consolecanvas.desktop',
-                  'CFBundleShortVersionString': '0.4.0', 'CFBundleVersion': '0.4.0'})
+                  'CFBundleShortVersionString': json.loads((ROOT / 'package.json').read_text())['version'],
+                  'CFBundleVersion': json.loads((ROOT / 'package.json').read_text())['version']})
     plist.write_bytes(plistlib.dumps(value))
     subprocess.run(['/usr/bin/codesign', '--force', '--deep', '--sign', '-', str(app)], check=True)
     output = ROOT / 'dist' / ('console-canvas-desktop-macos-' + arch + '.zip')

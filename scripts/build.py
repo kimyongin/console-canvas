@@ -9,6 +9,7 @@ parser.add_argument('--output',type=Path,default=ROOT/'dist')
 args=parser.parse_args()
 OUT=args.output.resolve()
 OUT.mkdir(parents=True,exist_ok=True)
+(ROOT/'agent-guide.md').write_text((ROOT/'skills/console-canvas/SKILL.md').read_text())
 sample=json.loads((ROOT/'sample.uiclone.json').read_text())
 html=(ROOT/'editor.html').read_text()
 html=html.replace('<link rel="stylesheet" href="editor.css">','<style>'+(ROOT/'editor.css').read_text()+'</style>')
@@ -28,7 +29,7 @@ html=html.replace('</body>',bootstrap+'</body>')
 (ROOT/'preview.html').write_text(html)
 (OUT/'Console Canvas.html').write_text(html)
 files=['manifest.json','background.js','capture.js','db.js','engine.js','export.js','editor.js','editor.css','editor.html','README.md','preview.html','sample.uiclone.json','fixtures/console.html','fixtures/console.css','fixtures/console.js']
-files+=['bridge-client.js','editor-controller.js','snapshot-history.js','mcp/server.py','mcp/bridge.py','package.json','desktop/main.cjs','desktop/preload.cjs','desktop/shell-preload.cjs','desktop/shell.html','desktop/shell.css','desktop/shell.cjs']
+files+=['bridge-client.js','editor-controller.js','snapshot-history.js','agent-guide.md','mcp/server.py','mcp/bridge.py','mcp/skill_install.py','package.json','desktop/main.cjs','desktop/preload.cjs','desktop/shell-preload.cjs','desktop/shell.html','desktop/shell.css','desktop/shell.cjs']
 archive=OUT/'console-canvas-extension.zip'
 with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as package:
     for filename in files:

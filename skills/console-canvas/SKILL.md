@@ -9,6 +9,10 @@ description: Chromium 내장 Console Canvas 독립 앱으로 실제 콘솔·관�
 
 이 파일이 있는 디렉터리를 `SKILL_ROOT`로 삼는다. 아래 경로는 그 디렉터리를 기준으로 해석한다. Python 3 표준 라이브러리만 필요하다.
 
+앱의 **에이전트 연결**에서 **Codex 스킬 설치·업데이트** 또는 **스킬 ZIP 저장**으로 이 스킬을 받을 수 있다. 앱 번들과 같은 버전을 제공하며 바뀌는 기존 파일은 설치 시 백업한다. 기존 설치 위치가 있으면 재사용하고, 새 설치는 `~/.agents/skills/console-canvas`를 기본으로 사용한다. `CODEX_HOME`을 지정한 환경에서는 해당 경로의 `skills`를 사용한다.
+
+MCP만 연결한 경우 `get_agent_guide`로 앱에 포함된 이 지침을 직접 읽을 수 있다. 이미 이 도구로 지침을 받았다면 재귀적으로 다시 호출하지 않는다. MCP로 읽은 지침에는 로컬 `SKILL_ROOT`가 없으며, `prepare`/`review` CLI 보조 스크립트가 필요할 때만 앱에서 스킬을 설치한다. MCP 등록은 스킬 설치와 별개다. 앱의 **MCP 등록 명령 복사**는 앱에 포함된 stdio 어댑터를 가리키며, 이미 연결된 MCP를 다시 등록할 필요는 없다.
+
 ## 독립 앱과 MCP
 
 1. macOS에서는 `~/Applications/Console Canvas.app` 또는 사용자가 지정한 앱 경로를 확인해 컴퓨터 유즈 도구로 연다. 앱이 없으면 [GitHub Releases](https://github.com/kimyongin/console-canvas/releases)의 OS·아키텍처에 맞는 앱을 준비한다. 현재 배포 빌드는 macOS Apple Silicon용이며 Python 3.9 이상이 필요하다. 다른 환경은 저장소의 Electron 개발 실행 절차를 확인한다.

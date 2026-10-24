@@ -7,14 +7,15 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const client=new Client({name:'console-canvas-real-connection-test',version:'0.4.0'});
+const client=new Client({name:'console-canvas-real-connection-test',version:'0.5.0'});
 const transport=new StdioClientTransport({command:process.env.CONSOLE_CANVAS_MCP_COMMAND||process.env.CONSOLE_CANVAS_PYTHON||'/usr/bin/python3',args:process.env.CONSOLE_CANVAS_MCP_ARGS?JSON.parse(process.env.CONSOLE_CANVAS_MCP_ARGS):[path.join(root,'mcp/server.py')],stderr:'pipe'});
 const checks=[];
 function check(name,value){assert.ok(value,name);checks.push(name);}
 async function tool(name,args={},allowError=false){const result=await client.callTool({name,arguments:args});const value=result.structuredContent||JSON.parse(result.content[0].text);if(!allowError)assert.equal(result.isError,false,JSON.stringify(value));return value;}
 try{
   await client.connect(transport);
-  const tools=await client.listTools();check('Official SDK discovers ten MCP tools',tools.tools.length===10);
+  const tools=await client.listTools();check('Official SDK discovers eleven MCP tools',tools.tools.length===11);
+  const guide=await tool('get_agent_guide');check('Agent reads the app-bundled skill through MCP',guide.source==='app_bundle'&&guide.name==='console-canvas'&&guide.markdown.includes('## 독립 앱과 MCP')&&guide.markdown.includes('restore_snapshot'));
   const screens=(await tool('list_screens')).screens;
   const screen=screens.find(s=>{const u=new URL(s.url);return u.hostname==='127.0.0.1'&&u.pathname==='/fixtures/console.html';});
   assert.ok(screen,'Capture the disposable sample in the desktop app first');

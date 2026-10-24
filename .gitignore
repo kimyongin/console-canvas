@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 /dist/
 /preview.html
+/agent-guide.md
 /tests/example-review.html
 /local/
 /reviews/

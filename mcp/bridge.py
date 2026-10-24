@@ -68,7 +68,8 @@ def error(code, message):
 
 
 class Broker:
-    def __init__(self):
+    def __init__(self, app_dir=None):
+        self.app_dir = Path(app_dir) if app_dir else Path(__file__).resolve().parents[1]
         self.condition = threading.Condition()
         self.sessions = {}
         self.commands = OrderedDict()
@@ -131,6 +132,14 @@ class Broker:
             validate(arguments, rules[name])
         except ValueError as exc:
             return error('invalid_arguments', str(exc))
+        if name == 'get_agent_guide':
+            try:
+                return {'ok': True, 'name': 'console-canvas', 'version': VERSION,
+                        'markdown': (self.app_dir / 'agent-guide.md').read_text(encoding='utf-8'),
+                        'source': 'app_bundle', 'installation_required_for_mcp': False,
+                        'helper_scripts': 'Install the skill from the desktop app for prepare/review CLI helpers.'}
+            except OSError:
+                return error('guide_unavailable', 'The app-bundled skill guide is missing. Rebuild or update Console Canvas.')
         with self.condition:
             def live(session):
                 return not session.get('closed') and time.monotonic() - session['seen'] < 20
@@ -286,7 +295,7 @@ def main():
     server = ThreadingHTTPServer(('127.0.0.1', args.port), Handler)
     server.daemon_threads = True
     server.app_dir = args.app_dir.resolve()
-    server.broker = Broker()
+    server.broker = Broker(server.app_dir)
     server.token = secrets.token_urlsafe(32)
     target = args.state_dir / 'connection.json'
     temporary = args.state_dir / ('connection-' + str(os.getpid()) + '.tmp')
