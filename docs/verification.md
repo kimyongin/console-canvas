@@ -1,5 +1,7 @@
 # 0.13 문서·편집·버전 관리 동선 검증
 
+제품 요구사항·수용 기준·구현/검증 상태의 통합 기준은 [PRD](PRD.md)다. 이 문서는 버전별 실제 실행 결과를 보관한다.
+
 환경: macOS Apple Silicon, 공식 Electron 45.0.0, Python 3.9, Node.js 24, MCP SDK 1.32.2.
 
 ## 통합 명령
@@ -73,3 +75,9 @@ Mac 잠금 상태에서 표준 `npm run check`의 데스크톱 단계는 `Curren
 설치된 스킬의 관리 파일 4개는 앱 번들 ZIP과 바이트 단위로 일치한다. 원래 사용자 프로필을 시험 도구로 직접 열지 않고 사본의 지문을 대조했다. 7개 문서·13개 전체 스냅샷의 캡처·이름/휴지통 메타데이터·편집·주석·추가 설명·전체 타임라인이 설치 전후 동일하다. 설치 전은 정상 종료한 cold 백업이며 설치 후는 IndexedDB 파일 21개의 복사 전후/사본 해시 일치를 확인한 사본이다.
 
 로컬 증빙은 Git에서 제외한 `local/upgrade-0.15.0`의 `check.log`, `offscreen-check.log`, 시험 래퍼, `build.log`, `inventory-before.json`, `inventory-after.json`, `profile-copy-audit.json`, `installed-mcp-transport.json`, `installed-copy-reopen.json`, `graph-preview.png`에 있다. 네이티브 직접 조작·원본 화면 캡처·설치 앱 활성 화면 MCP 조회는 잠금 해제 후 남은 검증 항목이다.
+
+## PRD 문서 정리 검증 (2026-10-25)
+
+`docs/PRD.md`에 기능 요구사항 FR-01~14, 품질 기준 NFR-01~06, 수용 시나리오 AC-01~14와 이슈 #1~#7의 추적 표를 추가했다. README·구조 문서·작업 지침에 기준 문서를 연결하고, README의 다중 선택 미지원 설명과 Chromium 검사 수를 현재 기록에 맞췄다. 앱 동작·저장 형식·버전은 변경하지 않았다.
+
+문서의 로컬 링크, 요구사항/수용 기준 ID, 티켓 링크, 코드 펜스와 Git 공백 검사를 확인했다. 저장소 지침에 따라 기존 전체 검사도 재실행했다. 포맷·번들·Python 39·Node 23·Chromium 227개·독립 HTML·포인터 영역 선택은 통과했으며, 데스크톱 캡처는 잠금 상태의 `Current display surface not available for capture` 오류로 중단됐다. 이번 문서 변경으로 공식 SDK·설치 앱 직접 사용을 새로 완료한 것으로 기록하지 않는다. 실행 로그는 Git에서 제외한 `local/prd-check-2026-10-25.log`에 있다.

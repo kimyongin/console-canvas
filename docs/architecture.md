@@ -1,5 +1,7 @@
 # 개발 구조
 
+제품 요구사항과 사용자 동작의 기준은 [PRD](PRD.md), 실제 확인 결과는 [검증 기록](verification.md)에서 관리한다. 아래는 현재 구현 구조이며 React·TypeScript·shadcn/ui 전환은 [개선 계획](https://github.com/kimyongin/console-canvas/issues/1) 단계다.
+
 ## 편집과 명령
 
 - `capture.js`: 원본 DOM 읽기. 스크립트·입력 이벤트를 실행하지 않는다.
