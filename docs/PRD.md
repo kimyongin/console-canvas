@@ -373,14 +373,20 @@ flowchart LR
 | 실행 순서 | 티켓 | 담당 범위 | 관련 요구사항 |
 | --- | --- | --- | --- |
 | 전체 계획 | [#1](https://github.com/kimyongin/console-canvas/issues/1) | 범위·순서·공통 완료 조건 | 전체 |
-| 1 | [#2](https://github.com/kimyongin/console-canvas/issues/2) | React/TS/Tailwind·기존 esbuild 기반 | NFR-02, NFR-04 |
-| 2 | [#3](https://github.com/kimyongin/console-canvas/issues/3) | 기존 엔진과 단일 상태/명령 어댑터 | FR-04, FR-07~FR-12 |
-| 3 | [#4](https://github.com/kimyongin/console-canvas/issues/4) | shadcn 공통 컴포넌트·토큰·스타일/포커스 | FR-02, FR-05, NFR-02, NFR-03 |
-| 4 | [#5](https://github.com/kimyongin/console-canvas/issues/5) | 워크스페이스·레이어·문서·주석/속성 | FR-02~FR-06 |
-| 5 | [#6](https://github.com/kimyongin/console-canvas/issues/6) | 그래프·미리보기·이력·전달 UI | FR-07~FR-10 |
-| 6 | [#7](https://github.com/kimyongin/console-canvas/issues/7) | 회귀 검사·MCP/스킬·보존·설치 앱 | FR-11~FR-14, 전체 수용 기준 |
+| 0a | [#8](https://github.com/kimyongin/console-canvas/issues/8) | 데스크톱 PNG 네이티브 저장 결함 | FR-10, AC-10/14 |
+| 0b | [#9](https://github.com/kimyongin/console-canvas/issues/9) | 잘못된 파일의 UI/DB 무변경 거절 | FR-11/16, AC-17 |
+| 0c | [#10](https://github.com/kimyongin/console-canvas/issues/10) | DB 오류 중 긴급 편집 파일 백업 | FR-05/11/16, AC-04/12/17 |
+| 0d | [#11](https://github.com/kimyongin/console-canvas/issues/11) | 복원 저장 실패의 보호/롤백 | FR-07/11/12, AC-08/11/18 |
+| 1 | [#2](https://github.com/kimyongin/console-canvas/issues/2) | React/TS/Tailwind·기존 esbuild·배포 진입점 | FR-01/12/13/17, NFR-02/04 |
+| 2 | [#3](https://github.com/kimyongin/console-canvas/issues/3) | 기존 엔진과 상태/명령·저장 결과 어댑터 | FR-04/05/07/08/09/11/12/16 |
+| 3 | [#4](https://github.com/kimyongin/console-canvas/issues/4) | shadcn 공통 컴포넌트·토큰·스타일/포커스 | FR-02/05, NFR-02/03/04 |
+| 4 | [#5](https://github.com/kimyongin/console-canvas/issues/5) | 워크스페이스·레이어·문서/파일·주석/속성 | FR-02~FR-06, FR-11/16 |
+| 5 | [#6](https://github.com/kimyongin/console-canvas/issues/6) | 그래프·미리보기·두 버전 비교·통합 이력·PNG 전달 | FR-05/07/08/09/10/11/15 |
+| 6 | [#7](https://github.com/kimyongin/console-canvas/issues/7) | 전체 AC·보조 경로·MCP/스킬·보존·설치 앱 | FR-01~FR-17, NFR-01~06, AC-01~18 |
 
-추가된 FR-15 비교는 #6, FR-16 파일 입출력은 #5/#7, FR-17 보조 경로는 #2/#7에 연결한다. 결함 #8~#11은 React 전환 완료 여부와 별도로 추적한다.
+0단계는 기존 코드에서 먼저 수정해 정상/오류 회귀 기준을 확보한다. #8→#9→#10→#11은 추천 순서이며 #8/#9/#10 사이의 기술적 의존성은 없다. #11은 #10의 긴급 백업/저장 실패 계약과 먼저 맞춘다. #2의 빌드 준비는 먼저 할 수 있지만 사용자 편집을 담당하는 React 경로 활성화는 0단계 검증 뒤에 진행한다.
+
+결함 티켓이 오류 정책을 수정하고 #3이 이를 어댑터에 노출한다. #5/#6은 해당 계약을 UI에 연결하며 #7은 통합 검증을 맡는다. #7로 기존 결함 구현을 미루거나 같은 수정을 중복 구현하지 않는다. 각 기능·수용 기준의 담당과 제외 범위는 [티켓 재검토 기록](ticket-review.md)에 정리한다. 11개 이슈는 모두 열린 작업이며 이 순서 변경은 구현 완료 보고가 아니다.
 
 DOM 복제/이동 엔진은 React 외부에서 유지한다. UI와 MCP는 기존 명령·검증·실행 취소·저장 큐를 공유한다. Electron/백엔드 전체 재작성이나 추가 클라우드 서버는 이 전환의 필수 범위가 아니다. 상태 관리 라이브러리와 빌드 도구 추가는 구현상 필요와 비용을 확인한 뒤 결정한다.
 
@@ -399,6 +405,7 @@ DOM 복제/이동 엔진은 React 외부에서 유지한다. UI와 MCP는 기존
 - [구현 구조](architecture.md)
 - [버전별 검증 기록](verification.md)
 - [직접 사용 기록](usability-check.md)
+- [티켓 재검토·요구사항 담당표](ticket-review.md)
 - [앱 업데이트 검증](update-verification.md)
 - [에이전트 스킬 원본](../skills/console-canvas/SKILL.md)
 - [개발 완료·데이터 보존 작업 지침](../AGENTS.md)
@@ -409,3 +416,4 @@ DOM 복제/이동 엔진은 React 외부에서 유지한다. UI와 MCP는 기존
 | --- | --- |
 | 2026-10-25 | 대화에서 확정한 요구사항·0.15.0 구현/검증 상태·React/shadcn 개선 티켓을 최초 통합 |
 | 2026-10-25 | 112개 정적 조작 정의와 동적/MCP/CLI 경로 전수 대조. FR-15~17·AC-15~18, 실행 취소 수명·환경별 한도·열린 결함 #8~#11을 보완 |
+| 2026-10-25 | 전체 11개 티켓 재검토. 기존 결함 우선 순서·전환 책임·전체 FR/NFR/AC 담당과 오류/설치 검증 조건을 명확히 연결 |
