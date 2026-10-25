@@ -1,3 +1,6 @@
+import { useEffect, useRef, useState } from 'react';
+import { getDocument, documentSummary } from '../../db.js';
+import { withVersionScene } from '../version-preview.js';
 import { renderReact } from './mount';
 import { Button } from './components/button';
 import { ActionMenu, type MenuAction } from './components/action-menu';
@@ -145,6 +148,7 @@ export interface DocumentRow {
   url: string;
   date: string;
   captured: string;
+  summary?: { snapshotName?: string; commentCount?: number };
   current: boolean;
   disabled: boolean;
   open: () => void;
@@ -167,6 +171,7 @@ export function renderDocumentRows(host: Element, rows: DocumentRow[], loading: 
             title={row.captured}
             onClick={row.open}
           >
+            <DocumentVisual id={row.id} summary={row.summary} />
             <strong>{row.title + (row.current ? ' · 현재 작업' : '')}</strong>
             <span>{row.url}</span>
             <small>{row.date}</small>
@@ -240,5 +245,81 @@ export function renderWarnings(host: Element, warnings: { message: string }[]) {
         <li key={index}>{item.message}</li>
       ))}
     </>,
+  );
+}
+
+function DocumentVisual({
+  id,
+  summary,
+}: {
+  id: string;
+  summary?: { snapshotName?: string; commentCount?: number };
+}) {
+  const host = useRef<HTMLDivElement>(null);
+  const [details, setDetails] = useState(summary);
+  const [preview, setPreview] = useState<{
+    html: string;
+    size: { width: number; height: number };
+  } | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true,
+      started = false;
+    const observer = new IntersectionObserver((entries) => {
+      if (started || !entries.some((e) => e.isIntersecting)) return;
+      started = true;
+      observer.disconnect();
+      (async () => {
+        const doc = await getDocument(id, { includeDeleted: true });
+        if (!live || !doc) return;
+        setDetails(documentSummary(doc));
+        const result = await withVersionScene(
+          doc,
+          doc,
+          (scene: import('../../engine.js').CanvasScene) => ({
+            html: scene.serialize(),
+            size: scene.contentSize(),
+          }),
+        );
+        if (live) setPreview(result);
+      })().catch(() => {
+        if (live) setFailed(true);
+      });
+    });
+    observer.observe(host.current!);
+    return () => {
+      live = false;
+      observer.disconnect();
+    };
+  }, [id]);
+  const scale = preview ? Math.min(112 / preview.size.width, 72 / preview.size.height) : 1;
+  return (
+    <div className="document-visual" ref={host}>
+      <div className="document-thumbnail" aria-label="저장된 편집 화면 미리보기">
+        {preview ? (
+          <iframe
+            title="문서 축소 미리보기"
+            sandbox="allow-same-origin"
+            referrerPolicy="no-referrer"
+            tabIndex={-1}
+            aria-hidden="true"
+            srcDoc={preview.html}
+            width={preview.size.width}
+            height={preview.size.height}
+            style={{ transform: `scale(${scale})` }}
+          />
+        ) : (
+          <small>{failed ? '미리보기 없음' : '미리보기 준비 중'}</small>
+        )}
+      </div>
+      <div className="document-summary">
+        <span>{'최근 스냅샷 · ' + (details?.snapshotName || '불러오는 중')}</span>
+        <small>
+          {details?.commentCount === undefined
+            ? '주석 불러오는 중'
+            : '주석 ' + details.commentCount + '개'}
+        </small>
+      </div>
+    </div>
   );
 }

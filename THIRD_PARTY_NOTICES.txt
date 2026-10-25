@@ -1,4 +1,4 @@
-scheduler 0.28.0
+react 19.3.1
 MIT License
 
 Copyright (c) Meta Platforms, Inc. and affiliates.
@@ -24,7 +24,7 @@ SOFTWARE.
 
 ---
 
-react 19.3.1
+scheduler 0.28.0
 MIT License
 
 Copyright (c) Meta Platforms, Inc. and affiliates.

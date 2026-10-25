@@ -73,7 +73,9 @@ try {
   check(
     'Shared command adapter updates engine and native save status',
     app.adapter.getSnapshot().revision === app.state.revision &&
-      doc.querySelector('#save-status').textContent === '이 기기에 저장됨',
+      doc
+        .querySelector('#save-status')
+        .textContent.startsWith('자동 저장 완료 / 스냅샷 이후 변경 '),
   );
   const before = app.state.scene.edits[node.id]?.dx;
   app.adapter.dispatch('undo');

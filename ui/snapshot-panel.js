@@ -1,3 +1,4 @@
+import { snapshotChangeLabel } from './snapshot-delta.js';
 import { snapshotGraph } from '../snapshot-graph.js';
 import { withVersionScene } from './version-preview.js';
 import { renderSnapshotGraph, renderSnapshotTrash, renderVersionFrame } from './react/versions.tsx';
@@ -94,12 +95,12 @@ export function createSnapshotPanel({
       (active?.name || '현재 작업') +
       '  |  미리보기: ' +
       (entry?.name || '선택 없음') +
-      (snapshotHistory.dirty() ? ' · 저장 전 변경 있음' : '');
+      (snapshotHistory.dirty() ? ' · 스냅샷 이후 변경 있음' : '');
     const suffix =
       entry && entry.id !== active?.id
         ? ' · 미리보기'
         : snapshotHistory.dirty()
-          ? ' · 편집 중'
+          ? ' · 변경 있음'
           : '';
     $('#snapshot-active-name').textContent = name + suffix;
     $('#snapshot-dropdown').setAttribute('aria-label', '스냅샷 목록 · ' + name + suffix);
@@ -335,9 +336,7 @@ export function createSnapshotPanel({
     $('#snapshot-trash-list').hidden = !trashView;
     $('#snapshot-trash-help').hidden = !trashView;
     $('#snapshot-preview').hidden = trashView;
-    $('#version-status').textContent = snapshotHistory.dirty()
-      ? '스냅샷 이후 변경 있음'
-      : '스냅샷과 같음';
+    $('#version-status').textContent = snapshotChangeLabel(state, $('#review-note').value);
     const active = entries.find((e) => e.active);
     $('#snapshot-parent-name').textContent = '부모 버전 · ' + (active?.name || '현재 작업');
     $('#snapshot-current').textContent =

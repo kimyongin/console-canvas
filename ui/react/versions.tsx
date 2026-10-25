@@ -106,7 +106,7 @@ export function renderSnapshotGraph(
           className="snapshot-draft-node"
           style={{ left: parent ? parent.x + 30 : 20, top: parent ? parent.y + 28 : 20 }}
         >
-          <Badge variant="outline">◌ 현재 작업 · 저장 전</Badge>
+          <Badge variant="outline">◌ 현재 작업 · 스냅샷 이후 변경</Badge>
         </div>
       )}
     </>,
@@ -152,21 +152,24 @@ function VersionFrame({
   html,
   size,
   title,
+  zoom,
 }: {
   html: string;
   size: { width: number; height: number };
   title: string;
+  zoom?: number;
 }) {
   const space = useRef<HTMLDivElement>(null),
     [scale, setScale] = useState(0.5);
   useLayoutEffect(() => {
     const host = space.current!.parentElement!;
-    const fit = () => setScale(Math.max(0.05, Math.min(1, (host.clientWidth - 16) / size.width)));
+    const fit = () =>
+      setScale(zoom ?? Math.max(0.05, Math.min(1, (host.clientWidth - 16) / size.width)));
     fit();
     const observer = new ResizeObserver(fit);
     observer.observe(host);
     return () => observer.disconnect();
-  }, [size.width]);
+  }, [size.width, zoom]);
   return (
     <div
       ref={space}
@@ -190,8 +193,9 @@ export function renderVersionFrame(
   host: Element,
   result: { html: string; size: { width: number; height: number } },
   title: string,
+  zoom?: number,
 ) {
-  renderReact(host, <VersionFrame {...result} title={title} />);
+  renderReact(host, <VersionFrame {...result} title={title} zoom={zoom} />);
 }
 export function renderImage(host: Element, url: string) {
   renderReact(host, <img src={url} alt="변경 후 화면과 번호별 주석 카드가 포함된 전달 이미지" />);
@@ -272,6 +276,44 @@ export function renderHandoffPreview(
             onClick={() => pick(r.id)}
           />
         ))}
+    </div>,
+  );
+}
+
+export function renderTargetPreview(
+  host: Element,
+  html: string,
+  size: { width: number; height: number },
+  rect: { x: number; y: number; width: number; height: number },
+) {
+  const width = Math.min(size.width, Math.max(280, rect.width + 64)),
+    height = Math.min(size.height, Math.max(110, rect.height + 48));
+  const x = Math.max(0, Math.min(size.width - width, rect.x + rect.width / 2 - width / 2)),
+    y = Math.max(0, Math.min(size.height - height, rect.y + rect.height / 2 - height / 2));
+  const scale = Math.min(1, (host.clientWidth || 380) / width, 130 / height);
+  renderReact(
+    host,
+    <div className="target-crop" style={{ width: width * scale, height: height * scale }}>
+      <iframe
+        title="주석 대상 주변 화면"
+        aria-hidden="true"
+        sandbox="allow-same-origin"
+        referrerPolicy="no-referrer"
+        tabIndex={-1}
+        srcDoc={html}
+        width={size.width}
+        height={size.height}
+        style={{ transform: `scale(${scale})`, left: -x * scale, top: -y * scale }}
+      />
+      <span
+        className="target-crop-outline"
+        style={{
+          left: (rect.x - x) * scale,
+          top: (rect.y - y) * scale,
+          width: Math.max(8, rect.width * scale),
+          height: Math.max(8, rect.height * scale),
+        }}
+      />
     </div>,
   );
 }

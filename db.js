@@ -104,6 +104,7 @@ export async function saveSession(id, value) {
       metadata.put({
         ...request.result,
         ...(typeof documentName === 'string' ? { title: documentName } : {}),
+        ...documentSummary(session),
         updatedAt: session.updatedAt,
       });
     };
@@ -181,4 +182,17 @@ export function trashDocument(id) {
 }
 export function restoreDocument(id) {
   return updateMetadata(id, { deletedAt: null });
+}
+
+export function documentSummary(value) {
+  const entry = (value.timeline?.entries || [])
+    .filter((e) => !e.deletedAt && e.kind !== 'automatic')
+    .reverse()
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+  return {
+    snapshotName: entry?.name || '스냅샷 없음',
+    commentCount: Object.values(value.annotations || {}).filter(
+      (text) => typeof text === 'string' && text.trim(),
+    ).length,
+  };
 }

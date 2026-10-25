@@ -1,16 +1,29 @@
+import { handoffRequests } from '../handoff-image.js';
+import { renderTargetPreview } from './react/versions.tsx';
+import { clearReact } from './react/mount.tsx';
 import { elementLabel } from './element-labels.js';
 import { pointTarget } from '../edit-commands.js';
 export function createCommentEditor({ $, state, commit, flushEditor }) {
   const dialog = $('#comment-dialog'),
     field = $('#component-comment');
-  let timer;
+  let timer,
+    requests = [];
   function close() {
     clearTimeout(timer);
     if (dialog.open) dialog.close();
   }
-  function open({ id = state.scene?.selected } = {}) {
+  function open({ id = state.scene?.selected, navigating = false } = {}) {
     if (!state.scene || !id) return;
+    clearTimeout(timer);
     commit();
+    if (!navigating) {
+      requests = handoffRequests(state.scene);
+      if (!requests.some((r) => r.id === id)) requests.push({ id, number: requests.length + 1 });
+    }
+    const index = requests.findIndex((r) => r.id === id);
+    $('#comment-progress').textContent = `요청 ${index + 1} / ${requests.length}`;
+    $('#comment-previous').disabled = index <= 0;
+    $('#comment-next').disabled = index < 0 || index >= requests.length - 1;
     const point = pointTarget(id);
     if (!point && !state.scene.nodes.has(id)) return;
     state.commentTarget = id;
@@ -23,6 +36,28 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
     field.value = state.scene.annotations[id] || '';
     $('#clear-comment').disabled = !field.value;
     if (!dialog.open) dialog.showModal();
+    $('#comment-status').textContent = state.lastSaveError
+      ? '자동 저장 실패 · 파일로 백업해 주세요: ' + state.lastSaveError
+      : '입력 내용은 자동 저장됩니다.';
+    const scene = state.scene,
+      request = handoffRequests(scene).find((r) => r.id === id);
+    const rect =
+      request?.rect ||
+      (point
+        ? { x: point.x, y: point.y, width: 0, height: 0 }
+        : scene.rect(id) || scene.nodes.get(id).rect);
+    const reference = scene.hidden(id) ? scene.referenceFrame() : null;
+    $('#comment-preview-label').textContent = reference
+      ? '삭제 전 참고 · 테두리가 주석 대상입니다.'
+      : point
+        ? '지정 위치 주변 화면'
+        : '대상 주변 화면 · 보라색 테두리가 주석 대상입니다.';
+    renderTargetPreview(
+      $('#comment-target-preview'),
+      reference?.html || scene.serialize(),
+      reference?.size || scene.contentSize(),
+      rect,
+    );
     field.focus();
   }
   field.addEventListener('input', () => {
@@ -35,7 +70,7 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
       try {
         await flushEditor();
         if (state.generation === generation && state.commentTarget === target)
-          $('#comment-status').textContent = '이 기기에 저장됨';
+          $('#comment-status').textContent = '자동 저장 완료';
       } catch (error) {
         if (state.generation === generation && state.commentTarget === target)
           $('#comment-status').textContent =
@@ -62,6 +97,8 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
   dialog.addEventListener('close', () => {
     clearTimeout(timer);
     state.commentTarget = null;
+    requests = [];
+    clearReact($('#comment-target-preview'));
   });
   $('#close-comment-dialog').addEventListener('click', () => {
     commit();
@@ -71,5 +108,14 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
     commit();
     close();
   });
+  for (const [button, delta] of [
+    ['#comment-previous', -1],
+    ['#comment-next', 1],
+  ])
+    $(button).addEventListener('click', () => {
+      const index = requests.findIndex((r) => r.id === state.commentTarget),
+        next = requests[index + delta];
+      if (next) open({ id: next.id, navigating: true });
+    });
   return { open, reset: close, position() {} };
 }

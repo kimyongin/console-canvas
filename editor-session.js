@@ -88,7 +88,7 @@ export function createEditorSession({
     onSaved(id) {
       if (id === state.snapshot?.id) {
         state.lastSaveError = null;
-        status('이 기기에 저장됨');
+        status('자동 저장 완료');
       }
     },
     onError(error, id) {

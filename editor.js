@@ -1,3 +1,4 @@
+import { snapshotChangeLabel } from './ui/snapshot-delta.js';
 import { configureModelessInspector } from './ui/modeless-inspector.js';
 import { cleanLayerNames } from './layer-names.js';
 import { createSelectionToolbar } from './ui/selection-toolbar.js';
@@ -83,7 +84,9 @@ const adapter = createEditorAdapter(() => ({
   save: {
     pending: !!state.savePending,
     error: state.lastSaveError,
-    message: state.saveMessage || '이 브라우저에 저장',
+    message:
+      (state.saveMessage || '이 브라우저에 저장') +
+      (state.ready ? ' / ' + snapshotChangeLabel(state, $('#review-note').value) : ''),
   },
 }));
 connectEditorCommands(adapter);
@@ -258,6 +261,7 @@ const { renderLayers } = createDocumentLists({
   renameLayer: (id) => {
     selectNode(id, { reveal: true });
     adapter.dispatch('properties');
+    $('.inspector-details').open = true;
     $('.layer-alias-editor').open = true;
     $('#layer-alias').focus();
     $('#layer-alias').select();

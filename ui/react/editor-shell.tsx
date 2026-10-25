@@ -540,30 +540,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             <p>{'⌘/Ctrl+클릭으로 여러 요소 선택 · Alt+클릭으로 세부 요소 선택'}</p>
           </div>
           <section id="inspector" className="inspector" hidden={true}>
-            <div className="element-kind" id="element-kind"></div>
             <h2 id="element-name"></h2>
-            <details className="layer-alias-editor">
-              <summary>{'레이어 이름 변경'}</summary>
-              <label className="layer-alias-field">
-                {'레이어 별칭'}
-                <Input id="layer-alias" maxLength={120} placeholder="예: 고객 검색 영역" />
-              </label>
-              <Button id="save-layer-alias" variant="outline">
-                {'별칭 저장'}
-              </Button>
-              <Button id="clear-layer-alias" variant="ghost">
-                {'기본 이름 사용'}
-              </Button>
-            </details>
-            <div id="element-path" className="element-path"></div>
-            <Button
-              id="select-parent"
-              disabled={true}
-              title="상위 요소 선택 · Shift+클릭"
-              variant="outline"
-            >
-              {'\n            상위 요소 선택 ↑\n          '}
-            </Button>
             <div id="direct-edit-controls">
               <div id="batch-controls" hidden={true}>
                 <strong id="selection-count"></strong>
@@ -620,16 +597,45 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                 </Button>
               </div>
               <div className="element-size" id="element-size"></div>
+            </div>
+            <details className="inspector-details">
+              <summary>요소 정보·이름 변경</summary>
+              <div className="element-kind" id="element-kind"></div>
+              <details className="layer-alias-editor">
+                <summary>{'레이어 이름 변경'}</summary>
+                <label className="layer-alias-field">
+                  {'레이어 별칭'}
+                  <Input id="layer-alias" maxLength={120} placeholder="예: 고객 검색 영역" />
+                </label>
+                <Button id="save-layer-alias" variant="outline">
+                  {'별칭 저장'}
+                </Button>
+                <Button id="clear-layer-alias" variant="ghost">
+                  {'기본 이름 사용'}
+                </Button>
+              </details>
+              <div id="element-path" className="element-path"></div>
+              <Button
+                id="select-parent"
+                disabled={true}
+                title="상위 요소 선택 · Shift+클릭"
+                variant="outline"
+              >
+                {'\n            상위 요소 선택 ↑\n          '}
+              </Button>
+            </details>
+            <details className="inspector-secondary">
+              <summary>주석·삭제</summary>
               <Button id="inspector-delete" className="danger-outline" variant="outline">
                 {'이 요소 삭제'}
               </Button>
-            </div>
-            <div className="inspector-comment-summary">
-              <p id="selected-comment-summary"></p>
-              <Button id="edit-selected-comment" variant="outline">
-                {'주석 남기기'}
-              </Button>
-            </div>
+              <div className="inspector-comment-summary">
+                <p id="selected-comment-summary"></p>
+                <Button id="edit-selected-comment" variant="outline">
+                  {'주석 남기기'}
+                </Button>
+              </div>
+            </details>
           </section>
           <details id="capture-notes" className="capture-notes" hidden={true}>
             <summary id="capture-notes-title">{'가져오기 참고사항'}</summary>
@@ -667,10 +673,25 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           </Button>
         </div>
         <div id="comment-editor-host">
+          <div className="comment-navigation">
+            <Button id="comment-previous" variant="outline" aria-label="이전 요청">
+              ← 이전
+            </Button>
+            <span id="comment-progress" role="status"></span>
+            <Button id="comment-next" variant="outline" aria-label="다음 요청">
+              다음 →
+            </Button>
+          </div>
           <strong id="comment-target-title"></strong>
+          <div
+            id="comment-target-preview"
+            className="comment-target-preview"
+            aria-label="주석 대상 미리보기"
+          ></div>
+          <small id="comment-preview-label"></small>
           <div className="component-comment">
             <label htmlFor="component-comment">{'이 요소에 주석 남기기'}</label>
-            <p>{'어떻게 바꾸고 싶은지 자유롭게 적어 주세요.'}</p>
+            <p>{'어떻게 바꾸고 싶은지 적어 주세요. 입력 내용은 자동 저장됩니다.'}</p>
             <Textarea
               id="component-comment"
               rows={4}
@@ -682,7 +703,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                 {'주석 삭제'}
               </Button>
               <Button id="save-comment" className="primary" variant="outline">
-                {'주석 저장'}
+                {'완료'}
               </Button>
             </div>
             <span id="comment-status" role="status"></span>
@@ -781,6 +802,26 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
         </form>
         <h2>{'화면 비교'}</h2>
         <p>{'비교는 현재 작업이나 스냅샷을 변경하지 않습니다.'}</p>
+        <div id="compare-diff" role="status"></div>
+        <div className="compare-tools">
+          <label>
+            확대{' '}
+            <NativeSelect id="compare-zoom" aria-label="비교 확대">
+              <option value="fit">화면에 맞춤</option>
+              <option value="0.5">50%</option>
+              <option value="0.75">75%</option>
+              <option value="1">100%</option>
+              <option value="1.5">150%</option>
+            </NativeSelect>
+          </label>
+          <label>
+            <Input id="compare-sync" type="checkbox" defaultChecked />
+            동기 스크롤
+          </label>
+          <label>
+            변경 위치 <NativeSelect id="compare-target" aria-label="비교 변경 위치"></NativeSelect>
+          </label>
+        </div>
         <div className="compare-grid">
           <section>
             <NativeSelect id="compare-left" aria-label="비교할 첫 번째 버전"></NativeSelect>
@@ -793,7 +834,6 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             <p id="compare-right-summary"></p>
           </section>
         </div>
-        <div id="compare-diff" role="status"></div>
       </DialogSurface>
       <aside
         id="comment-popover"

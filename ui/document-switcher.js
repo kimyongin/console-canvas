@@ -125,6 +125,7 @@ export function createDocumentSwitcher({
         id: value.id,
         title: value.title || '이름 없는 화면',
         url: value.url,
+        summary: value,
         date:
           (deleted ? '휴지통 이동 ' : '최근 저장 ') +
           new Date(deleted ? value.deletedAt : value.updatedAt).toLocaleString('ko-KR'),
@@ -156,8 +157,16 @@ export function createDocumentSwitcher({
     status.textContent = '저장된 화면을 불러오는 중…';
     dialog.showModal();
     try {
+      let saveError = '';
+      try {
+        await flushEditor();
+      } catch (error) {
+        saveError = error.message;
+      }
+      if (!dialog.open) return;
       await reload();
-      $('#document-search').focus();
+      if (saveError) status.textContent += ' · 자동 저장 실패: ' + saveError;
+      if (dialog.open) $('#document-search').focus();
     } catch (error) {
       status.textContent = error.message;
     }
@@ -187,6 +196,10 @@ export function createDocumentSwitcher({
       }
     });
   $('#document-search').addEventListener('input', render);
+  dialog.addEventListener('close', () => {
+    generation++;
+    renderDocumentRows(list, [], false);
+  });
   dialog.addEventListener('cancel', (event) => {
     if (loading) event.preventDefault();
   });
