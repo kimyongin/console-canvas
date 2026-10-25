@@ -17,6 +17,12 @@ async function run(command, args) {
   });
 }
 try {
+  const args = process.argv.slice(2);
+  if (args.length > 1 || args.some((arg) => !['--web', '--all'].includes(arg))) {
+    throw new Error('Usage: node scripts/check.mjs [--web | --all]');
+  }
+  const includeDesktop = args[0] === '--all';
+  console.log(includeDesktop ? 'Scope: web/common + Electron integration' : 'Scope: web/common');
   await run(process.execPath, ['node_modules/typescript/bin/tsc', '--noEmit']);
   await run(process.execPath, ['scripts/format.mjs', '--check']);
   await run('python3', ['scripts/build.py']);
@@ -30,7 +36,12 @@ try {
   await run(process.env.ELECTRON_BINARY || path.join(root, 'node_modules/.bin/electron'), [
     'tests/browser-runner.cjs',
   ]);
-  await run(process.execPath, ['scripts/check-desktop.mjs']);
+  if (includeDesktop) await run(process.execPath, ['scripts/check-desktop.mjs']);
+  console.log(
+    includeDesktop
+      ? 'Web/common and Electron integration checks passed. Installed-app deployment is separate.'
+      : 'Web/common checks passed. Electron integration and installed-app deployment were not run.',
+  );
 } catch (error) {
   console.error(error.message);
   process.exitCode = 1;

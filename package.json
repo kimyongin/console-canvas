@@ -1,6 +1,6 @@
 {
   "name": "console-canvas",
-  "version": "0.19.1",
+  "version": "0.19.2",
   "private": true,
   "description": "Embedded Chromium console UI editor with MCP control",
   "main": "desktop/main.cjs",
@@ -11,6 +11,8 @@
     "build": "python3 scripts/build.py",
     "test": "node scripts/check.mjs",
     "check": "node scripts/check.mjs",
+    "check:web": "node scripts/check.mjs --web",
+    "check:all": "node scripts/check.mjs --all",
     "test:browser": "electron tests/browser-runner.cjs",
     "test:desktop": "node scripts/check-desktop.mjs",
     "typecheck": "tsc --noEmit",

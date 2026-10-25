@@ -1,10 +1,12 @@
 # Console Canvas · 화면 복제 편집기
 
+0.19.2: [변경별 검증 기준](docs/validation-policy.md)에 따라 웹 UI 검증·Electron 통합·설치 배포를 분리했다. 기본 `npm run check`는 웹/공통 검사다. 완료한 UI의 설치 확인은 별도 배포 티켓에서 추적한다.
+
 0.19.1: 드롭다운 여백·공통 폼/체크박스·메뉴·닫기 버튼·변경 이력 카드의 디자인을 정리했다. [디자인 보정과 검증 상태](docs/design-0.19.1.md)를 확인한다. 스냅샷/비교/요청 탐색은 [0.19 UX 기록](docs/ux-0.19.md)에 있다.
 
 0.16.2: 전달 모달의 고정 출력 버튼·스냅샷 이름 변경 후 그래프 복귀·PNG 제목 줄바꿈·삭제 복사본 참고 화면을 수정했다. [검증 및 설치 상태](docs/fix-0.16.2.md)를 확인한다.
 
-제품 목적·확정한 UI 동작·수용 기준·구현/검증 상태는 [PRD](docs/PRD.md), 기능별 코드/검사 대응과 열린 결함은 [전수 대조표](docs/feature-audit.md), 전환 작업과 잔여 검증은 [React·shadcn/ui 개선 티켓](https://github.com/kimyongin/console-canvas/issues/1)에서 확인합니다.
+제품 목적·확정한 UI 동작·수용 기준·구현/검증 상태는 [PRD](docs/PRD.md), 기능별 코드/검사 대응은 [전수 대조표](docs/feature-audit.md), 현재 티켓과 통합/배포 잔여는 [티켓 추적표](docs/ticket-review.md)에서 확인합니다.
 
 현재 보고 있는 콘솔 웹 화면을 **소스코드 없이** 가져와 독립된 편집 공간에서 수정하거나 요소별 주석으로 변경 방향을 남기는 로컬 프로토타입입니다. 주 사용 경로는 Chromium을 내장한 독립 앱이며 Chrome 확장은 보조 방식으로 유지합니다. 원본 사이트와 복제본 편집기는 분리되고, AI API 키 없이 로컬 MCP로 에이전트와 연결할 수 있습니다.
 
@@ -164,7 +166,11 @@ npm ci
 npm run check
 ```
 
-`check`는 TypeScript 검사 → 포맷 검사 → 모듈 번들·스킬 패키징 → Python → Node → 실제 Chromium UI → 독립 앱·공식 MCP SDK·종료 후 재실행 검증을 순서대로 실행합니다. 가상 NORTH 데이터와 임시 프로필·임시 포트만 사용합니다. `npm run format`은 포맷을 정리하고 `npm run test:desktop`은 독립 앱 검증만 실행합니다. 별도로 준비한 Electron은 `ELECTRON_BINARY=/absolute/path/to/Electron npm run check`로 지정할 수 있습니다.
+`check`/`check:web`은 TypeScript → 포맷 → 번들·스킬 패키징 → Python → Node → Chromium 웹/공통 검사를 실행합니다. 웹 실행기로 Electron 개발 바이너리를 사용하지만 설치 앱이나 OS 통합 검사는 포함하지 않습니다. UI 변경은 이 검사와 영향받은 브라우저 흐름 확인으로 완료합니다.
+
+Electron 수집·IPC·네이티브 저장·종료·업데이트 등을 바꾸면 영향받은 통합 검사를 추가합니다. `npm run test:desktop`은 앱 통합만, `npm run check:all`은 웹/공통과 앱 통합을 실행합니다. 표시 표면 없는 `test:desktop:offscreen`은 명시적 대체 검사이며 실제 OS 캡처·직접 사용과 구별합니다. MCP 변경은 공식 SDK로 확인합니다. 설치 앱 갱신은 별도 배포 작업이며 [검증 기준](docs/validation-policy.md)의 저장·백업·자료 보존 절차를 따릅니다.
+
+검사는 가상 NORTH 자료와 임시 프로필·포트만 사용합니다. `npm run format`은 포맷을 정리합니다. 별도로 준비한 Electron은 `ELECTRON_BINARY=/absolute/path/to/Electron npm run check`로 지정할 수 있습니다.
 
 ```sh
 python3 -m http.server 8848 --bind 127.0.0.1 --directory /absolute/path/to/console-canvas
