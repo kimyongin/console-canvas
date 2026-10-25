@@ -193,25 +193,17 @@ try {
     app.state.scene.annotations[node.id] === '접어도 보존할 수정 방향' &&
       app.state.scene.selected === node.id,
   );
-  click('snapshots-button');
+  click('snapshot-dropdown');
   check(
-    'Snapshots reopen a collapsed properties panel',
-    !doc.querySelector('#properties-panel').hidden && !doc.querySelector('#snapshot-panel').hidden,
+    'Snapshot dropdown opens independently while the right panel remains collapsed',
+    doc.querySelector('#properties-panel').hidden &&
+      doc.querySelector('#snapshot-panel').matches(':popover-open'),
   );
+  doc.querySelector('#snapshot-panel').hidePopover();
   check(
-    'Snapshot mode keeps the collapse toggle visible in the same shared heading',
-    !doc.querySelector('#properties-panel-title').closest('[hidden]') &&
-      doc.querySelector('#properties-panel-title').textContent === '스냅샷' &&
-      !doc.querySelector('#toggle-properties').closest('[hidden]') &&
-      !doc.querySelector('#close-snapshots'),
+    'Dropdown does not consume a side panel or change its width',
+    doc.querySelector('#properties-rail').getBoundingClientRect().width === 36,
   );
-  click('toggle-properties');
-  click('snapshots-button');
-  check(
-    'Snapshots reopen even when the hidden panel already contains the snapshot list',
-    !doc.querySelector('#properties-panel').hidden && !doc.querySelector('#snapshot-panel').hidden,
-  );
-  click('toggle-properties');
   click('toggle-layers');
   await app.state.saving;
   const documentId = app.state.snapshot.id;
@@ -237,16 +229,12 @@ try {
       doc.querySelector('#component-comment').value === '접어도 보존할 수정 방향' &&
       app.state.timeline.entries.length === 1,
   );
-  click('snapshots-button');
-  click('toggle-properties');
-  // Selecting a comment from the change list explicitly opens its input, unlike ordinary selection.
   doc.querySelector('#changes button').click();
   check(
-    'Opening a comment reveals its inspector instead of the hidden snapshot list',
-    !doc.querySelector('#properties-panel').hidden &&
-      doc.querySelector('#snapshot-panel').hidden &&
-      doc.activeElement.id === 'component-comment',
+    'Comment opens a modal independent of side-panel visibility',
+    doc.querySelector('#comment-dialog').open && doc.activeElement.id === 'component-comment',
   );
+  doc.querySelector('#close-comment-dialog').click();
   await app.state.saving;
   document.querySelector('#status').textContent = JSON.stringify({
     passed: results.length,

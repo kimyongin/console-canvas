@@ -30,11 +30,18 @@ export function cleanEdits(value, nodes) {
     }
   return result;
 }
+export function pointTarget(id) {
+  const match = /^point:([0-9]+(?:\.[0-9]+)?):([0-9]+(?:\.[0-9]+)?)$/.exec(id || '');
+  if (!match) return null;
+  const x = Number(match[1]),
+    y = Number(match[2]);
+  return x <= EDIT_LIMITS.x && y <= EDIT_LIMITS.y ? { x, y, width: 0, height: 0 } : null;
+}
 export function cleanComments(value, nodes) {
   const result = {};
   if (!value || typeof value !== 'object' || Array.isArray(value)) return result;
   for (const [id, text] of Object.entries(value))
-    if (nodes.has(id) && typeof text === 'string' && text.trim())
+    if ((nodes.has(id) || pointTarget(id)) && typeof text === 'string' && text.trim())
       result[id] = text.trim().slice(0, EDIT_LIMITS.comment);
   return result;
 }
@@ -48,8 +55,28 @@ export function prepareEdits(current, operations, elements) {
     invalid('invalid_operations', '1~100개의 작업을 지정해 주세요.');
   const edits = structuredClone(current.edits),
     annotations = structuredClone(current.annotations);
-  for (const operation of operations) {
-    if (!operation || !elements.has(operation.element_id))
+  for (let operation of operations) {
+    if (operation?.type === 'point_comment') {
+      if (
+        !Number.isFinite(operation.x) ||
+        !Number.isFinite(operation.y) ||
+        operation.x < 0 ||
+        operation.y < 0 ||
+        operation.x > EDIT_LIMITS.x ||
+        operation.y > EDIT_LIMITS.y
+      )
+        invalid('invalid_comment', '주석 좌표가 허용 범위를 넘습니다.');
+      operation = {
+        type: 'comment',
+        element_id: `point:${operation.x}:${operation.y}`,
+        text: operation.text,
+      };
+    }
+    if (
+      !operation ||
+      (!elements.has(operation.element_id) &&
+        !(operation.type === 'comment' && pointTarget(operation.element_id)))
+    )
       invalid('unknown_element', '존재하지 않는 요소입니다: ' + operation?.element_id);
     const id = operation.element_id;
     if (operation.type === 'move') {

@@ -50,3 +50,13 @@ IndexedDB `console-canvas-workspace`의 세 저장소를 사용한다.
 문서의 사용자 지정 이름과 `deletedAt`은 `documents` 메타데이터에 저장한다. 세션 저장은 해당 레코드를 병합하며 휴지통에 있는 문서에는 쓰지 않는다. 문서 휴지통은 캡처·세션을 지우지 않고 기본 조회·최근 목록에서 제외한다. 활성 문서를 휴지통으로 옮기기 전 저장 큐를 flush하고 편집기를 닫아 MCP 화면 등록도 해제한다. 복구는 메타데이터만 바꾸며 다시 열 때 모든 편집과 버전을 읽는다.
 
 스냅샷의 이름·`deletedAt`은 타임라인의 기존 엔트리에 기록한다. 부모 ID와 상태는 유지하며 기본 목록·탐색·비교·MCP 조회는 휴지통 항목을 제외한다. 활성 버전을 삭제하면 `activeId`를 비우고 현재 편집 상태는 유지한다. 실행 취소도 휴지통의 ID를 활성화하지 않는다. 파일 왕복은 휴지통을 포함한 타임라인을 보존한다. 휴지통 복구와 저장 버전 적용은 서로 다른 동작이다.
+
+## 0.14 분기·주석·이미지 전달
+
+- `snapshot-tree.js`는 parentId를 따라 저장 버전을 순회한다. 휴지통 조상은 살아 있는 후손의 연결에 필요한 경우에만 비활성 노드로 남긴다. 중앙 상단 popover와 이름 입력 dialog는 오른쪽 패널 상태와 독립적이다.
+- `activity-history.js`는 `{id,parent_id,snapshot_id,created_at,actor,label,changes}` 이벤트를 추가하며 세션의 `activityHead`에서 현재 가지를 역순 조회한다. 스냅샷 체크포인트에는 head ID만 포함하고 전체 이벤트 배열은 세션에 한 번 보관한다. 과거 버전 복원이나 실행 취소가 다른 가지의 이벤트를 제거하지 않는다. 기존 세션에는 빈 이력을 추가하며 과거 시간 정보를 추정하지 않는다.
+- `annotations`의 기존 요소 ID→문자열은 유지한다. `point:x:y` 키는 고정 문서 좌표 주석이다. 공통 명령 검증은 `point_comment`를 해당 키의 주석 변경으로 정규화한다. 좌표 주석에 이동·삭제 명령을 적용하지 않는다. 실행 취소·스냅샷·편집 파일·IndexedDB가 같은 annotation map을 사용한다.
+- `ui/comment-editor.js`의 모달에서 같은 입력란을 사용한다. 선택된 요소 위의 editor-only 아이콘과 빈 곳 클릭의 좌표 아이콘이 진입점이다. 번호 배지로 재편집하며 원본 DOM 이벤트를 실행하지 않는다.
+- `handoff-image.js`는 현재 결과의 변경·주석을 대상별로 묶고 화면 위에 같은 번호의 하이라이트를 그린다. 하단 카드는 두 열이며 글꼴 크기를 고정하고 높이를 늘린다. 삭제 전 참고·작은 영역 확대·추가 설명도 같은 PNG에 포함한다. 이미지 생성은 별도의 version scene에서 수행해 현재 선택·편집·이력을 변경하지 않는다.
+- 데스크톱 `render-image.cjs`는 신뢰한 editor mainFrame의 IPC만 받는다. 임시 Chromium 세션에는 preload·Node·JavaScript가 없고 sandbox/contextIsolation/webSecurity를 유지한다. 페이지 스크립트는 실행하지 않으며 캡처 후 창과 임시 저장소를 정리한다. 브라우저·확장은 기존 SVG foreignObject 경로를 사용하므로 외부 리소스·폰트 표현에 차이가 생길 수 있다.
+- MCP `get_review_image`는 같은 PNG를 image content block으로 반환한다. 읽기 도중 revision이 바뀌면 거절하고 편집 모달·드래그 중에는 busy를 반환한다. 이미지 응답만 별도 45초 기한·20MB PNG 한도를 적용하며 편집 요청의 기존 크기/시간 제한은 유지한다. `list_history`는 현재 가지 또는 모든 가지를 페이지로 반환한다.

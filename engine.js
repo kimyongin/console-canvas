@@ -1,7 +1,13 @@
 import { selectionRoots, alignmentOperations, snapDelta } from './selection-tools.js';
 import { expandCopyNodes } from './copy-model.js';
 import { indexNodes } from './node-index.js';
-import { cleanEdits, cleanComments, EDIT_LIMITS, prepareEdits } from './edit-commands.js';
+import {
+  cleanEdits,
+  cleanComments,
+  pointTarget,
+  EDIT_LIMITS,
+  prepareEdits,
+} from './edit-commands.js';
 export { cleanEdits, cleanComments } from './edit-commands.js';
 export const copy = (value) => JSON.parse(JSON.stringify(value));
 const POLICY =
@@ -190,6 +196,13 @@ export class CanvasScene {
     this.commentLayer.style.cssText =
       'position:absolute!important;left:0!important;top:0!important;width:0!important;height:0!important;overflow:visible!important;pointer-events:none!important;z-index:2147483647!important';
     this.doc.documentElement.append(this.commentLayer);
+    this.addCommentButton = this.doc.createElement('button');
+    this.addCommentButton.dataset.uicEditor = 'add-comment';
+    this.addCommentButton.dataset.uicAddComment = 'true';
+    this.addCommentButton.innerHTML =
+      '<svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 3h12v10H9l-4 4v-4H4z"/><path d="M7 8h6M10 5v6"/></svg>';
+    this.addCommentButton.setAttribute('aria-label', '선택한 위치에 주석 작성');
+    this.doc.documentElement.append(this.addCommentButton);
     for (const node of this.nodes.values())
       if (node.position === 'fixed' && node.visible && this.elements.has(node.id))
         this.lift(node.id, node.rect);
@@ -216,6 +229,16 @@ export class CanvasScene {
     this.doc.addEventListener(
       'keydown',
       (event) => {
+        if (
+          event.target.closest?.('[data-uic-add-comment]') &&
+          ['Enter', ' '].includes(event.key)
+        ) {
+          event.preventDefault();
+          this.callbacks.onCommentSelect?.(
+            this.selected || `point:${this.pointComment.x}:${this.pointComment.y}`,
+          );
+          return;
+        }
         const marker = event.target.closest?.('[data-uic-comment]');
         if (marker && (event.key === 'Enter' || event.key === ' ')) {
           event.preventDefault();
@@ -686,7 +709,7 @@ export class CanvasScene {
     this.renderCommentMarkers();
   }
   setComment(id, text) {
-    if (!this.nodes.has(id)) return;
+    if (!this.nodes.has(id) && !pointTarget(id)) return;
     this.commitOperations([{ type: 'comment', element_id: id, text }]);
   }
   commitOperations(operations) {
@@ -699,7 +722,17 @@ export class CanvasScene {
     this.callbacks.onBeforeChange?.();
     this.annotations = next.annotations;
     this.setEdits(next.edits);
-    this.callbacks.onCommit?.();
+    this.callbacks.onCommit?.({
+      label:
+        this.editCategory === 'property'
+          ? '속성 변경'
+          : operations.some((o) => o.type.includes('comment'))
+            ? '주석 편집'
+            : operations.some((o) => o.type === 'delete')
+              ? '요소 삭제'
+              : '요소 이동',
+      category: this.editCategory || 'move',
+    });
   }
   setDisplayScale(value) {
     if (Number.isFinite(value) && value > 0 && value !== this.displayScale) {
@@ -707,13 +740,47 @@ export class CanvasScene {
       this.renderCommentMarkers();
     }
   }
+  showPointComment(x, y) {
+    this.pointComment = {
+      x: Math.max(0, Math.round(x)),
+      y: Math.max(0, Math.round(y)),
+      width: 0,
+      height: 0,
+    };
+    this.select(null);
+    this.drawCommentButton();
+  }
+  drawCommentButton() {
+    const button = this.addCommentButton;
+    if (!button) return;
+    const r = this.selected ? this.rect(this.selected) : this.pointComment;
+    button.style.cssText =
+      'all:initial!important;position:absolute!important;z-index:2147483647!important;cursor:pointer!important;background:#6557dc!important;color:white!important;border-radius:7px!important;box-shadow:0 2px 8px #31236e55!important;text-align:center!important;';
+    if (!r || this.drag?.started || this.areaSelecting) {
+      button.style.setProperty('display', 'none', 'important');
+      return;
+    }
+    button.style.setProperty('display', 'grid', 'important');
+    button.style.setProperty('place-items', 'center', 'important');
+    const size = 28 / this.displayScale;
+    button.style.setProperty('left', Math.max(0, r.x + r.width / 2 - size / 2) + 'px', 'important');
+    button.style.setProperty(
+      'top',
+      Math.max(0, r.y - size - 5 / this.displayScale) + 'px',
+      'important',
+    );
+    button.style.setProperty('width', size + 'px', 'important');
+    button.style.setProperty('height', size + 'px', 'important');
+    button.style.setProperty('font', '700 ' + 16 / this.displayScale + 'px system-ui', 'important');
+  }
   openComment(id) {
     if (!this.annotations[id]) return;
-    this.select(id);
+    if (!pointTarget(id)) this.select(id);
     this.callbacks.onCommentSelect?.(id);
   }
   renderCommentMarkers() {
     if (!this.commentLayer) return;
+    this.drawCommentButton();
     for (const [id, marker] of this.commentMarkers)
       if (!this.annotations[id]) {
         marker.remove();
@@ -724,14 +791,16 @@ export class CanvasScene {
       bounds = this.contentSize(),
       occupied = [];
     Object.entries(this.annotations).forEach(([id, text], index) => {
-      const node = this.nodes.get(id),
-        offset = this.offset(id),
-        deleted = this.hidden(id);
-      const rect = (!deleted && this.rect(id)) || {
-        ...node.rect,
-        x: node.rect.x + offset.x,
-        y: node.rect.y + offset.y,
-      };
+      const point = pointTarget(id),
+        node = this.nodes.get(id) || { name: '위치 주석', rect: point },
+        offset = point ? { x: 0, y: 0 } : this.offset(id),
+        deleted = !point && this.hidden(id);
+      const rect = point ||
+        (!deleted && this.rect(id)) || {
+          ...node.rect,
+          x: node.rect.x + offset.x,
+          y: node.rect.y + offset.y,
+        };
       let marker = this.commentMarkers.get(id);
       if (!marker) {
         marker = this.doc.createElement('button');
@@ -786,10 +855,19 @@ export class CanvasScene {
   }
   comments() {
     return Object.entries(this.annotations).map(([id, text]) => {
-      const node = this.nodes.get(id),
-        offset = this.offset(id);
+      const point = pointTarget(id),
+        node = this.nodes.get(id) || {
+          name: '위치 주석',
+          kind: 'point',
+          tag: 'point',
+          rect: point,
+          locator: null,
+          parentId: null,
+        },
+        offset = point ? { x: 0, y: 0 } : this.offset(id);
       return {
         id,
+        ...(point ? { point } : {}),
         name: node.name,
         kind: node.kind,
         tag: node.tag,
@@ -798,10 +876,11 @@ export class CanvasScene {
         text,
         ...(node.copiedFrom ? { copiedFrom: node.copiedFrom } : {}),
         before: node.rect,
-        after: this.hidden(id)
-          ? null
-          : { ...node.rect, x: node.rect.x + offset.x, y: node.rect.y + offset.y },
-        targetDeleted: this.hidden(id),
+        after:
+          !point && this.hidden(id)
+            ? null
+            : { ...node.rect, x: node.rect.x + offset.x, y: node.rect.y + offset.y },
+        targetDeleted: !point && this.hidden(id),
       };
     });
   }
@@ -854,6 +933,12 @@ export class CanvasScene {
         this.beginDrag(event, this.selected);
       return;
     }
+    if (event.target.closest?.('[data-uic-add-comment]')) {
+      const id = this.selected || `point:${this.pointComment.x}:${this.pointComment.y}`;
+      this.callbacks.onCommentSelect?.(id);
+      return;
+    }
+    this.pointComment = null;
     const marker = event.target.closest?.('[data-uic-comment]');
     if (marker) {
       this.openComment(marker.dataset.uicComment);

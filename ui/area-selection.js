@@ -70,6 +70,10 @@ export function createAreaSelection({ $, state, toast }) {
     if (cancel) g.scene.select(g.primary, { ids: g.before });
     else if (!g.started) {
       if (!g.additive || g.clickId) g.scene.select(g.clickId, { additive: g.additive });
+      if (!g.clickId && !g.additive) {
+        const frame = g.scene.frame.getBoundingClientRect();
+        g.scene.showPointComment((g.x - frame.left) / state.zoom, (g.y - frame.top) / state.zoom);
+      }
     } else
       toast(
         g.scene.selection.size +

@@ -35,3 +35,25 @@ npm run check
 0.13은 총 267개 검사(Python 39·Node 18·Chromium 192·공식 SDK 18)를 통과했다. 문서명 메뉴의 패널 독립성, 명시적인 선택/주석 모드와 입력란 Esc 초안 보존, 속성과 주석 입력의 분리, 팝오버 관리 메뉴의 키보드 이동/포커스 복귀, 삭제 되돌리기, 휴지통 전용 도구, 복구하고 적용 시 현재 작업 자동 보관, 전역 스냅샷 상태와 패널 상태 일치, 현재 작업 전체 백업, 모달 안의 복구 알림 조작, 복구하고 열기를 확인한다. 문서가 없을 때는 무효한 스냅샷 저장/탐색 도구를 숨기고 개수를 초기화한다. 설치 앱의 실제 화면·공식 SDK 읽기 전용 연결·스킬 4개 파일 동기화도 확인했다.
 
 0.13.1은 접힌 패널의 전체 높이 세로 바·상단 펼치기 버튼·캔버스 너비 계산·포커스/저장 너비 복원으로 패널 검사를 갱신했다. 전체 검사 수는 267개로 같다.
+
+## 0.14.0 검증 (2026-10-25)
+
+총 291개 검사: Python 39, Node 21, Chromium 209, 공식 MCP SDK 22. Chromium 세부 결과는 integration 61 / snapshots 11 / panels 22 / storage 7 / ux 19 / selection 35 / trash 19 / placement 15 / evolution 21이다. 독립 HTML 번들 실행과 실제 iframe 경계를 넘는 영역 선택도 통과했다.
+
+새 검사는 모드 없는 주석 모달·번호 배지 재편집·좌표 주석 실행 취소/복원, 이름 입력 스냅샷 모달, A→B→C와 A→D 병존, 트리 깊이/현재 버전, 현재 가지 이벤트 분리, 시간순 통합 기록, 미래 복원, 요청 10개의 단일 PNG와 삭제 전 참고, 이미지 생성 시 현재 상태 무변경, IndexedDB/편집 파일의 좌표 주석·이력 그래프 왕복을 확인한다. 공식 SDK는 실제 Electron에 point_comment를 적용하고 list_comments/list_history를 조회하며 get_review_image의 image/png content와 PNG 서명, 조회 후 revision 무변경을 확인한다. 소스 fixture의 DOM과 세 뷰의 격리 설정은 기존 검사를 유지한다.
+
+필수 전체 검사 명령:
+
+```sh
+PATH='/Applications/ChatGPT.app/Contents/Resources/cua_node/bin':$PATH \
+ELECTRON_BINARY="$PWD/local/electron/v45.0.0-arm64/Electron.app/Contents/MacOS/Electron" \
+node scripts/check.mjs
+```
+
+설치 전 실제 앱을 메뉴로 정상 종료해 주석 초안·추가 설명을 flush한 뒤 기존 앱과 사용자 프로필을 백업했다. 0.14.0 앱/ZIP/DMG를 빌드해 DMG 체크섬을 검증하고 ~/Applications의 설치 앱을 갱신했다. 네이티브 UI로 실제 설치 앱을 다시 열어 한 줄 도구 모음·모드 버튼 제거·중앙 스냅샷 트리·기존 3개 버전·오른쪽 변경 이력을 확인했다. 원래 사용자 문서에는 테스트 편집을 적용하지 않았다.
+
+설치된 앱의 공식 SDK 읽기 전용 조회는 버전 0.14.0·13개 도구·앱 지침·마지막 문서 364개 요소·3개 활성 스냅샷을 확인했다. 설치된 스킬의 관리 파일 4개가 앱 번들 ZIP과 바이트 단위로 일치한다. 전체 프로필의 7개 문서·13개 스냅샷에 대해 캡처, 제목/휴지통, 편집, 주석, 추가 설명, 전체 타임라인 지문이 설치 전후 동일하다. 설치 전은 정상 종료한 cold 백업이고, 설치 후는 UI 잠금 상태에서 DB 파일들이 복사 전후 바뀌지 않음을 확인한 사본이다. 실제 프로필을 감사용 Electron으로 직접 열지 않았다.
+
+직접 사용은 별도 브라우저의 가상 NORTH에서 컴포넌트 선택→아이콘→모달 주석 작성→저장→이름 모달 스냅샷 저장을 수행했다. 설치 앱 재실행과 기존 스냅샷 드롭다운도 직접 확인했다. 이후 Mac이 잠겨 별도 네이티브 QA 프로필에서 추가 마우스 조작은 수행하지 못했다. 사용자는 현재 잠금 해제가 불가능하다고 답했다. 이 추가 수동 검증을 완료한 것으로 보고하지 않는다. 임시 Electron 프로필에서 동일 기능의 자동 테스트·MCP·정상 종료/재실행 검사는 완료했다.
+
+로컬 증빙은 Git에서 제외한 local/upgrade-0.14.0의 check.log, build.log, inventory-before.json, inventory-after.json, installed-mcp.json, profile-copy-audit.json에 있다. 생성된 실제 MCP PNG는 local/mcp-review-image.png다. 사용자 캡처·백업·토큰은 커밋하지 않는다.

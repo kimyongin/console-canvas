@@ -35,7 +35,7 @@ async function tool(name, args = {}, allowError = false) {
 try {
   await client.connect(transport);
   const tools = await client.listTools();
-  check('Official SDK discovers eleven MCP tools', tools.tools.length === 11);
+  check('Official SDK discovers thirteen MCP tools', tools.tools.length === 13);
   const guide = await tool('get_agent_guide');
   check(
     'Agent reads the app-bundled skill through MCP',
@@ -252,6 +252,49 @@ try {
     snapshot_id: initialVersion.id,
   });
   current = finalRestore.screen;
+  const history = await tool('list_history', { ...base, scope: 'all' });
+  check(
+    'Official SDK reads persisted branch-aware history',
+    history.total > 5 && history.events.some((e) => e.actor === 'agent'),
+  );
+  current = (
+    await tool('apply_edits', {
+      ...base,
+      expected_revision: current.revision,
+      operation_id: randomUUID(),
+      operations: [
+        { type: 'point_comment', x: 770, y: 350, text: '검색 영역에 맞춰 여백을 정리해 주세요.' },
+      ],
+    })
+  ).screen;
+  check(
+    'Official SDK creates and queries coordinate annotations',
+    (await tool('list_comments', base)).comments.some(
+      (c) => c.id === 'point:770:350' && c.point.x === 770,
+    ),
+  );
+  const image = await client.callTool({ name: 'get_review_image', arguments: base });
+  if (image.isError)
+    throw new Error(
+      'MCP image failure: ' + JSON.stringify(image.structuredContent || image.content),
+    );
+  const imageBlock = image.content.find((c) => c.type === 'image');
+  check(
+    'Official SDK receives a real PNG as MCP image content',
+    !image.isError &&
+      imageBlock?.mimeType === 'image/png' &&
+      Buffer.from(imageBlock.data, 'base64').subarray(0, 8).toString('hex') === '89504e470d0a1a0a',
+  );
+  await fs.writeFile(
+    path.join(root, 'local/mcp-review-image.png'),
+    Buffer.from(imageBlock.data, 'base64'),
+  );
+  const imageBefore = current.revision;
+  current = (await tool('get_screen', base)).screen;
+  check('MCP image retrieval does not mutate current revision', current.revision === imageBefore);
+  current = (
+    await tool('undo', { ...base, expected_revision: current.revision, operation_id: randomUUID() })
+  ).screen;
   const report = {
     officialSdk: true,
     transport: 'stdio',

@@ -190,6 +190,7 @@ try {
     'Cmd-click on container background adds it even without a marquee drag',
     scene.selection.has(first.id) && scene.selection.has(stats.id),
   );
+  doc.querySelector('#tab-inspect').click();
   check(
     'Multi-selection inspector presents group controls first and labels its delete scope and bounds',
     doc.querySelector('#direct-edit-controls').getBoundingClientRect().top <
@@ -229,9 +230,10 @@ try {
     'Cancelled group-handle drag leaves no geometry or undo change',
     JSON.stringify(scene.edits) === groupBefore && app.state.undo.length === groupUndo,
   );
-  doc.querySelector('#comment-mode').click();
-  check('Comment mode hides group movement handle', scene.groupBox.style.display === 'none');
-  doc.querySelector('#select-mode').click();
+  check(
+    'Selection shows a contextual comment action without changing editing modes',
+    scene.addCommentButton.style.display !== 'none' && !doc.querySelector('#comment-mode'),
+  );
   root.setPointerCapture = oldSet;
   root.hasPointerCapture = oldHas;
   sceneRoot.setPointerCapture = oldSceneSet;
@@ -297,14 +299,12 @@ try {
   app.undo();
   scene.remove(copyRoot);
   doc.querySelector('#export-button').click();
-  await until(() =>
-    doc.querySelector('#handoff-items').textContent.includes('삭제된 복사본의 주석'),
-  );
+  await until(() => doc.querySelector('#handoff-preview img'));
   check(
-    'Handoff distinguishes deleted copies and their comments from captured-element deletions',
-    doc.querySelector('#handoff-items').textContent.includes('복사본 삭제') &&
-      doc.querySelector('#export-summary').textContent.includes('삭제 0개') &&
-      doc.querySelector('#export-summary').textContent.includes('복사본 삭제 1개') &&
+    'Handoff image includes the selected copy deletion without deleting its captured source',
+    doc.querySelector('#handoff-preview img').src.startsWith('blob:') &&
+      !scene.hidden(first.id) &&
+      scene.hidden(copyRoot) &&
       instructionText(app.state.snapshot, scene.changes(), '', scene.comments()).includes(
         '참조 원본 ' + first.id + '은 유지',
       ),

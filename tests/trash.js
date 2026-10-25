@@ -44,7 +44,7 @@ try {
       (await getDocument(id)).html === originalHtml,
   );
   click('#documents-dialog .dialog-close');
-  click('#snapshots-button');
+  click('#snapshot-dropdown');
   app.selectNode(node.id);
   app.state.scene.setPosition(12, 24);
   app.state.scene.setComment(node.id, '보존할 주석');
@@ -215,7 +215,7 @@ try {
       app.state.timeline.entries.some((e) => e.id === a.id && e.deletedAt),
   );
   for (const e of [...app.snapshotHistory.list()]) app.snapshotHistory.trash(e.id);
-  click('#snapshots-button');
+  click('#snapshot-dropdown');
   check(
     'All versions can be trashed while the current editable work remains available',
     !app.snapshotHistory.list().length &&

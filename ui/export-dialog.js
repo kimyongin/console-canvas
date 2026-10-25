@@ -1,98 +1,56 @@
-import {
-  download,
-  instructionText,
-  reviewPayload,
-  buildReview,
-  changeActionLabel,
-} from '../export.js';
+import { download, reviewPayload } from '../export.js';
+import { buildHandoffImage, handoffRequests } from '../handoff-image.js';
 import { withVersionScene, versionOptions } from './version-preview.js';
-import { elementLabel } from './element-labels.js';
-export function createExportDialog({ $, state, commitCommentDraft, editorId, flushEditor, toast }) {
-  let generation = 0;
+export function createExportDialog({ $, state, commitCommentDraft, flushEditor, toast }) {
+  let generation = 0,
+    latest = null,
+    previewUrl = null;
   function chosen() {
     return versionOptions(state).find((v) => v.id === $('#handoff-version').value);
-  }
-  function timelineFor(option) {
-    return {
-      ...state.timeline,
-      activeId:
-        option.id === '@current'
-          ? state.timeline.activeId
-          : option.id === '@original'
-            ? null
-            : option.id,
-    };
   }
   async function useVersion(run) {
     commitCommentDraft();
     const option = chosen();
     if (!option) throw new Error('전달할 버전을 선택해 주세요.');
-    return option.id === '@current'
-      ? run(state.scene, option)
-      : withVersionScene(state.snapshot, option.state, (scene) => run(scene, option));
+    return withVersionScene(state.snapshot, option.state, (scene) => run(scene, option));
   }
   async function refresh() {
     const token = ++generation;
-    $('#handoff-items').textContent = '변경 내용 확인 중…';
-    const option = chosen();
-    $('#review-note').closest('label').hidden = option?.id !== '@current';
+    latest = null;
+    $('#copy-summary').disabled = true;
+    $('#download-review').disabled = true;
+    $('#handoff-preview').textContent = '전달 이미지 준비 중…';
     try {
-      await useVersion((scene, version) => {
-        if (token !== generation) return;
-        const changes = scene.changes(),
-          comments = scene.comments(),
-          deleted = changes.filter((c) => c.action === 'delete' && !c.copiedFrom).length,
-          deletedCopies = changes.filter((c) => c.action === 'delete' && c.copiedFrom).length,
-          copied = changes.filter((c) => c.action === 'copy').length;
-        $('#export-summary').textContent =
-          '이동 ' +
-          changes.filter((c) => c.action === 'move').length +
-          '개 · 삭제 ' +
-          deleted +
-          '개 · 복사본 ' +
-          copied +
-          (deletedCopies ? '개 · 복사본 삭제 ' + deletedCopies : '') +
-          '개 · 주석 ' +
-          comments.length +
-          '개 · ' +
-          version.name;
-        const list = $('#handoff-items');
-        list.replaceChildren();
-        for (const change of changes) {
-          const item = document.createElement('div');
-          item.className = 'handoff-item';
-          item.textContent =
-            changeActionLabel(change) +
-            ' · ' +
-            elementLabel(scene.nodes.get(change.id)) +
-            (change.action === 'move' ? ' · X ' + change.delta.x + ' / Y ' + change.delta.y : '');
-          list.append(item);
-        }
-        for (const comment of comments) {
-          const item = document.createElement('div');
-          item.className = 'handoff-item';
-          item.classList.toggle('target-deleted', comment.targetDeleted);
-          item.textContent =
-            (comment.targetDeleted
-              ? comment.copiedFrom
-                ? '삭제된 복사본의 주석 · '
-                : '삭제된 요소의 주석 · '
-              : '주석 · ') +
-            elementLabel(scene.nodes.get(comment.id)) +
-            '\n' +
-            comment.text;
-          list.append(item);
-        }
-        if (version.id !== '@current' && version.state.note) {
-          const item = document.createElement('div');
-          item.className = 'handoff-item';
-          item.textContent = '추가 설명 · ' + version.state.note;
-          list.append(item);
-        }
-        if (!list.children.length) list.textContent = '아직 이동·삭제·주석이 없습니다.';
+      const result = await useVersion(async (scene, version) => {
+        const requests = handoffRequests(scene);
+        $('#export-summary').textContent = version.name + ' · 변경 요청 ' + requests.length + '개';
+        $('#review-note').closest('label').hidden = version.id !== '@current';
+        $('#handoff-items').replaceChildren();
+        // The image is the review surface; avoid duplicating all cards as text.
+        return buildHandoffImage(
+          state.snapshot,
+          scene,
+          version.state.note,
+          (m) => ($('#export-status').textContent = m),
+        );
       });
+      if (token !== generation || !$('#export-dialog').open) return;
+      latest = result;
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = URL.createObjectURL(result.blob);
+      const image = new Image();
+      image.alt = '변경 후 화면과 번호별 주석 카드가 포함된 전달 이미지';
+      image.src = previewUrl;
+      $('#handoff-preview').replaceChildren(image);
+      $('#export-status').textContent =
+        '이 이미지 한 장을 에이전트 대화에 첨부하세요. 번호별 주석에 반응형 배치 의도를 적으면 더 명확해집니다.';
+      $('#copy-summary').disabled = false;
+      $('#download-review').disabled = false;
     } catch (error) {
-      $('#handoff-items').textContent = error.message;
+      if (token === generation) {
+        $('#handoff-preview').textContent = '';
+        $('#export-status').textContent = '이미지를 만들지 못했습니다: ' + error.message;
+      }
     }
   }
   $('#export-button').addEventListener('click', () => {
@@ -101,62 +59,64 @@ export function createExportDialog({ $, state, commitCommentDraft, editorId, flu
       ...versionOptions(state).map((v) => new Option(v.name, v.id)),
     );
     $('#handoff-version').value = '@current';
-    $('#export-status').textContent =
-      '전달할 변경과 주석을 확인하세요. 연결된 에이전트에는 요청문을 복사하고, 파일로 전달할 때는 ZIP을 저장하세요.';
     $('#export-dialog').showModal();
     refresh();
   });
   $('#handoff-version').addEventListener('change', refresh);
+  $('#review-note').addEventListener('change', () => {
+    if ($('#export-dialog').open) refresh();
+  });
+  $('#export-dialog').addEventListener('close', () => {
+    generation++;
+    latest = null;
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    previewUrl = null;
+    $('#handoff-preview').replaceChildren();
+  });
   $('#copy-summary').addEventListener('click', async () => {
     try {
-      const text = await useVersion((scene, version) => {
-        const context =
-          version.id === '@current'
-            ? '현재 작업'
-            : version.id === '@original'
-              ? '가져온 원본'
-              : version.name + ' (snapshot_id: ' + version.id + ')';
-        return (
-          'Console Canvas의 ' +
-          context +
-          '을 기준으로 수정해 주세요.\ndocument_id: ' +
-          state.snapshot.id +
-          '\neditor_id: ' +
-          editorId +
-          '\nMCP에서 화면과 최신 revision을 다시 조회한 뒤 작업해 주세요.\n\n' +
-          instructionText(state.snapshot, scene.changes(), version.state.note, scene.comments())
-        );
-      });
-      await navigator.clipboard.writeText(text);
-      $('#export-status').textContent =
-        '전달 기준과 변경 내용을 복사했습니다. 에이전트 대화에 붙여넣으세요.';
+      if (!latest) return;
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': latest.blob })]);
+      $('#export-status').textContent = '이미지를 복사했습니다. 에이전트 대화에 붙여넣으세요.';
     } catch (error) {
-      $('#export-status').textContent = '복사하지 못했습니다: ' + error.message;
+      $('#export-status').textContent =
+        '이미지 복사를 지원하지 않는 환경입니다. 전달 이미지 저장을 사용해 주세요. ' +
+        error.message;
     }
   });
-  async function perform(button, run) {
+  $('#download-review').addEventListener('click', async () => {
+    if (!latest) return;
+    const button = $('#download-review');
     button.disabled = true;
     try {
-      await run();
+      const result = await download(
+        'console-canvas-' + state.snapshot.id.slice(0, 8) + '.png',
+        latest.blob,
+        'image/png',
+      );
+      $('#export-status').textContent = result?.canceled
+        ? '저장을 취소했습니다.'
+        : '전달 이미지 한 장을 저장했습니다. 에이전트 대화에 첨부하세요.';
     } catch (error) {
-      $('#export-status').textContent = '저장하지 못했습니다: ' + error.message;
+      $('#export-status').textContent = '저장 실패: ' + error.message;
     } finally {
       button.disabled = false;
     }
-  }
+  });
   $('#save-document').addEventListener('click', async () => {
     if (!state.ready) return;
     $('#document-menu-content').hidePopover();
     const button = $('#save-document');
     button.disabled = true;
     try {
-      commitCommentDraft();
       await flushEditor();
       const payload = reviewPayload(
         state.snapshot,
         state.scene,
         $('#review-note').value,
         state.timeline,
+        state.activity,
+        state.activityHead,
       );
       const result = await download(
         'console-canvas-' + state.snapshot.id.slice(0, 8) + '.uiclone.json',
@@ -166,35 +126,12 @@ export function createExportDialog({ $, state, commitCommentDraft, editorId, flu
       toast(
         result?.canceled
           ? '저장을 취소했습니다.'
-          : '편집 파일을 저장했습니다. 스냅샷과 휴지통도 포함됩니다.',
+          : '편집 파일을 저장했습니다. 주석·분기·변경 이력·휴지통도 포함됩니다.',
       );
     } catch (error) {
-      toast('편집 파일을 저장하지 못했습니다: ' + error.message);
+      toast('편집 파일 저장 실패: ' + error.message);
     } finally {
       button.disabled = !state.ready;
     }
   });
-  $('#download-review').addEventListener('click', () =>
-    perform($('#download-review'), async () => {
-      const result = await useVersion((scene, version) =>
-        buildReview(
-          state.snapshot,
-          scene,
-          version.state.note,
-          (message) => ($('#export-status').textContent = message),
-          timelineFor(version),
-        ),
-      );
-      const saved = await download(
-        'console-canvas-review-' + state.snapshot.id.slice(0, 8) + '.zip',
-        result.blob,
-      );
-      $('#export-status').textContent = saved?.canceled
-        ? '저장을 취소했습니다.'
-        : (saved?.path ? '전달 ZIP을 저장했습니다.' : '전달 ZIP 다운로드를 요청했습니다.') +
-          ' 에이전트 대화에 첨부해 주세요.' +
-          (result.warnings.length ? ' 일부 이미지는 HTML 비교 화면으로 확인해 주세요.' : '');
-    }),
-  );
-  return {};
 }

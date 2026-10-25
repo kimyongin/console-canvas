@@ -109,20 +109,11 @@ try {
   );
   app.undo();
   app.undo();
-  click('comment-mode');
-  scene.begin({
-    button: 0,
-    target: scene.elements.get(first.id),
-    preventDefault() {},
-    stopPropagation() {},
-    clientX: 0,
-    clientY: 0,
-  });
+  app.selectNode(first.id);
+  scene.callbacks.onCommentSelect(first.id);
   check(
-    'Comment mode opens the same draft field next to the selected component',
-    !doc.querySelector('#comment-popover').hidden &&
-      doc.querySelector('#comment-popover').contains(doc.querySelector('#component-comment')) &&
-      doc.activeElement.id === 'component-comment',
+    'Component comment icon opens a modal without a mode switch',
+    doc.querySelector('#comment-dialog').open && doc.activeElement.id === 'component-comment',
   );
   const field = doc.querySelector('#component-comment');
   field.value = '버튼 문구를 고객 추가로 변경';
@@ -133,7 +124,7 @@ try {
     'Inline comments autosave and keep a numbered canvas marker',
     scene.commentMarkers.has(first.id) && scene.annotations[first.id].includes('고객 추가'),
   );
-  click('close-comment-popover');
+  click('close-comment-dialog');
   check(
     'Closing the popover preserves the draft and returns the draft to the comments panel',
     doc.querySelector('#comment-editor-host').contains(field) &&
@@ -154,15 +145,15 @@ try {
       !doc.querySelector('#comments-panel').hidden &&
       doc.activeElement.id === 'component-comment',
   );
-  click('select-mode');
+  click('close-comment-dialog');
   const a = app.snapshotHistory.create('비교 A');
   scene.nudge(35, 20);
   const b = app.snapshotHistory.create('비교 B');
-  click('snapshots-button');
-  await until(() => doc.querySelector('[data-preview-id]')?.src.startsWith('data:image/png'));
+  click('snapshot-dropdown');
   check(
-    'Snapshot entries show generated layout thumbnails',
-    doc.querySelector('.snapshot-entry img').src.startsWith('data:image/png'),
+    'Snapshot tree displays branch depth and saved names',
+    doc.querySelector('[data-depth="1"]') &&
+      doc.querySelector('#snapshot-list').textContent.includes('비교 B'),
   );
   const signature = () =>
     JSON.stringify([
@@ -196,7 +187,7 @@ try {
   await until(() => doc.querySelector('#export-summary').textContent.includes('비교 A'));
   check(
     'Handoff previews the selected saved version without restoring it',
-    signature() === saved && doc.querySelector('#handoff-items').textContent.includes('주석'),
+    signature() === saved && doc.querySelector('#export-summary').textContent.includes('변경 요청'),
   );
   doc.querySelector('#export-dialog').close();
   const payload = JSON.stringify(

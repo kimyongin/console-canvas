@@ -37,21 +37,12 @@ try {
   const field = doc.querySelector('#component-comment');
   field.value = '저장 전 주석 초안';
   field.dispatchEvent(new win.Event('input', { bubbles: true }));
-  click('#comment-mode');
-  click('#comment-mode');
+  click('#close-comment-dialog');
   check(
-    'Comment mode is explicit and clicking it again does not silently switch modes',
-    app.state.mode === 'comment' &&
-      doc.querySelector('#select-mode').getAttribute('aria-pressed') === 'false',
-  );
-  field.dispatchEvent(
-    new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
-  );
-  check(
-    'Escape from a comment input saves the draft and returns to selection mode',
-    app.state.mode === 'edit' &&
-      app.state.scene.annotations[node.id] === '저장 전 주석 초안' &&
-      doc.querySelector('#select-mode').getAttribute('aria-pressed') === 'true',
+    'Closing comment modal preserves draft with no global modes',
+    !doc.querySelector('#comment-dialog').open &&
+      !doc.querySelector('#comment-mode') &&
+      app.state.scene.annotations[node.id] === '저장 전 주석 초안',
   );
   click('#tab-inspect');
   check(
@@ -62,7 +53,7 @@ try {
   );
   app.state.scene.nudge(16, 8);
   const snapshot = app.snapshotHistory.create('배치 검증');
-  click('#snapshots-button');
+  click('#snapshot-dropdown');
   const card = () =>
     doc.querySelector('[data-snapshot-id="' + snapshot.id + '"]').closest('.snapshot-card');
   card().querySelector('.more-actions').click();
@@ -114,18 +105,13 @@ try {
         (e) => e.kind === 'automatic' && e.state.edits[node.id]?.dx === 21,
       ),
   );
-  click('#toggle-properties');
+  if (!doc.querySelector('#snapshot-panel').matches(':popover-open')) click('#snapshot-dropdown');
   check(
-    'Global snapshot state follows panel visibility',
-    doc.querySelector('#snapshots-button').getAttribute('aria-expanded') === 'false',
-  );
-  click('#snapshots-button');
-  check(
-    'Global snapshot button always opens versions instead of unexpectedly switching to properties',
-    !doc.querySelector('#snapshot-panel').hidden &&
-      doc.querySelector('#snapshots-button').getAttribute('aria-expanded') === 'true' &&
+    'Snapshot tree is independent of the right inspector',
+    doc.querySelector('#snapshot-panel').matches(':popover-open') &&
       !doc.querySelector('#close-snapshots'),
   );
+  doc.querySelector('#snapshot-panel').hidePopover();
   let saved;
   win.ConsoleCanvasDesktop = {
     saveFile: async (value) => {

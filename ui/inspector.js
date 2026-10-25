@@ -18,11 +18,10 @@ export function createInspector({ $, state, kinds, selectNode }) {
     $('#selection-count').textContent = count + '개 선택됨';
     $('.coordinate-fields').hidden = count > 1;
     $('.field-heading').textContent = count > 1 ? '묶음 전체 이동' : '원래 위치에서 이동';
-    $('.component-comment label').textContent =
-      count > 1 ? '주석 대상: ' + elementLabel(node) : '이 요소에 주석 남기기';
+    $('.component-comment label').textContent = '수정 요청';
     $('#zoom-selection').disabled = !node;
     if (!node) {
-      state.commentTarget = null;
+      if (!$('#comment-dialog').open) state.commentTarget = null;
       return;
     }
     const comment = scene.annotations[id] || '';
@@ -30,9 +29,12 @@ export function createInspector({ $, state, kinds, selectNode }) {
     $('#selected-comment-summary').textContent =
       comment || '수정 방향을 주석으로 남길 수 있습니다.';
     $('#edit-selected-comment').textContent = comment ? '주석 편집' : '주석 남기기';
-    if (state.commentTarget !== id || document.activeElement !== $('#component-comment'))
+    if (
+      !$('#comment-dialog').open &&
+      (state.commentTarget !== id || document.activeElement !== $('#component-comment'))
+    )
       $('#component-comment').value = comment;
-    state.commentTarget = id;
+    if (!$('#comment-dialog').open) state.commentTarget = id;
     $('#clear-comment').disabled = !comment && !$('#component-comment').value.trim();
     $('#comment-status').textContent = comment
       ? '저장된 주석 · 전달 파일에 포함됩니다.'

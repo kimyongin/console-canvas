@@ -88,11 +88,20 @@ export function instructionText(snapshot, changes, note = '', comments = []) {
   );
   return lines.join('\n');
 }
-export function reviewPayload(snapshot, scene, note = '', timeline = null) {
+export function reviewPayload(
+  snapshot,
+  scene,
+  note = '',
+  timeline = null,
+  activity = [],
+  activityHead = null,
+) {
   return {
     format: 'console-canvas-review',
     version: 1,
     createdAt: new Date().toISOString(),
+    activity,
+    activityHead,
     snapshot,
     edits: scene.edits,
     annotations: scene.annotations,

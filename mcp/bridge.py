@@ -168,7 +168,7 @@ class Broker:
                 command_id = str(uuid.uuid4())
                 command = {'command_id': command_id, 'editor_id': editor_id, 'document_id': session['screen']['document_id'],
                            'name': name, 'arguments': arguments, 'fingerprint': fingerprint, 'key': key,
-                           'deadline': time.time() + 12, 'delivered': False, 'result': None}
+                           'deadline': time.time() + (45 if name == 'get_review_image' else 12), 'delivered': False, 'result': None}
                 self.commands[command_id] = command
                 if key:
                     self.operation_keys[key] = command_id
@@ -263,7 +263,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(error('unauthorized', 'Invalid pairing code, origin or Host'), 401)
         try:
             size = int(self.headers.get('Content-Length', 0))
-            if not 0 < size <= MAX_BODY:
+            if not 0 < size <= (32 * 1024 * 1024 if self.path == '/bridge/poll' else MAX_BODY):
                 raise ValueError('Invalid request size')
             body = json.loads(self.rfile.read(size), parse_constant=lambda _: (_ for _ in ()).throw(ValueError('Non-finite JSON')))
             if not isinstance(body, dict):

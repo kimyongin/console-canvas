@@ -1,3 +1,4 @@
+import { activityBranch } from './activity-history.js';
 import { prepareEdits } from './edit-commands.js';
 import { copy } from './engine.js';
 
@@ -110,6 +111,53 @@ export function createEditorController(options) {
         offset,
         comments: comments.slice(offset, offset + limit),
       };
+    }
+    if (name === 'list_history') {
+      const events = activityBranch(state, args.scope === 'all'),
+        offset = args.offset || 0,
+        limit = args.limit || 50;
+      return {
+        ok: true,
+        revision: state.revision,
+        active_head: state.activityHead || null,
+        total: events.length,
+        offset,
+        events: events.slice(offset, offset + limit),
+      };
+    }
+    if (name === 'get_review_image') {
+      if (screen().busy) return failure('editor_busy', '편집을 마친 뒤 이미지를 요청해 주세요.');
+      const revision = state.revision;
+      try {
+        const result = await options.buildHandoffImage(args.snapshot_id);
+        if (state.revision !== revision)
+          return failure(
+            'revision_conflict',
+            '이미지를 만드는 동안 화면이 바뀌었습니다. 다시 요청해 주세요.',
+          );
+        if (result.blob.size > 20 * 1024 * 1024)
+          return failure(
+            'image_error',
+            '이미지가 MCP 전송 한도를 넘었습니다. 앱에서 PNG로 저장해 주세요.',
+          );
+        const data_url = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(result.blob);
+        });
+        return {
+          ok: true,
+          revision,
+          mime_type: 'image/png',
+          data_url,
+          width: result.width,
+          height: result.height,
+          request_count: result.requests.length,
+        };
+      } catch (error) {
+        return failure('image_error', error.message);
+      }
     }
     if (name === 'list_snapshots') {
       const entries = options.snapshotHistory.list(),

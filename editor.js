@@ -1,3 +1,8 @@
+import { buildHandoffImage } from './handoff-image.js';
+import { withVersionScene } from './ui/version-preview.js';
+import { cleanActivity } from './activity-history.js';
+import { pointTarget } from './edit-commands.js';
+import { createActivityPanel } from './ui/activity-panel.js';
 import { createToast } from './ui/toast.js';
 import { createRenameDialog } from './ui/rename-dialog.js';
 import { createDocumentSwitcher } from './ui/document-switcher.js';
@@ -39,6 +44,8 @@ const state = {
   generation: 0,
   commentTarget: null,
   mode: 'edit',
+  activity: [],
+  activityHead: null,
   ready: false,
   revision: 0,
   lastAction: null,
@@ -79,6 +86,7 @@ const {
     renderInspector();
     renderLayers();
     renderChanges();
+    activityPanel.render();
     renderHistory();
     renderSnapshots();
     renderMcpStatus();
@@ -147,6 +155,9 @@ function closeDocument(id) {
       state.snapshot = null;
       state.scene = null;
       state.timeline = null;
+      state.activity = [];
+      state.activityHead = null;
+      activityPanel.render();
       state.commentTarget = null;
       state.undo = [];
       state.redo = [];
@@ -205,7 +216,7 @@ const commentEditor = createCommentEditor({
   commit: commitCommentDraft,
   showComments: () => showPanel('comments'),
 });
-function focusComment(options) {
+function focusComment(options = {}) {
   commentEditor.open(options);
 }
 const preview = createVersionPreview({ $, state, commitCommentDraft });
@@ -228,6 +239,7 @@ const { showSnapshots, renderSnapshots, showPanel } = createSnapshotPanel({
   renameDialog,
   flushEditor,
 });
+const activityPanel = createActivityPanel({ $, state, selectNode, focusComment });
 function onKey(event) {
   if (!state.scene || document.querySelector('dialog[open]')) return;
   if (state.scene.areaSelecting) return;
@@ -305,11 +317,17 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
     note: storedNote,
     documentName: storedDocumentName,
     deletedAt,
+    activity,
+    activityHead,
     ...capture
   } = snapshot;
   timeline = timeline || storedTimeline;
   state.timeline = null;
   state.snapshot = { ...capture, ...(documentName ? { documentName } : {}) };
+  state.activity = cleanActivity(snapshot.activity);
+  state.activityHead = snapshot.activityHead || null;
+  state.lastCheckpoint = null;
+  state.pendingBefore = null;
   state.undo = [];
   state.redo = [];
   state.expanded = new Set(snapshot.nodes.filter((node) => !node.parentId).map((node) => node.id));
@@ -345,7 +363,7 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
       renderInspector();
       renderLayers();
     },
-    onCommentSelect: (_id, options) => focusComment(options),
+    onCommentSelect: (id) => focusComment({ id }),
     onSize: sizeChanged,
     onBeforeChange: historyBefore,
     onLiveChange: () => {
@@ -371,6 +389,7 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
     renderInspector();
     renderLayers();
     renderChanges();
+    activityPanel.render();
     renderHistory();
     renderSnapshots();
     $('#export-button').disabled = false;
@@ -383,6 +402,9 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
       li.textContent = warning.message;
       $('#capture-notes-list').append(li);
     }
+    state.lastCheckpoint = checkpoint();
+    activityPanel.render();
+    showPanel('history', { reveal: false });
     state.ready = true;
     connectDesktopIfReady();
     renderMcpStatus();
@@ -436,7 +458,7 @@ async function importFile(file) {
   const data = JSON.parse(await file.text());
   if (data.format === 'console-canvas-review') {
     await openSnapshot(
-      data.snapshot,
+      { ...data.snapshot, activity: data.activity, activityHead: data.activityHead },
       data.edits,
       data.note || '',
       data.annotations || {},
@@ -491,34 +513,17 @@ $('#clear-comment').addEventListener('click', () => {
   commitCommentDraft();
   renderInspector();
 });
-function setMode(mode) {
+function setMode() {
   commitCommentDraft();
-  state.mode = mode;
   commentEditor.reset();
+  state.mode = 'edit';
   if (state.scene) {
-    state.scene.interactionMode = state.mode;
+    state.scene.interactionMode = 'edit';
     state.scene.drawSelection();
   }
-  $('#select-mode').setAttribute('aria-pressed', String(mode === 'edit'));
-  $('#comment-mode').setAttribute('aria-pressed', String(mode === 'comment'));
-  $('#canvas-hint').textContent =
-    mode === 'comment'
-      ? '주석 모드 · 요소 클릭으로 작성 · Esc로 선택 모드'
-      : '빈 곳 드래그로 영역 선택 · ⌘/Ctrl+클릭 추가 선택 · ⌘/Ctrl+C / V 복사·붙여넣기';
   renderInspector();
 }
-$('#select-mode').addEventListener('click', () => setMode('edit'));
-$('#comment-mode').addEventListener('click', () => setMode('comment'));
 $('#edit-selected-comment').addEventListener('click', () => focusComment());
-// Escape must also leave comment mode when its textarea has focus.
-$('#component-comment').addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') {
-    event.preventDefault();
-    event.stopPropagation();
-    setMode('edit');
-    $('#select-mode').focus();
-  }
-});
 $('#undo').addEventListener('click', () => undo());
 $('#redo').addEventListener('click', () => undo('redo'));
 $('#select-parent').addEventListener('click', () =>
@@ -534,7 +539,15 @@ for (const button of document.querySelectorAll('[data-nudge]'))
 for (const id of ['#offset-x', '#offset-y'])
   $(id).addEventListener('change', () =>
     editSafely(() =>
-      state.scene?.setPosition(Number($('#offset-x').value), Number($('#offset-y').value)),
+      (() => {
+        if (!state.scene) return;
+        state.scene.editCategory = 'property';
+        try {
+          state.scene.setPosition(Number($('#offset-x').value), Number($('#offset-y').value));
+        } finally {
+          state.scene.editCategory = null;
+        }
+      })(),
     ),
   );
 $('#zoom').addEventListener('change', (event) => zoomTo(Number(event.target.value)));
@@ -591,6 +604,15 @@ const controller = createEditorController({
   changeCommitted,
   undo,
   snapshotHistory,
+  buildHandoffImage: async (id) => {
+    const point = id
+      ? state.timeline.entries.find((e) => e.id === id && !e.deletedAt)?.state
+      : checkpoint();
+    if (!point) throw new Error('해당 스냅샷을 찾을 수 없습니다.');
+    return withVersionScene(state.snapshot, point, (scene) =>
+      buildHandoffImage(state.snapshot, scene, point.note),
+    );
+  },
   isBusy: () =>
     !!document.querySelector('dialog[open]') ||
     document.activeElement === $('#snapshot-name') ||
@@ -602,6 +624,7 @@ const controller = createEditorController({
     renderInspector();
     renderLayers();
     renderChanges();
+    activityPanel.render();
     renderHistory();
   },
   flush: async () => {
@@ -734,6 +757,10 @@ window.ConsoleCanvas = {
   selectNode,
   controller,
   snapshotHistory,
+  buildHandoffImage: () =>
+    withVersionScene(state.snapshot, checkpoint(), (scene) =>
+      buildHandoffImage(state.snapshot, scene, $('#review-note').value),
+    ),
   buildReview: () =>
     buildReview(state.snapshot, state.scene, $('#review-note').value, undefined, state.timeline),
 };

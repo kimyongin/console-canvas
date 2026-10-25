@@ -251,6 +251,16 @@ def summarize(data):
         edits = data.get('edits', {})
         if isinstance(annotations, dict):
             for node_id, text in annotations.items():
+                if isinstance(node_id, str) and node_id.startswith('point:') and isinstance(text, str) and text.strip():
+                    try:
+                        _, x, y = node_id.split(':')
+                        x, y = float(x), float(y)
+                        if finite(x) and finite(y) and 0 <= x <= 60000 and 0 <= y <= 200000:
+                            point = {'x': x, 'y': y, 'width': 0, 'height': 0}
+                            comments.append({'id': node_id, 'name': '위치 주석', 'kind': 'point', 'tag': 'point', 'point': point, 'before': point, 'after': point, 'text': text.strip()[:4000], 'targetDeleted': False, 'locator': None})
+                    except (ValueError, TypeError):
+                        pass
+                    continue
                 if node_id not in nodes or not isinstance(text, str) or not text.strip():
                     continue
                 node = nodes[node_id]
@@ -289,6 +299,7 @@ def summarize(data):
         'warnings': snapshot.get('warnings', []) if snapshot else [],
         'canReopen': snapshot is not None,
         'changeBasis': 'snapshot+edits' if snapshot else 'changes-only',
+        'activityCount': len(data.get('activity', [])) if isinstance(data.get('activity'), list) else 0,
         'commentCount': len(comments), 'componentComments': comments,
     }
     return summary, changes

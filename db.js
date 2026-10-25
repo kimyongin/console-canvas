@@ -36,8 +36,18 @@ async function transact(stores, mode, action) {
   }
 }
 export function captureFromDocument(value) {
-  const { edits, annotations, timeline, note, updatedAt, documentName, deletedAt, ...capture } =
-    value;
+  const {
+    edits,
+    annotations,
+    timeline,
+    activity,
+    activityHead,
+    note,
+    updatedAt,
+    documentName,
+    deletedAt,
+    ...capture
+  } = value;
   return capture;
 }
 export async function saveCapture(value) {
@@ -64,11 +74,13 @@ export async function saveSession(id, value) {
     edits = {},
     annotations = {},
     timeline = null,
+    activity = [],
+    activityHead = null,
     note = '',
     updatedAt = new Date().toISOString(),
     documentName,
   } = value;
-  const session = { edits, annotations, timeline, note, updatedAt };
+  const session = { edits, annotations, timeline, activity, activityHead, note, updatedAt };
   return transact(['sessions', 'documents'], 'readwrite', (tx) => {
     const metadata = tx.objectStore('documents');
     const request = metadata.get(id);

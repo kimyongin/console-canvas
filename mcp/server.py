@@ -34,11 +34,14 @@ TOOLS = [
     ('list_elements', 'Search captured elements by text, label, selector, tag or ID. Includes original locator, geometry and deletion state; paginated.',
      schema({**BASE, 'query': {'type': 'string', 'maxLength': 500}, 'parent_id': {'type': 'string'},
              'offset': {'type': 'integer', 'minimum': 0}, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 200}}, BASE)),
+    ('list_history', 'Read persisted chronological edit events. Current branch follows snapshot ancestry; scope all includes parallel branches.', schema({**BASE, 'scope': {'enum': ['branch', 'all']}, 'offset': {'type': 'integer', 'minimum': 0}, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 200}}, BASE)),
+    ('get_review_image', 'Get ONE image with the after screen, numbered highlighted regions and annotation cards below. Optional snapshot_id selects a saved version. Read the image as layout intent, not pixel CSS instructions.', schema({**BASE, 'snapshot_id': {'type': 'string', 'minLength': 1, 'maxLength': 100}}, BASE)),
     ('list_comments', 'Read component comments with element IDs, original locators and deleted-target status.',
      schema({**BASE, 'element_id': {'type': 'string'}, 'offset': {'type': 'integer', 'minimum': 0}, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 200}}, BASE)),
     ('apply_edits', 'Atomically apply moves, deletions and component comment edits as ONE undo step. Move mode absolute sets offsets from capture; relative adds to current offsets. Empty comment text removes it. Does not edit source code.',
      schema({**WRITE, 'operations': {'type': 'array', 'minItems': 1, 'maxItems': EDIT_LIMITS['operations'], 'items': {'oneOf': [
          schema({'type': {'const': 'move'}, 'element_id': {'type': 'string'}, 'dx': {'type': 'number', 'minimum': -EDIT_LIMITS['x'], 'maximum': EDIT_LIMITS['x']}, 'dy': {'type': 'number', 'minimum': -EDIT_LIMITS['y'], 'maximum': EDIT_LIMITS['y']}, 'mode': {'enum': ['absolute', 'relative']}}, ['type', 'element_id', 'dx', 'dy', 'mode']),
+         schema({'type': {'const': 'point_comment'}, 'x': {'type': 'number', 'minimum': 0, 'maximum': EDIT_LIMITS['x']}, 'y': {'type': 'number', 'minimum': 0, 'maximum': EDIT_LIMITS['y']}, 'text': {'type': 'string', 'maxLength': EDIT_LIMITS['comment']}}, ['type', 'x', 'y', 'text']),
          schema({'type': {'const': 'delete'}, 'element_id': {'type': 'string'}}, ['type', 'element_id']),
          schema({'type': {'const': 'comment'}, 'element_id': {'type': 'string'}, 'text': {'type': 'string', 'maxLength': EDIT_LIMITS['comment']}}, ['type', 'element_id', 'text']),
      ]}}}, [*WRITE, 'operations'])),
@@ -145,8 +148,12 @@ def stdio(connection):
                 result = {'tools': definitions()}
             elif method == 'tools/call':
                 try:
-                    value = request(connection, '/agent/call', params)
-                    result = {'content': [{'type': 'text', 'text': json.dumps(value, ensure_ascii=False)}], 'structuredContent': value, 'isError': not value.get('ok', False)}
+                    value = request(connection, '/agent/call', params, timeout=50 if params.get('name') == 'get_review_image' else 15)
+                    if value.get('ok') and value.get('data_url', '').startswith('data:image/png;base64,'):
+                        image = value.pop('data_url').split(',', 1)[1]
+                        result = {'content': [{'type': 'image', 'mimeType': 'image/png', 'data': image}, {'type': 'text', 'text': json.dumps(value, ensure_ascii=False)}], 'structuredContent': value, 'isError': False}
+                    else:
+                        result = {'content': [{'type': 'text', 'text': json.dumps(value, ensure_ascii=False)}], 'structuredContent': value, 'isError': not value.get('ok', False)}
                 except (ValueError, OSError) as error:
                     result = {'content': [{'type': 'text', 'text': str(error)}], 'isError': True}
             else:

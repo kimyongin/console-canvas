@@ -39,7 +39,7 @@ try {
     doc.querySelector('#snapshot-form').dispatchEvent(new Event('submit', { cancelable: true }));
     return app.state.timeline.activeId;
   };
-  doc.querySelector('#snapshots-button').click();
+  doc.querySelector('#snapshot-dropdown').click();
   check(
     'Snapshot panel opens with an initial saved version',
     !doc.querySelector('#snapshot-panel').hidden &&

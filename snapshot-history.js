@@ -15,6 +15,7 @@ function snapshotPoint(value, nodes) {
         ? [value.selected]
         : [],
     note: typeof value?.note === 'string' ? value.note : '',
+    activityHead: typeof value?.activityHead === 'string' ? value.activityHead : null,
   };
 }
 function snapshotSignature(point) {

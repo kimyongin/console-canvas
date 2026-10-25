@@ -1,3 +1,4 @@
+import { recordActivity } from './activity-history.js';
 import { copy } from './engine.js';
 import { saveSession } from './db.js';
 import { createSaveQueue } from './save-queue.js';
@@ -17,10 +18,12 @@ export function createEditorSession({
       selection: [...state.scene.selection],
       note: getNote(),
       activeSnapshotId: state.timeline?.activeId || null,
+      activityHead: state.activityHead || null,
     };
   }
   function applyCheckpoint(point) {
     state.commentTarget = null;
+    state.activityHead = point.activityHead || null;
     state.scene.setEdits(point.edits);
     state.scene.setComments(point.annotations);
     state.scene.select(point.selected, {
@@ -29,7 +32,8 @@ export function createEditorSession({
     setNote(point.note || '');
   }
   function historyBefore() {
-    state.undo.push(checkpoint());
+    state.pendingBefore = checkpoint();
+    state.undo.push(state.pendingBefore);
     if (state.undo.length > 100) state.undo.shift();
     state.pendingRedo = state.redo;
     state.redo = [];
@@ -39,9 +43,17 @@ export function createEditorSession({
       state.undo.pop();
       state.redo = state.pendingRedo || [];
     } else {
+      recordActivity(
+        state,
+        state.pendingBefore || state.lastCheckpoint || checkpoint(),
+        checkpoint(),
+        detail,
+      );
       state.revision++;
       state.lastAction = { actor: detail.actor || 'user', label: detail.label || '화면 편집' };
     }
+    state.pendingBefore = null;
+    state.lastCheckpoint = checkpoint();
     render();
     save();
   }
@@ -59,6 +71,11 @@ export function createEditorSession({
       )
         ? previous.activeSnapshotId
         : null;
+    recordActivity(state, to.at(-1), checkpoint(), {
+      ...detail,
+      label: direction === 'undo' ? '실행 취소' : '다시 실행',
+    });
+    state.lastCheckpoint = checkpoint();
     state.revision++;
     state.lastAction = {
       actor: detail.actor || 'user',
@@ -89,6 +106,8 @@ export function createEditorSession({
       edits: state.scene.edits,
       annotations: state.scene.annotations,
       timeline: state.timeline,
+      activity: state.activity,
+      activityHead: state.activityHead,
       note: getNote(),
       updatedAt: new Date().toISOString(),
     });

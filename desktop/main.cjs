@@ -191,6 +191,10 @@ async function start() {
     getWindow: () => win,
     downloads: app.getPath('downloads'),
   });
+  ipcMain.handle('canvas:render-image', async (event, value) => {
+    trusted(event, 'editor');
+    return require('./render-image.cjs')(value);
+  });
   ipcMain.handle('canvas:save-file', (event, value) => {
     trusted(event, 'editor');
     return saveFile(value);

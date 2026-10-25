@@ -1,84 +1,65 @@
 import { elementLabel } from './element-labels.js';
-export function createCommentEditor({ $, state, commit, showComments }) {
-  const form = $('.component-comment'),
+import { pointTarget } from '../edit-commands.js';
+export function createCommentEditor({ $, state, commit }) {
+  const dialog = $('#comment-dialog'),
     field = $('#component-comment');
   let timer;
   function close() {
-    $('#comment-popover').hidden = true;
-    $('#comment-editor-host').append(form);
+    clearTimeout(timer);
+    if (dialog.open) dialog.close();
   }
-  function position() {
-    if ($('#comment-popover').hidden || !state.scene?.selected) return;
-    const r = state.scene.rect(state.scene.selected),
-      frame = $('#scene-frame').getBoundingClientRect();
-    if (!r) return;
-    const box = $('#comment-popover'),
-      width = Math.min(320, innerWidth - 24);
-    box.style.width = width + 'px';
-    box.style.left =
-      Math.max(
-        12,
-        Math.min(innerWidth - width - 12, frame.left + (r.x + r.width) * state.zoom + 12),
-      ) + 'px';
-    box.style.top =
-      Math.max(12, Math.min(innerHeight - box.offsetHeight - 12, frame.top + r.y * state.zoom)) +
-      'px';
+  function open({ id = state.scene?.selected } = {}) {
+    if (!state.scene || !id) return;
+    commit();
+    const point = pointTarget(id);
+    if (!point && !state.scene.nodes.has(id)) return;
+    state.commentTarget = id;
+    $('#comment-dialog-title').textContent = point
+      ? '위치에 주석 남기기'
+      : '컴포넌트에 주석 남기기';
+    $('#comment-target-title').textContent = point
+      ? `위치 · ${point.x}, ${point.y}`
+      : elementLabel(state.scene.nodes.get(id));
+    field.value = state.scene.annotations[id] || '';
+    $('#clear-comment').disabled = !field.value;
+    if (!dialog.open) dialog.showModal();
+    field.focus();
   }
-  function open({ floating = false } = {}) {
-    if (!state.scene?.selected) return;
-    $('#comment-editor-host').hidden = false;
-    if (floating) {
-      $('#floating-comment-title').textContent = elementLabel(
-        state.scene.nodes.get(state.scene.selected),
-      );
-      $('#floating-comment-host').append(form);
-      $('#comment-popover').hidden = false;
-      position();
-    } else {
-      close();
-      showComments();
-    }
-    field.focus({ preventScroll: true });
-    if (!floating) field.scrollIntoView({ block: 'nearest' });
-  }
-  function schedule() {
+  field.addEventListener('input', () => {
     clearTimeout(timer);
     $('#comment-status').textContent = '입력 중 · 자동 저장됩니다.';
     timer = setTimeout(() => {
       commit();
-      const id = state.commentTarget,
-        text = field.value.trim();
-      state.saving.then(() => {
-        if (state.commentTarget === id && field.value.trim() === text)
-          $('#comment-status').textContent = state.lastSaveError
-            ? '저장 실패 · 다시 저장해 주세요.'
-            : '주석이 이 기기에 저장됐습니다.';
-      });
+      $('#comment-status').textContent = '이 기기에 저장됨';
     }, 650);
-  }
-  function reset() {
-    clearTimeout(timer);
-    close();
-    $('#comment-editor-host').hidden = true;
-  }
-  field.addEventListener('input', schedule);
-  field.addEventListener('keydown', (event) => {
-    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-      event.preventDefault();
-      clearTimeout(timer);
-      commit();
-      close();
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
+  });
+  field.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
       commit();
       close();
     }
   });
-  $('#close-comment-popover').addEventListener('click', () => {
+  dialog.addEventListener('cancel', () => commit());
+  field.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      commit();
+      close();
+    }
+  });
+  dialog.addEventListener('close', () => {
+    clearTimeout(timer);
+    state.commentTarget = null;
+  });
+  $('#close-comment-dialog').addEventListener('click', () => {
     commit();
     close();
   });
-  $('#viewport').addEventListener('scroll', position);
-  window.addEventListener('resize', position);
-  return { open, reset, position };
+  $('#save-comment').addEventListener('click', () => {
+    commit();
+    close();
+  });
+  return { open, reset: close, position() {} };
 }

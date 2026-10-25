@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('ConsoleCanvasDesktop', {
   openSource: (url) => ipcRenderer.invoke('canvas:open-source', url),
   showSource: () => ipcRenderer.invoke('canvas:show-source'),
+  renderImage: (value) => ipcRenderer.invoke('canvas:render-image', value),
   saveFile: (value) => ipcRenderer.invoke('canvas:save-file', value),
   getConnection: () => ipcRenderer.invoke('canvas:connection'),
   onHistory: (callback) =>

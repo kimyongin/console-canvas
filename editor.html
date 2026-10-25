@@ -17,8 +17,8 @@
         ><span id="document-title">화면을 가져와 편집 방향을 보여주세요</span>
       </div>
       <div class="header-actions">
-        <button id="snapshots-button" disabled aria-expanded="false" aria-controls="snapshot-panel">
-          스냅샷 <span id="snapshot-count">0</span></button
+        <button id="snapshots-button" disabled aria-controls="snapshot-save-dialog">
+          스냅샷 저장 <span id="snapshot-count" class="sr-only">0</span></button
         ><button id="export-button" class="primary" disabled>
           변경 내용 전달 <span aria-hidden="true">↗</span>
         </button>
@@ -128,11 +128,7 @@
             <div class="history-controls">
               <button id="undo" aria-label="실행 취소" disabled>↶</button
               ><button id="redo" aria-label="다시 실행" disabled>↷</button
-              ><span class="toolbar-divider"></span
-              ><button id="select-mode" aria-pressed="true" title="선택·이동 · Esc">선택</button
-              ><button id="comment-mode" aria-pressed="false" title="요소별 수정 요청 작성">
-                주석
-              </button>
+              ><span class="toolbar-divider"></span>
               <button id="copy" title="선택 요소 복사 · ⌘/Ctrl+C" disabled>복사</button>
               <button id="paste" title="이 화면에 요소 붙여넣기 · ⌘/Ctrl+V">붙여넣기</button
               ><button id="delete" disabled>삭제</button>
@@ -151,6 +147,15 @@
               ><button id="zoom-selection" title="선택한 요소에 맞추기" disabled>선택 맞춤</button>
             </div>
           </div>
+          <button
+            id="snapshot-dropdown"
+            disabled
+            popovertarget="snapshot-panel"
+            aria-label="스냅샷 목록"
+            title="저장된 버전 사이 이동"
+          >
+            <span id="snapshot-active-name">스냅샷 목록</span> ⌄
+          </button>
         </div>
         <div id="viewport" class="canvas-viewport">
           <div id="welcome" class="welcome">
@@ -206,65 +211,36 @@
           <div id="properties-toggle-home" class="panel-toggle-slot"></div>
           <strong id="properties-panel-title" class="sr-only">선택한 요소</strong>
           <nav class="inspector-tabs" aria-label="오른쪽 패널">
-            <button id="tab-inspect" aria-pressed="true">속성</button
+            <button id="tab-inspect" aria-pressed="false">속성</button
             ><button id="tab-comments" aria-pressed="false">
               주석 <span id="comments-count">0</span></button
-            ><button id="tab-snapshots" aria-pressed="false">스냅샷</button>
+            ><button id="tab-history" aria-pressed="true">변경 이력</button>
           </nav>
         </div>
-        <section id="snapshot-panel" class="snapshot-panel" hidden aria-label="스냅샷 기록">
-          <div id="snapshot-tools">
-            <form id="snapshot-form">
-              <label for="snapshot-name">현재 상태 저장</label>
-              <div class="snapshot-create">
-                <input
-                  id="snapshot-name"
-                  maxlength="120"
-                  placeholder="예: 검색 영역 정리"
-                  autocomplete="off"
-                /><button id="save-snapshot" class="primary" type="submit">저장</button>
-              </div>
-            </form>
-            <div class="snapshot-navigation">
-              <button id="previous-snapshot" aria-label="이전 스냅샷">← 이전</button
-              ><span id="snapshot-position"></span
-              ><button id="next-snapshot" aria-label="다음 스냅샷">다음 →</button>
-            </div>
-            <div id="snapshot-current" class="snapshot-current" role="status"></div>
-            <button id="compare-button" class="compare-launch">원본·스냅샷 비교</button>
+        <section id="history-panel" aria-label="통합 변경 이력">
+          <div class="activity-controls">
+            <label
+              >범위<select id="activity-scope">
+                <option value="branch">현재 가지</option>
+                <option value="all">모든 가지</option>
+              </select></label
+            ><label
+              >종류<select id="activity-filter">
+                <option value="all">전체</option>
+                <option value="layout">배치</option>
+                <option value="property">속성</option>
+                <option value="comment">주석</option>
+              </select></label
+            >
           </div>
-          <div class="list-tabs">
-            <button id="snapshots-live" aria-pressed="true">저장된 버전</button
-            ><button id="snapshots-trash" aria-pressed="false">휴지통</button>
-          </div>
-          <p id="snapshot-trash-help" class="snapshot-help" hidden>
-            복구하면 버전 목록으로 돌아갑니다. 복구만으로 현재 화면을 바꾸지는 않습니다.
-          </p>
-          <div id="snapshot-list" class="snapshot-list" aria-label="저장된 스냅샷 목록"></div>
+          <p id="activity-branch" class="activity-branch"></p>
+          <div id="activity-list" class="activity-list"></div>
         </section>
         <section id="comments-panel" hidden aria-label="요소별 주석 목록">
           <input id="comment-search" type="search" placeholder="주석 검색" aria-label="주석 검색" />
-          <div id="comment-editor-host" hidden>
-            <strong id="comment-target-title"></strong>
-            <div class="component-comment">
-              <label for="component-comment">이 요소에 주석 남기기</label>
-              <p>어떻게 바꾸고 싶은지 자유롭게 적어 주세요.</p>
-              <textarea
-                id="component-comment"
-                rows="4"
-                maxlength="4000"
-                placeholder="예: 버튼을 오른쪽 위로 옮기고, 문구를 ‘고객 추가’로 바꿔 주세요."
-              ></textarea>
-              <div class="comment-actions">
-                <button id="clear-comment">주석 삭제</button
-                ><button id="save-comment" class="primary">주석 저장</button>
-              </div>
-              <span id="comment-status" role="status"></span>
-            </div>
-          </div>
           <div id="comments-list"></div>
         </section>
-        <div id="inspect-panel">
+        <div id="inspect-panel" hidden>
           <div id="no-selection" class="no-selection">
             <strong>요소를 선택해 편집하세요</strong>
             <p>⌘/Ctrl+클릭으로 여러 요소 선택 · Alt+클릭으로 세부 요소 선택</p>
@@ -355,9 +331,75 @@
             ><span>속성</span>
           </button>
         </div>
-        <span class="panel-rail-label" aria-hidden="true">속성</span>
+        <span class="panel-rail-label" aria-hidden="true">변경 이력</span>
       </aside>
     </main>
+    <div
+      id="snapshot-panel"
+      class="snapshot-panel snapshot-dropdown-panel"
+      popover="auto"
+      aria-label="스냅샷 기록"
+    >
+      <div id="snapshot-tools">
+        <div class="snapshot-navigation">
+          <button id="previous-snapshot" aria-label="이전 스냅샷">← 이전</button
+          ><span id="snapshot-position"></span
+          ><button id="next-snapshot" aria-label="다음 스냅샷">다음 →</button>
+        </div>
+        <div id="snapshot-current" class="snapshot-current" role="status"></div>
+        <button id="compare-button" class="compare-launch">원본·스냅샷 비교</button>
+      </div>
+      <div class="list-tabs">
+        <button id="snapshots-live" aria-pressed="true">저장된 버전</button
+        ><button id="snapshots-trash" aria-pressed="false">휴지통</button>
+      </div>
+      <p id="snapshot-trash-help" class="snapshot-help" hidden>
+        복구하면 버전 목록으로 돌아갑니다. 복구만으로 현재 화면을 바꾸지는 않습니다.
+      </p>
+      <div id="snapshot-list" class="snapshot-list" aria-label="저장된 스냅샷 목록"></div>
+    </div>
+
+    <dialog id="snapshot-save-dialog" aria-labelledby="snapshot-save-title">
+      <h2 id="snapshot-save-title">스냅샷 저장</h2>
+      <p id="snapshot-parent-name"></p>
+      <form id="snapshot-form">
+        <label for="snapshot-name">스냅샷 이름</label>
+        <div class="snapshot-create">
+          <input
+            id="snapshot-name"
+            maxlength="120"
+            placeholder="예: 검색 영역 정리"
+            required
+            autocomplete="off"
+          /><button id="save-snapshot" class="primary" type="submit">저장</button>
+        </div>
+      </form>
+      <button id="cancel-snapshot" type="button">취소</button>
+    </dialog>
+    <dialog id="comment-dialog" aria-labelledby="comment-dialog-title">
+      <div class="popover-heading">
+        <h2 id="comment-dialog-title">주석 남기기</h2>
+        <button id="close-comment-dialog" aria-label="주석 입력 닫기">×</button>
+      </div>
+      <div id="comment-editor-host">
+        <strong id="comment-target-title"></strong>
+        <div class="component-comment">
+          <label for="component-comment">이 요소에 주석 남기기</label>
+          <p>어떻게 바꾸고 싶은지 자유롭게 적어 주세요.</p>
+          <textarea
+            id="component-comment"
+            rows="4"
+            maxlength="4000"
+            placeholder="예: 버튼을 오른쪽 위로 옮기고, 문구를 ‘고객 추가’로 바꿔 주세요."
+          ></textarea>
+          <div class="comment-actions">
+            <button id="clear-comment">주석 삭제</button
+            ><button id="save-comment" class="primary">주석 저장</button>
+          </div>
+          <span id="comment-status" role="status"></span>
+        </div>
+      </div>
+    </dialog>
     <dialog id="rename-dialog" aria-labelledby="rename-title">
       <form id="rename-form">
         <h2 id="rename-title">이름 변경</h2>
@@ -394,11 +436,12 @@
       <div class="eyebrow">HAND OFF YOUR CHANGES</div>
       <h2>편집 방향을 전달하세요.</h2>
       <p>
-        이동·삭제 기록, 주석과 전후 화면을 전달합니다.<br />ZIP에는 과거 스냅샷도 포함됩니다. 파일
-        백업은 문서 메뉴에서 저장하세요.
+        변경 후 화면과 번호별 요청 카드를 이미지 한 장으로 전달합니다.<br />편집 파일 백업은 문서
+        메뉴에서 저장하세요.
       </p>
       <label class="handoff-label">전달 기준<select id="handoff-version"></select></label>
       <div id="handoff-items" class="handoff-items"></div>
+      <div id="handoff-preview" class="handoff-preview"></div>
       <div id="export-summary" class="export-summary"></div>
       <label class="review-note-label"
         >추가 설명 <span>선택</span
@@ -409,8 +452,8 @@
         ></textarea>
       </label>
       <div class="export-actions">
-        <button id="copy-summary">지시문 복사</button
-        ><button id="download-review" class="primary">전달용 ZIP 다운로드 ↓</button>
+        <button id="copy-summary">이미지 복사</button
+        ><button id="download-review" class="primary">전달 이미지 저장 ↓</button>
       </div>
       <div id="export-status" class="export-status" aria-live="polite"></div>
     </dialog>

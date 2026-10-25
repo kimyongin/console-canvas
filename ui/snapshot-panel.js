@@ -1,3 +1,4 @@
+import { snapshotTree } from '../snapshot-tree.js';
 import { createActionMenu } from './action-menu.js';
 export function createSnapshotPanel({
   $,
@@ -12,25 +13,25 @@ export function createSnapshotPanel({
   flushEditor,
 }) {
   let trashView = false;
-  function showPanel(tab) {
-    setPanelVisibility('properties', true);
+  function showPanel(tab, { reveal = true } = {}) {
+    if (tab === 'snapshots') {
+      showSnapshots();
+      return;
+    }
+    if (reveal) setPanelVisibility('properties', true);
     $('#properties-panel-title').textContent =
-      tab === 'snapshots' ? '스냅샷' : tab === 'comments' ? '주석' : '선택한 요소';
-    $('#snapshot-panel').hidden = tab !== 'snapshots';
-    $('#inspect-panel').hidden = tab !== 'inspect';
-    $('#comments-panel').hidden = tab !== 'comments';
-    $('#snapshots-button').setAttribute(
-      'aria-expanded',
-      String(panels.properties && tab === 'snapshots'),
-    );
-    for (const name of ['inspect', 'comments', 'snapshots'])
+      tab === 'history' ? '변경 이력' : tab === 'comments' ? '주석' : '선택한 요소';
+    for (const name of ['inspect', 'comments', 'history']) {
+      $('#' + (name === 'inspect' ? 'inspect' : name) + '-panel').hidden = tab !== name;
       $('#tab-' + name).setAttribute('aria-pressed', String(tab === name));
-    if (tab === 'snapshots') renderSnapshots();
+    }
   }
   function showSnapshots(show = true) {
-    showPanel(show ? 'snapshots' : 'inspect');
+    renderSnapshots();
+    if (show) $('#snapshot-panel').showPopover();
+    else $('#snapshot-panel').hidePopover();
   }
-  for (const name of ['inspect', 'comments', 'snapshots'])
+  for (const name of ['inspect', 'comments', 'history'])
     $('#tab-' + name).addEventListener('click', () => {
       commitCommentDraft();
       showPanel(name);
@@ -46,6 +47,7 @@ export function createSnapshotPanel({
     ])
       $(id).disabled = !available;
     $('#snapshot-tools').hidden = !available || trashView;
+    $('#snapshot-dropdown').disabled = !available;
     if (!available) {
       $('#snapshot-count').textContent = '0';
       $('#snapshots-live').textContent = '저장된 버전 0';
@@ -68,7 +70,7 @@ export function createSnapshotPanel({
     $('#snapshot-current').textContent = dirty
       ? '현재 작업 중 · 다른 버전으로 이동하면 자동 보관됩니다.'
       : '저장된 버전을 보고 있습니다.';
-    if ($('#snapshot-panel').hidden) return;
+
     const fragment = document.createDocumentFragment();
     const trashEntries = snapshotHistory.list({ deleted: true });
     $('#snapshots-live').textContent = '저장된 버전 ' + entries.length;
@@ -77,7 +79,17 @@ export function createSnapshotPanel({
     $('#snapshots-trash').setAttribute('aria-pressed', String(trashView));
     $('#snapshot-trash-help').hidden = !trashView;
     $('#snapshot-tools').hidden = trashView;
-    const shown = trashView ? trashEntries : entries;
+    const shown = trashView
+      ? trashEntries.map((entry) => ({ ...entry, depth: 0 }))
+      : snapshotTree(state.timeline.entries).map((e) => ({
+          ...e,
+          active: e.id === state.timeline.activeId,
+        }));
+    const active = entries.find((e) => e.active);
+    $('#snapshot-dropdown').disabled = !available;
+    $('#snapshot-active-name').textContent =
+      (active?.name || '현재 작업') + (dirty ? ' · 편집 중' : '');
+    $('#snapshot-parent-name').textContent = '부모 버전 · ' + (active?.name || '현재 작업');
     if (!shown.length) {
       const empty = document.createElement('p');
       empty.className = 'empty-small';
@@ -91,10 +103,10 @@ export function createSnapshotPanel({
       button.type = 'button';
       button.className = 'snapshot-entry';
       button.dataset.snapshotId = entry.id;
-      button.disabled = trashView;
+      button.disabled = trashView || !!entry.deletedAt;
       button.setAttribute('aria-pressed', String(entry.active));
       const title = document.createElement('strong');
-      title.textContent = i + 1 + '. ' + entry.name;
+      title.textContent = entry.deletedAt ? entry.name + ' · 휴지통' : entry.name;
       const meta = document.createElement('span');
       meta.textContent =
         new Date(entry.created_at).toLocaleString('ko-KR', {
@@ -122,12 +134,14 @@ export function createSnapshotPanel({
       const image = document.createElement('img');
       image.alt = '배치 미리보기 · ' + entry.name;
       image.dataset.previewId = entry.id;
-      button.append(image, title, meta, badge);
+      button.append(title, meta, badge);
       button.addEventListener('click', () => restoreSnapshot(entry.id));
       const card = document.createElement('div');
-      card.className = 'snapshot-card';
+      card.className = 'snapshot-card snapshot-tree-row';
+      card.style.setProperty('--tree-depth', Math.min(entry.depth || 0, 15));
+      card.dataset.depth = entry.depth || 0;
       const actions = [];
-      if (!trashView)
+      if (!trashView && !entry.deletedAt)
         actions.push({
           label: '현재 작업과 비교',
           className: 'snapshot-compare',
@@ -145,7 +159,7 @@ export function createSnapshotPanel({
           }),
       });
       const documentId = state.snapshot.id;
-      if (!trashView)
+      if (!trashView && !entry.deletedAt)
         actions.push({
           label: '휴지통으로 이동',
           scope: 'snapshot',
@@ -166,7 +180,8 @@ export function createSnapshotPanel({
               },
             }),
         });
-      card.append(button, createActionMenu({ label: entry.name, actions }));
+      card.append(button);
+      if (!entry.deletedAt) card.append(createActionMenu({ label: entry.name, actions }));
       if (trashView) {
         const controls = document.createElement('div');
         controls.className = 'recovery-actions';
@@ -199,6 +214,19 @@ export function createSnapshotPanel({
       }
       fragment.append(card);
     });
+    if (!trashView && dirty) {
+      const current = document.createElement('div');
+      current.className = 'snapshot-current-leaf';
+      const parent = shown.find((e) => e.id === state.timeline.activeId);
+      current.style.marginLeft = ((parent?.depth || 0) + 1) * 18 + 'px';
+      current.textContent = '└ ◌ 현재 작업 · 저장 전';
+      const activeCard = [...fragment.children].find(
+        (el) =>
+          el.querySelector('[data-snapshot-id]')?.dataset.snapshotId === state.timeline.activeId,
+      );
+      if (activeCard) activeCard.after(current);
+      else fragment.append(current);
+    }
     $('#snapshot-list').replaceChildren(fragment);
     preview.thumbnails();
   }
@@ -225,6 +253,7 @@ export function createSnapshotPanel({
     try {
       commitCommentDraft();
       const result = snapshotHistory.restore(id);
+      $('#snapshot-panel').hidePopover();
       toast(
         result.automatic_snapshot_id
           ? '현재 작업을 자동 보관하고 스냅샷으로 이동했어요.'
@@ -235,8 +264,26 @@ export function createSnapshotPanel({
     }
   }
   $('#snapshots-button').addEventListener('click', () => {
+    if (!state.ready) return;
     commitCommentDraft();
-    showSnapshots();
+    renderSnapshots();
+    $('#snapshot-panel').hidePopover();
+    $('#snapshot-name').value = '';
+    $('#snapshot-save-dialog').showModal();
+    $('#snapshot-name').focus();
+  });
+  $('#cancel-snapshot').addEventListener('click', () => $('#snapshot-save-dialog').close());
+  $('#snapshot-panel').addEventListener('beforetoggle', (event) => {
+    if (event.newState === 'open') {
+      renderSnapshots();
+      const r = $('#snapshot-dropdown').getBoundingClientRect(),
+        panel = $('#snapshot-panel');
+      panel.style.top = r.bottom + 6 + 'px';
+      panel.style.left =
+        Math.max(12, Math.min(innerWidth - panel.offsetWidth - 12, r.right - 600)) + 'px';
+      panel.style.right = 'auto';
+      panel.style.maxHeight = Math.max(160, innerHeight - r.bottom - 22) + 'px';
+    }
   });
   $('#snapshot-form').addEventListener('submit', (event) => {
     event.preventDefault();
@@ -244,6 +291,7 @@ export function createSnapshotPanel({
       commitCommentDraft();
       snapshotHistory.create($('#snapshot-name').value);
       $('#snapshot-name').value = '';
+      $('#snapshot-save-dialog').close();
       toast('현재 화면과 주석을 스냅샷으로 저장했어요.');
     } catch (error) {
       toast(error.message);

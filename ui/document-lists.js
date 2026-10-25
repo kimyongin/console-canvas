@@ -131,7 +131,7 @@ export function createDocumentLists({ $, state, selectNode, focusComment }) {
       pick.append(title);
       pick.addEventListener('click', () => {
         selectNode(comment.id, { reveal: true });
-        focusComment();
+        focusComment({ id: comment.id });
       });
       const text = document.createElement('span');
       text.className = 'comment-text';
@@ -154,7 +154,7 @@ export function createDocumentLists({ $, state, selectNode, focusComment }) {
     const list = $('#comments-list');
     list.replaceChildren();
     for (const [index, comment] of comments.entries()) {
-      const name = elementLabel(state.scene.nodes.get(comment.id));
+      const name = comment.point ? '위치 주석' : elementLabel(state.scene.nodes.get(comment.id));
       if (query && !`${name} ${comment.text}`.toLowerCase().includes(query)) continue;
       const button = document.createElement('button');
       button.className = 'comment-list-item';
@@ -165,7 +165,7 @@ export function createDocumentLists({ $, state, selectNode, focusComment }) {
       button.append(title, text);
       button.addEventListener('click', () => {
         selectNode(comment.id, { reveal: true });
-        focusComment();
+        focusComment({ id: comment.id });
       });
       list.append(button);
     }
