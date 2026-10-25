@@ -147,6 +147,85 @@ try {
     before ===
       JSON.stringify([scene.edits, scene.annotations, app.state.timeline, app.state.activity]),
   );
+  click('#snapshot-dropdown');
+  const graphScroll = doc.querySelector('#snapshot-graph-scroll');
+  graphScroll.scrollLeft = 30;
+  const savedScroll = graphScroll.scrollLeft,
+    selectedBeforeRename = app.state.snapshotPreviewId;
+  const renameCard = doc.querySelector(`[data-snapshot-id="${d}"]`).closest('.snapshot-card');
+  renameCard.querySelector('.more-actions').click();
+  renameCard.querySelector('[data-snapshot-action="rename"]').click();
+  doc.querySelector('#rename-name').value = 'D renamed';
+  doc.querySelector('#rename-form').requestSubmit();
+  await until(
+    () =>
+      !doc.querySelector('#rename-dialog').open &&
+      doc.querySelector('#snapshot-panel').matches(':popover-open'),
+  );
+  await new Promise((r) =>
+    frame.contentWindow.requestAnimationFrame(() => frame.contentWindow.requestAnimationFrame(r)),
+  );
+  check(
+    'Snapshot rename returns to graph with preview and horizontal position preserved',
+    app.state.snapshotPreviewId === selectedBeforeRename &&
+      graphScroll.scrollLeft === savedScroll &&
+      doc.querySelector(`[data-snapshot-id="${d}"]`).textContent.includes('D renamed') &&
+      doc.activeElement.getAttribute('aria-label') === 'D renamed · 기타 작업',
+  );
+  doc.querySelector('#snapshot-panel').hidePopover();
+  const oldHeight = frame.style.height;
+  frame.style.height = '720px';
+  click('#export-button');
+  const footerButton = doc.querySelector('#download-review').getBoundingClientRect();
+  check(
+    'Export actions remain inside the 720px viewport without scrolling',
+    footerButton.top > 0 &&
+      footerButton.bottom <= frame.contentWindow.innerHeight &&
+      doc.querySelector('#export-dialog').scrollHeight <=
+        doc.querySelector('#export-dialog').clientHeight + 2,
+  );
+  doc.querySelector('#export-dialog').close();
+  frame.style.height = oldHeight;
+  await until(() => !doc.querySelector('#export-dialog').open);
+  app.selectNode(button.id);
+  const copied = scene.pasteSelection(scene.copySelection())[0];
+  scene.setComment(copied, 'Deleted copied button reference');
+  const copiedRect = scene.nodes.get(copied).rect;
+  scene.remove(copied);
+  const referenceState = JSON.stringify([scene.edits, scene.annotations, [...scene.selection]]);
+  const reference = scene.referenceFrame();
+  check(
+    'Deleted-copy reference contains its actual node and covers the complete rectangle',
+    reference.html.includes(copied) &&
+      reference.size.width >= copiedRect.x + copiedRect.width &&
+      reference.size.height >= copiedRect.y + copiedRect.height,
+  );
+  check(
+    'Reference rendering preserves deleted edits, comments and selection',
+    JSON.stringify([scene.edits, scene.annotations, [...scene.selection]]) === referenceState,
+  );
+  const oldTitle = app.state.snapshot.documentName;
+  app.state.snapshot.documentName =
+    '아주 긴 문서 제목과 변경 요청을 정상 크기로 읽을 수 있어야 합니다 '.repeat(3);
+  const proto = frame.contentWindow.CanvasRenderingContext2D.prototype,
+    originalFill = proto.fillText,
+    titleDraws = [];
+  proto.fillText = function (...args) {
+    if (this.font.includes('36px')) titleDraws.push(args);
+    return originalFill.apply(this, args);
+  };
+  try {
+    await app.buildHandoffImage();
+  } finally {
+    proto.fillText = originalFill;
+    app.state.snapshot.documentName = oldTitle;
+  }
+  check(
+    'Long PNG title wraps over multiple lines without horizontal text compression',
+    titleDraws.length > 1 &&
+      titleDraws.every((args) => args.length === 3) &&
+      titleDraws[1][2] > titleDraws[0][2],
+  );
   const id = app.state.snapshot.id;
   await app.state.saving;
   const saved = await getDocument(id);

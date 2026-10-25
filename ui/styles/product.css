@@ -325,8 +325,31 @@
 }
 #export-dialog {
   width: 640px;
-  max-height: 90vh;
+  max-height: 90dvh;
+  padding: 0;
+  overflow: hidden;
+}
+#export-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.export-scroll {
+  min-height: 0;
   overflow: auto;
+  padding: 24px;
+}
+.export-footer {
+  flex: none;
+  padding: 12px 24px;
+  background: var(--surface, white);
+  border-top: 1px solid var(--line);
+}
+#export-dialog .handoff-preview {
+  max-height: none;
+  overflow: visible;
+}
+#export-dialog .export-actions {
+  margin-top: 0;
 }
 @media (max-width: 1100px) {
   .desktop-editor .header-actions #export-button {

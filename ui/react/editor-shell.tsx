@@ -697,38 +697,42 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             {'×'}
           </Button>
         </form>
-        <div className="eyebrow">{'HAND OFF YOUR CHANGES'}</div>
-        <h2>{'편집 방향을 전달하세요.'}</h2>
-        <p>
-          {'\n        변경 후 화면과 번호별 요청 카드를 이미지 한 장으로 전달합니다.'}
-          <br />
-          {'편집 파일 백업은 문서\n        메뉴에서 저장하세요.\n      '}
-        </p>
-        <label className="handoff-label">
-          {'전달 기준'}
-          <NativeSelect id="handoff-version"></NativeSelect>
-        </label>
-        <div id="handoff-items" className="handoff-items"></div>
-        <div id="handoff-preview" className="handoff-preview"></div>
-        <div id="export-summary" className="export-summary"></div>
-        <label className="review-note-label">
-          {'추가 설명 '}
-          <span>{'선택'}</span>
-          <Textarea
-            id="review-note"
-            rows={3}
-            placeholder="예: 검색 조건을 위로 모으고 작업 버튼을 오른쪽에 정렬하고 싶어요."
-          ></Textarea>
-        </label>
-        <div className="export-actions">
-          <Button id="copy-summary" variant="outline">
-            {'이미지 복사'}
-          </Button>
-          <Button id="download-review" className="primary" variant="outline">
-            {'전달 이미지 저장 ↓'}
-          </Button>
+        <div className="export-scroll">
+          <div className="eyebrow">{'HAND OFF YOUR CHANGES'}</div>
+          <h2>{'편집 방향을 전달하세요.'}</h2>
+          <p>
+            {'\n        변경 후 화면과 번호별 요청 카드를 이미지 한 장으로 전달합니다.'}
+            <br />
+            {'편집 파일 백업은 문서\n        메뉴에서 저장하세요.\n      '}
+          </p>
+          <label className="handoff-label">
+            {'전달 기준'}
+            <NativeSelect id="handoff-version"></NativeSelect>
+          </label>
+          <div id="handoff-items" className="handoff-items"></div>
+          <div id="handoff-preview" className="handoff-preview"></div>
+          <div id="export-summary" className="export-summary"></div>
+          <label className="review-note-label">
+            {'추가 설명 '}
+            <span>{'선택'}</span>
+            <Textarea
+              id="review-note"
+              rows={3}
+              placeholder="예: 검색 조건을 위로 모으고 작업 버튼을 오른쪽에 정렬하고 싶어요."
+            ></Textarea>
+          </label>
         </div>
-        <div id="export-status" className="export-status" aria-live="polite"></div>
+        <div className="export-footer">
+          <div className="export-actions">
+            <Button id="copy-summary" variant="outline">
+              {'이미지 복사'}
+            </Button>
+            <Button id="download-review" className="primary" variant="outline">
+              {'전달 이미지 저장 ↓'}
+            </Button>
+          </div>
+          <div id="export-status" className="export-status" aria-live="polite"></div>
+        </div>
       </DialogSurface>
       <DialogSurface id="compare-dialog" aria-label="화면 버전 비교">
         <form method="dialog">

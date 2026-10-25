@@ -2,10 +2,12 @@ export function createRenameDialog({ $ }) {
   const dialog = $('#rename-dialog'),
     field = $('#rename-name');
   let save = null,
+    afterClose = null,
     busy = false;
-  function open(title, name, onSave) {
+  function open(title, name, onSave, onClose = null) {
     if (dialog.open) return;
     save = onSave;
+    afterClose = onClose;
     $('#rename-title').textContent = title;
     field.value = name;
     $('#rename-error').textContent = '';
@@ -43,6 +45,9 @@ export function createRenameDialog({ $ }) {
   });
   dialog.addEventListener('close', () => {
     save = null;
+    const callback = afterClose;
+    afterClose = null;
+    callback?.();
   });
   return { open };
 }

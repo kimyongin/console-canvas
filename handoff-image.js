@@ -88,11 +88,15 @@ function badge(ctx, n, x, y) {
 export async function buildHandoffImage(snapshot, scene, note = '', progress = () => {}) {
   progress('변경 후 화면과 요청 카드를 만들고 있습니다.');
   const requests = handoffRequests(scene),
-    size = scene.contentSize();
+    currentSize = scene.contentSize(),
+    reference = requests.some((r) => r.deleted) ? scene.referenceFrame() : null,
+    size = {
+      width: Math.max(currentSize.width, reference?.size.width || 0),
+      height: Math.max(currentSize.height, reference?.size.height || 0),
+    };
   const after = await createImageBitmap(await screenshot(scene.serialize(), size));
   let before;
-  if (requests.some((r) => r.deleted))
-    before = await createImageBitmap(await screenshot(await scene.beforeHtml(), size));
+  if (reference) before = await createImageBitmap(await screenshot(reference.html, size));
   try {
     const width = Math.max(1440, Math.min(2200, size.width + 80)),
       margin = 40,
@@ -100,10 +104,16 @@ export async function buildHandoffImage(snapshot, scene, note = '', progress = (
       cardWidth = (width - margin * 2 - gutter) / 2,
       screenWidth = width - margin * 2,
       scale = screenWidth / size.width,
-      screenHeight = Math.ceil(size.height * scale),
-      screenY = 144;
+      screenHeight = Math.ceil(size.height * scale);
     const canvas = document.createElement('canvas'),
       ctx = canvas.getContext('2d');
+    ctx.font = '700 36px system-ui';
+    const titleLines = wrap(
+      ctx,
+      (snapshot.documentName || snapshot.source.title || '화면') + ' · UI 변경 요청',
+      width - margin * 2,
+    );
+    const screenY = 144 + (titleLines.length - 1) * 46;
     ctx.font = '22px system-ui';
     const cards = requests.map((r) => ({
       ...r,
@@ -135,15 +145,14 @@ export async function buildHandoffImage(snapshot, scene, note = '', progress = (
     ctx.fillRect(0, 0, width, height);
     ctx.fillStyle = '#111a34';
     ctx.font = '700 36px system-ui';
-    ctx.fillText(
-      (snapshot.documentName || snapshot.source.title || '화면') + ' · UI 변경 요청',
-      margin,
-      58,
-      width - 80,
-    );
+    titleLines.forEach((line, i) => ctx.fillText(line, margin, 58 + i * 46));
     ctx.font = '21px system-ui';
     ctx.fillStyle = '#72798d';
-    ctx.fillText('변경 후 화면 · 같은 번호의 하이라이트와 주석 카드를 확인해 주세요.', margin, 103);
+    ctx.fillText(
+      '변경 후 화면 · 같은 번호의 하이라이트와 주석 카드를 확인해 주세요.',
+      margin,
+      screenY - 41,
+    );
     ctx.drawImage(after, margin, screenY, screenWidth, screenHeight);
     // Number badges never form leader lines. Deleted targets are dashed at their old location.
     const occupied = [];

@@ -122,12 +122,34 @@ export function createSnapshotPanel({
         label: '이름 변경',
         scope: 'snapshot',
         kind: 'rename',
-        run: () =>
-          renameDialog.open('스냅샷 이름 변경', entry.name, async (name) => {
-            snapshotHistory.rename(entry.id, name);
-            await flushEditor();
-            toast('스냅샷 이름을 변경했습니다.');
-          }),
+        run: () => {
+          const panel = $('#snapshot-panel'),
+            graph = $('#snapshot-graph-scroll');
+          const position = { left: graph.scrollLeft, top: graph.scrollTop, panel: panel.scrollTop };
+          renameDialog.open(
+            '스냅샷 이름 변경',
+            entry.name,
+            async (name) => {
+              snapshotHistory.rename(entry.id, name);
+              await flushEditor();
+              toast('스냅샷 이름을 변경했습니다.');
+            },
+            () => {
+              if (state.snapshot?.id !== doc) return;
+              showSnapshots();
+              requestAnimationFrame(() => {
+                graph.scrollLeft = position.left;
+                graph.scrollTop = position.top;
+                panel.scrollTop = position.panel;
+                panel
+                  .querySelector('[data-snapshot-id="' + entry.id + '"]')
+                  ?.closest('.snapshot-card')
+                  ?.querySelector('.more-actions')
+                  ?.focus({ preventScroll: true });
+              });
+            },
+          );
+        },
       },
     ];
     if (!entry.deletedAt)

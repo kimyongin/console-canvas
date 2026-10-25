@@ -1134,4 +1134,26 @@ export class CanvasScene {
     this.select(selected, { ids: selection });
     return result;
   }
+  referenceFrame() {
+    const edits = copy(this.edits),
+      annotations = copy(this.annotations),
+      selection = [...this.selection],
+      selected = this.selected;
+    try {
+      // Copies have no counterpart in the original capture. Keep their captured
+      // descriptors at their base rectangles so deleted-copy references exist.
+      this.setEdits(
+        Object.fromEntries(
+          Object.entries(edits)
+            .filter(([, edit]) => edit.copy)
+            .map(([id, edit]) => [id, { copy: edit.copy }]),
+        ),
+      );
+      return { html: this.serialize(), size: this.contentSize() };
+    } finally {
+      this.setEdits(edits);
+      this.setComments(annotations);
+      this.select(selected, { ids: selection });
+    }
+  }
 }
