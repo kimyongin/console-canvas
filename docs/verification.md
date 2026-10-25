@@ -1,5 +1,13 @@
 # 버전별 검증 기록
 
+## 2026-10-26 · Chrome 확장 WebMCP 실험 · 소스 0.19.2
+
+공식 MCP SDK → Chrome DevTools MCP 1.12.0 → 격리 headless Chrome 155 → 실제 `chrome-extension://` 편집기의 네이티브 `document.modelContext` → 기존 공통 controller 연결을 검증했다. 별도 Native Messaging 호스트·우리 Python MCP/브리지 없이 **37개 검사 통과**. 확장 액션으로 HTTP NORTH 원본을 수집하고 11개 도구 발견, 실제 DOM 이동·주석/이력·undo/redo·재시도/충돌·A→B→C/A→D·미래 복원·탭 새로고침 보존·원본 무변경을 확인했다.
+
+기존 manifest는 API가 있어도 document.domain 조건으로 등록 실패했다. 실험용 사본의 표준 COOP/COEP 격리를 켜면 등록·호출이 성공했고, WebMCP를 명시적으로 끈 대조군은 도구 없이 정상 편집기를 열었다. 실험 환경과 제품 적용은 구별한다. 기존 웹/공통 검사 Python 39·Node 27·Chromium 321도 통과했다.
+
+[재현 명령·범위·결과와 남은 조건](../experiments/webmcp/README.md). 원본 제품 manifest·진입점·설치 앱·스킬·사용자 문서는 변경하지 않았다. 일반 사용자 Chrome 연결·정식 UI/배포·전체 리소스 호환성·전달 PNG의 WebMCP 반환은 추가 검증 대상이다.
+
 ## 최신 소스 · 0.19.2 · 검증 범위 분리
 
 2026-10-25, 사용자 승인으로 [변경별 검증 기준](validation-policy.md)을 적용했다. 공통 웹 UI 완료, 영향받은 Electron 통합, 사용자 설치 앱 배포를 나눈다. 작업 지침·PRD·README·스킬 원본과 생성 가이드/스킬 ZIP을 같은 기준으로 갱신했다. MCP 도구·프로토콜·Electron 실행 코드는 변경하지 않았다.

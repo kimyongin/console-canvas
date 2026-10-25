@@ -418,6 +418,12 @@ flowchart LR
 
 요구사항을 코드에 맞춰 제거하지 않는다. 최초 전수 조사 원문은 [전수 대조표](feature-audit.md), 현재 티켓 상태는 [티켓 검토](ticket-review.md), 버전별 증빙은 [검증 기록](verification.md)에서 확인한다. 0.16 실행 결과는 당시 설치 증빙이다.
 
+### 9.3 Chrome 확장 WebMCP 실험 · 2026-10-26
+
+제품 기능으로 활성화하기 전의 별도 실험이다. 소스 0.19.2의 공통 controller를 재사용해, 공식 Chrome DevTools MCP 1.12.0과 Chrome 155의 네이티브 WebMCP로 확장 편집기의 11개 도구를 조회·실행했다. 이동·주석·실행 취소·분기/미래 이동·새로고침 보존과 오류 경계를 포함한 37개 검사가 통과했다. 별도 우리 MCP 브리지·Native Messaging 호스트는 사용하지 않았다.
+
+기존 확장 manifest는 document.domain 조건으로 등록이 거절됐고 실험 사본에 표준 COOP/COEP 격리를 적용해 해소했다. 일반 사용자 Chrome 연결·연결/해제 UI·사이트별 리소스 호환성·재로딩을 넘는 재시도·전달 PNG는 제품 적용 전 남은 범위다. 현재 FR-12/13/17의 제공 경로를 대체하거나 일반 배포 완료로 해석하지 않는다. [실험 구성과 재현/검증 기록](../experiments/webmcp/README.md)을 따른다.
+
 ## 10. React·shadcn/ui 개선 계획과 추적
 
 ### 10.1 전환 계획 · #1~#11
