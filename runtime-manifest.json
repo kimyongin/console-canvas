@@ -49,7 +49,7 @@
     "ui/workspace-layout.js"
   ],
   "files": {
-    "README.md": "12687d1e23ecd55679002aaa6f5057908e7151d689a5a20434364c93a04beeed",
+    "README.md": "201dd4cf372c9bf063c5273b5195656e9a50480cbcb75494df9270888d57bdd6",
     "activity-history.js": "4b9ff92b482730fb85466fc2560e4b2c7adc4bca9954ddb82c1782b6efa1aab5",
     "agent-guide.md": "10d7a274228eaec991e0f6f8004c25d6dd1fc6ee976caa41f3cc50610688cbb9",
     "background.js": "c080c9df87f3689050f4b4063b22d5d1838e7c607e652b32a44344713efb44d9",
