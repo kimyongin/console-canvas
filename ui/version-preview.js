@@ -40,7 +40,7 @@ export function versionOptions(state) {
       })),
   ];
 }
-export function createVersionPreview({ $, state, commitCommentDraft }) {
+export function createVersionPreview({ $, state, commitCommentDraft, adapter }) {
   const scenes = new Map();
   let different = [];
   let scale = 1,
@@ -64,8 +64,55 @@ export function createVersionPreview({ $, state, commitCommentDraft }) {
     for (const side of ['left', 'right']) {
       const item = scenes.get(side);
       if (item?.result)
-        renderVersionFrame(host(side), item.result, item.name + ' 비교 화면', scale);
+        renderVersionFrame(
+          host(side),
+          item.result,
+          item.name + ' 비교 화면',
+          scale,
+          highlight(side),
+        );
     }
+  }
+  function target(side) {
+    const id = $('#compare-target').value,
+      item = scenes.get(side)?.result;
+    if (!id || !item) return null;
+    const value = item.targets[id],
+      other = scenes.get(side === 'left' ? 'right' : 'left')?.result?.targets[id];
+    const point = pointTarget(id);
+    return {
+      rect: point
+        ? { x: point.x, y: point.y, width: 0, height: 0 }
+        : value && !value.hidden
+          ? value.rect
+          : other?.rect || value?.rect,
+      missing: !point && (!value || value.hidden),
+      point: !!point,
+      name: point ? '위치 주석' : value?.name || other?.name || '요소',
+      status: point ? '위치 주석' : !value ? '이 버전에 없음' : value.hidden ? '삭제됨' : '대상',
+    };
+  }
+  function highlight(side) {
+    const value = target(side),
+      index = different.indexOf($('#compare-target').value);
+    if (!value?.rect) return undefined;
+    return {
+      ...value,
+      label:
+        `${index + 1} · ${value.name}` +
+        (value.missing ? ' · ' + value.status + ' (참고 위치)' : ''),
+    };
+  }
+  function focusStatus() {
+    const index = different.indexOf($('#compare-target').value);
+    $('#compare-previous').disabled = index <= 0;
+    $('#compare-next').disabled = !different.length || index >= different.length - 1;
+    $('#compare-focus-status').textContent =
+      index < 0
+        ? different.length
+          ? '변경 위치를 선택하거나 다음을 눌러 검토하세요.'
+          : '선택한 두 버전의 요소·주석 차이가 없습니다.'
+        : `변경 ${index + 1} / ${different.length} · 왼쪽: ${target('left')?.status || '준비 중'} · 오른쪽: ${target('right')?.status || '준비 중'}`;
   }
   function differences() {
     const values = ['left', 'right'].map(
@@ -89,11 +136,14 @@ export function createVersionPreview({ $, state, commitCommentDraft }) {
           ' · ' +
           (pointTarget(id)
             ? '위치 주석'
-            : elementLabel(state.scene.nodes.get(id), state.snapshot.layerNames)),
+            : scenes.get('left')?.result?.targets[id]?.name ||
+              scenes.get('right')?.result?.targets[id]?.name ||
+              elementLabel(state.scene.nodes.get(id), state.snapshot.layerNames)),
       })),
     ]);
     $('#compare-target').value = different.includes(selected) ? selected : '';
     $('#compare-target').disabled = !different.length;
+    focusStatus();
   }
   async function renderSide(side) {
     const token = (scenes.get(side)?.token || 0) + 1;
@@ -109,12 +159,20 @@ export function createVersionPreview({ $, state, commitCommentDraft }) {
         size: scene.contentSize(),
         changes: scene.changes().length,
         comments: scene.comments().length,
-        rects: Object.fromEntries(
-          [...scene.nodes.keys()].map((id) => [id, scene.rect(id) || scene.nodes.get(id).rect]),
+        targets: Object.fromEntries(
+          [...scene.nodes].map(([id, node]) => [
+            id,
+            {
+              rect: !scene.hidden(id) ? scene.rect(id) || node.rect : node.rect,
+              hidden: scene.hidden(id),
+              name: elementLabel(node, state.snapshot.layerNames),
+            },
+          ]),
         ),
       }));
       if (scenes.get(side)?.token !== token || !$('#compare-dialog').open) return;
       scenes.set(side, { token, result, name: option.name });
+      differences();
       draw();
       $('#compare-' + side + '-summary').textContent =
         '변경 ' +
@@ -130,14 +188,23 @@ export function createVersionPreview({ $, state, commitCommentDraft }) {
   }
   function jump() {
     const id = $('#compare-target').value;
+    focusStatus();
     if (!id) return;
-    const point = pointTarget(id);
+    const left = target('left')?.rect,
+      right = target('right')?.rect;
+    const common =
+      left && right
+        ? {
+            x: Math.min(left.x, right.x),
+            y: Math.min(left.y, right.y),
+            width: Math.max(left.x + left.width, right.x + right.width) - Math.min(left.x, right.x),
+            height:
+              Math.max(left.y + left.height, right.y + right.height) - Math.min(left.y, right.y),
+          }
+        : left || right;
+    syncing = true;
     for (const side of ['left', 'right']) {
-      const item = scenes.get(side);
-      const other = scenes.get(side === 'left' ? 'right' : 'left');
-      const rect = point
-        ? { x: point.x, y: point.y, width: 0, height: 0 }
-        : item?.result?.rects[id] || other?.result?.rects[id];
+      const rect = $('#compare-sync').checked ? common : target(side)?.rect;
       if (rect) {
         host(side).scrollLeft = Math.max(
           0,
@@ -149,7 +216,21 @@ export function createVersionPreview({ $, state, commitCommentDraft }) {
         );
       }
     }
+    requestAnimationFrame(() => {
+      syncing = false;
+    });
   }
+  function step(delta) {
+    if (!$('#compare-dialog').open) return;
+    const index = different.indexOf($('#compare-target').value),
+      next = index + delta;
+    if (next < 0 || next >= different.length) return;
+    $('#compare-target').value = different[next];
+    draw();
+    jump();
+  }
+  adapter.register('compare-previous', () => step(-1));
+  adapter.register('compare-next', () => step(1));
   function open(left = '@original', right = '@current') {
     if (!state.ready) return;
     commitCommentDraft();
@@ -184,7 +265,10 @@ export function createVersionPreview({ $, state, commitCommentDraft }) {
     draw();
     jump();
   });
-  $('#compare-target').addEventListener('change', jump);
+  $('#compare-target').addEventListener('change', () => {
+    draw();
+    jump();
+  });
   const observer = new ResizeObserver(() => {
     if ($('#compare-dialog').open) draw();
   });

@@ -1,7 +1,12 @@
 import { snapshotChangeLabel } from './snapshot-delta.js';
 import { snapshotGraph } from '../snapshot-graph.js';
 import { withVersionScene } from './version-preview.js';
-import { renderSnapshotGraph, renderSnapshotTrash, renderVersionFrame } from './react/versions.tsx';
+import {
+  renderSnapshotGraph,
+  renderSnapshotTrash,
+  renderVersionFrame,
+  renderSnapshotMatches,
+} from './react/versions.tsx';
 import { clearReact } from './react/mount.tsx';
 export function createSnapshotPanel({
   $,
@@ -161,13 +166,94 @@ export function createSnapshotPanel({
     if (!entry) return;
     state.snapshotPreviewId = id;
     renderSnapshots();
-    if (reveal)
-      $('#snapshot-list [data-snapshot-id="' + id + '"]').scrollIntoView({
-        block: 'nearest',
-        inline: 'center',
-        behavior: 'smooth',
-      });
+    if (reveal) revealNode(id);
   }
+  function revealNode(id) {
+    const node = $('#snapshot-list [data-snapshot-id="' + id + '"]')?.closest(
+      '.snapshot-graph-node',
+    );
+    if (!node) return;
+    const scroll = $('#snapshot-graph-scroll');
+    scroll.scrollLeft = Math.max(
+      0,
+      node.offsetLeft + node.offsetWidth / 2 - scroll.clientWidth / 2,
+    );
+    scroll.scrollTop = Math.max(
+      0,
+      node.offsetTop + node.offsetHeight / 2 - scroll.clientHeight / 2,
+    );
+  }
+  function search() {
+    const query = $('#snapshot-search').value.trim().toLocaleLowerCase(),
+      host = $('#snapshot-search-results');
+    host.hidden = !query || trashView;
+    if (host.hidden) {
+      clearReact(host);
+      return;
+    }
+    const entries = state.timeline?.entries || [],
+      names = new Map(entries.map((e) => [e.id, e.name]));
+    const matches = entries
+      .filter((e) => !e.deletedAt && e.name.toLocaleLowerCase().includes(query))
+      .reverse()
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+    renderSnapshotMatches(
+      host,
+      matches.slice(0, 40).map((e) => ({
+        id: e.id,
+        name: e.name,
+        parent: '부모 · ' + (names.get(e.parentId) || '가져온 시작점'),
+      })),
+      matches.length,
+      (id) => {
+        $('#snapshot-search').value = '';
+        search();
+        selectPreview(id);
+        $('#snapshot-panel').scrollTop = 0;
+        revealNode(id);
+        $('#snapshot-list [data-snapshot-id="' + id + '"]')?.focus({ preventScroll: true });
+      },
+    );
+  }
+  $('#snapshot-search').addEventListener('input', search);
+  $('#snapshot-search').addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && $('#snapshot-search').value) {
+      e.preventDefault();
+      e.stopPropagation();
+      $('#snapshot-search').value = '';
+      search();
+    }
+    if (e.key === 'ArrowDown' && !$('#snapshot-search-results').hidden) {
+      e.preventDefault();
+      e.stopPropagation();
+      $('#snapshot-search-results button')?.focus();
+    }
+  });
+  $('#snapshot-panel').addEventListener('keydown', (e) => e.stopPropagation());
+  $('#snapshot-search-results').addEventListener('keydown', (e) => {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const buttons = [...$('#snapshot-search-results').querySelectorAll('button')],
+      index = buttons.indexOf(document.activeElement);
+    const next =
+      e.key === 'Home'
+        ? 0
+        : e.key === 'End'
+          ? buttons.length - 1
+          : Math.max(0, Math.min(buttons.length - 1, index + (e.key === 'ArrowDown' ? 1 : -1)));
+    buttons[next]?.focus();
+  });
+  adapter.register('snapshot-current', () => {
+    const id = state.timeline?.activeId;
+    if (!id || trashView) return;
+    $('#snapshot-search').value = '';
+    search();
+    selectPreview(id);
+    $('#snapshot-panel').scrollTop = 0;
+    revealNode(id);
+    $('#snapshot-list [data-snapshot-id="' + id + '"]')?.focus({ preventScroll: true });
+  });
   async function manage(run, message, action = null, rethrow = false) {
     try {
       commitCommentDraft();
@@ -288,6 +374,9 @@ export function createSnapshotPanel({
 
   function renderSnapshots() {
     const available = !!state.timeline;
+    $('#snapshot-find').hidden = !available || trashView;
+    $('#snapshot-find-current').disabled = !available || !state.timeline.activeId;
+    search();
     for (const id of [
       '#snapshot-dropdown',
       '#snapshot-name',
@@ -318,7 +407,10 @@ export function createSnapshotPanel({
       state.snapshotPreviewId = state.timeline.activeId;
       previewKey = null;
       trashView = false;
+      $('#snapshot-search').value = '';
+      search();
     }
+    $('#snapshot-find').hidden = trashView;
     if (activeId !== state.timeline.activeId) {
       activeId = state.timeline.activeId;
       state.snapshotPreviewId = activeId;
@@ -355,26 +447,37 @@ export function createSnapshotPanel({
     if (show) {
       if (!$('#snapshot-panel').matches(':popover-open')) $('#snapshot-panel').showPopover();
       requestAnimationFrame(() => {
+        $('#snapshot-panel').scrollTop = 0;
         renderPreview();
-        const b = $('#snapshot-list [data-snapshot-id="' + state.snapshotPreviewId + '"]');
-        b?.scrollIntoView({ block: 'nearest', inline: 'center' });
+        revealNode(state.snapshotPreviewId);
       });
     } else $('#snapshot-panel').hidePopover();
   }
   $('#snapshot-panel').addEventListener('beforetoggle', (e) => {
     if (e.newState === 'open') {
       renderSnapshots();
+      $('#snapshot-panel').scrollTop = 0;
       const r = $('#snapshot-dropdown').getBoundingClientRect(),
         panel = $('#snapshot-panel');
       panel.style.top = Math.min(r.bottom + 8, innerHeight * 0.22) + 'px';
       panel.style.left = '24px';
       panel.style.maxHeight =
         Math.max(280, innerHeight - Math.min(r.bottom + 8, innerHeight * 0.22) - 18) + 'px';
-      requestAnimationFrame(renderPreview);
+      requestAnimationFrame(() => {
+        $('#snapshot-panel').scrollTop = 0;
+        renderPreview();
+        revealNode(state.snapshotPreviewId);
+      });
     }
   });
   $('#snapshot-dropdown').addEventListener('click', () => {
     commitCommentDraft();
+  });
+  $('#snapshot-panel').addEventListener('toggle', (e) => {
+    if (e.newState === 'closed') {
+      $('#snapshot-search').value = '';
+      search();
+    }
   });
   $('#close-snapshots').addEventListener('click', () => $('#snapshot-panel').hidePopover());
   for (const [id, value] of [

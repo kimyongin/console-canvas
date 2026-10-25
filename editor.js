@@ -276,7 +276,7 @@ const commentEditor = createCommentEditor({
 function focusComment(options = {}) {
   commentEditor.open(options);
 }
-const preview = createVersionPreview({ $, state, commitCommentDraft });
+const preview = createVersionPreview({ $, state, commitCommentDraft, adapter });
 const snapshotHistory = createSnapshotHistory({
   state,
   checkpoint,
@@ -585,6 +585,7 @@ $('#save-comment').addEventListener('click', () => {
 });
 $('#clear-comment').addEventListener('click', () => {
   $('#component-comment').value = '';
+  $('#clear-comment').disabled = true;
   commitCommentDraft();
   renderInspector();
 });

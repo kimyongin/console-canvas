@@ -1,5 +1,5 @@
 import { handoffRequests } from '../handoff-image.js';
-import { renderTargetPreview } from './react/versions.tsx';
+import { renderTargetPreview, renderVersionOptions } from './react/versions.tsx';
 import { clearReact } from './react/mount.tsx';
 import { elementLabel } from './element-labels.js';
 import { pointTarget } from '../edit-commands.js';
@@ -18,8 +18,20 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
     commit();
     if (!navigating) {
       requests = handoffRequests(state.scene);
-      if (!requests.some((r) => r.id === id)) requests.push({ id, number: requests.length + 1 });
+      if (!requests.some((r) => r.id === id))
+        requests.push({
+          id,
+          number: requests.length + 1,
+          name: pointTarget(id)
+            ? '위치 주석'
+            : elementLabel(state.scene.nodes.get(id), state.snapshot.layerNames),
+        });
+      renderVersionOptions(
+        $('#comment-request'),
+        requests.map((r, i) => ({ id: r.id, name: `${i + 1} / ${requests.length} · ${r.name}` })),
+      );
     }
+    $('#comment-request').value = id;
     const index = requests.findIndex((r) => r.id === id);
     $('#comment-progress').textContent = `요청 ${index + 1} / ${requests.length}`;
     $('#comment-previous').disabled = index <= 0;
@@ -61,6 +73,7 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
     field.focus();
   }
   field.addEventListener('input', () => {
+    $('#clear-comment').disabled = !field.value.trim();
     clearTimeout(timer);
     $('#comment-status').textContent = '입력 중 · 자동 저장됩니다.';
     const target = state.commentTarget,
@@ -117,5 +130,8 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
         next = requests[index + delta];
       if (next) open({ id: next.id, navigating: true });
     });
+  $('#comment-request').addEventListener('change', () =>
+    open({ id: $('#comment-request').value, navigating: true }),
+  );
   return { open, reset: close, position() {} };
 }

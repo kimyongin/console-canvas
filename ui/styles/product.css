@@ -1159,3 +1159,152 @@
   padding: 3px 7px;
   background: white;
 }
+
+.snapshot-navigation-header {
+  position: sticky;
+  top: -18px;
+  z-index: 5;
+  background: white;
+  padding: 12px 0 10px;
+  margin-top: -12px;
+  border-bottom: 1px solid var(--line);
+}
+.snapshot-navigation-header .snapshot-browser-heading {
+  align-items: center;
+}
+.snapshot-navigation-header .snapshot-browser-heading p {
+  font-size: 11px;
+}
+.snapshot-navigation-header .list-tabs {
+  margin: 6px 0;
+}
+.snapshot-navigation-header #snapshot-current {
+  margin: 4px 0;
+}
+.snapshot-find {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.snapshot-search-field {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+#snapshot-search {
+  width: 100%;
+  height: 30px;
+  font-size: 12px;
+}
+#snapshot-find-current {
+  height: 30px;
+  font-size: 11px;
+}
+#snapshot-search-results {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: min(270px, 40vh);
+  overflow: auto;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 12px 28px #24204324;
+  padding: 6px;
+  z-index: 6;
+}
+#snapshot-search-results > small {
+  display: block;
+  padding: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.snapshot-search-match {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  gap: 2px;
+  padding: 8px;
+  white-space: normal;
+}
+.snapshot-search-match strong {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.snapshot-search-match small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.snapshot-graph-node {
+  scroll-margin: 12px;
+}
+.comment-request-pick {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 3px;
+  text-align: center;
+}
+#comment-request {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px;
+  font-size: 11px;
+  background: white;
+}
+#comment-progress {
+  font-size: 10px;
+}
+.comment-navigation > button {
+  font-size: 11px;
+  padding: 4px 8px;
+}
+.compare-step {
+  display: flex;
+  gap: 5px;
+}
+.compare-step button {
+  height: 30px;
+  font-size: 11px;
+  padding: 4px 8px;
+}
+#compare-focus-status {
+  font-size: 11px;
+  color: var(--muted);
+  min-height: 16px;
+}
+.compare-target-highlight {
+  position: absolute;
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 3px #6547ed20;
+  background: #6547ed0a;
+  pointer-events: none;
+  z-index: 1;
+}
+.compare-target-highlight > span {
+  position: absolute;
+  left: 0;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--accent);
+  color: white;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 16px;
+}
+.compare-target-highlight.missing-target {
+  border-style: dashed;
+  background: #6547ed06;
+}
+.compare-target-highlight.point-target {
+  border-radius: 50%;
+}

@@ -62,6 +62,7 @@ async function main() {
     'react-ui',
     'usability',
     'followup',
+    'navigation',
   ]) {
     await window.loadURL(`http://127.0.0.1:${server.address().port}/tests/${suite}.html`);
     const deadline = Date.now() + 120000;

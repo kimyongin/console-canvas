@@ -456,25 +456,46 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
         </aside>
       </main>
       <div id="snapshot-panel" className="snapshot-browser" popover="auto" aria-label="스냅샷 목록">
-        <div className="snapshot-browser-heading">
-          <div>
-            <h2>{'스냅샷 목록'}</h2>
-            <p>{'노드를 선택해 미리 보고, 이 버전으로 이동하세요.'}</p>
+        <div className="snapshot-navigation-header">
+          <div className="snapshot-browser-heading">
+            <div>
+              <h2>{'스냅샷 목록'}</h2>
+              <p>{'노드를 선택해 미리 보고, 이 버전으로 이동하세요.'}</p>
+            </div>
+            <Button id="close-snapshots" aria-label="스냅샷 목록 닫기" variant="outline">
+              {'×'}
+            </Button>
           </div>
-          <Button id="close-snapshots" aria-label="스냅샷 목록 닫기" variant="outline">
-            {'×'}
-          </Button>
-        </div>
-        <div className="list-tabs">
-          <Button id="snapshots-live" aria-pressed="true" variant="outline">
-            {'저장된 버전'}
-          </Button>
-          <Button id="snapshots-trash" aria-pressed="false" variant="outline">
-            {'휴지통'}
-          </Button>
+          <div className="list-tabs">
+            <Button id="snapshots-live" aria-pressed="true" variant="outline">
+              {'저장된 버전'}
+            </Button>
+            <Button id="snapshots-trash" aria-pressed="false" variant="outline">
+              {'휴지통'}
+            </Button>
+          </div>
+          <div id="snapshot-current" role="status"></div>
+          <div id="snapshot-find" className="snapshot-find">
+            <div className="snapshot-search-field">
+              <Input
+                id="snapshot-search"
+                type="search"
+                aria-label="스냅샷 검색"
+                placeholder="스냅샷 이름 검색"
+                autoComplete="off"
+              />
+              <div id="snapshot-search-results" aria-label="스냅샷 검색 결과" hidden></div>
+            </div>
+            <Button
+              id="snapshot-find-current"
+              onClick={() => dispatchEditorCommand('snapshot-current')}
+              variant="outline"
+            >
+              현재 버전 찾기
+            </Button>
+          </div>
         </div>
         <div id="snapshot-tools">
-          <div id="snapshot-current" role="status"></div>
           <div
             id="snapshot-graph-scroll"
             className="snapshot-graph-scroll"
@@ -677,7 +698,10 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             <Button id="comment-previous" variant="outline" aria-label="이전 요청">
               ← 이전
             </Button>
-            <span id="comment-progress" role="status"></span>
+            <div className="comment-request-pick">
+              <NativeSelect id="comment-request" aria-label="검토할 요청"></NativeSelect>
+              <span id="comment-progress" role="status"></span>
+            </div>
             <Button id="comment-next" variant="outline" aria-label="다음 요청">
               다음 →
             </Button>
@@ -821,7 +845,26 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           <label>
             변경 위치 <NativeSelect id="compare-target" aria-label="비교 변경 위치"></NativeSelect>
           </label>
+          <div className="compare-step">
+            <Button
+              id="compare-previous"
+              aria-label="이전 변경"
+              onClick={() => dispatchEditorCommand('compare-previous')}
+              variant="outline"
+            >
+              ← 이전
+            </Button>
+            <Button
+              id="compare-next"
+              aria-label="다음 변경"
+              onClick={() => dispatchEditorCommand('compare-next')}
+              variant="outline"
+            >
+              다음 →
+            </Button>
+          </div>
         </div>
+        <div id="compare-focus-status" role="status"></div>
         <div className="compare-grid">
           <section>
             <NativeSelect id="compare-left" aria-label="비교할 첫 번째 버전"></NativeSelect>

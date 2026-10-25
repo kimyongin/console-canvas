@@ -148,16 +148,24 @@ export function renderSnapshotTrash(
     ),
   );
 }
+export interface PreviewHighlight {
+  rect: { x: number; y: number; width: number; height: number };
+  label: string;
+  missing?: boolean;
+  point?: boolean;
+}
 function VersionFrame({
   html,
   size,
   title,
   zoom,
+  highlight,
 }: {
   html: string;
   size: { width: number; height: number };
   title: string;
   zoom?: number;
+  highlight?: PreviewHighlight;
 }) {
   const space = useRef<HTMLDivElement>(null),
     [scale, setScale] = useState(0.5);
@@ -186,6 +194,25 @@ function VersionFrame({
         srcDoc={html}
         style={{ pointerEvents: 'none', transform: `scale(${scale})` }}
       />
+      {highlight && (
+        <div
+          className={
+            'compare-target-highlight' +
+            (highlight.missing ? ' missing-target' : '') +
+            (highlight.point ? ' point-target' : '')
+          }
+          role="img"
+          aria-label={highlight.label}
+          style={{
+            left: highlight.rect.x * scale,
+            top: highlight.rect.y * scale,
+            width: Math.max(14, highlight.rect.width * scale),
+            height: Math.max(14, highlight.rect.height * scale),
+          }}
+        >
+          <span style={{ top: highlight.rect.y * scale < 26 ? 0 : -25 }}>{highlight.label}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -194,8 +221,9 @@ export function renderVersionFrame(
   result: { html: string; size: { width: number; height: number } },
   title: string,
   zoom?: number,
+  highlight?: PreviewHighlight,
 ) {
-  renderReact(host, <VersionFrame {...result} title={title} zoom={zoom} />);
+  renderReact(host, <VersionFrame {...result} title={title} zoom={zoom} highlight={highlight} />);
 }
 export function renderImage(host: Element, url: string) {
   renderReact(host, <img src={url} alt="변경 후 화면과 번호별 주석 카드가 포함된 전달 이미지" />);
@@ -315,5 +343,36 @@ export function renderTargetPreview(
         }}
       />
     </div>,
+  );
+}
+
+export function renderSnapshotMatches(
+  host: Element,
+  entries: { id: string; name: string; parent: string }[],
+  total: number,
+  pick: (id: string) => void,
+) {
+  renderReact(
+    host,
+    <>
+      <small role="status">
+        {total
+          ? `${total}개 결과` + (total > entries.length ? ` · 최근 ${entries.length}개 표시` : '')
+          : '검색 결과가 없습니다.'}
+      </small>
+      {entries.map((e) => (
+        <Button
+          key={e.id}
+          variant="ghost"
+          size="content"
+          className="snapshot-search-match"
+          data-snapshot-match={e.id}
+          onClick={() => pick(e.id)}
+        >
+          <strong>{e.name}</strong>
+          <small>{e.parent}</small>
+        </Button>
+      ))}
+    </>,
   );
 }

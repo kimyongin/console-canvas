@@ -29,7 +29,8 @@ export function createInspector({ $, state, kinds, selectNode }) {
     if (document.activeElement !== $('#layer-alias'))
       $('#layer-alias').value = state.snapshot.layerNames?.[id] || '';
     const comment = scene.annotations[id] || '';
-    $('#comment-target-title').textContent = elementLabel(node, state.snapshot.layerNames);
+    if (!$('#comment-dialog').open)
+      $('#comment-target-title').textContent = elementLabel(node, state.snapshot.layerNames);
     $('#selected-comment-summary').textContent =
       comment || '수정 방향을 주석으로 남길 수 있습니다.';
     $('#edit-selected-comment').textContent = comment ? '주석 편집' : '주석 남기기';
@@ -39,10 +40,12 @@ export function createInspector({ $, state, kinds, selectNode }) {
     )
       $('#component-comment').value = comment;
     if (!$('#comment-dialog').open) state.commentTarget = id;
-    $('#clear-comment').disabled = !comment && !$('#component-comment').value.trim();
-    $('#comment-status').textContent = comment
-      ? '저장된 주석 · 전달 파일에 포함됩니다.'
-      : '주석은 화면을 바꾸지 않고 요청으로 전달됩니다.';
+    if (!$('#comment-dialog').open) {
+      $('#clear-comment').disabled = !comment && !$('#component-comment').value.trim();
+      $('#comment-status').textContent = comment
+        ? '저장된 주석 · 전달 파일에 포함됩니다.'
+        : '주석은 화면을 바꾸지 않고 요청으로 전달됩니다.';
+    }
     $('#element-kind').textContent =
       count > 1 ? '다중 선택 · ' + count + '개' : (kinds[node.kind] || '요소') + ' · ' + node.tag;
     $('#element-name').textContent =

@@ -12,7 +12,17 @@ export interface EditorView {
   save: { pending: boolean; error: string | null; message: string };
 }
 export type EditorCommand =
-  'undo' | 'redo' | 'delete' | 'copy' | 'paste' | 'properties' | 'comment' | 'snapshots';
+  | 'undo'
+  | 'redo'
+  | 'delete'
+  | 'copy'
+  | 'paste'
+  | 'properties'
+  | 'comment'
+  | 'snapshots'
+  | 'snapshot-current'
+  | 'compare-previous'
+  | 'compare-next';
 export function createEditorAdapter(read: () => EditorView) {
   let snapshot = read();
   const listeners = new Set<() => void>();
