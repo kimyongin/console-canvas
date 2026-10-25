@@ -1308,3 +1308,173 @@
 .compare-target-highlight.point-target {
   border-radius: 50%;
 }
+
+/* Preserve native select interaction while giving every arrow a consistent inset. */
+#editor-root select[data-slot='select'] {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-inline-end: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='m3 4.5 3 3 3-3' stroke='%23667085' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px 12px;
+}
+
+/* Shared control geometry and quieter surfaces for the editor chrome. */
+#editor-root {
+  --control-height: 32px;
+  --control-radius: 7px;
+}
+#editor-root select[data-slot='select'],
+#editor-root input[data-slot='input']:not([type='checkbox']) {
+  min-height: var(--control-height);
+  border: 1px solid #dfe3ec;
+  border-radius: var(--control-radius);
+  color: #394359;
+  background-color: #fff;
+  box-shadow: none;
+  font-size: 12px;
+  line-height: 18px;
+  padding-block: 6px;
+  padding-inline-start: 10px;
+}
+#editor-root input[data-slot='input']:not([type='checkbox']) {
+  height: var(--control-height);
+}
+#editor-root #zoom {
+  width: 72px;
+  max-width: 72px;
+  height: 27px;
+  min-height: 27px;
+  padding-block: 2px;
+  padding-inline-start: 6px;
+  font-size: 11px;
+}
+#editor-root input[data-slot='input'][type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  min-height: 14px;
+  padding: 0;
+  margin: 0;
+  flex: none;
+  box-shadow: none;
+  accent-color: var(--accent);
+  vertical-align: middle;
+}
+#editor-root input[data-slot='input']:focus-visible,
+#editor-root textarea:focus-visible,
+#editor-root select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 3px #5a55d912;
+}
+#editor-root .activity-controls {
+  gap: 8px;
+}
+#editor-root .activity-controls label {
+  line-height: 16px;
+  color: #687287;
+}
+#editor-root .activity-selected {
+  gap: 8px;
+  min-height: 24px;
+  margin: 8px 0;
+}
+#editor-root .layer-filter,
+#editor-root .snap-setting {
+  gap: 8px;
+  align-items: center;
+}
+#editor-root .activity-branch {
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 8px 0 14px;
+  color: #687287;
+}
+#editor-root .activity-event {
+  border-left-color: #e7e4f0;
+  padding: 0 0 18px 12px;
+}
+#editor-root .activity-event > small {
+  color: #788296;
+  font-size: 10px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+}
+#editor-root .activity-event > strong {
+  font-size: 12px;
+  line-height: 18px;
+  margin-bottom: 7px;
+}
+#editor-root .activity-change {
+  border: 1px solid #efedf5;
+  border-radius: 8px;
+  padding: 9px 10px;
+  margin: 0 0 6px;
+  background: #fafaff;
+  box-shadow: none;
+}
+#editor-root .activity-change strong {
+  margin-bottom: 4px;
+  line-height: 1.5;
+  color: #424b62;
+}
+#editor-root .activity-change span {
+  line-height: 1.7;
+  color: #626d82;
+}
+#editor-root .activity-change:hover:not(:disabled) {
+  background: #f3f1fd;
+  border-color: #ded8f2;
+}
+#document-menu-content button,
+#editor-root .action-menu-popover button {
+  box-shadow: none;
+  border: 0;
+  background: transparent;
+  border-radius: 6px;
+  min-height: 32px;
+  padding: 8px 10px;
+  line-height: 18px;
+  text-align: left;
+}
+#document-menu-content button:hover:not(:disabled),
+#editor-root .action-menu-popover button:hover:not(:disabled) {
+  background: #f3f1fd;
+}
+#document-menu-content button:disabled {
+  opacity: 0.5;
+}
+#editor-root button[aria-label$='닫기'] {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  flex: none;
+  padding: 0;
+  border-color: transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #778196;
+  box-shadow: none;
+  line-height: 1;
+}
+#editor-root button[aria-label$='닫기']:hover {
+  background: #f2f1f8;
+  color: #424b62;
+}
+#editor-root .canvas-footer {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+#editor-root .canvas-footer #canvas-hint {
+  flex: 1;
+  min-width: 0;
+}
+#editor-root .canvas-footer .connection-badge,
+#editor-root .canvas-footer #version-status,
+#editor-root .canvas-footer #canvas-dimensions {
+  flex: none;
+  white-space: nowrap;
+}
