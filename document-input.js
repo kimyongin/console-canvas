@@ -1,3 +1,4 @@
+import { cleanLayerNames } from './layer-names.js';
 import { validateSnapshot, cleanEdits, cleanComments } from './engine.js';
 import { expandCopyNodes } from './copy-model.js';
 import { createSnapshotHistory } from './snapshot-history.js';
@@ -5,6 +6,7 @@ import { createSnapshotHistory } from './snapshot-history.js';
 // Validate the whole portable document before flushing or replacing the active editor.
 export function validateDocumentInput(snapshot, edits, annotations, timeline) {
   validateSnapshot(snapshot);
+  cleanLayerNames(snapshot.layerNames);
   for (const value of [edits, annotations])
     if (value != null && (typeof value !== 'object' || Array.isArray(value)))
       throw new Error('편집/주석 형식이 올바르지 않습니다.');

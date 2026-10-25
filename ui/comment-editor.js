@@ -19,7 +19,7 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
       : '컴포넌트에 주석 남기기';
     $('#comment-target-title').textContent = point
       ? `위치 · ${point.x}, ${point.y}`
-      : elementLabel(state.scene.nodes.get(id));
+      : elementLabel(state.scene.nodes.get(id), state.snapshot.layerNames);
     field.value = state.scene.annotations[id] || '';
     $('#clear-comment').disabled = !field.value;
     if (!dialog.open) dialog.showModal();

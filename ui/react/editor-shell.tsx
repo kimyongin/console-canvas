@@ -218,66 +218,12 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                 </Button>
                 <span className="toolbar-divider"></span>
                 <Button
-                  id="edit-properties"
-                  onClick={() => dispatchEditorCommand('properties')}
-                  disabled={!view?.selected}
-                  title="선택 요소의 위치·정렬 편집"
-                  variant="outline"
-                >
-                  {'\n                요소 편집\n              '}
-                </Button>
-                <Button
-                  id="copy"
-                  onClick={() => dispatchEditorCommand('copy')}
-                  title="선택 요소 복사 · ⌘/Ctrl+C"
-                  disabled={!view?.selected || !!view?.selectedHidden}
-                  variant="outline"
-                >
-                  {'복사'}
-                </Button>
-                <Button
                   id="paste"
                   onClick={() => dispatchEditorCommand('paste')}
                   title="이 화면에 요소 붙여넣기 · ⌘/Ctrl+V"
                   variant="outline"
                 >
                   {'붙여넣기'}
-                </Button>
-                <Button
-                  id="delete"
-                  onClick={() => dispatchEditorCommand('delete')}
-                  disabled={!view?.selected || !!view?.selectedHidden}
-                  variant="outline"
-                >
-                  {'삭제'}
-                </Button>
-              </div>
-              <div className="zoom-controls">
-                <Button id="zoom-out" aria-label="축소" variant="outline">
-                  {'−'}
-                </Button>
-                <NativeSelect id="zoom" aria-label="확대 비율">
-                  <option value="0.25">{'25%'}</option>
-                  <option value="0.5">{'50%'}</option>
-                  <option value="0.75">{'75%'}</option>
-                  <option value="1">{'100%'}</option>
-                  <option value="1.25">{'125%'}</option>
-                  <option value="1.5">{'150%'}</option>
-                  <option value="2">{'200%'}</option>
-                </NativeSelect>
-                <Button id="zoom-in" aria-label="확대" variant="outline">
-                  {'＋'}
-                </Button>
-                <Button id="fit" variant="outline">
-                  {'맞춤'}
-                </Button>
-                <Button
-                  id="zoom-selection"
-                  title="선택한 요소에 맞추기"
-                  disabled={true}
-                  variant="outline"
-                >
-                  {'선택 맞춤'}
                 </Button>
               </div>
             </div>
@@ -352,7 +298,73 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
               </div>
             </div>
           </div>
+          <div id="selection-actions" role="toolbar" aria-label="선택 요소 작업" hidden={true}>
+            {' '}
+            <Button
+              id="context-comment"
+              onClick={() => dispatchEditorCommand('comment')}
+              disabled={!view?.selected}
+              variant="outline"
+              aria-label="선택 요소 주석 편집"
+            >
+              {'주석'}
+            </Button>
+            <Button
+              id="edit-properties"
+              onClick={() => dispatchEditorCommand('properties')}
+              disabled={!view?.selected}
+              title="선택 요소의 위치·정렬 편집"
+              variant="outline"
+            >
+              {'\n                요소 편집\n              '}
+            </Button>
+            <Button
+              id="copy"
+              onClick={() => dispatchEditorCommand('copy')}
+              title="선택 요소 복사 · ⌘/Ctrl+C"
+              disabled={!view?.selected || !!view?.selectedHidden}
+              variant="outline"
+            >
+              {'복사'}
+            </Button>
+            <Button
+              id="delete"
+              onClick={() => dispatchEditorCommand('delete')}
+              disabled={!view?.selected || !!view?.selectedHidden}
+              variant="outline"
+            >
+              {'삭제'}
+            </Button>
+          </div>
           <div className="canvas-footer">
+            <div className="zoom-controls">
+              <Button id="zoom-out" aria-label="축소" variant="outline">
+                {'−'}
+              </Button>
+              <NativeSelect id="zoom" aria-label="확대 비율">
+                <option value="0.25">{'25%'}</option>
+                <option value="0.5">{'50%'}</option>
+                <option value="0.75">{'75%'}</option>
+                <option value="1">{'100%'}</option>
+                <option value="1.25">{'125%'}</option>
+                <option value="1.5">{'150%'}</option>
+                <option value="2">{'200%'}</option>
+              </NativeSelect>
+              <Button id="zoom-in" aria-label="확대" variant="outline">
+                {'＋'}
+              </Button>
+              <Button id="fit" variant="outline">
+                {'맞춤'}
+              </Button>
+              <Button
+                id="zoom-selection"
+                title="선택한 요소에 맞추기"
+                disabled={true}
+                variant="outline"
+              >
+                {'선택 맞춤'}
+              </Button>
+            </div>
             <Button
               id="mcp-button"
               className="connection-badge"
@@ -404,6 +416,10 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
               placeholder="대상·주석·변경 검색"
               aria-label="변경 이력 검색"
             />
+            <label className="activity-selected">
+              <Input id="activity-selected" type="checkbox" />
+              {'선택 요소만'}
+            </label>
             <p id="activity-branch" className="activity-branch"></p>
             <div id="activity-list" className="activity-list"></div>
           </section>
@@ -467,6 +483,16 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           >
             <div id="snapshot-list" className="snapshot-graph"></div>
           </div>
+          <div
+            id="snapshot-splitter"
+            role="separator"
+            tabIndex={0}
+            aria-label="그래프와 미리보기 크기 조절"
+            aria-orientation="horizontal"
+            aria-valuemin={100}
+            aria-valuemax={360}
+            aria-valuenow={170}
+          ></div>
           <div className="snapshot-legend">
             {
               '\n          ● 현재 버전 · ◉ 선택한 미리보기 · 점선은 저장 전 작업 · 가로로 스크롤하여 탐색\n        '
@@ -516,6 +542,19 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           <section id="inspector" className="inspector" hidden={true}>
             <div className="element-kind" id="element-kind"></div>
             <h2 id="element-name"></h2>
+            <details className="layer-alias-editor">
+              <summary>{'레이어 이름 변경'}</summary>
+              <label className="layer-alias-field">
+                {'레이어 별칭'}
+                <Input id="layer-alias" maxLength={120} placeholder="예: 고객 검색 영역" />
+              </label>
+              <Button id="save-layer-alias" variant="outline">
+                {'별칭 저장'}
+              </Button>
+              <Button id="clear-layer-alias" variant="ghost">
+                {'기본 이름 사용'}
+              </Button>
+            </details>
             <div id="element-path" className="element-path"></div>
             <Button
               id="select-parent"
@@ -709,9 +748,8 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             {'전달 기준'}
             <NativeSelect id="handoff-version"></NativeSelect>
           </label>
-          <div id="handoff-items" className="handoff-items"></div>
-          <div id="handoff-preview" className="handoff-preview"></div>
-          <div id="export-summary" className="export-summary"></div>
+          <div id="export-summary" className="export-summary" role="status"></div>
+          <div id="handoff-items" className="handoff-items" aria-label="번호별 요청 검토"></div>
           <label className="review-note-label">
             {'추가 설명 '}
             <span>{'선택'}</span>
@@ -721,6 +759,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
               placeholder="예: 검색 조건을 위로 모으고 작업 버튼을 오른쪽에 정렬하고 싶어요."
             ></Textarea>
           </label>
+          <div id="handoff-preview" className="handoff-preview"></div>
         </div>
         <div className="export-footer">
           <div className="export-actions">

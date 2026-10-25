@@ -6,7 +6,7 @@ export function handoffRequests(scene) {
     id: c.id,
     name:
       (c.targetDeleted ? (c.copiedFrom ? '복사본 삭제 · ' : '삭제 · ') : '') +
-      (c.point ? '위치 주석' : elementLabel(scene.nodes.get(c.id))),
+      (c.point ? '위치 주석' : elementLabel(scene.nodes.get(c.id), scene.snapshot.layerNames)),
     text: c.text,
     rect: c.after || c.before,
     deleted: c.targetDeleted,
@@ -19,7 +19,7 @@ export function handoffRequests(scene) {
     if (!annotated.has(c.id))
       result.push({
         id: c.id,
-        name: elementLabel(scene.nodes.get(c.id)),
+        name: elementLabel(scene.nodes.get(c.id), scene.snapshot.layerNames),
         text:
           c.action === 'delete'
             ? '이 요소를 제거하고 주변 배치와 간격을 자연스럽게 정리해 주세요.'
@@ -155,7 +155,8 @@ export async function buildHandoffImage(snapshot, scene, note = '', progress = (
     );
     ctx.drawImage(after, margin, screenY, screenWidth, screenHeight);
     // Number badges never form leader lines. Deleted targets are dashed at their old location.
-    const occupied = [];
+    const occupied = [],
+      hotspots = [];
     for (const r of requests) {
       if (!r.rect) continue;
       const x = margin + r.rect.x * scale,
@@ -187,6 +188,7 @@ export async function buildHandoffImage(snapshot, scene, note = '', progress = (
         by += 42;
       occupied.push({ x: bx, y: by });
       badge(ctx, r.number, bx, by);
+      hotspots.push({ id: r.id, number: r.number, x: bx - 22, y: by - 22, width: 44, height: 44 });
     }
     ctx.fillStyle = '#111a34';
     ctx.font = '700 29px system-ui';
@@ -199,6 +201,14 @@ export async function buildHandoffImage(snapshot, scene, note = '', progress = (
     for (const c of cards) {
       box(ctx, c.x, c.y, cardWidth, c.h, 'white', '#e1e2f0');
       badge(ctx, c.number, c.x + 36, c.y + 38);
+      hotspots.push({
+        id: c.id,
+        number: c.number,
+        x: c.x + 14,
+        y: c.y + 16,
+        width: 44,
+        height: 44,
+      });
       ctx.fillStyle = '#19213a';
       ctx.font = '700 23px system-ui';
       c.title.forEach((line, i) => ctx.fillText(line, c.x + 70, c.y + 37 + i * 28));
@@ -255,7 +265,7 @@ export async function buildHandoffImage(snapshot, scene, note = '', progress = (
     footer.forEach((line, i) => ctx.fillText(line, margin, y + 38 + i * 29));
     const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
     if (!blob) throw new Error('전달 이미지 생성 실패');
-    return { blob, requests, width, height };
+    return { blob, requests, width, height, hotspots };
   } finally {
     after.close();
     before?.close();

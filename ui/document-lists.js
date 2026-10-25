@@ -1,6 +1,6 @@
 import { elementLabel, isMajorElement } from './element-labels.js';
 import { renderLayerRows } from './react/lists.tsx';
-export function createDocumentLists({ $, state, selectNode }) {
+export function createDocumentLists({ $, state, selectNode, renameLayer }) {
   function renderLayers() {
     const scene = state.scene;
     if (!scene) return;
@@ -11,7 +11,21 @@ export function createDocumentLists({ $, state, selectNode }) {
     if (query) {
       matches = new Set();
       for (const node of scene.nodes.values())
-        if ((node.name + ' ' + node.tag + ' ' + node.id).toLowerCase().includes(query)) {
+        if (
+          (
+            (state.snapshot.layerNames?.[node.id] || '') +
+            ' ' +
+            elementLabel(node) +
+            ' ' +
+            node.name +
+            ' ' +
+            node.tag +
+            ' ' +
+            node.id
+          )
+            .toLowerCase()
+            .includes(query)
+        ) {
           matches.add(node.id);
           scene.ancestors(node.id).forEach((id) => matches.add(id));
         }
@@ -37,10 +51,10 @@ export function createDocumentLists({ $, state, selectNode }) {
         deleted: scene.hidden(node.id),
         expanded,
         hasChildren: !!children.length,
-        name: node.name,
+        name: elementLabel(node, state.snapshot.layerNames),
         title: node.name + ' · ' + node.tag + ' · ' + node.id,
         icon: { text: 'T', icon: '◇', raster: '▧' }[node.kind] || '▱',
-        label: elementLabel(node),
+        label: elementLabel(node, state.snapshot.layerNames),
         comment: scene.annotations[node.id],
         commentNumber: numbers.get(node.id),
         mark: edit?.deleted ? '×' : edit?.dx || edit?.dy ? '•' : null,
@@ -57,6 +71,7 @@ export function createDocumentLists({ $, state, selectNode }) {
         renderLayers();
       },
       (id, additive) => selectNode(id, { reveal: true, additive }),
+      renameLayer,
     );
     $('#layer-count').textContent = scene.elements.size.toLocaleString();
   }

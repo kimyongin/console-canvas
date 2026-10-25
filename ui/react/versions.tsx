@@ -208,3 +208,70 @@ export function renderVersionOptions(host: Element, options: { id: string; name:
     </>,
   );
 }
+
+export function renderHandoffRequests(
+  host: Element,
+  requests: { id: string; number: number; name: string }[],
+  editable: boolean,
+  pick: (id: string) => void,
+) {
+  renderReact(
+    host,
+    <>
+      {requests.map((r) => (
+        <Button
+          key={r.id}
+          className="handoff-request"
+          variant="outline"
+          disabled={!editable}
+          aria-label={'요청 ' + r.number + ' · ' + r.name + ' 주석 편집'}
+          data-request-id={r.id}
+          onClick={() => pick(r.id)}
+        >
+          {r.number + ' · ' + r.name}
+        </Button>
+      ))}
+      {!editable && (
+        <small>{'저장 버전은 보기 전용입니다. 현재 작업을 선택해 주석을 편집하세요.'}</small>
+      )}
+    </>,
+  );
+}
+export function renderHandoffPreview(
+  host: Element,
+  url: string,
+  result: {
+    width: number;
+    height: number;
+    hotspots: { id: string; number: number; x: number; y: number; width: number; height: number }[];
+  },
+  editable: boolean,
+  pick: (id: string) => void,
+) {
+  renderReact(
+    host,
+    <div className="handoff-interactive">
+      <img
+        src={url}
+        width={result.width}
+        height={result.height}
+        alt="변경 후 화면과 번호별 주석 카드가 포함된 전달 이미지"
+      />
+      {editable &&
+        result.hotspots.map((r, i) => (
+          <button
+            key={i}
+            className="handoff-hotspot"
+            aria-label={'이미지 요청 ' + r.number + ' 주석 편집'}
+            style={{
+              left: (r.x / result.width) * 100 + '%',
+              top: (r.y / result.height) * 100 + '%',
+              width: (r.width / result.width) * 100 + '%',
+              height: (r.height / result.height) * 100 + '%',
+            }}
+            onClick={() => pick(r.id)}
+          />
+        ))}
+    </div>,
+  );
+}

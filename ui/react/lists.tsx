@@ -21,6 +21,7 @@ export function renderLayerRows(
   rows: LayerRow[],
   toggle: (id: string) => void,
   pick: (id: string, additive: boolean) => void,
+  rename?: (id: string) => void,
 ) {
   renderReact(
     host,
@@ -60,6 +61,16 @@ export function renderLayerRows(
             </span>
           )}
           {row.mark && <span className="layer-mark">{row.mark}</span>}
+          {row.selected && rename && (
+            <Button
+              className="layer-rename"
+              variant="ghost"
+              aria-label={row.label + ' 별칭 변경'}
+              onClick={() => rename(row.id)}
+            >
+              ⋯
+            </Button>
+          )}
         </div>
       ))}
     </>,
@@ -69,6 +80,7 @@ export interface ActivityRow {
   id: string;
   time: string;
   heading: string;
+  children?: ActivityRow[];
   changes: {
     id: string;
     name: string;
@@ -78,6 +90,39 @@ export interface ActivityRow {
     run: () => void;
   }[];
 }
+function ActivityContents({ row }: { row: ActivityRow }) {
+  return (
+    <>
+      <small>{row.time}</small>
+      <strong>{row.heading}</strong>
+      {row.changes.map((change, index) => (
+        <Button
+          variant="ghost"
+          key={change.id + '/' + index}
+          className="activity-change"
+          size="content"
+          data-target-id={change.id}
+          data-change-type={change.type}
+          disabled={change.disabled}
+          onClick={change.run}
+        >
+          <strong>{change.name}</strong>
+          <span>{change.description}</span>
+        </Button>
+      ))}
+      {row.children && (
+        <details className="activity-details">
+          <summary>{'개별 기록 ' + row.children.length + '개 보기'}</summary>
+          {row.children.map((child) => (
+            <div className="activity-detail" key={child.id} data-detail-event-id={child.id}>
+              <ActivityContents row={child} />
+            </div>
+          ))}
+        </details>
+      )}
+    </>
+  );
+}
 export function renderActivityRows(host: Element, rows: ActivityRow[], empty: string) {
   renderReact(
     host,
@@ -85,23 +130,7 @@ export function renderActivityRows(host: Element, rows: ActivityRow[], empty: st
       <>
         {rows.map((row) => (
           <article key={row.id} className="activity-event" data-event-id={row.id}>
-            <small>{row.time}</small>
-            <strong>{row.heading}</strong>
-            {row.changes.map((change, index) => (
-              <Button
-                variant="ghost"
-                key={change.id + '/' + index}
-                className="activity-change"
-                size="content"
-                data-target-id={change.id}
-                data-change-type={change.type}
-                disabled={change.disabled}
-                onClick={change.run}
-              >
-                <strong>{change.name}</strong>
-                <span>{change.description}</span>
-              </Button>
-            ))}
+            <ActivityContents row={row} />
           </article>
         ))}
       </>

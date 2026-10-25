@@ -60,6 +60,7 @@ async function main() {
     'graphflow',
     'resilience',
     'react-ui',
+    'usability',
   ]) {
     await window.loadURL(`http://127.0.0.1:${server.address().port}/tests/${suite}.html`);
     const deadline = Date.now() + 120000;
@@ -140,7 +141,10 @@ async function main() {
 }
 async function finish(code) {
   window?.destroy();
-  if (server) await new Promise((resolve) => server.close(resolve));
+  if (server) {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
   if (profile) await fs.rm(profile, { recursive: true, force: true });
   app.exit(code);
 }

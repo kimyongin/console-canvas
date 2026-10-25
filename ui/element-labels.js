@@ -13,11 +13,19 @@ const regionNames = {
   th: '열 제목',
   form: '입력 영역',
 };
-export function elementLabel(node) {
+export function elementLabel(node, aliases = {}) {
   if (!node) return '요소';
+  if (typeof aliases[node.id] === 'string') return aliases[node.id];
   if (node.copiedFrom && node.copyRoot === node.id)
     return elementLabel({ ...node, copiedFrom: null }) + ' · 복사본';
   const name = (node.locator?.label || node.name || '').replace(/\s+/g, ' ').trim();
+  const region =
+    !['text', 'icon', 'raster'].includes(node.kind) &&
+    !['button', 'input', 'select', 'textarea', 'a'].includes(node.tag);
+  const identity = (node.locator?.id || '').toLowerCase();
+  if (region && /search|filter/.test(identity)) return '검색 영역';
+  if (node.tag === 'table' && /customer/.test(identity)) return '고객 목록';
+  if (region && node.locator?.label) return name.slice(0, 36);
   if (regionNames[node.tag]) return regionNames[node.tag];
   const suffix =
     {

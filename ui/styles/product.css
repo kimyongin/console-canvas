@@ -767,3 +767,213 @@
   border-radius: 0;
   background: transparent;
 }
+
+/* Canvas editing stays modeless; the unified history panel remains independent. */
+#properties-dialog[open] {
+  position: fixed;
+  inset: auto;
+  top: 140px;
+  right: 48px;
+  margin: 0;
+  width: min(320px, calc(100vw - 32px));
+  max-height: calc(100dvh - 160px);
+  padding: 16px;
+  overflow: auto;
+  z-index: 60;
+  box-shadow: 0 10px 32px #25284d30;
+}
+#properties-dialog .popover-heading {
+  cursor: move;
+  touch-action: none;
+}
+#properties-dialog h2 {
+  font-size: 14px;
+}
+#properties-dialog .element-path {
+  max-height: 62px;
+  overflow: auto;
+}
+#properties-dialog .field-heading {
+  margin-top: 12px;
+}
+.layer-alias-editor {
+  margin: 10px 0;
+  font-size: 12px;
+}
+.layer-alias-field {
+  display: grid;
+  gap: 5px;
+  margin: 8px 0;
+}
+#selection-actions {
+  position: fixed;
+  z-index: 45;
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  background: white;
+  border: 1px solid #dad6ec;
+  border-radius: 9px;
+  box-shadow: 0 5px 20px #25284d20;
+}
+#selection-actions[hidden] {
+  display: none;
+}
+#selection-actions button {
+  font-size: 11px;
+  min-height: 30px;
+}
+.canvas-footer .zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+}
+.canvas-footer .zoom-controls button,
+.canvas-footer .zoom-controls select {
+  height: 27px;
+  min-height: 27px;
+  font-size: 11px;
+  padding: 2px 5px;
+}
+.canvas-footer {
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+.canvas-footer #canvas-hint {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.canvas-tools {
+  min-width: 0;
+}
+.canvas-tools #snapshot-dropdown {
+  min-width: 130px;
+  max-width: 240px;
+}
+.canvas-toolbar {
+  flex: none;
+}
+.snapshot-graph-scroll {
+  min-height: 100px;
+  max-height: 360px;
+}
+#snapshot-splitter {
+  height: 16px;
+  cursor: ns-resize;
+  touch-action: none;
+  outline-offset: -2px;
+}
+#snapshot-splitter::after {
+  content: '';
+  display: block;
+  width: 52px;
+  height: 4px;
+  border-radius: 3px;
+  background: #c4bfd8;
+  margin: 6px auto;
+}
+#snapshot-splitter:focus-visible {
+  outline: 2px solid var(--accent);
+}
+.activity-selected {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0;
+  font-size: 12px;
+}
+.activity-selected input {
+  width: 16px;
+  height: 16px;
+}
+.activity-details {
+  font-size: 11px;
+  margin-top: 8px;
+}
+.activity-details summary {
+  cursor: pointer;
+  color: var(--accent);
+}
+.activity-detail {
+  border-left: 2px solid #e2dff0;
+  margin: 8px 0;
+  padding: 8px;
+  display: grid;
+  gap: 5px;
+}
+#handoff-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 100px;
+  overflow: auto;
+  padding: 0;
+  margin: 8px 0;
+  border: 0;
+}
+.handoff-request {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+}
+.handoff-interactive {
+  position: relative;
+}
+.handoff-interactive img {
+  margin: 0;
+}
+.handoff-hotspot {
+  position: absolute;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.handoff-hotspot:hover,
+.handoff-hotspot:focus-visible {
+  outline: 3px solid #3b27bc;
+  background: #ffffff33;
+}
+@media (max-width: 1100px) {
+  .canvas-footer #canvas-hint,
+  .canvas-footer #canvas-dimensions {
+    display: none;
+  }
+  .canvas-tools .document-menu {
+    max-width: 150px;
+    min-width: 90px;
+  }
+  .canvas-tools #snapshot-dropdown {
+    max-width: 180px;
+  }
+}
+
+.layer-rename {
+  flex: none;
+  width: 24px;
+  min-height: 24px;
+  padding: 0;
+}
+.handoff-hotspot {
+  min-width: 24px;
+  min-height: 24px;
+}
+
+#properties-dialog .popover-heading {
+  position: sticky;
+  top: -16px;
+  z-index: 2;
+  background: white;
+  margin: -16px -16px 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 12px 12px 0 0;
+}
+#properties-dialog .popover-heading h2 {
+  margin: 0;
+}

@@ -1,3 +1,4 @@
+import { activityGroups } from './activity-groups.js';
 import { renderActivityRows } from './react/lists.tsx';
 import { activityBranch } from '../activity-history.js';
 import { pointTarget } from '../edit-commands.js';
@@ -39,7 +40,8 @@ export function createActivityPanel({ $, state, selectNode, focusComment }) {
     const rows = [];
     const all = $('#activity-scope').value === 'all',
       filter = $('#activity-filter').value,
-      query = $('#activity-search').value.trim().toLowerCase();
+      query = $('#activity-search').value.trim().toLowerCase(),
+      selectedOnly = $('#activity-selected').checked;
     const entries = activityBranch(state, all),
       covered = new Set();
     $('#activity-branch').textContent =
@@ -52,11 +54,20 @@ export function createActivityPanel({ $, state, selectNode, focusComment }) {
           (filter === 'layout' ? ['move', 'delete', 'copy'].includes(c.type) : c.type === filter);
         return (
           matches &&
+          (!selectedOnly || state.scene?.selection.has(c.id)) &&
           (!query ||
-            JSON.stringify([event.label, c.name, c.before, c.after]).toLowerCase().includes(query))
+            JSON.stringify([
+              event.label,
+              c.name,
+              state.snapshot.layerNames?.[c.id],
+              c.before,
+              c.after,
+            ])
+              .toLowerCase()
+              .includes(query))
         );
       });
-      if ((filter !== 'all' || query) && !changes.length) return;
+      if ((filter !== 'all' || query || selectedOnly) && !changes.length) return;
       rows.push({
         id: event.id || 'baseline-' + changes[0]?.id,
         time: baseline
@@ -68,7 +79,7 @@ export function createActivityPanel({ $, state, selectNode, focusComment }) {
         heading: changes.length === 1 ? label(changes[0]) : event.label,
         changes: changes.map((change) => ({
           id: change.id || '',
-          name: change.name,
+          name: state.snapshot.layerNames?.[change.id] || change.name,
           type: change.type,
           description: changeDescription(change),
           disabled: !change.id || (!pointTarget(change.id) && !state.scene?.nodes.has(change.id)),
@@ -98,16 +109,40 @@ export function createActivityPanel({ $, state, selectNode, focusComment }) {
           },
           true,
         );
+    const byId = new Map(rows.map((row) => [row.id, row])),
+      display = [],
+      grouped = new Set();
+    for (const group of activityGroups(entries)) {
+      const children = group.map((e) => byId.get(e.id)).filter(Boolean);
+      if (!children.length) continue;
+      for (const child of children) grouped.add(child.id);
+      if (children.length === group.length && children.length > 1) {
+        const first = group[0].changes[0],
+          last = group.at(-1).changes[0];
+        display.push({
+          ...children[0],
+          heading: children[0].changes[0].name + ' 위치 조정 · ' + children.length + '회',
+          changes: [
+            {
+              ...children[0].changes[0],
+              description: changeDescription({ ...first, before: last.before }),
+            },
+          ],
+          children,
+        });
+      } else display.push(...children);
+    }
+    display.push(...rows.filter((row) => !grouped.has(row.id)));
     $('#activity-count').textContent = rows.length;
     renderActivityRows(
       list,
-      rows,
-      query || filter !== 'all'
+      display,
+      query || filter !== 'all' || selectedOnly
         ? '조건에 맞는 변경이 없습니다.'
         : '아직 변경 이력이 없습니다. 편집과 주석이 시간순으로 모입니다.',
     );
   }
-  for (const id of ['#activity-scope', '#activity-filter'])
+  for (const id of ['#activity-scope', '#activity-filter', '#activity-selected'])
     $(id).addEventListener('change', render);
   $('#activity-search').addEventListener('input', render);
   return { render };

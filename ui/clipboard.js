@@ -16,7 +16,7 @@ export function createClipboard({ $, state, toast, commitCommentDraft, adapter }
       state.mode === 'edit' &&
       !state.scene?.drag &&
       !state.scene?.areaSelecting &&
-      !document.querySelector('dialog[open]')
+      !document.querySelector('dialog:modal')
     );
   }
   function collect() {

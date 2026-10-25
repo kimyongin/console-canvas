@@ -45,6 +45,7 @@ export function captureFromDocument(value) {
     note,
     updatedAt,
     documentName,
+    layerNames,
     deletedAt,
     ...capture
   } = value;
@@ -77,10 +78,20 @@ export async function saveSession(id, value) {
     activity = [],
     activityHead = null,
     note = '',
+    layerNames = {},
     updatedAt = new Date().toISOString(),
     documentName,
   } = value;
-  const session = { edits, annotations, timeline, activity, activityHead, note, updatedAt };
+  const session = {
+    edits,
+    annotations,
+    timeline,
+    activity,
+    activityHead,
+    note,
+    ...(Object.keys(layerNames).length ? { layerNames } : {}),
+    updatedAt,
+  };
   return transact(['sessions', 'documents'], 'readwrite', (tx) => {
     const metadata = tx.objectStore('documents');
     const request = metadata.get(id);

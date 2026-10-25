@@ -31,7 +31,7 @@ TOOLS = [
     ('get_agent_guide', 'Read the app-bundled Console Canvas skill instructions and version before editing. Works before capturing a screen and does not install files.', schema()),
     ('list_screens', 'List explicitly connected live editor tabs. No original website access.', schema()),
     ('get_screen', 'Read revision, document identity, changes, and undo/redo counts.', schema(BASE, BASE)),
-    ('list_elements', 'Search captured elements by text, label, selector, tag or ID. Includes original locator, geometry and deletion state; paginated.',
+    ('list_elements', 'Search captured elements by text, label, user alias, selector, tag or ID. Includes optional alias, original locator, geometry and deletion state; paginated.',
      schema({**BASE, 'query': {'type': 'string', 'maxLength': 500}, 'parent_id': {'type': 'string'},
              'offset': {'type': 'integer', 'minimum': 0}, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 200}}, BASE)),
     ('list_history', 'Read persisted chronological edit events. Current branch follows snapshot ancestry; scope all includes parallel branches.', schema({**BASE, 'scope': {'enum': ['branch', 'all']}, 'offset': {'type': 'integer', 'minimum': 0}, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 200}}, BASE)),

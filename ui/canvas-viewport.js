@@ -23,6 +23,7 @@ export function createCanvasViewport({ $, state }) {
     }
     option.textContent = Math.round(zoom * 100) + '%';
     select.value = String(zoom);
+    $('#viewport').dispatchEvent(new Event('canvas:viewportchange'));
     $('#canvas-dimensions').textContent =
       width + ' × ' + height + ' · ' + Math.round(zoom * 100) + '%';
   }

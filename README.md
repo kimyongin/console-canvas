@@ -1,5 +1,7 @@
 # Console Canvas · 화면 복제 편집기
 
+0.17.0: 비모달 편집·번호별 전달 검토·그래프 크기 조절·선택 작업 도구·연속 이력 묶음·레이어 별칭을 구현했다. [UX 티켓과 검증 상태](docs/ux-0.17.md)를 확인한다.
+
 0.16.2: 전달 모달의 고정 출력 버튼·스냅샷 이름 변경 후 그래프 복귀·PNG 제목 줄바꿈·삭제 복사본 참고 화면을 수정했다. [검증 및 설치 상태](docs/fix-0.16.2.md)를 확인한다.
 
 제품 목적·확정한 UI 동작·수용 기준·구현/검증 상태는 [PRD](docs/PRD.md), 기능별 코드/검사 대응과 열린 결함은 [전수 대조표](docs/feature-audit.md), 전환 작업과 잔여 검증은 [React·shadcn/ui 개선 티켓](https://github.com/kimyongin/console-canvas/issues/1)에서 확인합니다.

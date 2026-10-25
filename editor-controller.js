@@ -48,6 +48,9 @@ export function createEditorController(options) {
     return {
       id: node.id,
       name: node.name,
+      ...(state.snapshot.layerNames?.[node.id]
+        ? { alias: state.snapshot.layerNames[node.id] }
+        : {}),
       tag: node.tag,
       kind: node.kind,
       parent_id: node.parentId,
@@ -86,7 +89,17 @@ export function createEditorController(options) {
         (node) =>
           (!args.parent_id || node.parentId === args.parent_id) &&
           (!query ||
-            (node.id + ' ' + node.name + ' ' + node.tag + ' ' + JSON.stringify(node.locator))
+            (
+              node.id +
+              ' ' +
+              node.name +
+              ' ' +
+              (state.snapshot.layerNames?.[node.id] || '') +
+              ' ' +
+              node.tag +
+              ' ' +
+              JSON.stringify(node.locator)
+            )
               .toLowerCase()
               .includes(query)),
       );

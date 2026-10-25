@@ -1,3 +1,6 @@
+import { configureModelessInspector } from './ui/modeless-inspector.js';
+import { cleanLayerNames } from './layer-names.js';
+import { createSelectionToolbar } from './ui/selection-toolbar.js';
 import { renderRecent, renderWarnings } from './ui/react/lists.tsx';
 import { buildHandoffImage } from './handoff-image.js';
 import { withVersionScene } from './ui/version-preview.js';
@@ -224,8 +227,12 @@ function closeDocument(id) {
 const areaSelection = createAreaSelection({ $, state, toast });
 const clipboard = createClipboard({ $, state, toast, commitCommentDraft, adapter });
 const { renderInspector: renderInspectorView } = createInspector({ $, state, kinds, selectNode });
+const selectionToolbar = createSelectionToolbar({ $, state });
+configureModelessInspector({ $ });
 function renderInspector() {
   renderInspectorView();
+  selectionToolbar.position();
+  if (!state.scene?.selected && $('#properties-dialog').open) $('#properties-dialog').close();
   adapter.publish();
 }
 function selectNode(id, { reveal = false, additive = false } = {}) {
@@ -244,7 +251,18 @@ function selectNode(id, { reveal = false, additive = false } = {}) {
     }
   }
 }
-const { renderLayers } = createDocumentLists({ $, state, selectNode, focusComment });
+const { renderLayers } = createDocumentLists({
+  $,
+  state,
+  selectNode,
+  renameLayer: (id) => {
+    selectNode(id, { reveal: true });
+    adapter.dispatch('properties');
+    $('.layer-alias-editor').open = true;
+    $('#layer-alias').focus();
+    $('#layer-alias').select();
+  },
+});
 const commentEditor = createCommentEditor({
   $,
   state,
@@ -288,7 +306,8 @@ const { showSnapshots, renderSnapshots } = createSnapshotPanel({
 });
 const activityPanel = createActivityPanel({ $, state, selectNode, focusComment });
 function onKey(event) {
-  if (!state.scene || document.querySelector('dialog[open]')) return;
+  if (event.defaultPrevented) return;
+  if (!state.scene || document.querySelector('dialog:modal')) return;
   if (state.scene.areaSelecting) return;
   const editing = event.target.closest?.('input,textarea,select');
   if (editing && event.target.ownerDocument === document) return;
@@ -366,6 +385,7 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
     annotations: storedComments,
     note: storedNote,
     documentName: storedDocumentName,
+    layerNames: storedLayerNames,
     deletedAt,
     activity,
     activityHead,
@@ -373,7 +393,11 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
   } = snapshot;
   timeline = timeline || storedTimeline;
   state.timeline = null;
-  state.snapshot = { ...capture, ...(documentName ? { documentName } : {}) };
+  state.snapshot = {
+    ...capture,
+    layerNames: cleanLayerNames(storedLayerNames),
+    ...(documentName ? { documentName } : {}),
+  };
   state.activity = cleanActivity(snapshot.activity);
   state.activityHead = snapshot.activityHead || null;
   state.lastCheckpoint = null;
@@ -412,6 +436,7 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
         for (const parent of state.scene.ancestors(id)) state.expanded.add(parent);
       renderInspector();
       renderLayers();
+      activityPanel.render();
     },
     onCommentSelect: (id) => focusComment({ id }),
     onSize: sizeChanged,
@@ -424,6 +449,7 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
     onKey,
   });
   state.scene = scene;
+  scene.snapshot.layerNames = state.snapshot.layerNames;
   try {
     await scene.mount();
     areaSelection.bind(scene);
@@ -572,13 +598,43 @@ $('#edit-selected-comment').addEventListener('click', () => {
   $('#properties-dialog').close();
   focusComment();
 });
+adapter.register('comment', () => focusComment());
 adapter.register('properties', () => {
   if (!state.scene?.selected) return;
   commitCommentDraft();
   renderInspector();
-  $('#properties-dialog').showModal();
+  $('#properties-dialog').show();
 });
+async function setLayerAlias(clear = false) {
+  const id = state.scene?.selected;
+  if (!id) return;
+  const name = clear ? '' : $('#layer-alias').value.trim();
+  if (name.length > 120) return toast('별칭은 120자 이내로 입력해 주세요.');
+  const aliases = { ...state.snapshot.layerNames };
+  if (name) aliases[id] = name;
+  else delete aliases[id];
+  state.snapshot.layerNames = aliases;
+  state.scene.snapshot.layerNames = aliases;
+  state.revision++;
+  renderInspector();
+  renderLayers();
+  try {
+    await flushEditor();
+    toast(name ? '레이어 별칭을 저장했습니다.' : '기본 레이어 이름을 사용합니다.');
+  } catch (error) {
+    toast(error.message);
+  }
+}
+$('#save-layer-alias').addEventListener('click', () => setLayerAlias());
+$('#clear-layer-alias').addEventListener('click', () => setLayerAlias(true));
 $('#close-properties').addEventListener('click', () => $('#properties-dialog').close());
+$('#properties-dialog').addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !e.isComposing) {
+    e.preventDefault();
+    e.stopPropagation();
+    $('#properties-dialog').close();
+  }
+});
 adapter.register('undo', () => undo());
 adapter.register('redo', () => undo('redo'));
 $('#select-parent').addEventListener('click', () =>
@@ -624,14 +680,23 @@ $('#viewport').addEventListener(
 );
 document.addEventListener('keydown', onKey);
 $('#review-note').addEventListener('change', () => changeCommitted({ label: '추가 설명 수정' }));
-createExportDialog({ $, state, commitCommentDraft, editorId, flushEditor, prepareEditor, toast });
+createExportDialog({
+  $,
+  state,
+  commitCommentDraft,
+  editorId,
+  flushEditor,
+  prepareEditor,
+  toast,
+  focusComment,
+});
 window.addEventListener('dragover', (event) => {
   if (event.dataTransfer?.types.includes('Files')) event.preventDefault();
 });
 window.addEventListener('drop', (event) => {
   if (event.dataTransfer?.files.length) {
     event.preventDefault();
-    if (document.querySelector('dialog[open]')) {
+    if (document.querySelector('dialog:modal')) {
       toast('열린 창을 닫고 파일을 가져와 주세요.');
       return;
     }
@@ -670,7 +735,8 @@ const controller = createEditorController({
   },
   isBusy: () =>
     !!state.transactionBusy ||
-    !!document.querySelector('dialog[open]') ||
+    !!document.querySelector('dialog:modal') ||
+    !!document.activeElement?.closest('#properties-dialog input') ||
     document.activeElement === $('#snapshot-name') ||
     !!(
       state.commentTarget &&
@@ -745,7 +811,7 @@ if (window.ConsoleCanvasDesktop) {
       !state.ready ||
       state.scene?.drag ||
       state.scene?.areaSelecting ||
-      document.querySelector('dialog[open]')
+      document.querySelector('dialog:modal')
     )
       return;
     commitCommentDraft();

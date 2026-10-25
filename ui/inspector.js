@@ -26,8 +26,10 @@ export function createInspector({ $, state, kinds, selectNode }) {
       if (!$('#comment-dialog').open) state.commentTarget = null;
       return;
     }
+    if (document.activeElement !== $('#layer-alias'))
+      $('#layer-alias').value = state.snapshot.layerNames?.[id] || '';
     const comment = scene.annotations[id] || '';
-    $('#comment-target-title').textContent = elementLabel(node);
+    $('#comment-target-title').textContent = elementLabel(node, state.snapshot.layerNames);
     $('#selected-comment-summary').textContent =
       comment || '수정 방향을 주석으로 남길 수 있습니다.';
     $('#edit-selected-comment').textContent = comment ? '주석 편집' : '주석 남기기';
@@ -43,13 +45,14 @@ export function createInspector({ $, state, kinds, selectNode }) {
       : '주석은 화면을 바꾸지 않고 요청으로 전달됩니다.';
     $('#element-kind').textContent =
       count > 1 ? '다중 선택 · ' + count + '개' : (kinds[node.kind] || '요소') + ' · ' + node.tag;
-    $('#element-name').textContent = count > 1 ? count + '개 요소 선택' : elementLabel(node);
+    $('#element-name').textContent =
+      count > 1 ? count + '개 요소 선택' : elementLabel(node, state.snapshot.layerNames);
     const path = $('#element-path');
     renderPath(
       path,
       [...scene.ancestors(id).reverse(), id].slice(-5).map((key) => ({
         id: key,
-        label: elementLabel(scene.nodes.get(key)),
+        label: elementLabel(scene.nodes.get(key), state.snapshot.layerNames),
         title: scene.nodes.get(key).tag + ' · ' + key,
       })),
       selectNode,

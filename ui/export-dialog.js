@@ -1,4 +1,8 @@
-import { renderImage, renderVersionOptions } from './react/versions.tsx';
+import {
+  renderHandoffPreview,
+  renderHandoffRequests,
+  renderVersionOptions,
+} from './react/versions.tsx';
 import { clearReact } from './react/mount.tsx';
 import { download, reviewPayload } from '../export.js';
 import { buildHandoffImage, handoffRequests } from '../handoff-image.js';
@@ -10,10 +14,39 @@ export function createExportDialog({
   flushEditor,
   prepareEditor,
   toast,
+  focusComment,
 }) {
   let generation = 0,
     latest = null,
-    previewUrl = null;
+    previewUrl = null,
+    returnToExport = null;
+  function editRequest(id) {
+    if (chosen()?.id !== '@current') return;
+    returnToExport = {
+      document: state.snapshot.id,
+      generation: state.generation,
+      scroll: $('.export-scroll').scrollTop,
+    };
+    $('#export-dialog').close();
+    focusComment({ id });
+  }
+  $('#comment-dialog').addEventListener('close', async () => {
+    const target = returnToExport;
+    returnToExport = null;
+    if (!target || target.document !== state.snapshot?.id || target.generation !== state.generation)
+      return;
+    try {
+      await flushEditor();
+      if (target.generation !== state.generation) return;
+      renderVersionOptions($('#handoff-version'), versionOptions(state));
+      $('#handoff-version').value = '@current';
+      $('#export-dialog').showModal();
+      await refresh();
+      $('.export-scroll').scrollTop = target.scroll;
+    } catch (error) {
+      toast(error.message);
+    }
+  });
   function chosen() {
     return versionOptions(state).find((v) => v.id === $('#handoff-version').value);
   }
@@ -30,12 +63,19 @@ export function createExportDialog({
     $('#download-review').disabled = true;
     clearReact($('#handoff-preview'));
     $('#handoff-preview').textContent = '전달 이미지 준비 중…';
+    clearReact($('#handoff-items'));
     try {
       const result = await useVersion(async (scene, version) => {
         const requests = handoffRequests(scene);
         $('#export-summary').textContent = version.name + ' · 변경 요청 ' + requests.length + '개';
         $('#review-note').closest('label').hidden = version.id !== '@current';
-        $('#handoff-items').replaceChildren();
+        if (token === generation)
+          renderHandoffRequests(
+            $('#handoff-items'),
+            requests,
+            version.id === '@current',
+            editRequest,
+          );
         // The image is the review surface; avoid duplicating all cards as text.
         return buildHandoffImage(
           state.snapshot,
@@ -48,7 +88,14 @@ export function createExportDialog({
       latest = result;
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       previewUrl = URL.createObjectURL(result.blob);
-      renderImage($('#handoff-preview'), previewUrl);
+      renderHandoffPreview(
+        $('#handoff-preview'),
+        previewUrl,
+        result,
+        chosen()?.id === '@current',
+        editRequest,
+      );
+      if (token !== generation || !$('#export-dialog').open) return;
       $('#export-status').textContent =
         '이 이미지 한 장을 에이전트 대화에 첨부하세요. 번호별 주석에 반응형 배치 의도를 적으면 더 명확해집니다.';
       $('#copy-summary').disabled = false;

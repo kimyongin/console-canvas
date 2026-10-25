@@ -103,6 +103,7 @@ export function createEditorSession({
     status('저장 중…');
     state.saving = saveQueue.enqueue(state.snapshot.id, {
       documentName: state.snapshot.documentName,
+      layerNames: state.snapshot.layerNames || {},
       edits: state.scene.edits,
       annotations: state.scene.annotations,
       timeline: state.timeline,

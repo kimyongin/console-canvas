@@ -18,6 +18,68 @@ export function createSnapshotPanel({
     activeId = null,
     previewKey = null,
     generation = 0;
+  let preferredHeight = null;
+  try {
+    preferredHeight = Number(localStorage.getItem('console-canvas-graph-height')) || null;
+  } catch {}
+  function graphHeight(natural = 170) {
+    const h = Math.max(
+      100,
+      Math.min(preferredHeight || natural, Math.min(360, innerHeight * 0.42)),
+    );
+    $('#snapshot-graph-scroll').style.height = h + 'px';
+    $('#snapshot-splitter').setAttribute('aria-valuenow', String(Math.round(h)));
+  }
+  const splitter = $('#snapshot-splitter');
+  let resizing = null;
+  function storeHeight() {
+    try {
+      localStorage.setItem('console-canvas-graph-height', String(preferredHeight));
+    } catch {}
+  }
+  splitter.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    resizing = {
+      y: e.clientY,
+      height: $('#snapshot-graph-scroll').getBoundingClientRect().height,
+      id: e.pointerId,
+    };
+    splitter.setPointerCapture(e.pointerId);
+  });
+  splitter.addEventListener('pointermove', (e) => {
+    if (!resizing || e.pointerId !== resizing.id) return;
+    preferredHeight = Math.max(100, Math.min(360, resizing.height + e.clientY - resizing.y));
+    graphHeight();
+  });
+  function finishResize(e) {
+    if (!resizing || e.pointerId !== resizing.id) return;
+    resizing = null;
+    if (splitter.hasPointerCapture(e.pointerId)) splitter.releasePointerCapture(e.pointerId);
+    storeHeight();
+  }
+  splitter.addEventListener('pointerup', finishResize);
+  splitter.addEventListener('pointercancel', finishResize);
+  splitter.addEventListener('keydown', (e) => {
+    if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    preferredHeight =
+      e.key === 'Home'
+        ? 100
+        : e.key === 'End'
+          ? 360
+          : Math.max(
+              100,
+              Math.min(
+                360,
+                Number(splitter.getAttribute('aria-valuenow')) + (e.key === 'ArrowUp' ? -20 : 20),
+              ),
+            );
+    graphHeight();
+    storeHeight();
+  });
+  window.addEventListener('resize', () => graphHeight($('#snapshot-list').offsetHeight));
   const selected = () =>
     state.timeline?.entries.find((e) => e.id === state.snapshotPreviewId && !e.deletedAt);
   function updateLabel() {
@@ -27,6 +89,12 @@ export function createSnapshotPanel({
         (e) => e.id === state.timeline.activeId && !e.deletedAt,
       );
     const name = entry?.name || active?.name || (state.timeline ? '현재 작업' : '문서 열기');
+    $('#snapshot-current').textContent =
+      '작업 중: ' +
+      (active?.name || '현재 작업') +
+      '  |  미리보기: ' +
+      (entry?.name || '선택 없음') +
+      (snapshotHistory.dirty() ? ' · 저장 전 변경 있음' : '');
     const suffix =
       entry && entry.id !== active?.id
         ? ' · 미리보기'
@@ -191,6 +259,7 @@ export function createSnapshotPanel({
       selectPreview,
       actions,
     );
+    graphHeight(data.height);
     scroll.scrollLeft = x;
     scroll.scrollTop = y;
     if (focus)

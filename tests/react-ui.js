@@ -52,15 +52,16 @@ try {
   doc.querySelector('#edit-properties').focus();
   doc.querySelector('#edit-properties').click();
   check(
-    'Selection enables the React action and opens a labelled modal',
+    'Selection opens the labelled modeless editor',
     doc.querySelector('#properties-dialog').open &&
+      !doc.querySelector('#properties-dialog').matches(':modal') &&
       (doc.querySelector('#properties-dialog').hasAttribute('aria-labelledby') ||
         doc.querySelector('#properties-dialog').hasAttribute('aria-label')),
   );
   doc.querySelector('#close-properties').click();
   await until(() => doc.activeElement === doc.querySelector('#edit-properties'));
   check(
-    'Closing the modal returns focus to its trigger',
+    'Closing the modeless editor returns focus to its trigger',
     doc.activeElement === doc.querySelector('#edit-properties'),
   );
   app.adapter.dispatch('properties');
