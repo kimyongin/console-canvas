@@ -1,3 +1,4 @@
+import { renderPath } from './react/lists.tsx';
 import { elementLabel } from './element-labels.js';
 export function createInspector({ $, state, kinds, selectNode }) {
   function renderInspector() {
@@ -44,15 +45,15 @@ export function createInspector({ $, state, kinds, selectNode }) {
       count > 1 ? '다중 선택 · ' + count + '개' : (kinds[node.kind] || '요소') + ' · ' + node.tag;
     $('#element-name').textContent = count > 1 ? count + '개 요소 선택' : elementLabel(node);
     const path = $('#element-path');
-    path.replaceChildren();
-    for (const key of [...scene.ancestors(id).reverse(), id].slice(-5)) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.textContent = elementLabel(scene.nodes.get(key));
-      button.title = scene.nodes.get(key).tag + ' · ' + key;
-      button.addEventListener('click', () => selectNode(key));
-      path.append(button);
-    }
+    renderPath(
+      path,
+      [...scene.ancestors(id).reverse(), id].slice(-5).map((key) => ({
+        id: key,
+        label: elementLabel(scene.nodes.get(key)),
+        title: scene.nodes.get(key).tag + ' · ' + key,
+      })),
+      selectNode,
+    );
     const edit = scene.edits[id] || {};
     $('#offset-x').value = edit.dx || 0;
     $('#offset-y').value = edit.dy || 0;

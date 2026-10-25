@@ -5,7 +5,7 @@ import {
   trashDocument,
   restoreDocument,
 } from '../db.js';
-import { createActionMenu } from './action-menu.js';
+import { renderDocumentRows } from './react/lists.tsx';
 export function createDocumentSwitcher({
   $,
   state,
@@ -95,7 +95,7 @@ export function createDocumentSwitcher({
   }
   function render() {
     const query = $('#document-search').value.trim().toLocaleLowerCase();
-    list.replaceChildren();
+
     $('#documents-live').setAttribute('aria-pressed', String(!deleted));
     $('#documents-trash').setAttribute('aria-pressed', String(deleted));
     const matches = documents.filter((d) =>
@@ -108,30 +108,8 @@ export function createDocumentSwitcher({
         : deleted
           ? '휴지통이 비어 있습니다.'
           : '저장된 화면이 없습니다.';
-    for (const value of matches) {
-      const card = document.createElement('div'),
-        button = document.createElement('button');
-      card.className = 'document-card';
-      card.dataset.documentCard = value.id;
-      button.className = 'document-item';
-      button.disabled = loading || deleted;
-      button.dataset.documentId = value.id;
+    const rows = matches.map((value) => {
       const current = value.id === state.snapshot?.id;
-      if (current) button.setAttribute('aria-current', 'true');
-      const title = document.createElement('strong'),
-        url = document.createElement('span'),
-        date = document.createElement('small');
-      title.textContent = (value.title || '이름 없는 화면') + (current ? ' · 현재 작업' : '');
-      url.textContent = value.url;
-      date.textContent = deleted
-        ? '휴지통 이동 ' + new Date(value.deletedAt).toLocaleString('ko-KR')
-        : '최근 저장 ' + new Date(value.updatedAt).toLocaleString('ko-KR');
-      button.title = '가져옴 ' + new Date(value.capturedAt).toLocaleString('ko-KR');
-      button.append(title, url, date);
-      button.addEventListener('click', () => {
-        if (current) dialog.close();
-        else action(() => openDocument(value.id));
-      });
       const actions = [
         { label: '이름 변경', scope: 'document', kind: 'rename', run: () => rename(value) },
       ];
@@ -143,27 +121,30 @@ export function createDocumentSwitcher({
           className: 'danger-menu',
           run: () => trash(value),
         });
-      card.append(button, createActionMenu({ label: value.title, actions }));
-      if (deleted) {
-        const controls = document.createElement('div');
-        controls.className = 'recovery-actions';
-        for (const [label, kind, open] of [
-          ['복구', 'recover', false],
-          ['복구하고 열기', 'recover-open', true],
-        ]) {
-          const b = document.createElement('button');
-          b.textContent = label;
-          b.setAttribute('aria-label', value.title + ' · ' + label);
-          b.dataset.documentAction = kind;
-          b.disabled = loading;
-          b.addEventListener('click', () => recover(value, open));
-          controls.append(b);
-        }
-        card.append(controls);
-      }
-      if (loading) for (const b of card.querySelectorAll('button')) b.disabled = true;
-      list.append(card);
-    }
+      return {
+        id: value.id,
+        title: value.title || '이름 없는 화면',
+        url: value.url,
+        date:
+          (deleted ? '휴지통 이동 ' : '최근 저장 ') +
+          new Date(deleted ? value.deletedAt : value.updatedAt).toLocaleString('ko-KR'),
+        captured: '가져옴 ' + new Date(value.capturedAt).toLocaleString('ko-KR'),
+        current,
+        disabled: loading || deleted,
+        open: () => {
+          if (current) dialog.close();
+          else action(() => openDocument(value.id));
+        },
+        actions,
+        recovery: deleted
+          ? [
+              { label: '복구', kind: 'recover', run: () => recover(value, false) },
+              { label: '복구하고 열기', kind: 'recover-open', run: () => recover(value, true) },
+            ]
+          : undefined,
+      };
+    });
+    renderDocumentRows(list, rows, loading);
   }
   async function show(trashView = false) {
     if (state.scene?.drag || state.scene?.areaSelecting || loading) return;
@@ -171,7 +152,7 @@ export function createDocumentSwitcher({
     menu.hidePopover();
     deleted = trashView;
     $('#document-search').value = '';
-    list.replaceChildren();
+    renderDocumentRows(list, [], true);
     status.textContent = '저장된 화면을 불러오는 중…';
     dialog.showModal();
     try {

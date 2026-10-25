@@ -4,6 +4,8 @@ import path from 'node:path';
 import os from 'node:os';
 import net from 'node:net';
 const root = path.resolve(import.meta.dirname, '..');
+const offscreen = process.argv.includes('--offscreen');
+const fixture = offscreen ? 'tests/desktop-offscreen-fixture.cjs' : 'tests/desktop-fixture.cjs';
 const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'console-canvas-desktop-check-'));
 const socket = net.createServer();
 await new Promise((resolve) => socket.listen(0, '127.0.0.1', resolve));
@@ -16,6 +18,7 @@ const env = {
   CONSOLE_CANVAS_TEST_DIR: temporary,
   CONSOLE_CANVAS_STATE_DIR: path.join(temporary, 'bridge'),
   CONSOLE_CANVAS_PORT: String(port),
+  ...(offscreen ? { CONSOLE_CANVAS_OFFSCREEN: '1' } : {}),
 };
 await fs.mkdir(env.HOME, { recursive: true });
 let active,
@@ -56,7 +59,7 @@ async function waitFor(filename) {
 }
 try {
   const electron = process.env.ELECTRON_BINARY || path.join(root, 'node_modules/.bin/electron');
-  active = start(electron, ['tests/desktop-fixture.cjs'], { CONSOLE_CANVAS_TEST_PHASE: 'prepare' });
+  active = start(electron, [fixture], { CONSOLE_CANVAS_TEST_PHASE: 'prepare' });
   const capture = await Promise.race([
     waitFor('prepare-ready.json'),
     active.done.then(() => {
@@ -84,7 +87,7 @@ try {
   );
   if (session.document_id !== expected.document_id)
     throw new Error('Normal quit did not persist last document');
-  active = start(electron, ['tests/desktop-fixture.cjs'], { CONSOLE_CANVAS_TEST_PHASE: 'reopen' });
+  active = start(electron, [fixture], { CONSOLE_CANVAS_TEST_PHASE: 'reopen' });
   const reopened = await Promise.race([
     waitFor('reopen-ready.json'),
     active.done.then(() => {
@@ -94,13 +97,17 @@ try {
   await active.done;
   active = null;
   const report = {
+    captureMode: offscreen
+      ? 'real DOM / fixture screenshot / offscreen'
+      : 'real DOM / display screenshot',
+    manualInstalledAppUse: false,
     capture,
     reopened,
     officialSdkChecks: sdkReport.passed,
     normalQuitAndRelaunch: true,
   };
   await fs.writeFile(
-    path.join(root, 'dist/desktop-checks.json'),
+    path.join(root, offscreen ? 'dist/desktop-offscreen-checks.json' : 'dist/desktop-checks.json'),
     JSON.stringify(report, null, 2) + '\n',
   );
   console.log(JSON.stringify(report));

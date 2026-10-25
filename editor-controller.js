@@ -194,7 +194,7 @@ export function createEditorController(options) {
             ? {
                 snapshot_id: options.snapshotHistory.create(args.name || '', { actor: 'agent' }).id,
               }
-            : options.snapshotHistory.restore(args.snapshot_id, { actor: 'agent' });
+            : await options.snapshotHistory.restorePersisted(args.snapshot_id, { actor: 'agent' });
       } catch (error) {
         return failure('snapshot_error', error.message);
       }

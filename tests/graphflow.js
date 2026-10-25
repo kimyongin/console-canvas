@@ -49,6 +49,7 @@ try {
         doc.querySelector('#snapshot-dropdown').textContent.includes(name),
     );
     await app.state.saving;
+    while (app.state.transactionBusy) await new Promise((r) => setTimeout(r, 10));
     const id = app.state.timeline.activeId;
     await until(() => doc.querySelector('#snapshot-preview-view iframe')?.title.includes(name));
     return id;
@@ -81,6 +82,7 @@ try {
   );
   click('#apply-snapshot');
   await app.state.saving;
+  while (app.state.transactionBusy) await new Promise((r) => setTimeout(r, 10));
   check(
     'Explicit apply returns to past A with its saved edits and comments',
     app.state.timeline.activeId === a &&
@@ -122,6 +124,7 @@ try {
   click(`[data-snapshot-id="${c}"]`);
   click('#apply-snapshot');
   await app.state.saving;
+  while (app.state.transactionBusy) await new Promise((r) => setTimeout(r, 10));
   check(
     'Future C remains reachable without removing D',
     app.state.timeline.activeId === c && app.state.scene.edits[node.id].dx === 72 && !!entry(d),
@@ -129,6 +132,7 @@ try {
   click(`[data-snapshot-id="${d}"]`);
   click('#apply-snapshot');
   await app.state.saving;
+  while (app.state.transactionBusy) await new Promise((r) => setTimeout(r, 10));
   check(
     'Parallel D remains reachable with its own geometry',
     app.state.timeline.activeId === d && app.state.scene.edits[node.id].dx === 96,
@@ -149,6 +153,7 @@ try {
   );
   const id = app.state.snapshot.id;
   await app.state.saving;
+  while (app.state.transactionBusy) await new Promise((r) => setTimeout(r, 10));
   const persisted = await getDocument(id);
   check(
     'Saved session retains both branch parent IDs',
@@ -164,6 +169,7 @@ try {
   click(`[data-snapshot-id="${c}"]`);
   click('#apply-snapshot');
   await app.state.saving;
+  while (app.state.transactionBusy) await new Promise((r) => setTimeout(r, 10));
   check(
     'App-page restart preserves graph and past/future navigation',
     app.state.timeline.activeId === c &&

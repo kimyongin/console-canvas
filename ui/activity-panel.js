@@ -1,3 +1,4 @@
+import { renderActivityRows } from './react/lists.tsx';
 import { activityBranch } from '../activity-history.js';
 import { pointTarget } from '../edit-commands.js';
 export function changeDescription(change) {
@@ -35,7 +36,7 @@ export function createActivityPanel({ $, state, selectNode, focusComment }) {
   }
   function render() {
     const list = $('#activity-list');
-    list.replaceChildren();
+    const rows = [];
     const all = $('#activity-scope').value === 'all',
       filter = $('#activity-filter').value,
       query = $('#activity-search').value.trim().toLowerCase();
@@ -56,35 +57,24 @@ export function createActivityPanel({ $, state, selectNode, focusComment }) {
         );
       });
       if ((filter !== 'all' || query) && !changes.length) return;
-      const card = document.createElement('article');
-      card.className = 'activity-event';
-      if (event.id) card.dataset.eventId = event.id;
-      const time = document.createElement('small');
-      time.textContent = baseline
-        ? '저장된 주석 · 이전 작업에서 유지됨'
-        : new Date(event.created_at).toLocaleTimeString('ko-KR', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }) + (event.actor === 'agent' ? ' · 에이전트' : '');
-      const heading = document.createElement('strong');
-      heading.textContent = changes.length === 1 ? label(changes[0]) : event.label;
-      card.append(time, heading);
-      for (const change of changes) {
-        const button = document.createElement('button');
-        button.className = 'activity-change';
-        button.dataset.targetId = change.id || '';
-        button.dataset.changeType = change.type;
-        const target = document.createElement('strong');
-        target.textContent = change.name;
-        const detail = document.createElement('span');
-        detail.textContent = changeDescription(change);
-        button.append(target, detail);
-        button.disabled =
-          !change.id || (!pointTarget(change.id) && !state.scene?.nodes.has(change.id));
-        button.addEventListener('click', () => reveal(change));
-        card.append(button);
-      }
-      list.append(card);
+      rows.push({
+        id: event.id || 'baseline-' + changes[0]?.id,
+        time: baseline
+          ? '저장된 주석 · 이전 작업에서 유지됨'
+          : new Date(event.created_at).toLocaleTimeString('ko-KR', {
+              hour: '2-digit',
+              minute: '2-digit',
+            }) + (event.actor === 'agent' ? ' · 에이전트' : ''),
+        heading: changes.length === 1 ? label(changes[0]) : event.label,
+        changes: changes.map((change) => ({
+          id: change.id || '',
+          name: change.name,
+          type: change.type,
+          description: changeDescription(change),
+          disabled: !change.id || (!pointTarget(change.id) && !state.scene?.nodes.has(change.id)),
+          run: () => reveal(change),
+        })),
+      });
     }
     for (const event of entries) {
       for (const c of event.changes) if (c.type === 'comment') covered.add(c.id);
@@ -108,12 +98,14 @@ export function createActivityPanel({ $, state, selectNode, focusComment }) {
           },
           true,
         );
-    $('#activity-count').textContent = list.children.length;
-    if (!list.children.length)
-      list.textContent =
-        query || filter !== 'all'
-          ? '조건에 맞는 변경이 없습니다.'
-          : '아직 변경 이력이 없습니다. 편집과 주석이 시간순으로 모입니다.';
+    $('#activity-count').textContent = rows.length;
+    renderActivityRows(
+      list,
+      rows,
+      query || filter !== 'all'
+        ? '조건에 맞는 변경이 없습니다.'
+        : '아직 변경 이력이 없습니다. 편집과 주석이 시간순으로 모입니다.',
+    );
   }
   for (const id of ['#activity-scope', '#activity-filter'])
     $(id).addEventListener('change', render);

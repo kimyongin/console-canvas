@@ -1,6 +1,6 @@
 # Console Canvas · 화면 복제 편집기
 
-제품 목적·확정한 UI 동작·수용 기준·구현/검증 상태는 [PRD](docs/PRD.md), 기능별 코드/검사 대응과 열린 결함은 [전수 대조표](docs/feature-audit.md), 기술 전환 계획은 [React·shadcn/ui 개선 티켓](https://github.com/kimyongin/console-canvas/issues/1)에서 확인합니다.
+제품 목적·확정한 UI 동작·수용 기준·구현/검증 상태는 [PRD](docs/PRD.md), 기능별 코드/검사 대응과 열린 결함은 [전수 대조표](docs/feature-audit.md), 전환 작업과 잔여 검증은 [React·shadcn/ui 개선 티켓](https://github.com/kimyongin/console-canvas/issues/1)에서 확인합니다.
 
 현재 보고 있는 콘솔 웹 화면을 **소스코드 없이** 가져와 독립된 편집 공간에서 수정하거나 요소별 주석으로 변경 방향을 남기는 로컬 프로토타입입니다. 주 사용 경로는 Chromium을 내장한 독립 앱이며 Chrome 확장은 보조 방식으로 유지합니다. 원본 사이트와 복제본 편집기는 분리되고, AI API 키 없이 로컬 MCP로 에이전트와 연결할 수 있습니다.
 
@@ -135,7 +135,7 @@ python3 scripts/install_skill.py
 2. 위에 변경 후 화면, 아래에 번호별 요청 카드가 두 열로 배치된 단일 이미지를 검토합니다.
 3. **이미지 복사** 또는 **전달 이미지 저장**으로 PNG 한 장을 대화에 전달합니다.
 
-0.15.0에는 데스크톱 **전달 이미지 저장**이 PNG 파일명 검사에서 거절되는 [열린 결함 #8](https://github.com/kimyongin/console-canvas/issues/8)이 있습니다. 이미지 생성·브라우저 다운로드·MCP PNG 응답과 데스크톱 파일 저장의 상태를 구분합니다. 잘못된 파일 열기와 저장 오류 시 백업/복원 문제도 [PRD의 미충족 요구](docs/PRD.md)에 기록했습니다.
+0.16.0 소스는 데스크톱 PNG 저장, 잘못된 파일의 사전 거절, DB 오류 중 긴급 JSON 백업, 스냅샷 복원 저장 실패의 롤백을 수정했습니다. PNG 파일 저장은 격리 앱의 실제 IPC/파일 경로로 확인했으며, 설치 창 직접 사용과 배포 상태는 [검증 기록](docs/verification.md)을 따릅니다. 긴급 파일은 현재 문서 한 개의 편집·주석·분기/휴지통·이력을 담고, 자동 저장 오류는 별도로 계속 표시합니다.
 
 화면의 하이라이트와 카드가 같은 번호로 연결됩니다. 삭제된 대상은 점선 위치와 삭제 전 참고 이미지, 작은 대상은 확대 영역을 포함합니다. 주석과 추가 설명은 같은 이미지에 들어갑니다. 고정 픽셀 이동량 대신 정렬·간격·반응형 줄바꿈 의도를 전달합니다. 요청이 많으면 글자를 줄이지 않고 이미지 높이를 늘립니다. 현재 생성 한도는 높이 32,760px·1억 픽셀이며 초과 시 내용을 줄이거나 버전을 나누도록 안내합니다.
 
@@ -153,14 +153,14 @@ python3 scripts/install_skill.py
 
 ## 개발 및 검증
 
-실행 중인 편집기와 MCP 서버에는 외부 런타임 패키지가 필요 없습니다. 소스 개발·빌드는 Node.js 22.12 이상과 Python 3.9 이상을 사용하며, 개발 의존성으로 Electron·MCP SDK·esbuild·Prettier를 설치합니다.
+실행 중인 편집기와 MCP 서버에는 외부 런타임 패키지가 필요 없습니다. 소스 개발·빌드는 Node.js 22.12 이상과 Python 3.9 이상을 사용하며, 편집기 UI는 React·TypeScript·shadcn 소스를 사용합니다. React/JSX 런타임은 번들에 포함하며 빌드에 TypeScript·Tailwind/PostCSS·Electron·MCP SDK·esbuild·Prettier를 설치합니다.
 
 ```sh
 npm ci
 npm run check
 ```
 
-`check`는 포맷 검사 → 모듈 번들·스킬 패키징 → Python → Node → 실제 Chromium UI → 독립 앱·공식 MCP SDK·종료 후 재실행 검증을 순서대로 실행합니다. 가상 NORTH 데이터와 임시 프로필·임시 포트만 사용합니다. `npm run format`은 포맷을 정리하고 `npm run test:desktop`은 독립 앱 검증만 실행합니다. 별도로 준비한 Electron은 `ELECTRON_BINARY=/absolute/path/to/Electron npm run check`로 지정할 수 있습니다.
+`check`는 TypeScript 검사 → 포맷 검사 → 모듈 번들·스킬 패키징 → Python → Node → 실제 Chromium UI → 독립 앱·공식 MCP SDK·종료 후 재실행 검증을 순서대로 실행합니다. 가상 NORTH 데이터와 임시 프로필·임시 포트만 사용합니다. `npm run format`은 포맷을 정리하고 `npm run test:desktop`은 독립 앱 검증만 실행합니다. 별도로 준비한 Electron은 `ELECTRON_BINARY=/absolute/path/to/Electron npm run check`로 지정할 수 있습니다.
 
 ```sh
 python3 -m http.server 8848 --bind 127.0.0.1 --directory /absolute/path/to/console-canvas
@@ -177,7 +177,7 @@ python3 -m http.server 8848 --bind 127.0.0.1 --directory /absolute/path/to/conso
 
 빌드 결과는 `dist/Console Canvas.html`, `dist/console-canvas-extension.zip`, `dist/console-canvas-skill.zip`입니다. 스킬 런타임 자산도 같은 빌드에서 갱신합니다. 저장소에 포함된 `sample.uiclone.json`은 가상 데이터만 사용합니다. 실제 캡처 파일과 사용자 전달 ZIP은 커밋하지 않습니다.
 
-0.15.0의 잠금 상태 재검증에서 Chromium 227개, Python 39개, Node 23개를 통과했습니다. 표준 전체 검사는 데스크톱 캡처 단계에서 중단됐으며, 가상 캡처 조건의 MCP·재실행 결과와 직접 사용 잔여 항목은 [docs/verification.md](docs/verification.md)에 구분해 기록합니다. **개인 Chrome에 확장을 설치한 뒤 탭 권한으로 실제 사이트를 가져오는 경계는 아직 검증하지 않았습니다.**
+0.16.0에서 TypeScript·포맷·빌드, Chromium 247개·Python 39개·Node 24개와 공식 SDK 22개를 표준 전체 검사로 통과했습니다. 실제 DOM/표시 표면 캡처·네이티브 PNG 파일 저장·정상 종료/재실행을 포함합니다. 잠금 상태의 별도 offscreen 검사·설치 창 직접 사용·배포 상태는 [docs/verification.md](docs/verification.md)에 구분합니다. **개인 Chrome 확장의 설치/탭 권한 경계는 별도 검증 대상입니다.**
 
 Chrome 확장의 권한은 `activeTab`, `scripting`, `storage`, `unlimitedStorage`와 로컬 MCP 연결용 `http://127.0.0.1/*` 접근입니다. 원격 서버나 AI API에 데이터를 전송하는 기능은 없습니다.
 
@@ -194,7 +194,7 @@ python3 scripts/install_desktop.py
 
 공식 Electron 릴리스의 SHA-256을 확인한 뒤 `dist/Console Canvas.app`과 `dist/console-canvas-desktop-macos-arm64.zip`을 생성합니다. `--download-only`는 런타임 준비만 수행합니다. 설치 위치는 기본 `~/Applications/Console Canvas.app`이며 기존 앱은 `--update`를 지정한 Console Canvas만 교체합니다.
 
-Node.js 개발 환경에서는 `npm install` 후 `npm start`로 소스를 실행할 수 있습니다. Python 실행 파일은 `CONSOLE_CANVAS_PYTHON`, 로컬 상태 폴더는 `CONSOLE_CANVAS_STATE_DIR`, 개발용 브리지 포트는 `CONSOLE_CANVAS_PORT`(기본 8849)로 지정할 수 있습니다. 일반 CLI 서버의 상태 폴더는 `--state-dir`로 지정합니다.
+Node.js 개발 환경에서는 `npm ci`와 `npm run build` 후 `npm start`로 소스를 실행할 수 있습니다. Python 실행 파일은 `CONSOLE_CANVAS_PYTHON`, 로컬 상태 폴더는 `CONSOLE_CANVAS_STATE_DIR`, 개발용 브리지 포트는 `CONSOLE_CANVAS_PORT`(기본 8849)로 지정할 수 있습니다. 일반 CLI 서버의 상태 폴더는 `--state-dir`로 지정합니다.
 
 독립 앱에서 가상 **샘플 콘솔**을 가져온 뒤 `node scripts/verify_mcp.mjs`를 실행하면 공식 SDK가 실제 stdio MCP 서버와 통신해 이동·삭제·주석 수정·실행 취소·재전송·버전 충돌을 검증합니다. 사용자 실제 데이터에는 이 검증 스크립트를 사용하지 않습니다.
 

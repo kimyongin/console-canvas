@@ -1,5 +1,5 @@
 const FORMAT = 'console-canvas-clipboard';
-export function createClipboard({ $, state, toast, commitCommentDraft }) {
+export function createClipboard({ $, state, toast, commitCommentDraft, adapter }) {
   let local = null,
     lastText = '',
     pasteCount = 0,
@@ -78,7 +78,7 @@ export function createClipboard({ $, state, toast, commitCommentDraft }) {
     };
   }
   bind(document);
-  $('#copy').addEventListener('click', async () => {
+  adapter.register('copy', async () => {
     if (!available()) return;
     const text = safely(collect);
     if (!text) return;
@@ -89,7 +89,7 @@ export function createClipboard({ $, state, toast, commitCommentDraft }) {
       toast('요소를 복사했습니다. 이 창에서 붙여넣기를 사용할 수 있습니다.');
     }
   });
-  $('#paste').addEventListener('click', async () => {
+  adapter.register('paste', async () => {
     if (!available()) return;
     let text;
     try {

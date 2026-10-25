@@ -1,6 +1,8 @@
 # 기능 전수 조사와 PRD 대조
 
-조사일 2026-10-25 · 코드 기준 0.15.0 / 6756a95 · 대상 [PRD](PRD.md)
+최초 조사일 2026-10-25 · 최초 코드 기준 0.15.0 / 6756a95 · 대상 [PRD](PRD.md)
+
+0.16.0 후속: 아래는 결함 발견 당시의 전수 조사 기록이다. #8~#11의 코드 수정·회귀 검사를 추가했고 UI 마크업은 `ui/react/editor-shell.tsx`, 목록은 `lists.tsx`/`versions.tsx`로 이동했다. 제품 현재 상태는 PRD 9절과 [검증 기록](verification.md)을 따른다. 아래의 “미수정”은 최초 조사 당시 상태다.
 
 ## 조사 방법과 경계
 
@@ -36,7 +38,7 @@
 
 추가로 문서 재열기 전 undo 3개가 재열기 후 0개이며 영구 activity 3개와 저장 스냅샷은 남는 것을 확인했다. 이것은 현재 수명 정책을 문서에 보완한 것이며 undo 영구 복원을 새 기능으로 승인한 것은 아니다.
 
-재현 스크립트/원시 결과는 Git에서 제외한 `local/prd-audit-2026-10-25/probes.cjs`, `probe-results.json`, `probes.log`에 있다. 테스트에서 주입한 오류를 실제 사용자 프로필의 오류나 데이터 손실로 보고하지 않는다. **네 결함은 발견/등록 상태이며 코드 수정 완료가 아니다.**
+재현 스크립트/원시 결과는 Git에서 제외한 `local/prd-audit-2026-10-25/probes.cjs`, `probe-results.json`, `probes.log`에 있다. 테스트에서 주입한 오류를 실제 사용자 프로필의 오류나 데이터 손실로 보고하지 않는다. **최초 조사 당시 네 결함은 발견/등록 상태였다. 0.16.0 소스 수정과 자동 회귀 검사 이후에도 설치 창 직접 사용 조건이 남아 티켓은 열려 있다.**
 
 ## 기능별 코드·검사 대응
 
@@ -128,7 +130,7 @@
 
 <!-- CONTROLS: generated from the two checked-in HTML entrypoints; not a runtime test result. -->
 
-E는 editor.html, S는 desktop/shell.html의 소스 순서다. 연결 구현은 저장소 루트 기준의 상대 경로다.
+E는 최초 editor.html(0.16.0에는 ui/react/editor-shell.tsx로 이전), S는 desktop/shell.html의 소스 순서다. 연결 구현은 저장소 루트 기준의 상대 경로다.
 
 | 정의 | 조작/선택자 | PRD | 연결 구현 |
 | --- | --- | --- | --- |

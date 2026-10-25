@@ -3,7 +3,7 @@
 - 제품 요구사항과 확정한 UI 동작은 `docs/PRD.md`를 기준으로 한다. 동작을 바꾸면 해당 FR/AC와 연결된 이슈, README·관련 스킬을 함께 갱신한다. 사용법·구현 구조·검증 결과의 역할을 구분하고 계획/미검증을 구현/검증 완료로 표시하지 않는다.
 - 사용자가 정한 앱 수정 완료 기준: 기능·UI를 수정하면 현재 편집 내용과 스냅샷을 보존하고, 설치된 앱까지 업데이트한 뒤 다시 실행해 실제 화면에 변경이 반영됐는지 확인한다. 소스 수정이나 로컬 빌드만으로 완료했다고 보고하지 않는다.
 - 설치 앱을 교체하기 전 주석 초안·추가 설명까지 저장하고 복구 가능한 백업을 확보한다. 저장 구조를 바꾸는 경우 호환 계층이 없어도 기존 작업을 파일 내보내기·가져오기 또는 검증한 일회성 이전으로 보존한다. 재실행 후 기존 문서·편집·스냅샷 복원, 실제 UI, 설치된 스킬 동기화와 필요한 MCP 연결을 확인한다. 실제 사용자 문서에는 테스트용 편집을 적용하지 않는다.
-- 주 사용 경로는 `desktop/`의 Electron Chromium 내장 앱이며 Chrome MV3 확장은 보조 방식이다. HTML 편집기와 Python MCP 서버는 외부 런타임 패키지 없이 동작한다. Electron·공식 MCP SDK·esbuild·Prettier는 개발 의존성이다. Node.js 22.12 이상을 사용한다.
+- 주 사용 경로는 `desktop/`의 Electron Chromium 내장 앱이며 Chrome MV3 확장은 보조 방식이다. HTML 편집기와 Python MCP 서버는 외부 런타임 패키지 없이 동작한다. 편집기 UI는 React·TypeScript와 shadcn 소스 컴포넌트를 사용하고 React/JSX 런타임은 배포 번들에 포함한다. Tailwind/PostCSS·TypeScript·Electron·공식 MCP SDK·esbuild·Prettier는 개발 도구다. Node.js 22.12 이상을 사용한다.
 - `capture.js`는 읽기만 수행한다. 원본 페이지를 변경하거나 원본 이벤트를 실행하지 않는다. `engine.js`가 가져온 HTML을 재정제한 뒤 스크립트 없는 iframe에서 표시한다.
 - 원본 DOM 식별자와 편집 오프셋은 유지한다. 부모 이동과 삭제는 이미 분리한 자식에도 적용하고, 변경 기록에서 조상 삭제 아래의 변경은 중복 나열하지 않는다.
 - `sample.uiclone.json`과 `fixtures/`는 가상 NORTH 콘솔 데이터다. 실제 사이트 캡처나 사용자 전달 ZIP을 저장소에 커밋하지 않는다.
@@ -24,3 +24,6 @@
 - `db.js`는 immutable 캡처·mutable 세션·최근 목록 메타데이터를 분리한다. `editor-session.js`의 저장 큐와 flush를 우회하지 않는다. 종료·업데이트는 `desktop/lifecycle.cjs`의 같은 저장 응답을 기다린다.
 
 - 문서의 사용자 지정 이름·휴지통은 `documents` 메타데이터, 스냅샷의 휴지통은 타임라인 엔트리의 `deletedAt`이다. 원본 캡처·하위 버전·부모 ID를 지우지 않는다. 기본 목록과 MCP는 휴지통을 제외하지만 파일·저장 왕복에서는 유지한다. 휴지통 복구만으로 편집 상태를 적용하지 않는다.
+
+- `ui/react/`는 안정된 셸과 목록 UI를 소유한다. `editor-runtime.js/css`는 생성물이며 직접 수정하지 않는다. 새 UI 명령은 `store.ts`/`commands.ts`에 연결하고 React 버튼의 disabled와 DOM 상태가 달라지지 않게 한다. 캡처 iframe은 엔진 소유이며 React 렌더마다 교체하지 않는다.
+- 사용자/MCP 스냅샷 복원은 저장 결과를 기다리는 `restorePersisted`를 사용한다. 입력 검증은 문서 교체 전에 수행하고 긴급 백업은 DB 오류와 분리한다. 잠금 대체 검사는 `npm run test:desktop:offscreen`으로 실행하며 표준 검사와 직접 사용 완료로 표시하지 않는다.

@@ -62,6 +62,8 @@ try {
   );
   doc.querySelector('[data-snapshot-id="' + a + '"]').click();
   doc.querySelector('#apply-snapshot').click();
+  await app.state.saving;
+  while (app.state.transactionBusy) await new Promise((r) => setTimeout(r, 10));
   check(
     'Clicking a saved version restores geometry, comments and notes',
     app.state.scene.edits[node.id].dx === 30 &&
@@ -70,6 +72,8 @@ try {
   );
   doc.querySelector('[data-snapshot-id="' + b + '"]').click();
   doc.querySelector('#apply-snapshot').click();
+  await app.state.saving;
+  while (app.state.transactionBusy) await new Promise((r) => setTimeout(r, 10));
   check(
     'Next-version control returns to the future without losing saved versions',
     app.state.timeline.activeId === b &&
@@ -78,11 +82,15 @@ try {
   );
   doc.querySelector('[data-snapshot-id="' + a + '"]').click();
   doc.querySelector('#apply-snapshot').click();
+  await app.state.saving;
+  while (app.state.transactionBusy) await new Promise((r) => setTimeout(r, 10));
   select();
   app.state.scene.setPosition(100, 120);
   comment('이동 전 미저장 주석');
   doc.querySelector('[data-snapshot-id="' + b + '"]').click();
   doc.querySelector('#apply-snapshot').click();
+  await app.state.saving;
+  while (app.state.transactionBusy) await new Promise((r) => setTimeout(r, 10));
   const automatic = app.state.timeline.entries.find((e) => e.kind === 'automatic');
   check(
     'UI navigation preserves unsaved edits as a visible automatic snapshot',

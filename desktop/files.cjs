@@ -8,18 +8,24 @@ function createFileSaver({ dialog, getWindow, downloads }) {
       typeof value.name !== 'string' ||
       value.name !== path.basename(value.name) ||
       value.name.length > 180 ||
-      !/^console-canvas-[\w.-]+\.(json|zip)$/.test(value.name) ||
+      !/^console-canvas-[\w.-]+\.(json|zip|png)$/.test(value.name) ||
       !(value.bytes instanceof ArrayBuffer) ||
       value.bytes.byteLength > 120_000_000
     )
       throw new Error('저장할 파일 정보가 올바르지 않습니다.');
+    const extension = path.extname(value.name).slice(1);
+    if (extension === 'png') {
+      const signature = new Uint8Array(value.bytes, 0, Math.min(8, value.bytes.byteLength));
+      if (![137, 80, 78, 71, 13, 10, 26, 10].every((byte, i) => signature[i] === byte))
+        throw new Error('PNG 이미지 형식이 올바르지 않습니다.');
+    }
     const result = await dialog.showSaveDialog(getWindow(), {
       title: '편집 내용 저장',
       defaultPath: path.join(downloads, value.name),
       filters: [
         {
-          name: value.name.endsWith('.zip') ? 'ZIP 파일' : '편집 JSON',
-          extensions: [value.name.endsWith('.zip') ? 'zip' : 'json'],
+          name: { zip: 'ZIP 파일', json: '편집 JSON', png: 'PNG 이미지' }[extension],
+          extensions: [extension],
         },
       ],
     });

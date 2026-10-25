@@ -111,6 +111,32 @@ async function main() {
       'Skill ZIP save failed',
     );
     dialog.showSaveDialog = originalSave;
+    const pngFile = path.join(directory, 'review.png');
+    dialog.showSaveDialog = async () => ({ canceled: false, filePath: pngFile });
+    await evaluate(editor, "document.querySelector('#export-button').click()");
+    await until(
+      () =>
+        evaluate(
+          editor,
+          "!document.querySelector('#download-review').disabled && !!document.querySelector('#handoff-preview img')",
+        ),
+      'Handoff PNG not ready',
+    );
+    await evaluate(editor, "document.querySelector('#download-review').click()");
+    await until(
+      () =>
+        fs.stat(pngFile).then(
+          (s) => s.size > 100,
+          () => false,
+        ),
+      'Native PNG file not saved',
+    );
+    assert.deepEqual(
+      [...(await fs.readFile(pngFile)).subarray(0, 8)],
+      [137, 80, 78, 71, 13, 10, 26, 10],
+    );
+    await evaluate(editor, "document.querySelector('#export-dialog').close()");
+    dialog.showSaveDialog = originalSave;
     await evaluate(shell, "document.querySelector('.settings-back').click()");
     await until(
       () => evaluate(shell, "document.body.dataset.view==='settings'"),
@@ -295,7 +321,7 @@ async function main() {
       }),
     );
   }
-  if (phase === 'reopen') {
+  if (phase === 'reopen' && !process.env.CONSOLE_CANVAS_OFFSCREEN) {
     await fs.writeFile(
       path.join(__dirname, '../dist/editor-panel-controls.png'),
       (await editor.capturePage()).toPNG(),

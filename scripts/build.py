@@ -26,8 +26,8 @@ def write_archive(destination, entries):
 def build_standalone(output):
     html = (ROOT / 'editor.html').read_text()
     css = (ROOT / 'dist/editor.bundle.css').read_text()
-    html = re.sub(r'<link\b[^>]*href="editor.css"[^>]*>', lambda _: '<style>' + css + '</style>', html)
-    html = re.sub(r'<script\b[^>]*src="(?:capture|editor).js"[^>]*>\s*</script>', '', html)
+    html = re.sub(r'<link\b[^>]*href="editor-runtime.css"[^>]*>', lambda _: '<style>' + css + '</style>', html)
+    html = re.sub(r'<script\b[^>]*src="(?:capture|editor-runtime).js"[^>]*>\s*</script>', '', html)
     html = html.replace('href="editor.html"', 'href="preview.html"')
     bundle = (ROOT / 'dist/editor.bundle.js').read_text()
     bundle = re.sub(r'</script', lambda _: '<\\/script', bundle, flags=re.I)

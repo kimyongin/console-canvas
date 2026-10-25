@@ -56,6 +56,8 @@ async function main() {
     'placement',
     'evolution',
     'graphflow',
+    'resilience',
+    'react-ui',
   ]) {
     await window.loadURL(`http://127.0.0.1:${server.address().port}/tests/${suite}.html`);
     const deadline = Date.now() + 120000;

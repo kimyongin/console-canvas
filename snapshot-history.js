@@ -3,6 +3,16 @@ import { expandCopyNodes } from './copy-model.js';
 
 // Versions share the captured DOM; only editing data is copied into each entry.
 function snapshotPoint(value, nodes) {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    [value.edits, value.annotations].some(
+      (v) => v != null && (typeof v !== 'object' || Array.isArray(v)),
+    ) ||
+    (value.note != null && typeof value.note !== 'string')
+  )
+    throw new Error('스냅샷 편집 상태 형식이 올바르지 않습니다.');
   const edits = cleanEdits(value?.edits, nodes);
   nodes = expandCopyNodes(edits, new Map([...nodes].filter(([, n]) => !n.copiedFrom))).nodes;
   return {
@@ -59,6 +69,16 @@ export function createSnapshotHistory(options) {
           ...(entry.deletedAt ? { deletedAt: entry.deletedAt } : {}),
         };
       });
+      for (const entry of entries) {
+        const seen = new Set([entry.id]);
+        let parent = entry.parentId;
+        while (parent) {
+          if (!ids.has(parent) || seen.has(parent))
+            throw new Error('스냅샷 부모 관계가 올바르지 않습니다.');
+          seen.add(parent);
+          parent = entries.find((candidate) => candidate.id === parent).parentId;
+        }
+      }
       state.timeline = {
         version: 1,
         entries,
@@ -161,12 +181,53 @@ export function createSnapshotHistory(options) {
             : '스냅샷 휴지통 복구',
     });
   }
+  async function restorePersisted(id, detail = {}, { recover = false } = {}) {
+    if (state.transactionBusy) throw new Error('버전 이동을 마친 뒤 다시 시도해 주세요.');
+    const before = copy(options.checkpoint());
+    const fields = [
+      'timeline',
+      'activity',
+      'activityHead',
+      'undo',
+      'redo',
+      'revision',
+      'lastAction',
+      'lastCheckpoint',
+      'pendingBefore',
+      'pendingRedo',
+      'snapshotPreviewId',
+    ];
+    const previous = Object.fromEntries(fields.map((key) => [key, structuredClone(state[key])]));
+    state.transactionBusy = true;
+    options.setBusy?.(true);
+    try {
+      if (recover) manage(id, 'recover');
+      const result = restore(id, detail);
+      await options.persist?.();
+      return result;
+    } catch (error) {
+      options.apply(before);
+      Object.assign(state, previous);
+      // Replace the failed target in the save queue with the protected current work.
+      try {
+        await options.persist?.();
+      } catch {
+        /* Keep the storage error visible. */
+      }
+      options.render?.();
+      throw error;
+    } finally {
+      state.transactionBusy = false;
+      options.setBusy?.(false);
+    }
+  }
   return {
     initialise,
     dirty,
     list,
     create,
     restore,
+    restorePersisted,
     rename: (id, name) => manage(id, 'rename', name),
     trash: (id) => manage(id, 'trash'),
     recover: (id) => manage(id, 'recover'),

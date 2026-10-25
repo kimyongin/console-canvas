@@ -1,3 +1,4 @@
+import { renderRecent, renderWarnings } from './ui/react/lists.tsx';
 import { buildHandoffImage } from './handoff-image.js';
 import { withVersionScene } from './ui/version-preview.js';
 import { cleanActivity } from './activity-history.js';
@@ -29,7 +30,17 @@ import { buildReview } from './export.js';
 import { createEditorController } from './editor-controller.js';
 import { createMcpBridge } from './bridge-client.js';
 import { createSnapshotHistory } from './snapshot-history.js';
+import { validateDocumentInput } from './document-input.js';
+import {
+  mountEditorShell,
+  clearReact,
+  renderSaveStatus,
+  connectShellAdapter,
+} from './ui/react/mount.tsx';
+import { createEditorAdapter } from './ui/react/store.ts';
+import { connectEditorCommands } from './ui/react/commands.ts';
 
+mountEditorShell();
 const $ = (selector) => document.querySelector(selector);
 const isExtension = typeof chrome !== 'undefined' && !!chrome.runtime?.id;
 const state = {
@@ -55,6 +66,26 @@ const state = {
 const editorId =
   globalThis.crypto?.randomUUID?.() ||
   'editor-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+const adapter = createEditorAdapter(() => ({
+  documentId: state.snapshot?.id || null,
+  generation: state.generation,
+  revision: state.revision,
+  ready: state.ready,
+  selected: !!state.scene?.selected,
+  selectedHidden: !!(state.scene?.selected && state.scene.hidden(state.scene.selected)),
+  undoCount: state.undo.length,
+  redoCount: state.redo.length,
+  activeSnapshotId: state.timeline?.activeId || null,
+  previewSnapshotId: state.snapshotPreviewId || null,
+  save: {
+    pending: !!state.savePending,
+    error: state.lastSaveError,
+    message: state.saveMessage || '이 브라우저에 저장',
+  },
+}));
+connectEditorCommands(adapter);
+connectShellAdapter(adapter);
+renderSaveStatus($('#save-status'), adapter);
 const kinds = {
   text: '텍스트',
   pseudo: '생성된 문구',
@@ -71,6 +102,7 @@ const {
   undo,
   save,
   flushEditor,
+  prepareEditor,
   flush,
 } = createEditorSession({
   state,
@@ -79,10 +111,13 @@ const {
     $('#review-note').value = value;
   },
   status: (message) => {
-    $('#save-status').textContent = message;
+    state.saveMessage = message;
+    state.savePending = message === '저장 중…';
+    adapter.publish();
   },
   commitCommentDraft,
   render: () => {
+    adapter.publish();
     renderInspector();
     renderLayers();
     activityPanel.render();
@@ -170,12 +205,13 @@ function closeDocument(id) {
       $('#source-url').hidden = true;
       $('#source-meta').textContent = '편집할 화면을 열어 주세요.';
       $('#review-note').value = '';
-      $('#layers').replaceChildren();
-      $('#snapshot-list').replaceChildren();
+      clearReact($('#layers'));
+      clearReact($('#snapshot-list'));
       for (const key of ['#layer-count', '#snapshot-count']) $(key).textContent = '0';
       $('#version-status').textContent = '';
       $('#snapshot-current').textContent = '';
-      $('#save-status').textContent = '휴지통에 보관됨';
+      state.saveMessage = '휴지통에 보관됨';
+      adapter.publish();
       renderDocumentName();
       renderSnapshots();
       renderInspector();
@@ -186,8 +222,12 @@ function closeDocument(id) {
   return next;
 }
 const areaSelection = createAreaSelection({ $, state, toast });
-const clipboard = createClipboard({ $, state, toast, commitCommentDraft });
-const { renderInspector } = createInspector({ $, state, kinds, selectNode });
+const clipboard = createClipboard({ $, state, toast, commitCommentDraft, adapter });
+const { renderInspector: renderInspectorView } = createInspector({ $, state, kinds, selectNode });
+function renderInspector() {
+  renderInspectorView();
+  adapter.publish();
+}
 function selectNode(id, { reveal = false, additive = false } = {}) {
   if (!state.scene) return;
   state.scene.select(id, { additive });
@@ -209,6 +249,7 @@ const commentEditor = createCommentEditor({
   $,
   state,
   commit: commitCommentDraft,
+  flushEditor,
 });
 function focusComment(options = {}) {
   commentEditor.open(options);
@@ -220,11 +261,23 @@ const snapshotHistory = createSnapshotHistory({
   historyBefore,
   apply: applyCheckpoint,
   changed: changeCommitted,
+  persist: () => flushEditor({ allowTransaction: true }),
+  setBusy: (busy) => {
+    document.body.inert = busy;
+  },
+  render: () => {
+    renderInspector();
+    renderLayers();
+    activityPanel.render();
+    renderHistory();
+    renderSnapshots();
+  },
 });
 const { showSnapshots, renderSnapshots } = createSnapshotPanel({
   $,
   state,
   snapshotHistory,
+  adapter,
   commitCommentDraft,
   setPanelVisibility,
   panels,
@@ -280,22 +333,24 @@ function openSnapshot(...args) {
   return next;
 }
 async function openDocument(snapshot, edits = {}, note = '', annotations = {}, timeline = null) {
-  validateSnapshot(snapshot);
+  timeline = timeline || snapshot.timeline;
+  validateDocumentInput(snapshot, edits, annotations, timeline);
+  if (typeof note !== 'string') throw new Error('추가 설명 형식이 올바르지 않습니다.');
+  const existingMeta = await getDocumentMetadata(snapshot.id);
+  if (existingMeta?.deletedAt)
+    throw new Error('휴지통에 있는 문서입니다. 문서 목록의 휴지통에서 먼저 복구해 주세요.');
   await flushEditor();
   areaSelection.reset();
   clipboard.reset();
   commentEditor.reset();
   for (const id of ['#compare-dialog', '#export-dialog', '#properties-dialog'])
     if ($(id).open) $(id).close();
-  const existingMeta = await getDocumentMetadata(snapshot.id);
   const documentName = snapshot.documentName
     ? cleanDocumentName(snapshot.documentName)
     : existingMeta?.title && existingMeta.title !== snapshot.source.title
       ? existingMeta.title
       : undefined;
   await saveCapture({ ...snapshot, ...(documentName ? { documentName } : {}) });
-  if (existingMeta?.deletedAt)
-    throw new Error('휴지통에 있는 문서입니다. 문서 목록의 휴지통에서 먼저 복구해 주세요.');
   const generation = ++state.generation;
   commitCommentDraft();
   state.commentTarget = null;
@@ -390,15 +445,11 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
     $('#snapshots-button').disabled = false;
     $('#capture-notes').hidden = !snapshot.warnings.length;
     $('#capture-notes-title').textContent = '가져오기 참고 ' + snapshot.warnings.length + '건';
-    $('#capture-notes-list').replaceChildren();
-    for (const warning of snapshot.warnings) {
-      const li = document.createElement('li');
-      li.textContent = warning.message;
-      $('#capture-notes-list').append(li);
-    }
+    renderWarnings($('#capture-notes-list'), snapshot.warnings);
     state.lastCheckpoint = checkpoint();
     activityPanel.render();
     state.ready = true;
+    adapter.publish();
     connectDesktopIfReady();
     renderMcpStatus();
     save();
@@ -450,6 +501,7 @@ async function importFile(file) {
     throw new Error('파일이 너무 큽니다. 85MB 이하의 화면 파일을 선택해 주세요.');
   const data = JSON.parse(await file.text());
   if (data.format === 'console-canvas-review') {
+    if (data.version !== 1) throw new Error('지원하지 않는 편집 파일 버전입니다.');
     await openSnapshot(
       { ...data.snapshot, activity: data.activity, activityHead: data.activityHead },
       data.edits,
@@ -520,19 +572,19 @@ $('#edit-selected-comment').addEventListener('click', () => {
   $('#properties-dialog').close();
   focusComment();
 });
-$('#edit-properties').addEventListener('click', () => {
+adapter.register('properties', () => {
   if (!state.scene?.selected) return;
   commitCommentDraft();
   renderInspector();
   $('#properties-dialog').showModal();
 });
 $('#close-properties').addEventListener('click', () => $('#properties-dialog').close());
-$('#undo').addEventListener('click', () => undo());
-$('#redo').addEventListener('click', () => undo('redo'));
+adapter.register('undo', () => undo());
+adapter.register('redo', () => undo('redo'));
 $('#select-parent').addEventListener('click', () =>
   selectNode(state.scene.parent(state.scene.selected)),
 );
-$('#delete').addEventListener('click', () => state.scene?.remove());
+adapter.register('delete', () => state.scene?.remove());
 $('#inspector-delete').addEventListener('click', () => state.scene?.remove());
 for (const button of document.querySelectorAll('[data-nudge]'))
   button.addEventListener('click', () => {
@@ -572,7 +624,7 @@ $('#viewport').addEventListener(
 );
 document.addEventListener('keydown', onKey);
 $('#review-note').addEventListener('change', () => changeCommitted({ label: '추가 설명 수정' }));
-createExportDialog({ $, state, commitCommentDraft, editorId, flushEditor, toast });
+createExportDialog({ $, state, commitCommentDraft, editorId, flushEditor, prepareEditor, toast });
 window.addEventListener('dragover', (event) => {
   if (event.dataTransfer?.types.includes('Files')) event.preventDefault();
 });
@@ -617,6 +669,7 @@ const controller = createEditorController({
     );
   },
   isBusy: () =>
+    !!state.transactionBusy ||
     !!document.querySelector('dialog[open]') ||
     document.activeElement === $('#snapshot-name') ||
     !!(
@@ -726,25 +779,14 @@ else renderRecentDocuments();
 async function renderRecentDocuments() {
   try {
     const values = await listDocuments();
-    $('#recent-documents').replaceChildren();
-    for (const snapshot of values) {
-      const button = document.createElement('button');
-      button.className = 'recent-item';
-      const title = document.createElement('span'),
-        date = document.createElement('small');
-      title.textContent = snapshot.title;
-      date.textContent = new Date(snapshot.capturedAt).toLocaleDateString('ko-KR');
-      button.append(title, date);
-      button.addEventListener('click', () =>
-        getDocument(snapshot.id)
-          .then((value) => {
-            if (!value) throw new Error('문서를 찾을 수 없습니다. 휴지통을 확인해 주세요.');
-            return openSnapshot(value, value.edits, value.note, value.annotations);
-          })
-          .catch((error) => notice(error.message)),
-      );
-      $('#recent-documents').append(button);
-    }
+    renderRecent($('#recent-documents'), values, (id) =>
+      getDocument(id)
+        .then((value) => {
+          if (!value) throw new Error('문서를 찾을 수 없습니다. 휴지통을 확인해 주세요.');
+          return openSnapshot(value, value.edits, value.note, value.annotations);
+        })
+        .catch((error) => notice(error.message)),
+    );
   } catch (error) {
     notice(error.message);
   }
@@ -752,6 +794,7 @@ async function renderRecentDocuments() {
 // Exposed for the local integration harness; contains only this editor's current document.
 window.ConsoleCanvas = {
   state,
+  adapter,
   openSnapshot,
   closeDocument,
   importFile,

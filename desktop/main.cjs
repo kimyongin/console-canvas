@@ -31,6 +31,12 @@ const { registerShellIpc } = require('./ipc.cjs');
 const { captureWebsite } = require('./capture.cjs');
 const { HEADER_HEIGHT } = require('./layout.cjs');
 const bridgePort = process.env.CONSOLE_CANVAS_PORT || '8849';
+// Explicit developer/QA isolation; the default user profile is unchanged.
+if (process.env.CONSOLE_CANVAS_USER_DATA_DIR) {
+  const qaProfile = path.resolve(process.env.CONSOLE_CANVAS_USER_DATA_DIR);
+  fs.mkdirSync(qaProfile, { recursive: true });
+  app.setPath('userData', qaProfile);
+}
 app.setName('Console Canvas');
 const stateDir =
   process.env.CONSOLE_CANVAS_STATE_DIR ||

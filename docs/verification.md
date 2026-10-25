@@ -91,3 +91,15 @@ PRD를 [기능 전수 대조표](feature-audit.md)와 다시 비교했다. 정�
 발견한 결함 #8~#11은 미수정이다. PRD의 정상 경로 구현 상태를 해당 오류 경로의 보장으로 확대하지 않고 FR-15~17·AC-15~18과 명시적인 미충족 목록을 추가했다. 기존 자동 검사 통과 기록은 이 오류 경로를 검사했다는 근거가 아니며, 각 결함 수정 시 회귀 검사를 추가해야 한다.
 
 보완 후 기존 전체 검사를 재실행해 Python 39·Node 23·Chromium 227개와 독립 HTML/실제 포인터 영역 선택을 통과했다. 데스크톱 캡처는 다시 잠금 표면 오류로 중단되어 표준 전체 통과로 기록하지 않는다. 새 오류 주입 재현은 결함 존재를 확인한 것이며 정상 기능 통과 수에 더하지 않는다. 문서의 FR 17개·AC 18개·정적 조작 112개 분류, 로컬 링크와 배포 README 체크섬도 대조했다. 로그는 local/prd-audit-2026-10-25/check.log다.
+
+## 0.16.0 React 전환·오류 복구 (2026-10-25)
+
+- Node 24.21.0 / Python 3.9 / Electron 45.0.0 arm64 / MCP SDK 1.32.2. `npm run check` 표준 전체 통과: TypeScript·포맷·번들, Python 39, Node 24, Chromium 247, 공식 SDK 22. 실제 표시 표면 캡처·네이티브 PNG 파일 쓰기·원본 DOM 무변경·정상 종료/재실행의 문서/초안/추가 설명/복사·전체 버전/휴지통·패널 설정 보존을 포함했다.
+- 새 `tests/resilience.html` 8개: 새/같은 ID의 잘못된 타임라인 거절, DB 무등록, quota 중 최신 초안/추가 설명의 긴급 파일·타임라인 보존과 재열기, 복원 실패의 장면/이력/undo/revision 롤백, 저장 회복 뒤 재시도.
+- 새 `tests/react-ui.html` 12개: React/shadcn 진입점·안정된 구독 snapshot·선택/실제 속성 입력·모달 이름/포커스 복귀·공유 undo·IME Enter·이름 저장 후 그래프·preview/active 분리·비교 장면 해제·통합 이력·기본 버튼 대비. 시각 검토에서 기존 `--accent`와 새 토큰 충돌을 발견해 `--cc-*`로 분리했다.
+- 새 Node PNG 검사와 `desktop-fixture.cjs`의 전달 버튼→preload/IPC→네이티브 파일 저장/PNG 헤더 확인을 추가했다. JSON/ZIP 기존 경로는 유지한다.
+- 최초 잠금 상태 시도는 `Current display surface not available for capture`로 표준 데스크톱 단계에서 실패했다. 명시적인 `npm run test:desktop:offscreen`은 실제 DOM/가상 NORTH 스크린샷 조건으로 SDK 22개·PNG 파일·정상 종료/재실행을 통과했다. 이 대체 결과를 실제 표시 표면 캡처로 취급하지 않았다. 잠금 해제 뒤 최종 표준 검사를 별도로 통과했다.
+- 원시 로그: Git 제외 `local/react-check-unlocked.log`, `local/react-offscreen.log`. 사용자 프로필을 테스트 Electron으로 직접 열지 않았다. CUA로 기존 설치 앱의 '이 기기에 저장됨'을 확인하고 정상 종료한 뒤 `local/upgrade-0.16.0/profile-saved-before`에 백업했다. 감사 사본의 7문서·13개 스냅샷에 편집·주석·전체 세션/이력 지문을 기록했다.
+- shadcn 공통 소스와 native dialog/menu/resize 어댑터의 선택/차이는 [구조](architecture.md)와 `ui/react/SOURCES.md`에 기록한다. 화면/엔진 저장 형식은 유지한다.
+
+설치 앱·기존 자료 전후 비교·직접 QA·설치 스킬·실제 앱 MCP·업데이트 버튼의 최종 결과는 아래에 별도로 기록한다.

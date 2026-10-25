@@ -1,7 +1,16 @@
+import { renderImage, renderVersionOptions } from './react/versions.tsx';
+import { clearReact } from './react/mount.tsx';
 import { download, reviewPayload } from '../export.js';
 import { buildHandoffImage, handoffRequests } from '../handoff-image.js';
 import { withVersionScene, versionOptions } from './version-preview.js';
-export function createExportDialog({ $, state, commitCommentDraft, flushEditor, toast }) {
+export function createExportDialog({
+  $,
+  state,
+  commitCommentDraft,
+  flushEditor,
+  prepareEditor,
+  toast,
+}) {
   let generation = 0,
     latest = null,
     previewUrl = null;
@@ -19,6 +28,7 @@ export function createExportDialog({ $, state, commitCommentDraft, flushEditor, 
     latest = null;
     $('#copy-summary').disabled = true;
     $('#download-review').disabled = true;
+    clearReact($('#handoff-preview'));
     $('#handoff-preview').textContent = '전달 이미지 준비 중…';
     try {
       const result = await useVersion(async (scene, version) => {
@@ -38,10 +48,7 @@ export function createExportDialog({ $, state, commitCommentDraft, flushEditor, 
       latest = result;
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       previewUrl = URL.createObjectURL(result.blob);
-      const image = new Image();
-      image.alt = '변경 후 화면과 번호별 주석 카드가 포함된 전달 이미지';
-      image.src = previewUrl;
-      $('#handoff-preview').replaceChildren(image);
+      renderImage($('#handoff-preview'), previewUrl);
       $('#export-status').textContent =
         '이 이미지 한 장을 에이전트 대화에 첨부하세요. 번호별 주석에 반응형 배치 의도를 적으면 더 명확해집니다.';
       $('#copy-summary').disabled = false;
@@ -55,9 +62,7 @@ export function createExportDialog({ $, state, commitCommentDraft, flushEditor, 
   }
   $('#export-button').addEventListener('click', () => {
     commitCommentDraft();
-    $('#handoff-version').replaceChildren(
-      ...versionOptions(state).map((v) => new Option(v.name, v.id)),
-    );
+    renderVersionOptions($('#handoff-version'), versionOptions(state));
     $('#handoff-version').value = '@current';
     $('#export-dialog').showModal();
     refresh();
@@ -71,7 +76,7 @@ export function createExportDialog({ $, state, commitCommentDraft, flushEditor, 
     latest = null;
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = null;
-    $('#handoff-preview').replaceChildren();
+    clearReact($('#handoff-preview'));
   });
   $('#copy-summary').addEventListener('click', async () => {
     try {
@@ -109,7 +114,16 @@ export function createExportDialog({ $, state, commitCommentDraft, flushEditor, 
     const button = $('#save-document');
     button.disabled = true;
     try {
-      await flushEditor();
+      prepareEditor();
+      const documentId = state.snapshot.id;
+      let storageError = null;
+      try {
+        await flushEditor();
+      } catch (error) {
+        storageError = error;
+      }
+      if (state.snapshot?.id !== documentId || !state.ready)
+        throw new Error('문서가 바뀌었습니다. 현재 문서에서 다시 저장해 주세요.');
       const payload = reviewPayload(
         state.snapshot,
         state.scene,
@@ -126,7 +140,10 @@ export function createExportDialog({ $, state, commitCommentDraft, flushEditor, 
       toast(
         result?.canceled
           ? '저장을 취소했습니다.'
-          : '편집 파일을 저장했습니다. 주석·분기·변경 이력·휴지통도 포함됩니다.',
+          : storageError
+            ? '긴급 편집 파일을 저장했습니다. 기기 자동 저장 오류는 계속되고 있습니다: ' +
+              storageError.message
+            : '편집 파일을 저장했습니다. 주석·분기·변경 이력·휴지통도 포함됩니다.',
       );
     } catch (error) {
       toast('편집 파일 저장 실패: ' + error.message);

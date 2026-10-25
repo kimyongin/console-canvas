@@ -110,6 +110,8 @@ try {
   click('#snapshots-live');
   card(a.id).querySelector('.snapshot-entry').click();
   click('#apply-snapshot');
+  await app.state.saving;
+  while (app.state.transactionBusy) await new Promise((r) => setTimeout(r, 10));
   check(
     'A recovered snapshot applies its original saved geometry and comments',
     app.state.scene.edits[node.id].dx === 12 &&
@@ -131,6 +133,7 @@ try {
       app.state.timeline.entries.some((e) => e.id === b.id && e.deletedAt),
   );
   await app.state.saving;
+  while (app.state.transactionBusy) await new Promise((r) => setTimeout(r, 10));
   frame.src = '../editor.html?id=' + id;
   await new Promise((resolve) => frame.addEventListener('load', resolve, { once: true }));
   await until(() => frame.contentWindow.ConsoleCanvas?.state.ready);
@@ -239,6 +242,7 @@ try {
       captureRecord.source.title === originalTitle,
   );
   await app.state.saving;
+  while (app.state.transactionBusy) await new Promise((r) => setTimeout(r, 10));
   document.querySelector('#status').textContent = JSON.stringify({
     passed: results.length,
     failed: 0,

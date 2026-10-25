@@ -98,7 +98,7 @@ try {
   app.selectNode(node.id);
   app.state.scene.nudge(5, 0);
   click('#snapshot-trash-list [data-snapshot-action="recover-apply"]');
-  await until(() => app.state.timeline.activeId === snapshot.id);
+  await until(() => app.state.timeline.activeId === snapshot.id && !app.state.transactionBusy);
   check(
     'Recover and apply restores the saved version and preserves newer work automatically',
     app.state.scene.edits[node.id].dx === 16 &&

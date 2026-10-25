@@ -1,6 +1,6 @@
 import { elementLabel } from './element-labels.js';
 import { pointTarget } from '../edit-commands.js';
-export function createCommentEditor({ $, state, commit }) {
+export function createCommentEditor({ $, state, commit, flushEditor }) {
   const dialog = $('#comment-dialog'),
     field = $('#component-comment');
   let timer;
@@ -28,13 +28,23 @@ export function createCommentEditor({ $, state, commit }) {
   field.addEventListener('input', () => {
     clearTimeout(timer);
     $('#comment-status').textContent = '입력 중 · 자동 저장됩니다.';
-    timer = setTimeout(() => {
+    const target = state.commentTarget,
+      generation = state.generation;
+    timer = setTimeout(async () => {
       commit();
-      $('#comment-status').textContent = '이 기기에 저장됨';
+      try {
+        await flushEditor();
+        if (state.generation === generation && state.commentTarget === target)
+          $('#comment-status').textContent = '이 기기에 저장됨';
+      } catch (error) {
+        if (state.generation === generation && state.commentTarget === target)
+          $('#comment-status').textContent =
+            '자동 저장 실패 · 편집 파일로 백업해 주세요: ' + error.message;
+      }
     }, 650);
   });
   field.addEventListener('keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    if (!e.isComposing && e.keyCode !== 229 && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
       commit();
       close();

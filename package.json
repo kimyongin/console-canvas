@@ -1,6 +1,6 @@
 {
   "name": "console-canvas",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "private": true,
   "description": "Embedded Chromium console UI editor with MCP control",
   "main": "desktop/main.cjs",
@@ -12,16 +12,33 @@
     "test": "node scripts/check.mjs",
     "check": "node scripts/check.mjs",
     "test:browser": "electron tests/browser-runner.cjs",
-    "test:desktop": "node scripts/check-desktop.mjs"
+    "test:desktop": "node scripts/check-desktop.mjs",
+    "typecheck": "tsc --noEmit",
+    "test:desktop:offscreen": "node scripts/check-desktop.mjs --offscreen"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "electron": "45.0.0",
     "esbuild": "0.28.2",
-    "prettier": "3.9.10"
+    "postcss": "8.5.31",
+    "prettier": "3.9.10",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2"
   },
   "type": "module",
   "engines": {
     "node": ">=22.12.0"
+  },
+  "dependencies": {
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "lucide-react": "1.61.0",
+    "radix-ui": "1.8.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "tailwind-merge": "3.7.0"
   }
 }

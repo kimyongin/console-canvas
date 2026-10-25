@@ -1,3 +1,5 @@
+import { renderVersionFrame, renderVersionOptions } from './react/versions.tsx';
+import { clearReact } from './react/mount.tsx';
 import { CanvasScene, copy } from '../engine.js';
 export async function withVersionScene(snapshot, point, run) {
   const frame = document.createElement('iframe');
@@ -43,6 +45,7 @@ export function createVersionPreview({ $, state, commitCommentDraft }) {
     const option = versionOptions(state).find((v) => v.id === $('#compare-' + side).value);
     if (!option) return;
     const target = $('#compare-' + side + '-view');
+    clearReact(target);
     target.textContent = '미리보기 준비 중…';
     try {
       const result = await withVersionScene(state.snapshot, option.state, (scene) => ({
@@ -52,24 +55,7 @@ export function createVersionPreview({ $, state, commitCommentDraft }) {
         comments: scene.comments().length,
       }));
       if (scenes.get(side)?.token !== token || !$('#compare-dialog').open) return;
-      const iframe = document.createElement('iframe');
-      iframe.setAttribute('sandbox', 'allow-same-origin');
-      iframe.title = option.name + ' 비교 화면';
-      iframe.style.pointerEvents = 'none';
-      iframe.width = result.size.width;
-      iframe.height = result.size.height;
-      const zoom = Math.min(1, Math.max(0.05, (target.clientWidth - 12) / result.size.width));
-      iframe.style.transform = 'scale(' + zoom + ')';
-      const space = document.createElement('div');
-      space.style.cssText =
-        'width:' +
-        result.size.width * zoom +
-        'px;height:' +
-        result.size.height * zoom +
-        'px;position:relative';
-      space.append(iframe);
-      target.replaceChildren(space);
-      iframe.srcdoc = result.html;
+      renderVersionFrame(target, result, option.name + ' 비교 화면');
       $('#compare-' + side + '-summary').textContent =
         '변경 ' +
         result.changes +
@@ -109,7 +95,7 @@ export function createVersionPreview({ $, state, commitCommentDraft }) {
     const options = versionOptions(state);
     for (const side of ['left', 'right']) {
       const select = $('#compare-' + side);
-      select.replaceChildren(...options.map((value) => new Option(value.name, value.id)));
+      renderVersionOptions(select, options);
       select.value = side === 'left' ? left : right;
     }
     if (!$('#compare-dialog').open) $('#compare-dialog').showModal();
@@ -124,7 +110,7 @@ export function createVersionPreview({ $, state, commitCommentDraft }) {
   $('#compare-dialog').addEventListener('close', () => {
     for (const side of ['left', 'right']) {
       scenes.set(side, { token: (scenes.get(side)?.token || 0) + 1 });
-      $('#compare-' + side + '-view').replaceChildren();
+      clearReact($('#compare-' + side + '-view'));
     }
   });
   return { open };

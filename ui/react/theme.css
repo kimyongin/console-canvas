@@ -1,0 +1,44 @@
+@layer theme, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+@source './**/*.{ts,tsx}';
+@theme inline {
+  --color-background: var(--cc-background);
+  --color-foreground: var(--cc-foreground);
+  --color-primary: var(--cc-primary);
+  --color-primary-foreground: var(--cc-primary-foreground);
+  --color-secondary: var(--cc-secondary);
+  --color-secondary-foreground: var(--cc-foreground);
+  --color-accent: var(--cc-accent);
+  --color-accent-foreground: var(--cc-foreground);
+  --color-destructive: var(--cc-destructive);
+  --color-border: var(--cc-border);
+  --color-input: var(--cc-border);
+  --color-ring: var(--cc-primary);
+  --color-muted-foreground: var(--cc-muted-foreground);
+}
+.cc-ui {
+  --cc-background: #fff;
+  --cc-foreground: #18213a;
+  --cc-primary: #6043ff;
+  --cc-primary-foreground: #fff;
+  --cc-secondary: #f5f3ff;
+  --cc-accent: #eeebff;
+  --cc-destructive: #dc344d;
+  --cc-border: #dfe3ee;
+  --cc-muted-foreground: #6d7690;
+  --cc-radius: 0.5rem;
+}
+#editor-root {
+  display: contents;
+}
+.cc-ui [data-slot='button'] {
+  font: inherit;
+}
+.cc-ui [data-slot='button']:focus-visible,
+.cc-ui input:focus-visible,
+.cc-ui textarea:focus-visible,
+.cc-ui select:focus-visible {
+  outline: 2px solid var(--cc-primary);
+  outline-offset: 2px;
+}

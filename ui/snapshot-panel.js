@@ -1,10 +1,12 @@
 import { snapshotGraph } from '../snapshot-graph.js';
 import { withVersionScene } from './version-preview.js';
-import { createActionMenu } from './action-menu.js';
+import { renderSnapshotGraph, renderSnapshotTrash, renderVersionFrame } from './react/versions.tsx';
+import { clearReact } from './react/mount.tsx';
 export function createSnapshotPanel({
   $,
   state,
   snapshotHistory,
+  adapter,
   commitCommentDraft,
   toast,
   preview,
@@ -19,6 +21,7 @@ export function createSnapshotPanel({
   const selected = () =>
     state.timeline?.entries.find((e) => e.id === state.snapshotPreviewId && !e.deletedAt);
   function updateLabel() {
+    adapter.publish();
     const entry = selected(),
       active = state.timeline?.entries.find(
         (e) => e.id === state.timeline.activeId && !e.deletedAt,
@@ -51,13 +54,14 @@ export function createSnapshotPanel({
     if (!entry) {
       generation++;
       previewKey = null;
-      $('#snapshot-preview-view').replaceChildren();
+      clearReact($('#snapshot-preview-view'));
       return;
     }
     const key = state.snapshot.id + '/' + state.generation + '/' + entry.id;
     if (key === previewKey && $('#snapshot-preview-view iframe')) return;
     previewKey = key;
     const token = ++generation;
+    clearReact($('#snapshot-preview-view'));
     $('#snapshot-preview-view').textContent = '미리보기 준비 중…';
     try {
       const capture = state.snapshot;
@@ -67,30 +71,7 @@ export function createSnapshotPanel({
       }));
       if (token !== generation || state.snapshot?.id !== capture.id || selected()?.id !== entry.id)
         return;
-      const frame = document.createElement('iframe');
-      frame.title = entry.name + ' 미리보기 화면';
-      frame.setAttribute('sandbox', 'allow-same-origin');
-      frame.referrerPolicy = 'no-referrer';
-      frame.tabIndex = -1;
-      frame.width = result.size.width;
-      frame.height = result.size.height;
-      frame.srcdoc = result.html;
-      frame.style.pointerEvents = 'none';
-      const space = document.createElement('div');
-      space.className = 'snapshot-preview-space';
-      space.append(frame);
-      $('#snapshot-preview-view').replaceChildren(space);
-      function fit() {
-        const scale = Math.max(
-          0.05,
-          Math.min(1, ($('#snapshot-preview-view').clientWidth - 16) / result.size.width),
-        );
-        frame.style.transform = 'scale(' + scale + ')';
-        space.style.width = result.size.width * scale + 'px';
-        space.style.height = result.size.height * scale + 'px';
-      }
-      fit();
-      requestAnimationFrame(fit);
+      renderVersionFrame($('#snapshot-preview-view'), result, entry.name + ' 미리보기 화면');
       $('#snapshot-preview-status').textContent =
         (entry.id === state.timeline.activeId
           ? '현재 작업의 기준 버전'
@@ -121,7 +102,7 @@ export function createSnapshotPanel({
   async function manage(run, message, action = null, rethrow = false) {
     try {
       commitCommentDraft();
-      run();
+      await run();
       await flushEditor();
       toast(message, action);
     } catch (error) {
@@ -170,7 +151,7 @@ export function createSnapshotPanel({
             },
           }),
       });
-    return createActionMenu({ label: entry.name, actions: items });
+    return items;
   }
   function graph() {
     const data = snapshotGraph(state.timeline.entries),
@@ -179,77 +160,15 @@ export function createSnapshotPanel({
       x = scroll.scrollLeft,
       y = scroll.scrollTop;
     const focus = document.activeElement?.dataset?.snapshotId;
-    root.style.width = data.width + 'px';
-    root.style.height = data.height + 'px';
-    root.replaceChildren();
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('width', data.width);
-    svg.setAttribute('height', data.height);
-    svg.setAttribute('aria-hidden', 'true');
-    svg.classList.add('snapshot-edges');
-    for (const edge of data.edges) {
-      const path = document.createElementNS(svg.namespaceURI, 'path');
-      path.dataset.parentId = edge.parent_id;
-      path.dataset.childId = edge.child_id;
-      if (edge.from.y !== edge.to.y) path.classList.add('branch-edge');
-      if (edge.child_id === state.snapshotPreviewId) path.classList.add('selected-edge');
-      path.setAttribute(
-        'd',
-        `M${edge.from.x},${edge.from.y} C${edge.from.x + 70},${edge.from.y} ${edge.to.x - 70},${edge.to.y} ${edge.to.x},${edge.to.y}`,
-      );
-      svg.append(path);
-    }
-    root.append(svg);
-    for (const entry of data.nodes) {
-      const card = document.createElement('div');
-      card.className = 'snapshot-card snapshot-graph-node';
-      card.style.left = entry.x - 28 + 'px';
-      card.style.top = entry.y - 65 + 'px';
-      card.dataset.depth = entry.depth;
-      card.dataset.lane = entry.lane;
-      card.classList.toggle('active-version', entry.id === state.timeline.activeId);
-      card.classList.toggle('preview-version', entry.id === state.snapshotPreviewId);
-      const b = document.createElement('button');
-      b.className = 'snapshot-entry';
-      b.type = 'button';
-      b.dataset.snapshotId = entry.id;
-      b.dataset.parentId = entry.parentId || '';
-      b.disabled = !!entry.deletedAt;
-      b.setAttribute('aria-pressed', String(entry.id === state.snapshotPreviewId));
-      b.setAttribute('aria-label', entry.name + ' · 미리보기');
-      const title = document.createElement('strong');
-      title.textContent = entry.name + (entry.deletedAt ? ' · 휴지통' : '');
-      const meta = document.createElement('span');
-      meta.textContent = new Date(entry.createdAt).toLocaleString('ko-KR', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      const badge = document.createElement('small');
-      badge.textContent =
-        entry.id === state.timeline.activeId
-          ? '현재 버전'
-          : entry.id === state.snapshotPreviewId
-            ? '선택한 미리보기'
-            : entry.kind === 'automatic'
-              ? '이동 전 자동 보관'
-              : '저장된 버전';
-      b.append(title, meta, badge);
-      b.addEventListener('click', () => selectPreview(entry.id));
-      card.append(b);
-      if (!entry.deletedAt) card.append(actions(entry));
-      root.append(card);
-    }
-    if (snapshotHistory.dirty()) {
-      const parent = data.nodes.find((n) => n.id === state.timeline.activeId),
-        leaf = document.createElement('div');
-      leaf.className = 'snapshot-draft-node';
-      leaf.textContent = '◌ 현재 작업 · 저장 전';
-      leaf.style.left = (parent ? parent.x + 30 : 20) + 'px';
-      leaf.style.top = (parent ? parent.y + 28 : 20) + 'px';
-      root.append(leaf);
-    }
+    renderSnapshotGraph(
+      root,
+      data,
+      state.timeline.activeId,
+      state.snapshotPreviewId,
+      snapshotHistory.dirty(),
+      selectPreview,
+      actions,
+    );
     scroll.scrollLeft = x;
     scroll.scrollTop = y;
     if (focus)
@@ -257,42 +176,24 @@ export function createSnapshotPanel({
   }
   function trash() {
     const root = $('#snapshot-trash-list');
-    root.replaceChildren();
-    for (const entry of state.timeline.entries.filter((e) => e.deletedAt)) {
-      const card = document.createElement('div');
-      card.className = 'snapshot-card';
-      card.dataset.trashedId = entry.id;
-      const title = document.createElement('strong');
-      title.textContent = entry.name;
-      card.append(title);
-      for (const [label, kind, apply] of [
-        ['복구', 'recover', false],
-        ['복구하고 적용', 'recover-apply', true],
-      ]) {
-        const b = document.createElement('button');
-        b.textContent = label;
-        b.dataset.snapshotAction = kind;
-        b.setAttribute('aria-label', entry.name + ' · ' + label);
-        b.addEventListener('click', () =>
-          manage(
-            () => {
-              snapshotHistory.recover(entry.id);
-              if (apply) {
-                snapshotHistory.restore(entry.id);
-                trashView = false;
-                state.snapshotPreviewId = entry.id;
-              }
-              renderSnapshots();
-            },
-            apply ? '스냅샷을 복구하고 적용했습니다.' : '스냅샷을 목록에 복구했습니다.',
-          ),
-        );
-        card.append(b);
-      }
-      root.append(card);
-    }
-    if (!root.children.length) root.textContent = '휴지통이 비어 있습니다.';
+    renderSnapshotTrash(
+      root,
+      state.timeline.entries.filter((e) => e.deletedAt),
+      (id, apply) =>
+        manage(
+          async () => {
+            if (apply) {
+              await snapshotHistory.restorePersisted(id, {}, { recover: true });
+              trashView = false;
+              state.snapshotPreviewId = id;
+            } else snapshotHistory.recover(id);
+            renderSnapshots();
+          },
+          apply ? '스냅샷을 복구하고 적용했습니다.' : '스냅샷을 목록에 복구했습니다.',
+        ),
+    );
   }
+
   function renderSnapshots() {
     const available = !!state.timeline;
     for (const id of [
@@ -311,8 +212,8 @@ export function createSnapshotPanel({
       previewKey = null;
       $('#snapshot-active-name').textContent = '문서 열기';
       $('#snapshot-count').textContent = '0';
-      $('#snapshot-list').replaceChildren();
-      $('#snapshot-preview-view').replaceChildren();
+      clearReact($('#snapshot-list'));
+      clearReact($('#snapshot-preview-view'));
       $('#apply-snapshot').disabled = true;
       $('#compare-button').disabled = true;
       $('#snapshot-tools').hidden = true;
@@ -394,7 +295,7 @@ export function createSnapshotPanel({
       trashView = value;
       renderSnapshots();
     });
-  $('#snapshots-button').addEventListener('click', () => {
+  adapter.register('snapshots', () => {
     if (!state.ready) return;
     commitCommentDraft();
     renderSnapshots();
@@ -424,7 +325,7 @@ export function createSnapshotPanel({
     if (!entry) return;
     try {
       commitCommentDraft();
-      const result = snapshotHistory.restore(entry.id);
+      const result = await snapshotHistory.restorePersisted(entry.id);
       await flushEditor();
       renderSnapshots();
       $('#snapshot-preview-status').textContent = entry.name + ' 버전을 편집 화면에 적용했습니다.';

@@ -17,6 +17,7 @@ async function run(command, args) {
   });
 }
 try {
+  await run(process.execPath, ['node_modules/typescript/bin/tsc', '--noEmit']);
   await run(process.execPath, ['scripts/format.mjs', '--check']);
   await run('python3', ['scripts/build.py']);
   await run('python3', ['-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_*.py']);

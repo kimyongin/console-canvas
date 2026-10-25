@@ -1,6 +1,6 @@
 # 개발 구조
 
-제품 요구사항과 사용자 동작의 기준은 [PRD](PRD.md), 실제 확인 결과는 [검증 기록](verification.md)에서 관리한다. 아래는 현재 구현 구조이며 React·TypeScript·shadcn/ui 전환은 [개선 계획](https://github.com/kimyongin/console-canvas/issues/1) 단계다.
+제품 요구사항과 사용자 동작의 기준은 [PRD](PRD.md), 실제 확인 결과는 [검증 기록](verification.md)에서 관리한다. 아래는 0.16.0의 구현 구조다. 전환 범위와 설치/직접 사용 잔여는 [개선 티켓](https://github.com/kimyongin/console-canvas/issues/1)과 검증 기록에서 구분한다.
 
 ## 편집과 명령
 
@@ -46,7 +46,7 @@ IndexedDB `console-canvas-workspace`의 세 저장소를 사용한다.
 
 `package.json`이 버전의 기준이다. `scripts/build.py`가 esbuild로 실제 모듈 의존성과 CSS import를 번들링한다. 독립 HTML은 외부 스크립트·CSS 없이 실행된다. `runtime-manifest.json`에는 공개 파일과 런타임 SHA-256을 기록하며, MCP HTTP 서버는 공개 파일만 제공하고 스킬 prepare는 패키지 파일·체크섬을 검사한다. 스킬 ZIP은 앱 Resources에서 런타임 밖에 둔다.
 
-`npm run check`는 포맷·빌드·Python·Node·Chromium·실제 데스크톱/공식 MCP SDK 순서로 실행한다. 데스크톱 검증은 임시 홈·프로필·포트에서 가상 NORTH만 가져오고, 정상 종료 뒤 같은 프로필을 다시 실행해 편집·초안·스냅샷·패널 너비를 확인한다. 설치된 사용자 앱의 데이터나 스킬에는 쓰지 않는다.
+`npm run check`는 TypeScript·포맷·빌드·Python·Node·Chromium·실제 데스크톱/공식 MCP SDK 순서로 실행한다. 데스크톱 검증은 임시 홈·프로필·포트에서 가상 NORTH만 가져오고, 정상 종료 뒤 같은 프로필을 다시 실행해 편집·초안·스냅샷·패널 너비를 확인한다. 설치된 사용자 앱의 데이터나 스킬에는 쓰지 않는다.
 
 
 문서의 사용자 지정 이름과 `deletedAt`은 `documents` 메타데이터에 저장한다. 세션 저장은 해당 레코드를 병합하며 휴지통에 있는 문서에는 쓰지 않는다. 문서 휴지통은 캡처·세션을 지우지 않고 기본 조회·최근 목록에서 제외한다. 활성 문서를 휴지통으로 옮기기 전 저장 큐를 flush하고 편집기를 닫아 MCP 화면 등록도 해제한다. 복구는 메타데이터만 바꾸며 다시 열 때 모든 편집과 버전을 읽는다.
@@ -69,3 +69,16 @@ IndexedDB `console-canvas-workspace`의 세 저장소를 사용한다.
 - `ui/snapshot-panel.js`의 미리보기 선택 `state.snapshotPreviewId`는 `timeline.activeId`와 별개다. 노드 선택은 현재 편집·revision·저장 버전을 바꾸지 않는다. 별도의 스크립트 없는 버전 장면을 아래 iframe에 표시하고 세대 토큰으로 늦게 도착한 이전 미리보기를 버린다. 이름 모달 저장 직후 그래프를 열며 명시적인 적용 버튼만 실제 버전을 복원한다.
 - MCP `get_screen`은 `preview_snapshot_id`와 `active_snapshot_id`를 구분한다. `list_snapshots.parent_id`는 그래프와 같은 저장 부모다. 기존 MCP 편집·복원 경로와 저장 형식은 유지한다.
 - 오른쪽은 탭 없는 변경 이력 하나다. `ui/activity-panel.js`가 배치·속성의 전후 값과 주석 내용·복사·삭제를 통합한다. 이전 작업의 저장된 주석은 시각을 만들지 않고 별도 보존 표시로 제공한다. 위치·정렬 입력은 도구 모음의 요소 편집 모달로 옮겼다. 패널의 너비·접힘 저장 키는 유지한다.
+
+## 0.16 React UI와 오류 복구
+
+- `ui/react/editor-shell.tsx`가 편집기 도구 모음·패널·모달의 안정된 마크업을 소유한다. `lists.tsx`와 `versions.tsx`가 레이어·문서·통합 이력·Git 그래프·버전 미리보기/비교·전달 이미지를 렌더링한다. DOM 복제 장면과 입력 값은 기존 엔진/컨트롤러가 관리한다. 전체 엔진을 TypeScript로 재작성하지 않았다.
+- `store.ts`는 문서/세대/revision·선택·undo 개수·active/preview·저장 결과의 구독과 타입 있는 UI 명령을 제공한다. `useSyncExternalStore`의 snapshot은 publish 전까지 안정적이다. 드래그의 장면 DOM을 React로 다시 만들지 않는다. 버튼 활성화도 같은 구독을 사용해 DOM과 React 이벤트 상태를 일치시킨다.
+- `mount.tsx`는 문서당 한 셸과 안정된 목록 host를 사용하고 해제 시 구독/루트를 정리한다. 기존 UI 직접 생성 루프와 `ui/action-menu.js`는 제거했다. `ui/*.js`의 기존 컨트롤러는 저장/선택/모달·입력/크기 변경을 조정하며 전체 화면 상태를 별도로 복제하지 않는다.
+- shadcn Button/Input/Textarea/Badge 소스를 저장소에서 관리한다. NativeSelect·DialogSurface·ActionMenu와 기존 패널 리사이즈 로직은 브라우저 top layer와 저장된 너비 계약을 유지하는 로컬 어댑터다. 다른 포털 focus trap을 중첩하지 않는다. 원본 shadcn Dialog/Resizable를 그대로 도입한 것으로 표현하지 않는다. 출처·라이선스·갱신 기준은 `ui/react/SOURCES.md`다.
+- Tailwind 4는 PostCSS로 정적 CSS를 만들고 preflight를 생략한다. 토큰은 `.cc-ui` 안에서 정의하고 복제 iframe에는 주입하지 않는다. esbuild는 React/JSX 런타임을 포함한 `editor-runtime.js/css`를 생성한다. 공개 목록은 실제 의존성에서 계산하되 node_modules 원문은 제외하고 번들/라이선스를 제공한다. 독립 HTML에는 같은 JS/CSS를 인라인한다.
+- `document-input.js`는 캡처·편집/복사·주석·타임라인·이력의 사전 검증을 수행한다. 잘못된 파일은 현재 문서 flush/교체/DB 등록 전에 거절한다. 휴지통 문서도 saveCapture 전 거절한다.
+- 편집 파일 저장은 안전 조건/초안 반영을 먼저 검사한다. DB flush만 실패하면 현재 메모리의 review JSON을 긴급 백업하고 DB 오류를 계속 표시한다. 다른 문서/설정/로그인 백업과 구분한다.
+- UI 복원·휴지통 복구하고 적용·MCP 복원은 `restorePersisted`를 사용한다. 저장 중 사용자 입력을 잠시 막고 실패 시 장면·timeline·active/preview·revision·activity·undo/redo를 복구한 뒤 이전 상태를 다시 저장 큐에 넣는다. 오류는 숨기지 않는다. 성공 시에는 기존처럼 자동 보관과 이후/병렬 버전을 유지한다. 동기 `restore`는 엔진 수준 조립/회귀 검사 용도이고 사용자 복원 명령은 영구 저장 결과를 기다린다.
+- PNG 저장기는 PNG 시그니처·이름/크기와 기존 IPC 프레임 경계를 검사하고 네이티브 PNG 필터·임시 파일/rename을 사용한다. 주석 완료 표시는 실제 flush를 기다린다.
+- `npm run test:desktop:offscreen`은 잠금 환경에서 실제 DOM과 가상 NORTH 스크린샷을 사용한 별도 조건의 SDK/PNG 파일/종료·재실행 검사다. 표준 화면 캡처 검사나 설치 창 직접 조작을 대체했다고 보고하지 않는다.

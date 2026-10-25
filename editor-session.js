@@ -112,12 +112,17 @@ export function createEditorSession({
       updatedAt: new Date().toISOString(),
     });
   }
-  async function flushEditor() {
+  function prepareEditor({ allowTransaction = false } = {}) {
+    if (state.transactionBusy && !allowTransaction)
+      throw new Error('버전 이동이 끝난 뒤 다시 시도해 주세요.');
     if (state.scene?.drag || state.scene?.areaSelecting)
       throw new Error('드래그를 마친 뒤 다시 시도해 주세요.');
     if (state.snapshot && !state.ready)
       throw new Error('화면을 여는 중입니다. 잠시 후 다시 시도해 주세요.');
     commitCommentDraft();
+  }
+  async function flushEditor(options) {
+    prepareEditor(options);
     save();
     await saveQueue.flush();
     return { document_id: state.snapshot?.id || null };
@@ -130,6 +135,7 @@ export function createEditorSession({
     undo,
     save,
     flushEditor,
+    prepareEditor,
     flush: saveQueue.flush,
   };
 }

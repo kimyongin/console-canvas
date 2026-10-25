@@ -12,8 +12,13 @@ async function visit(directory) {
       if (!ignored.has(entry.name)) await visit(path.join(directory, entry.name));
       continue;
     }
-    if (!/\.(?:m?js|cjs|css|html)$/.test(entry.name)) continue;
-    if (['preview.html', 'example-review.html'].includes(entry.name)) continue;
+    if (!/\.(?:m?js|cjs|ts|tsx|css|html)$/.test(entry.name)) continue;
+    if (
+      ['preview.html', 'example-review.html', 'editor-runtime.js', 'editor-runtime.css'].includes(
+        entry.name,
+      )
+    )
+      continue;
     const filename = path.join(directory, entry.name);
     const source = await fs.readFile(filename, 'utf8');
     const options = { ...(await prettier.resolveConfig(filename)), filepath: filename };

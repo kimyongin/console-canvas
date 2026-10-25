@@ -1,16 +1,12 @@
 import { elementLabel, isMajorElement } from './element-labels.js';
-export function createDocumentLists({ $, state, selectNode, focusComment }) {
+import { renderLayerRows } from './react/lists.tsx';
+export function createDocumentLists({ $, state, selectNode }) {
   function renderLayers() {
-    const scene = state.scene,
-      container = $('#layers');
+    const scene = state.scene;
     if (!scene) return;
     const query = $('#layer-search').value.trim().toLowerCase(),
-      fragment = document.createDocumentFragment();
-    const commentNumbers = new Map(
-      Object.keys(scene.annotations).map((id, index) => [id, index + 1]),
-    );
-    const children = scene.children;
-    const majorOnly = $('#major-layers').checked;
+      rows = [];
+    const numbers = new Map(Object.keys(scene.annotations).map((id, index) => [id, index + 1]));
     let matches = null;
     if (query) {
       matches = new Set();
@@ -22,70 +18,46 @@ export function createDocumentLists({ $, state, selectNode, focusComment }) {
     }
     function add(node, depth) {
       if (matches && !matches.has(node.id)) return;
-      if (majorOnly && !query && !isMajorElement(node) && !scene.selection.has(node.id)) {
-        for (const child of children.get(node.id) || []) add(child, depth);
+      const children = scene.children.get(node.id) || [];
+      if (
+        $('#major-layers').checked &&
+        !query &&
+        !isMajorElement(node) &&
+        !scene.selection.has(node.id)
+      ) {
+        children.forEach((child) => add(child, depth));
         return;
       }
-      const descendants = children.get(node.id) || [],
-        expanded = state.expanded.has(node.id) || !!query;
-      const row = document.createElement('div');
-      row.className =
-        'layer-row' +
-        (scene.selection.has(node.id) ? ' selected' : '') +
-        (scene.hidden(node.id) ? ' deleted' : '');
-      row.style.paddingLeft = Math.min(depth * 12, 96) + 'px';
-      row.dataset.layerId = node.id;
-      const toggle = document.createElement('button');
-      toggle.className = 'tree-toggle';
-      toggle.textContent = descendants.length ? (expanded ? '⌄' : '›') : '';
-      toggle.disabled = !descendants.length;
-      toggle.setAttribute('aria-label', (expanded ? '접기' : '펼치기') + ' ' + node.name);
-      toggle.setAttribute('aria-expanded', String(expanded));
-      toggle.addEventListener('click', () => {
-        if (state.expanded.has(node.id)) state.expanded.delete(node.id);
-        else state.expanded.add(node.id);
-        renderLayers();
+      const expanded = state.expanded.has(node.id) || !!query,
+        edit = scene.edits[node.id];
+      rows.push({
+        id: node.id,
+        depth,
+        selected: scene.selection.has(node.id),
+        deleted: scene.hidden(node.id),
+        expanded,
+        hasChildren: !!children.length,
+        name: node.name,
+        title: node.name + ' · ' + node.tag + ' · ' + node.id,
+        icon: { text: 'T', icon: '◇', raster: '▧' }[node.kind] || '▱',
+        label: elementLabel(node),
+        comment: scene.annotations[node.id],
+        commentNumber: numbers.get(node.id),
+        mark: edit?.deleted ? '×' : edit?.dx || edit?.dy ? '•' : null,
       });
-      const pick = document.createElement('button');
-      pick.className = 'layer-pick';
-      pick.setAttribute('aria-pressed', String(scene.selection.has(node.id)));
-      const icon = document.createElement('span');
-      icon.className = 'layer-icon';
-      icon.textContent =
-        node.kind === 'text'
-          ? 'T'
-          : node.kind === 'icon'
-            ? '◇'
-            : node.kind === 'raster'
-              ? '▧'
-              : '▱';
-      const label = document.createElement('span');
-      label.className = 'layer-label';
-      label.textContent = elementLabel(node);
-      pick.title = node.name + ' · ' + node.tag + ' · ' + node.id;
-      pick.append(icon, label);
-      pick.addEventListener('click', (event) =>
-        selectNode(node.id, { reveal: true, additive: event.metaKey || event.ctrlKey }),
-      );
-      row.append(toggle, pick);
-      if (scene.annotations[node.id]) {
-        const mark = document.createElement('span');
-        mark.className = 'layer-comment';
-        mark.textContent = '주석 ' + commentNumbers.get(node.id);
-        mark.title = scene.annotations[node.id];
-        row.append(mark);
-      }
-      if (scene.edits[node.id]?.deleted || scene.edits[node.id]?.dx || scene.edits[node.id]?.dy) {
-        const mark = document.createElement('span');
-        mark.className = 'layer-mark';
-        mark.textContent = scene.edits[node.id]?.deleted ? '×' : '•';
-        row.append(mark);
-      }
-      fragment.append(row);
-      if (expanded) descendants.forEach((child) => add(child, depth + 1));
+      if (expanded) children.forEach((child) => add(child, depth + 1));
     }
-    (children.get(null) || []).forEach((node) => add(node, 0));
-    container.replaceChildren(fragment);
+    (scene.children.get(null) || []).forEach((node) => add(node, 0));
+    renderLayerRows(
+      $('#layers'),
+      rows,
+      (id) => {
+        if (state.expanded.has(id)) state.expanded.delete(id);
+        else state.expanded.add(id);
+        renderLayers();
+      },
+      (id, additive) => selectNode(id, { reveal: true, additive }),
+    );
     $('#layer-count').textContent = scene.elements.size.toLocaleString();
   }
   return { renderLayers };
