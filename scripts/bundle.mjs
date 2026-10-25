@@ -53,7 +53,7 @@ for (const input of Object.keys(result.metafile.inputs).filter((name) =>
 packages.set('shadcn/ui', await fs.readFile(path.join(root, 'ui/react/SOURCES.md'), 'utf8'));
 await fs.writeFile(
   path.join(root, 'THIRD_PARTY_NOTICES.txt'),
-  [...packages.values()].join('\n\n---\n\n'),
+  [...packages.values()].join('\n\n---\n\n').replace(/\r\n/g, '\n'),
 );
 const theme = await postcss([tailwind()]).process(
   await fs.readFile(path.join(root, 'ui/react/theme.css'), 'utf8'),
