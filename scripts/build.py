@@ -83,13 +83,24 @@ def main():
     write_archive(archive, ((name, (ROOT / name).read_bytes()) for name in files))
     (skill / 'assets').mkdir(parents=True, exist_ok=True)
     shutil.copyfile(archive, skill / 'assets/console-canvas-extension.zip')
+    chrome_archive = output / 'console-canvas-chrome.zip'
+    chrome_files = sorted((set(json.loads((ROOT / 'runtime-manifest.json').read_text())['public'])
+                           - {'preview.html'}) | {'manifest.json', 'background.js'})
+    write_archive(chrome_archive, ((name, (ROOT / name).read_bytes()) for name in chrome_files))
+    (output / 'chrome-package.json').write_text(json.dumps({
+        'version': version,
+        'archive': chrome_archive.name,
+        'sha256': hashlib.sha256(chrome_archive.read_bytes()).hexdigest(),
+        'files': {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
+                  for name in chrome_files},
+    }, indent=2) + '\n')
     skill_archive = output / 'console-canvas-skill.zip'
     write_archive(skill_archive, ((path.relative_to(skill).as_posix(), path.read_bytes())
                                  for path in sorted(skill.rglob('*'))
                                  if path.is_file() and '__pycache__' not in path.parts))
     print(json.dumps({
         'standalone': str(output / 'Console Canvas.html'),
-        'extension': str(archive), 'skill': str(skill_archive),
+        'extension': str(archive), 'chrome': str(chrome_archive), 'skill': str(skill_archive),
         'files': len(files), 'bytes': archive.stat().st_size,
     }, ensure_ascii=False))
 

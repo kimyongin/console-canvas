@@ -1,0 +1,544 @@
+{
+  "version": 1,
+  "tools": [
+    {
+      "name": "get_agent_guide",
+      "description": "Read the app-bundled Console Canvas skill instructions and version before editing. Works before capturing a screen and does not install files.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "list_screens",
+      "description": "List explicitly connected live editor tabs. No original website access.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "get_screen",
+      "description": "Read revision, document identity, changes, and undo/redo counts.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "editor_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "editor_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "list_elements",
+      "description": "Search captured elements by text, label, user alias, selector, tag or ID. Includes optional alias, original locator, geometry and deletion state; paginated.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "editor_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "parent_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "required": [
+          "editor_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "list_history",
+      "description": "Read persisted chronological edit events. Current branch follows snapshot ancestry; scope all includes parallel branches.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "editor_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "scope": {
+            "enum": [
+              "branch",
+              "all"
+            ]
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "required": [
+          "editor_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "get_review_image",
+      "description": "Get ONE image with the after screen, numbered highlighted regions and annotation cards below. Optional snapshot_id selects a saved version. Read the image as layout intent, not pixel CSS instructions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "editor_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "snapshot_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "editor_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "list_comments",
+      "description": "Read component comments with element IDs, original locators and deleted-target status.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "editor_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "element_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "required": [
+          "editor_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "apply_edits",
+      "description": "Atomically apply moves, deletions and component comment edits as ONE undo step. Move mode absolute sets offsets from capture; relative adds to current offsets. Empty comment text removes it. Does not edit source code.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "editor_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "operation_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Unique idempotency key. Retry an uncertain call with the SAME key and identical arguments."
+          },
+          "operations": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": {
+              "$limit": "operations"
+            },
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "move"
+                    },
+                    "element_id": {
+                      "type": "string"
+                    },
+                    "dx": {
+                      "type": "number",
+                      "minimum": {
+                        "$limit": "-x"
+                      },
+                      "maximum": {
+                        "$limit": "x"
+                      }
+                    },
+                    "dy": {
+                      "type": "number",
+                      "minimum": {
+                        "$limit": "-y"
+                      },
+                      "maximum": {
+                        "$limit": "y"
+                      }
+                    },
+                    "mode": {
+                      "enum": [
+                        "absolute",
+                        "relative"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "element_id",
+                    "dx",
+                    "dy",
+                    "mode"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "point_comment"
+                    },
+                    "x": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": {
+                        "$limit": "x"
+                      }
+                    },
+                    "y": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": {
+                        "$limit": "y"
+                      }
+                    },
+                    "text": {
+                      "type": "string",
+                      "maxLength": {
+                        "$limit": "comment"
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "x",
+                    "y",
+                    "text"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "delete"
+                    },
+                    "element_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "element_id"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "const": "comment"
+                    },
+                    "element_id": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string",
+                      "maxLength": {
+                        "$limit": "comment"
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "element_id",
+                    "text"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "editor_id",
+          "expected_revision",
+          "operation_id",
+          "operations"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "undo",
+      "description": "Undo the latest shared editor history step, whether made by a person or agent. Check get_screen first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "editor_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "operation_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Unique idempotency key. Retry an uncertain call with the SAME key and identical arguments."
+          }
+        },
+        "required": [
+          "editor_id",
+          "expected_revision",
+          "operation_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "redo",
+      "description": "Redo the latest undone shared editor history step.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "editor_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "operation_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Unique idempotency key. Retry an uncertain call with the SAME key and identical arguments."
+          }
+        },
+        "required": [
+          "editor_id",
+          "expected_revision",
+          "operation_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "list_snapshots",
+      "description": "List saved versions of this capture, including the active version and unsaved-work status. No full DOM or snapshot state is returned.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "editor_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "required": [
+          "editor_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "create_snapshot",
+      "description": "Save the current edits, comments and handoff note as a named version. Other versions remain available.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "editor_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "operation_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Unique idempotency key. Retry an uncertain call with the SAME key and identical arguments."
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "editor_id",
+          "expected_revision",
+          "operation_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "restore_snapshot",
+      "description": "Return to a saved version without removing later versions. Unsaved current work is automatically saved as another snapshot first. Restoration is one undo step.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "editor_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "operation_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Unique idempotency key. Retry an uncertain call with the SAME key and identical arguments."
+          },
+          "snapshot_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "editor_id",
+          "expected_revision",
+          "operation_id",
+          "snapshot_id"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    }
+  ]
+}

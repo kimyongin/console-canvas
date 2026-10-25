@@ -1,8 +1,16 @@
-# Chrome 확장 WebMCP 연결 실험
+# Chrome 확장 WebMCP 연결 검증
 
 2026-10-26, 소스 0.19.2 기준. 공식 Chrome DevTools MCP 1.12.0을 공식 MCP SDK 클라이언트로 실행하고 실제 Chrome 155의 격리 headless 프로필에서 확장을 설치·수집·편집했다. **37개 검사가 통과했다.** 제품 경로에 활성화하거나 설치 앱을 교체한 변경은 아니다.
 
-## 재현
+## 0.20 제품 코드 검증
+
+`node experiments/webmcp/run.mjs --product`는 어댑터를 주입하지 않고 **최종 Chrome 전용 ZIP**을 풀어 설치한다. 공통 13개 도구를 실제 native API에 공개하고 공식 MCP로 실행한다. `--headed`를 추가하면 별도 프로필의 일반 Chrome 창으로 실행한다. 제품 모드는 Python으로 스키마를 추출하지 않는다. QA의 ZIP 압축 해제에만 Python 표준 라이브러리를 쓰며 확장 실행에는 필요 없다.
+
+실제 도구 호출과 준비/동의·오류 주입·상태 관찰을 구별한다. 편집 명령은 `execute_webmcp_tool`을 사용하고 UI 공개 버튼·IDB 저장 실패 주입과 관찰에는 `evaluate_script`를 사용한다. PNG는 반환한 정확한 blob 미리보기 탭의 크기/출처를 대조한 후 공식 MCP `image/png` 콘텐츠로 수신한다. 주석만·10개 요청·삭제 전 참고·저장 버전과 조회 비변경, 공개 철회·이전 세대·busy/한도·저장 실패/롤백을 포함해 55개를 확인했다. [상세 증빙·남은 QA](../../docs/webmcp-0.20.md)를 따른다.
+
+보고서는 `product-headless-report.json`/`product-headed-report.json`과 최근 실행 `report.json`, 실제 이미지 4종 `agent-*.png`로 `local/webmcp-experiment/`에 남는다. 일반 창 자동 검사와 실제 OS IME/권한/사람 입력을 동일시하지 않는다. 아래 내용은 최초 0.19.2 실험의 역사적 기록이다.
+
+## 최초 실험 재현
 
 Node.js 22.12 이상, Python 3.9 이상, Google Chrome이 필요하다. 아래 명령은 저장소 루트에서 실행한다.
 

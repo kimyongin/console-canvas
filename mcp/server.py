@@ -18,49 +18,22 @@ EDIT_LIMITS = json.loads((APP / 'edit-policy.json').read_text())
 DEFAULT_STATE = Path(os.environ.get('CODEX_HOME', str(Path.home() / '.codex'))) / 'console-canvas'
 
 
-def schema(properties=None, required=()):
-    return {'type': 'object', 'properties': properties or {}, 'required': list(required), 'additionalProperties': False}
-
-
-EDITOR = {'type': 'string', 'minLength': 1, 'maxLength': 100}
-REVISION = {'type': 'integer', 'minimum': 0}
-OPERATION = {'type': 'string', 'minLength': 1, 'maxLength': 100, 'description': 'Unique idempotency key. Retry an uncertain call with the SAME key and identical arguments.'}
-BASE = {'editor_id': EDITOR}
-WRITE = {**BASE, 'expected_revision': REVISION, 'operation_id': OPERATION}
-TOOLS = [
-    ('get_agent_guide', 'Read the app-bundled Console Canvas skill instructions and version before editing. Works before capturing a screen and does not install files.', schema()),
-    ('list_screens', 'List explicitly connected live editor tabs. No original website access.', schema()),
-    ('get_screen', 'Read revision, document identity, changes, and undo/redo counts.', schema(BASE, BASE)),
-    ('list_elements', 'Search captured elements by text, label, user alias, selector, tag or ID. Includes optional alias, original locator, geometry and deletion state; paginated.',
-     schema({**BASE, 'query': {'type': 'string', 'maxLength': 500}, 'parent_id': {'type': 'string'},
-             'offset': {'type': 'integer', 'minimum': 0}, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 200}}, BASE)),
-    ('list_history', 'Read persisted chronological edit events. Current branch follows snapshot ancestry; scope all includes parallel branches.', schema({**BASE, 'scope': {'enum': ['branch', 'all']}, 'offset': {'type': 'integer', 'minimum': 0}, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 200}}, BASE)),
-    ('get_review_image', 'Get ONE image with the after screen, numbered highlighted regions and annotation cards below. Optional snapshot_id selects a saved version. Read the image as layout intent, not pixel CSS instructions.', schema({**BASE, 'snapshot_id': {'type': 'string', 'minLength': 1, 'maxLength': 100}}, BASE)),
-    ('list_comments', 'Read component comments with element IDs, original locators and deleted-target status.',
-     schema({**BASE, 'element_id': {'type': 'string'}, 'offset': {'type': 'integer', 'minimum': 0}, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 200}}, BASE)),
-    ('apply_edits', 'Atomically apply moves, deletions and component comment edits as ONE undo step. Move mode absolute sets offsets from capture; relative adds to current offsets. Empty comment text removes it. Does not edit source code.',
-     schema({**WRITE, 'operations': {'type': 'array', 'minItems': 1, 'maxItems': EDIT_LIMITS['operations'], 'items': {'oneOf': [
-         schema({'type': {'const': 'move'}, 'element_id': {'type': 'string'}, 'dx': {'type': 'number', 'minimum': -EDIT_LIMITS['x'], 'maximum': EDIT_LIMITS['x']}, 'dy': {'type': 'number', 'minimum': -EDIT_LIMITS['y'], 'maximum': EDIT_LIMITS['y']}, 'mode': {'enum': ['absolute', 'relative']}}, ['type', 'element_id', 'dx', 'dy', 'mode']),
-         schema({'type': {'const': 'point_comment'}, 'x': {'type': 'number', 'minimum': 0, 'maximum': EDIT_LIMITS['x']}, 'y': {'type': 'number', 'minimum': 0, 'maximum': EDIT_LIMITS['y']}, 'text': {'type': 'string', 'maxLength': EDIT_LIMITS['comment']}}, ['type', 'x', 'y', 'text']),
-         schema({'type': {'const': 'delete'}, 'element_id': {'type': 'string'}}, ['type', 'element_id']),
-         schema({'type': {'const': 'comment'}, 'element_id': {'type': 'string'}, 'text': {'type': 'string', 'maxLength': EDIT_LIMITS['comment']}}, ['type', 'element_id', 'text']),
-     ]}}}, [*WRITE, 'operations'])),
-    ('undo', 'Undo the latest shared editor history step, whether made by a person or agent. Check get_screen first.', schema(WRITE, WRITE)),
-    ('redo', 'Redo the latest undone shared editor history step.', schema(WRITE, WRITE)),
-    ('list_snapshots', 'List saved versions of this capture, including the active version and unsaved-work status. No full DOM or snapshot state is returned.',
-     schema({**BASE, 'offset': {'type': 'integer', 'minimum': 0}, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 200}}, BASE)),
-    ('create_snapshot', 'Save the current edits, comments and handoff note as a named version. Other versions remain available.',
-     schema({**WRITE, 'name': {'type': 'string', 'maxLength': 120}}, WRITE)),
-    ('restore_snapshot', 'Return to a saved version without removing later versions. Unsaved current work is automatically saved as another snapshot first. Restoration is one undo step.',
-     schema({**WRITE, 'snapshot_id': {'type': 'string', 'minLength': 1, 'maxLength': 100}}, [*WRITE, 'snapshot_id'])),
-]
+def resolve_contract(value):
+    if isinstance(value, dict):
+        if set(value) == {'$limit'}:
+            key = value['$limit']
+            return -EDIT_LIMITS[key[1:]] if key.startswith('-') else EDIT_LIMITS[key]
+        return {key: resolve_contract(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [resolve_contract(item) for item in value]
+    return value
 
 
 def definitions():
-    return [{'name': name, 'description': description, 'inputSchema': inputs,
-             'annotations': {'readOnlyHint': name not in ('apply_edits', 'undo', 'redo', 'create_snapshot', 'restore_snapshot'),
-                             'destructiveHint': False, 'openWorldHint': False}}
-            for name, description, inputs in TOOLS]
+    return resolve_contract(json.loads((APP / 'tool-contract.json').read_text()))['tools']
+
+
+TOOLS = [(tool['name'], tool['description'], tool['inputSchema']) for tool in definitions()]
 
 
 def request(connection, path, data=None, timeout=15):

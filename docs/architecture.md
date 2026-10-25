@@ -84,3 +84,9 @@ IndexedDB `console-canvas-workspace`의 세 저장소를 사용한다.
 - `npm run test:desktop:offscreen`은 잠금 환경에서 실제 DOM과 가상 NORTH 스크린샷을 사용한 별도 조건의 SDK/PNG 파일/종료·재실행 검사다. 표준 화면 캡처 검사나 설치 창 직접 조작을 대체했다고 보고하지 않는다.
 
 개발용 `ui/react/contracts.ts`는 snapshot·이력·MCP 결과·editor preload의 타입 진입점이다. 전역 Window 선언은 TypeScript UI에서 사용하며 배포 런타임에 추가 코드를 만들지 않는다. JS/IPC/MCP의 런타임 검증을 대체하지 않는다.
+
+## Chrome WebMCP · 0.20
+
+`tool-contract.json`은 13개 도구 스키마·읽기/쓰기 annotations·계약 버전의 공통 원본이다. `tool-contract.js`와 `mcp/server.py`가 `edit-policy.json`의 한도를 해석한다. `webmcp-client.js`는 명시적으로 공개한 문서의 native `document.modelContext` 등록/철회·직렬 실행·최근 200개 성공 operation_id 결과만 담당한다. 편집·저장·실행 취소·분기는 기존 `editor-controller.js`와 세션/엔진에 위임한다. Electron IPC와 Python 브리지는 Chrome 실행 경로의 의존성이 아니다.
+
+가이드는 빌드된 동일 SKILL.md를 반환한다. 이미지 생성은 native 실행 반환 뒤 별도 작업으로 시작하고 같은 인수의 재조회로 결과를 전달한다. 로컬 blob 미리보기는 `review-image.html`에서만 로드하고 5분 또는 도구 철회 시 해제한다. 공식 Chrome MCP의 `new_page`→`take_screenshot(fullPage:true)`가 실제 MCP 이미지 콘텐츠를 반환한다. 상세 계약·실패 정책은 [Chrome 안내](chrome-webmcp.md), 실행 증빙은 [0.20](webmcp-0.20.md)에 있다.

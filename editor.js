@@ -1,4 +1,5 @@
 import { snapshotChangeLabel } from './ui/snapshot-delta.js';
+import { createWebMcpClient } from './webmcp-client.js';
 import { configureModelessInspector } from './ui/modeless-inspector.js';
 import { cleanLayerNames } from './layer-names.js';
 import { createSelectionToolbar } from './ui/selection-toolbar.js';
@@ -47,6 +48,7 @@ import { connectEditorCommands } from './ui/react/commands.ts';
 mountEditorShell();
 const $ = (selector) => document.querySelector(selector);
 const isExtension = typeof chrome !== 'undefined' && !!chrome.runtime?.id;
+let webMcpStatus = null;
 const state = {
   snapshot: null,
   scene: null,
@@ -183,6 +185,7 @@ function renderDocumentName() {
     : '';
 }
 function closeDocument(id) {
+  if (state.snapshot?.id === id) webMcp?.invalidate();
   const next = opening
     .catch(() => {})
     .then(async () => {
@@ -362,6 +365,7 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
   const existingMeta = await getDocumentMetadata(snapshot.id);
   if (existingMeta?.deletedAt)
     throw new Error('휴지통에 있는 문서입니다. 문서 목록의 휴지통에서 먼저 복구해 주세요.');
+  webMcp?.invalidate();
   await flushEditor();
   areaSelection.reset();
   clipboard.reset();
@@ -709,6 +713,12 @@ window.addEventListener('drop', (event) => {
   }
 });
 function renderMcpStatus() {
+  if (webMcpStatus?.enabled) {
+    $('#mcp-button').textContent = '● WebMCP 공개 중';
+    $('#mcp-button').classList.add('connected');
+    $('#mcp-state').textContent = webMcpStatus.message;
+    return;
+  }
   const status = state.mcpStatus;
   $('#mcp-button').textContent = status.connected ? '● 에이전트 연결됨' : '○ 에이전트 연결';
   $('#mcp-button').classList.toggle('connected', !!status.connected);
@@ -767,6 +777,30 @@ const mcpBridge = createMcpBridge({
   },
 });
 $('#mcp-button').addEventListener('click', () => $('#mcp-dialog').showModal());
+const webMcp = isExtension
+  ? createWebMcpClient({
+      controller,
+      onStatus(status) {
+        webMcpStatus = status;
+        renderMcpStatus();
+        $('#webmcp-status').textContent = status.message;
+        $('#webmcp-disable').disabled = !status.enabled;
+      },
+    })
+  : null;
+if (webMcp) {
+  $('#webmcp-controls').hidden = false;
+  $('#webmcp-disable').disabled = true;
+  $('#webmcp-enable').addEventListener('click', async () => {
+    try {
+      await webMcp.enable();
+      $('#mcp-dialog').close();
+    } catch (error) {
+      $('#webmcp-status').textContent = 'WebMCP 오류 · ' + error.message;
+    }
+  });
+  $('#webmcp-disable').addEventListener('click', () => webMcp.disable());
+}
 $('#mcp-connect').addEventListener('click', async () => {
   const button = $('#mcp-connect');
   button.disabled = true;

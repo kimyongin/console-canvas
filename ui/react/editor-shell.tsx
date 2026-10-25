@@ -900,6 +900,32 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
         </form>
         <div className="eyebrow">{'CONNECT YOUR AGENT'}</div>
         <h2>{'에이전트와 함께 편집'}</h2>
+        <section id="webmcp-controls" hidden>
+          <h3>Chrome WebMCP</h3>
+          <p>
+            Chrome MCP에서 이 문서의 도구를 사용할 수 있도록 공개합니다. 공식 MCP의 Chrome 연결
+            설정은 별도로 필요합니다. 문서를 바꾸거나 새로고침하면 다시 공개해야 합니다.
+          </p>
+          <p>
+            <a
+              href="https://github.com/kimyongin/console-canvas/blob/main/docs/chrome-webmcp.md"
+              target="_blank"
+              rel="noreferrer"
+            >
+              공식 MCP 설정·이미지 전달 안내
+            </a>
+          </p>
+          <Button id="webmcp-enable" type="button">
+            도구 공개
+          </Button>
+          <Button id="webmcp-disable" type="button" variant="outline">
+            공개 해제
+          </Button>
+          <p id="webmcp-status" role="status">
+            WebMCP 도구 미공개
+          </p>
+        </section>
+        <h3>로컬 MCP 서버 연결</h3>
         <p>
           {'\n        연결한 이 화면의 복제본만 에이전트가 읽고 편집합니다.'}
           <br />
