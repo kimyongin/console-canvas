@@ -1,5 +1,4 @@
 import { elementLabel, isMajorElement } from './element-labels.js';
-import { changeActionLabel } from '../export.js';
 export function createDocumentLists({ $, state, selectNode, focusComment }) {
   function renderLayers() {
     const scene = state.scene,
@@ -89,95 +88,5 @@ export function createDocumentLists({ $, state, selectNode, focusComment }) {
     container.replaceChildren(fragment);
     $('#layer-count').textContent = scene.elements.size.toLocaleString();
   }
-  function renderChanges() {
-    if (!state.scene) return;
-    const changes = state.scene.changes(),
-      comments = state.scene.comments(),
-      container = $('#changes');
-    container.replaceChildren();
-    $('#change-count').textContent = changes.length + comments.length;
-    renderComments();
-    if (!changes.length && !comments.length) {
-      const empty = document.createElement('div');
-      empty.className = 'empty-small';
-      empty.textContent = '이동·삭제 기록과 요소별 주석을 모읍니다.';
-      container.append(empty);
-    }
-    for (const change of changes) {
-      const item = document.createElement('div');
-      item.className = 'change-item';
-      const title = document.createElement('strong');
-      title.textContent = change.name;
-      const detail = document.createElement('span');
-      detail.textContent =
-        change.action === 'copy'
-          ? changeActionLabel(change)
-          : change.action === 'delete'
-            ? changeActionLabel(change) +
-              (change.affectedDescendants
-                ? ' · 하위 ' + change.affectedDescendants + '개 포함'
-                : '')
-            : 'X ' + change.delta.x + ' · Y ' + change.delta.y;
-      item.append(title, detail);
-      container.append(item);
-    }
-    comments.forEach((comment, index) => {
-      const item = document.createElement('div');
-      item.className = 'change-item';
-      const pick = document.createElement('button');
-      pick.type = 'button';
-      const title = document.createElement('strong');
-      title.textContent = '주석 ' + (index + 1) + ' · ' + comment.name;
-      pick.append(title);
-      pick.addEventListener('click', () => {
-        selectNode(comment.id, { reveal: true });
-        focusComment({ id: comment.id });
-      });
-      const text = document.createElement('span');
-      text.className = 'comment-text';
-      text.textContent = comment.text;
-      item.append(pick, text);
-      if (comment.targetDeleted) {
-        const deleted = document.createElement('span');
-        deleted.className = 'comment-target-deleted';
-        deleted.textContent = '대상이 삭제된 상태 · 요청 내용 확인 필요';
-        item.append(deleted);
-      }
-      container.append(item);
-    });
-  }
-
-  function renderComments() {
-    const comments = state.scene?.comments() || [],
-      query = $('#comment-search').value.trim().toLowerCase();
-    $('#comments-count').textContent = comments.length;
-    const list = $('#comments-list');
-    list.replaceChildren();
-    for (const [index, comment] of comments.entries()) {
-      const name = comment.point ? '위치 주석' : elementLabel(state.scene.nodes.get(comment.id));
-      if (query && !`${name} ${comment.text}`.toLowerCase().includes(query)) continue;
-      const button = document.createElement('button');
-      button.className = 'comment-list-item';
-      const title = document.createElement('strong'),
-        text = document.createElement('span');
-      title.textContent = index + 1 + '. ' + name + (comment.targetDeleted ? ' · 삭제된 대상' : '');
-      text.textContent = comment.text;
-      button.append(title, text);
-      button.addEventListener('click', () => {
-        selectNode(comment.id, { reveal: true });
-        focusComment({ id: comment.id });
-      });
-      list.append(button);
-    }
-    if (!list.children.length) {
-      const empty = document.createElement('p');
-      empty.className = 'empty-small';
-      empty.textContent = comments.length
-        ? '검색 결과가 없습니다.'
-        : '아직 저장된 주석이 없습니다.';
-      list.append(empty);
-    }
-  }
-  $('#comment-search').addEventListener('input', renderComments);
-  return { renderLayers, renderChanges, renderComments };
+  return { renderLayers };
 }

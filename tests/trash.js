@@ -31,7 +31,8 @@ try {
     await until(() => !doc.querySelector('#rename-dialog').open);
   }
   const card = (snapshotId) =>
-    doc.querySelector('[data-snapshot-id="' + snapshotId + '"]').closest('.snapshot-card');
+    doc.querySelector('[data-snapshot-id="' + snapshotId + '"]')?.closest('.snapshot-card') ||
+    doc.querySelector('[data-trashed-id="' + snapshotId + '"]');
   click('#documents-button');
   await until(() => doc.querySelector('[data-document-card="' + id + '"]'));
   click('[data-document-card="' + id + '"] [data-document-action="rename"]');
@@ -97,7 +98,7 @@ try {
   click('#snapshots-trash');
   check(
     'Snapshot trash exposes every recoverable version',
-    doc.querySelectorAll('#snapshot-list [data-snapshot-action="recover"]').length === 2,
+    doc.querySelectorAll('#snapshot-trash-list [data-snapshot-action="recover"]').length === 2,
   );
   const current = JSON.stringify(app.state.scene.edits);
   card(a.id).querySelector('[data-snapshot-action="recover"]').click();
@@ -108,6 +109,7 @@ try {
   );
   click('#snapshots-live');
   card(a.id).querySelector('.snapshot-entry').click();
+  click('#apply-snapshot');
   check(
     'A recovered snapshot applies its original saved geometry and comments',
     app.state.scene.edits[node.id].dx === 12 &&
@@ -221,7 +223,7 @@ try {
     !app.snapshotHistory.list().length &&
       app.state.ready &&
       app.state.timeline.activeId === null &&
-      doc.querySelector('#next-snapshot').disabled,
+      doc.querySelector('#apply-snapshot').disabled,
   );
   const db = await database();
   const captureRecord = await new Promise((resolve, reject) => {

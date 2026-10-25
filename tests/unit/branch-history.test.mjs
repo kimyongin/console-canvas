@@ -68,3 +68,35 @@ test('coordinate annotations roundtrip without admitting unknown element edits o
   );
   assert.deepEqual(deleted.annotations, {});
 });
+
+test('horizontal snapshot graph forks by parent instead of chronological save order', async () => {
+  const { snapshotGraph } = await import('../../snapshot-graph.js');
+  const { nodes, edges, width } = snapshotGraph([
+    { id: 'A', parentId: null },
+    { id: 'B', parentId: 'A' },
+    { id: 'C', parentId: 'B' },
+    { id: 'D', parentId: 'A' },
+  ]);
+  const n = (id) => nodes.find((n) => n.id === id);
+  assert.equal(n('B').lane, n('C').lane);
+  assert.notEqual(n('D').lane, n('C').lane);
+  assert.equal(n('D').x, n('B').x);
+  assert.ok(edges.some((e) => e.parent_id === 'A' && e.child_id === 'D'));
+  assert.ok(!edges.some((e) => e.parent_id === 'C' && e.child_id === 'D'));
+  assert.ok(width >= 1060);
+});
+test('first property edit is classified as a property event rather than restoration', () => {
+  const state = {
+    scene: { nodes: new Map([['n1', { name: '버튼' }]]) },
+    activity: [],
+    activityHead: null,
+  };
+  const point = { edits: {}, annotations: {}, note: '' };
+  const event = recordActivity(
+    state,
+    point,
+    { ...point, edits: { n1: { dx: 24, dy: 16, deleted: false } } },
+    { category: 'property' },
+  );
+  assert.equal(event.changes[0].type, 'property');
+});

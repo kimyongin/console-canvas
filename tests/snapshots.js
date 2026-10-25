@@ -61,24 +61,28 @@ try {
       doc.querySelector('#snapshot-list').textContent.includes('시안 B'),
   );
   doc.querySelector('[data-snapshot-id="' + a + '"]').click();
+  doc.querySelector('#apply-snapshot').click();
   check(
     'Clicking a saved version restores geometry, comments and notes',
     app.state.scene.edits[node.id].dx === 30 &&
       app.state.scene.annotations[node.id] === '시안 A의 주석' &&
       doc.querySelector('#review-note').value === '시안 A의 설명',
   );
-  doc.querySelector('#next-snapshot').click();
+  doc.querySelector('[data-snapshot-id="' + b + '"]').click();
+  doc.querySelector('#apply-snapshot').click();
   check(
     'Next-version control returns to the future without losing saved versions',
     app.state.timeline.activeId === b &&
       app.state.scene.edits[node.id].dx === 70 &&
       app.state.timeline.entries.length === 3,
   );
-  doc.querySelector('#previous-snapshot').click();
+  doc.querySelector('[data-snapshot-id="' + a + '"]').click();
+  doc.querySelector('#apply-snapshot').click();
   select();
   app.state.scene.setPosition(100, 120);
   comment('이동 전 미저장 주석');
   doc.querySelector('[data-snapshot-id="' + b + '"]').click();
+  doc.querySelector('#apply-snapshot').click();
   const automatic = app.state.timeline.entries.find((e) => e.kind === 'automatic');
   check(
     'UI navigation preserves unsaved edits as a visible automatic snapshot',

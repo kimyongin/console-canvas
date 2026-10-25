@@ -20,6 +20,7 @@ export function createInspector({ $, state, kinds, selectNode }) {
     $('.field-heading').textContent = count > 1 ? '묶음 전체 이동' : '원래 위치에서 이동';
     $('.component-comment label').textContent = '수정 요청';
     $('#zoom-selection').disabled = !node;
+    $('#edit-properties').disabled = !node;
     if (!node) {
       if (!$('#comment-dialog').open) state.commentTarget = null;
       return;

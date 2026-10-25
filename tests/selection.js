@@ -190,7 +190,7 @@ try {
     'Cmd-click on container background adds it even without a marquee drag',
     scene.selection.has(first.id) && scene.selection.has(stats.id),
   );
-  doc.querySelector('#tab-inspect').click();
+  doc.querySelector('#edit-properties').click();
   check(
     'Multi-selection inspector presents group controls first and labels its delete scope and bounds',
     doc.querySelector('#direct-edit-controls').getBoundingClientRect().top <
@@ -198,6 +198,7 @@ try {
       doc.querySelector('#inspector-delete').textContent === '선택한 2개 삭제' &&
       doc.querySelector('#element-size').textContent.startsWith('선택 영역'),
   );
+  doc.querySelector('#close-properties').click();
   app.selectNode(first.id);
   app.selectNode(second.id, { additive: true });
   const groupBefore = JSON.stringify(scene.edits),

@@ -129,6 +129,9 @@
               <button id="undo" aria-label="실행 취소" disabled>↶</button
               ><button id="redo" aria-label="다시 실행" disabled>↷</button
               ><span class="toolbar-divider"></span>
+              <button id="edit-properties" disabled title="선택 요소의 위치·정렬 편집">
+                요소 편집
+              </button>
               <button id="copy" title="선택 요소 복사 · ⌘/Ctrl+C" disabled>복사</button>
               <button id="paste" title="이 화면에 요소 붙여넣기 · ⌘/Ctrl+V">붙여넣기</button
               ><button id="delete" disabled>삭제</button>
@@ -154,7 +157,7 @@
             aria-label="스냅샷 목록"
             title="저장된 버전 사이 이동"
           >
-            <span id="snapshot-active-name">스냅샷 목록</span> ⌄
+            <span>스냅샷 목록 · </span><span id="snapshot-active-name">문서 열기</span> ⌄
           </button>
         </div>
         <div id="viewport" class="canvas-viewport">
@@ -206,16 +209,11 @@
           ><span id="mcp-state" role="status">MCP 연결 안 됨</span>
         </div>
       </section>
-      <aside class="right-panel" id="properties-panel" aria-label="속성·주석·스냅샷 패널">
+      <aside class="right-panel" id="properties-panel" aria-label="변경 이력 패널">
         <div class="panel-heading panel-topbar">
+          <strong id="properties-panel-title">변경 이력</strong>
+          <span id="activity-count" class="history-count">0</span>
           <div id="properties-toggle-home" class="panel-toggle-slot"></div>
-          <strong id="properties-panel-title" class="sr-only">선택한 요소</strong>
-          <nav class="inspector-tabs" aria-label="오른쪽 패널">
-            <button id="tab-inspect" aria-pressed="false">속성</button
-            ><button id="tab-comments" aria-pressed="false">
-              주석 <span id="comments-count">0</span></button
-            ><button id="tab-history" aria-pressed="true">변경 이력</button>
-          </nav>
         </div>
         <section id="history-panel" aria-label="통합 변경 이력">
           <div class="activity-controls">
@@ -233,84 +231,21 @@
               </select></label
             >
           </div>
+          <input
+            id="activity-search"
+            type="search"
+            placeholder="대상·주석·변경 검색"
+            aria-label="변경 이력 검색"
+          />
           <p id="activity-branch" class="activity-branch"></p>
           <div id="activity-list" class="activity-list"></div>
         </section>
-        <section id="comments-panel" hidden aria-label="요소별 주석 목록">
-          <input id="comment-search" type="search" placeholder="주석 검색" aria-label="주석 검색" />
-          <div id="comments-list"></div>
-        </section>
-        <div id="inspect-panel" hidden>
-          <div id="no-selection" class="no-selection">
-            <strong>요소를 선택해 편집하세요</strong>
-            <p>⌘/Ctrl+클릭으로 여러 요소 선택 · Alt+클릭으로 세부 요소 선택</p>
-          </div>
-          <section id="inspector" class="inspector" hidden>
-            <div class="element-kind" id="element-kind"></div>
-            <h2 id="element-name"></h2>
-            <div id="element-path" class="element-path"></div>
-            <button id="select-parent" disabled title="상위 요소 선택 · Shift+클릭">
-              상위 요소 선택 ↑
-            </button>
-            <div id="direct-edit-controls">
-              <div id="batch-controls" hidden>
-                <strong id="selection-count"></strong>
-                <div class="batch-actions">
-                  <button data-align="left">왼쪽 정렬</button
-                  ><button data-align="top">위쪽 정렬</button
-                  ><button data-align="center-x">가로 중앙</button
-                  ><button data-align="center-y">세로 중앙</button
-                  ><button data-align="distribute-x">가로 간격</button
-                  ><button data-align="distribute-y">세로 간격</button>
-                </div>
-              </div>
-              <label class="snap-setting"
-                ><input type="checkbox" id="snap-enabled" /> 정렬선에 맞추기
-                <small>Alt로 일시 해제</small></label
-              >
-              <div class="inspector-divider"></div>
-              <div class="field-heading">원래 위치에서 이동</div>
-              <div class="coordinate-fields">
-                <label
-                  >X
-                  <input id="offset-x" type="number" step="1" aria-label="가로 이동 거리" /></label
-                ><label
-                  >Y <input id="offset-y" type="number" step="1" aria-label="세로 이동 거리"
-                /></label>
-              </div>
-              <div class="nudge-controls">
-                <button data-nudge="left" aria-label="왼쪽으로 이동">←</button
-                ><button data-nudge="up" aria-label="위로 이동">↑</button
-                ><button data-nudge="down" aria-label="아래로 이동">↓</button
-                ><button data-nudge="right" aria-label="오른쪽으로 이동">→</button>
-              </div>
-              <div class="element-size" id="element-size"></div>
-              <button id="inspector-delete" class="danger-outline">이 요소 삭제</button>
-            </div>
-            <div class="inspector-comment-summary">
-              <p id="selected-comment-summary"></p>
-              <button id="edit-selected-comment">주석 남기기</button>
-            </div>
-          </section>
-          <section class="changes-section">
-            <div class="panel-heading">
-              <strong>변경 기록</strong><span id="change-count">0</span>
-            </div>
-            <div id="changes" class="changes">
-              <div class="empty-small">이동·삭제 기록과<br />요소별 주석을 모읍니다.</div>
-            </div>
-          </section>
-          <details id="capture-notes" class="capture-notes" hidden>
-            <summary id="capture-notes-title">가져오기 참고사항</summary>
-            <ul id="capture-notes-list"></ul>
-          </details>
-        </div>
       </aside>
 
       <aside
         id="properties-rail"
         class="panel-rail properties-rail"
-        aria-label="접힌 속성 패널"
+        aria-label="접힌 변경 이력 패널"
         hidden
       >
         <div id="properties-toggle-rail" class="panel-toggle-slot">
@@ -320,45 +255,126 @@
             type="button"
             aria-controls="properties-panel"
             aria-expanded="true"
-            aria-label="속성 패널 접기"
-            title="속성·주석·스냅샷 패널 접기"
+            aria-label="변경 이력 패널 접기"
+            title="변경 이력 패널 접기"
           >
             <svg aria-hidden="true" viewBox="0 0 20 20">
               <rect x="2" y="3" width="16" height="14" rx="2" />
               <path d="M13 3v14" />
               <path class="panel-open-chevron" d="M8 6l4 4-4 4" />
               <path class="panel-fill" d="M14 4h3v12h-3z" /></svg
-            ><span>속성</span>
+            ><span>변경 이력</span>
           </button>
         </div>
         <span class="panel-rail-label" aria-hidden="true">변경 이력</span>
       </aside>
     </main>
-    <div
-      id="snapshot-panel"
-      class="snapshot-panel snapshot-dropdown-panel"
-      popover="auto"
-      aria-label="스냅샷 기록"
-    >
-      <div id="snapshot-tools">
-        <div class="snapshot-navigation">
-          <button id="previous-snapshot" aria-label="이전 스냅샷">← 이전</button
-          ><span id="snapshot-position"></span
-          ><button id="next-snapshot" aria-label="다음 스냅샷">다음 →</button>
+    <div id="snapshot-panel" class="snapshot-browser" popover="auto" aria-label="스냅샷 목록">
+      <div class="snapshot-browser-heading">
+        <div>
+          <h2>스냅샷 목록</h2>
+          <p>노드를 선택해 미리 보고, 이 버전으로 이동하세요.</p>
         </div>
-        <div id="snapshot-current" class="snapshot-current" role="status"></div>
-        <button id="compare-button" class="compare-launch">원본·스냅샷 비교</button>
+        <button id="close-snapshots" aria-label="스냅샷 목록 닫기">×</button>
       </div>
       <div class="list-tabs">
         <button id="snapshots-live" aria-pressed="true">저장된 버전</button
         ><button id="snapshots-trash" aria-pressed="false">휴지통</button>
       </div>
+      <div id="snapshot-tools">
+        <div id="snapshot-current" role="status"></div>
+        <div
+          id="snapshot-graph-scroll"
+          class="snapshot-graph-scroll"
+          tabindex="0"
+          aria-label="스냅샷 분기 그래프 · 가로 스크롤"
+        >
+          <div id="snapshot-list" class="snapshot-graph"></div>
+        </div>
+        <div class="snapshot-legend">
+          ● 현재 버전 · ◉ 선택한 미리보기 · 점선은 저장 전 작업 · 가로로 스크롤하여 탐색
+        </div>
+      </div>
       <p id="snapshot-trash-help" class="snapshot-help" hidden>
-        복구하면 버전 목록으로 돌아갑니다. 복구만으로 현재 화면을 바꾸지는 않습니다.
+        복구만으로 현재 화면을 바꾸지 않습니다. 복구하고 적용하면 해당 버전으로 이동합니다.
       </p>
-      <div id="snapshot-list" class="snapshot-list" aria-label="저장된 스냅샷 목록"></div>
+      <div id="snapshot-trash-list" class="snapshot-trash-list" hidden></div>
+      <section id="snapshot-preview" class="snapshot-preview" aria-label="선택한 스냅샷 미리보기">
+        <div class="snapshot-preview-heading">
+          <div>
+            <h3 id="snapshot-preview-title">버전을 선택하세요</h3>
+            <p id="snapshot-preview-status" role="status">
+              선택만으로 현재 편집은 바뀌지 않습니다.
+            </p>
+          </div>
+          <button id="compare-button">현재 작업과 비교</button
+          ><button id="apply-snapshot" class="primary" disabled>이 버전으로 이동</button>
+        </div>
+        <div id="snapshot-preview-view" class="snapshot-preview-view"></div>
+      </section>
     </div>
-
+    <dialog id="properties-dialog" aria-label="선택 요소 편집">
+      <div class="popover-heading">
+        <h2>선택 요소 편집</h2>
+        <button id="close-properties" aria-label="요소 편집 닫기">×</button>
+      </div>
+      <div id="inspect-panel">
+        <div id="no-selection" class="no-selection">
+          <strong>요소를 선택해 편집하세요</strong>
+          <p>⌘/Ctrl+클릭으로 여러 요소 선택 · Alt+클릭으로 세부 요소 선택</p>
+        </div>
+        <section id="inspector" class="inspector" hidden>
+          <div class="element-kind" id="element-kind"></div>
+          <h2 id="element-name"></h2>
+          <div id="element-path" class="element-path"></div>
+          <button id="select-parent" disabled title="상위 요소 선택 · Shift+클릭">
+            상위 요소 선택 ↑
+          </button>
+          <div id="direct-edit-controls">
+            <div id="batch-controls" hidden>
+              <strong id="selection-count"></strong>
+              <div class="batch-actions">
+                <button data-align="left">왼쪽 정렬</button
+                ><button data-align="top">위쪽 정렬</button
+                ><button data-align="center-x">가로 중앙</button
+                ><button data-align="center-y">세로 중앙</button
+                ><button data-align="distribute-x">가로 간격</button
+                ><button data-align="distribute-y">세로 간격</button>
+              </div>
+            </div>
+            <label class="snap-setting"
+              ><input type="checkbox" id="snap-enabled" /> 정렬선에 맞추기
+              <small>Alt로 일시 해제</small></label
+            >
+            <div class="inspector-divider"></div>
+            <div class="field-heading">원래 위치에서 이동</div>
+            <div class="coordinate-fields">
+              <label
+                >X <input id="offset-x" type="number" step="1" aria-label="가로 이동 거리" /></label
+              ><label
+                >Y <input id="offset-y" type="number" step="1" aria-label="세로 이동 거리"
+              /></label>
+            </div>
+            <div class="nudge-controls">
+              <button data-nudge="left" aria-label="왼쪽으로 이동">←</button
+              ><button data-nudge="up" aria-label="위로 이동">↑</button
+              ><button data-nudge="down" aria-label="아래로 이동">↓</button
+              ><button data-nudge="right" aria-label="오른쪽으로 이동">→</button>
+            </div>
+            <div class="element-size" id="element-size"></div>
+            <button id="inspector-delete" class="danger-outline">이 요소 삭제</button>
+          </div>
+          <div class="inspector-comment-summary">
+            <p id="selected-comment-summary"></p>
+            <button id="edit-selected-comment">주석 남기기</button>
+          </div>
+        </section>
+        <details id="capture-notes" class="capture-notes" hidden>
+          <summary id="capture-notes-title">가져오기 참고사항</summary>
+          <ul id="capture-notes-list"></ul>
+        </details>
+      </div>
+    </dialog>
     <dialog id="snapshot-save-dialog" aria-labelledby="snapshot-save-title">
       <h2 id="snapshot-save-title">스냅샷 저장</h2>
       <p id="snapshot-parent-name"></p>

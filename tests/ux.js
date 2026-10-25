@@ -130,19 +130,18 @@ try {
     doc.querySelector('#comment-editor-host').contains(field) &&
       scene.annotations[first.id] === field.value,
   );
-  click('tab-comments');
-  doc.querySelector('#comment-search').value = '고객 추가';
-  doc.querySelector('#comment-search').dispatchEvent(new Event('input'));
+  doc.querySelector('#activity-search').value = '고객 추가';
+  doc.querySelector('#activity-search').dispatchEvent(new Event('input'));
   check(
-    'Comments have a searchable list with stable element targets',
-    doc.querySelectorAll('.comment-list-item').length === 1 &&
-      doc.querySelector('#comments-count').textContent === '1',
+    'Comments are searchable inside the unified history without tabs',
+    doc.querySelectorAll('.activity-change[data-change-type="comment"]').length === 1 &&
+      !doc.querySelector('#tab-comments'),
   );
-  doc.querySelector('.comment-list-item').click();
+  doc.querySelector('.activity-change[data-change-type="comment"]').click();
   check(
-    'Picking a comment reveals its target and input',
+    'Picking a history comment reveals target and modal',
     scene.selected === first.id &&
-      !doc.querySelector('#comments-panel').hidden &&
+      doc.querySelector('#comment-dialog').open &&
       doc.activeElement.id === 'component-comment',
   );
   click('close-comment-dialog');

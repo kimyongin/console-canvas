@@ -62,7 +62,7 @@ export function createWorkspaceLayout({ $, commitCommentDraft }) {
   }
   function renderPanels() {
     for (const [key, visible] of Object.entries(panels)) {
-      const label = key === 'layers' ? '레이어' : '속성',
+      const label = key === 'layers' ? '레이어' : '변경 이력',
         button = $('#toggle-' + key);
       const focused = document.activeElement === button;
       const home = $('#' + key + (visible ? '-toggle-home' : '-toggle-rail'));
@@ -72,10 +72,7 @@ export function createWorkspaceLayout({ $, commitCommentDraft }) {
       $('#workspace').classList.toggle(key + '-collapsed', !visible);
       button.setAttribute('aria-expanded', String(visible));
       button.setAttribute('aria-label', label + ' 패널 ' + (visible ? '접기' : '펼치기'));
-      button.title =
-        (key === 'properties' ? '속성·주석·스냅샷' : label) +
-        ' 패널 ' +
-        (visible ? '접기' : '펼치기');
+      button.title = label + ' 패널 ' + (visible ? '접기' : '펼치기');
       if (focused) button.focus({ preventScroll: true });
     }
 

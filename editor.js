@@ -85,7 +85,6 @@ const {
   render: () => {
     renderInspector();
     renderLayers();
-    renderChanges();
     activityPanel.render();
     renderHistory();
     renderSnapshots();
@@ -172,13 +171,9 @@ function closeDocument(id) {
       $('#source-meta').textContent = '편집할 화면을 열어 주세요.';
       $('#review-note').value = '';
       $('#layers').replaceChildren();
-      $('#changes').replaceChildren();
       $('#snapshot-list').replaceChildren();
-      $('#comments-list').replaceChildren();
-      for (const key of ['#layer-count', '#change-count', '#comments-count', '#snapshot-count'])
-        $(key).textContent = '0';
+      for (const key of ['#layer-count', '#snapshot-count']) $(key).textContent = '0';
       $('#version-status').textContent = '';
-      $('#snapshot-position').textContent = '';
       $('#snapshot-current').textContent = '';
       $('#save-status').textContent = '휴지통에 보관됨';
       renderDocumentName();
@@ -209,12 +204,11 @@ function selectNode(id, { reveal = false, additive = false } = {}) {
     }
   }
 }
-const { renderLayers, renderChanges } = createDocumentLists({ $, state, selectNode, focusComment });
+const { renderLayers } = createDocumentLists({ $, state, selectNode, focusComment });
 const commentEditor = createCommentEditor({
   $,
   state,
   commit: commitCommentDraft,
-  showComments: () => showPanel('comments'),
 });
 function focusComment(options = {}) {
   commentEditor.open(options);
@@ -227,7 +221,7 @@ const snapshotHistory = createSnapshotHistory({
   apply: applyCheckpoint,
   changed: changeCommitted,
 });
-const { showSnapshots, renderSnapshots, showPanel } = createSnapshotPanel({
+const { showSnapshots, renderSnapshots } = createSnapshotPanel({
   $,
   state,
   snapshotHistory,
@@ -291,7 +285,8 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
   areaSelection.reset();
   clipboard.reset();
   commentEditor.reset();
-  for (const id of ['#compare-dialog', '#export-dialog']) if ($(id).open) $(id).close();
+  for (const id of ['#compare-dialog', '#export-dialog', '#properties-dialog'])
+    if ($(id).open) $(id).close();
   const existingMeta = await getDocumentMetadata(snapshot.id);
   const documentName = snapshot.documentName
     ? cleanDocumentName(snapshot.documentName)
@@ -388,7 +383,6 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
     $('#viewport').scrollTop = (snapshot.source.scroll?.y || 0) * state.zoom;
     renderInspector();
     renderLayers();
-    renderChanges();
     activityPanel.render();
     renderHistory();
     renderSnapshots();
@@ -404,7 +398,6 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
     }
     state.lastCheckpoint = checkpoint();
     activityPanel.render();
-    showPanel('history', { reveal: false });
     state.ready = true;
     connectDesktopIfReady();
     renderMcpStatus();
@@ -523,7 +516,17 @@ function setMode() {
   }
   renderInspector();
 }
-$('#edit-selected-comment').addEventListener('click', () => focusComment());
+$('#edit-selected-comment').addEventListener('click', () => {
+  $('#properties-dialog').close();
+  focusComment();
+});
+$('#edit-properties').addEventListener('click', () => {
+  if (!state.scene?.selected) return;
+  commitCommentDraft();
+  renderInspector();
+  $('#properties-dialog').showModal();
+});
+$('#close-properties').addEventListener('click', () => $('#properties-dialog').close());
 $('#undo').addEventListener('click', () => undo());
 $('#redo').addEventListener('click', () => undo('redo'));
 $('#select-parent').addEventListener('click', () =>
@@ -623,7 +626,6 @@ const controller = createEditorController({
   render: () => {
     renderInspector();
     renderLayers();
-    renderChanges();
     activityPanel.render();
     renderHistory();
   },

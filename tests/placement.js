@@ -44,13 +44,14 @@ try {
       !doc.querySelector('#comment-mode') &&
       app.state.scene.annotations[node.id] === '저장 전 주석 초안',
   );
-  click('#tab-inspect');
+  click('#edit-properties');
   check(
     'Properties prioritize geometry and show a concise comment link, with editing on the comments tab',
     !doc.querySelector('#inspect-panel').contains(field) &&
       !doc.querySelector('#direct-edit-controls').hidden &&
       doc.querySelector('#selected-comment-summary').textContent.includes('주석 초안'),
   );
+  click('#close-properties');
   app.state.scene.nudge(16, 8);
   const snapshot = app.snapshotHistory.create('배치 검증');
   click('#snapshot-dropdown');
@@ -92,11 +93,11 @@ try {
   check(
     'Trash hides snapshot creation, navigation and compare, leaving restore actions',
     doc.querySelector('#snapshot-tools').hidden &&
-      card().querySelector('[data-snapshot-action="recover-apply"]'),
+      doc.querySelector('#snapshot-trash-list [data-snapshot-action="recover-apply"]'),
   );
   app.selectNode(node.id);
   app.state.scene.nudge(5, 0);
-  card().querySelector('[data-snapshot-action="recover-apply"]').click();
+  click('#snapshot-trash-list [data-snapshot-action="recover-apply"]');
   await until(() => app.state.timeline.activeId === snapshot.id);
   check(
     'Recover and apply restores the saved version and preserves newer work automatically',
@@ -109,7 +110,7 @@ try {
   check(
     'Snapshot tree is independent of the right inspector',
     doc.querySelector('#snapshot-panel').matches(':popover-open') &&
-      !doc.querySelector('#close-snapshots'),
+      !!doc.querySelector('#close-snapshots'),
   );
   doc.querySelector('#snapshot-panel').hidePopover();
   let saved;
@@ -142,7 +143,7 @@ try {
     'Closing the last document removes invalid snapshot actions and stale counts',
     doc.querySelector('#snapshot-tools').hidden &&
       doc.querySelector('#save-snapshot').disabled &&
-      doc.querySelector('#next-snapshot').disabled &&
+      doc.querySelector('#apply-snapshot').disabled &&
       doc.querySelector('#snapshots-live').textContent === '저장된 버전 0',
   );
   click('#toast-action');

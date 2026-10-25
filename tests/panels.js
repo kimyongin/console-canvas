@@ -229,7 +229,7 @@ try {
       doc.querySelector('#component-comment').value === '접어도 보존할 수정 방향' &&
       app.state.timeline.entries.length === 1,
   );
-  doc.querySelector('#changes button').click();
+  doc.querySelector('.activity-change[data-change-type="comment"]').click();
   check(
     'Comment opens a modal independent of side-panel visibility',
     doc.querySelector('#comment-dialog').open && doc.activeElement.id === 'component-comment',

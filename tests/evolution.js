@@ -88,14 +88,14 @@ try {
       app.state.timeline.entries.find((e) => e.id === c).parentId === b &&
       app.state.timeline.entries.find((e) => e.id === d).parentId === a,
   );
-  click('#snapshot-dropdown');
-  const depth = (id) =>
-    Number(doc.querySelector(`[data-snapshot-id="${id}"]`).closest('[data-depth]').dataset.depth);
+  if (!doc.querySelector('#snapshot-panel').matches(':popover-open')) click('#snapshot-dropdown');
+  const node = (id) => doc.querySelector(`[data-snapshot-id="${id}"]`).closest('[data-lane]');
   check(
-    'Dropdown displays real branch depths and current version',
-    depth(b) === depth(d) &&
-      depth(c) === depth(b) + 1 &&
-      doc.querySelector(`[data-snapshot-id="${d}"]`).getAttribute('aria-pressed') === 'true',
+    'Horizontal graph separates A→D from A→B→C',
+    node(b).dataset.lane === node(c).dataset.lane &&
+      node(d).dataset.lane !== node(b).dataset.lane &&
+      doc.querySelector(`path[data-parent-id="${a}"][data-child-id="${d}"]`) &&
+      !doc.querySelector(`path[data-parent-id="${c}"][data-child-id="${d}"]`),
   );
   doc.querySelector('#snapshot-panel').hidePopover();
   const currentEvents = activityBranch(app.state),

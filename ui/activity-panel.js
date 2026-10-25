@@ -1,69 +1,122 @@
 import { activityBranch } from '../activity-history.js';
 import { pointTarget } from '../edit-commands.js';
+export function changeDescription(change) {
+  if (change.type === 'comment') return change.after || '주석이 삭제되었습니다.';
+  const a = change.before || {},
+    b = change.after || {};
+  if (change.type === 'delete') return b.deleted ? '표시 → 삭제됨' : '삭제됨 → 표시';
+  if (change.type === 'copy') return '원본을 유지하고 복사본을 추가했습니다.';
+  const parts = [];
+  if ((a.dx || 0) !== (b.dx || 0)) parts.push('가로 위치 ' + (a.dx || 0) + ' → ' + (b.dx || 0));
+  if ((a.dy || 0) !== (b.dy || 0)) parts.push('세로 위치 ' + (a.dy || 0) + ' → ' + (b.dy || 0));
+  return parts.join(' · ') || '배치 속성이 변경되었습니다.';
+}
 export function createActivityPanel({ $, state, selectNode, focusComment }) {
-  const labels = {
-    move: '요소 이동',
-    delete: '삭제 상태 변경',
-    copy: '복사본 추가',
-    comment: '주석 변경',
-    property: '속성 변경',
-  };
+  const label = (c) =>
+    c.type === 'comment'
+      ? !c.before
+        ? '주석 추가'
+        : !c.after
+          ? '주석 삭제'
+          : '주석 수정'
+      : {
+          move: '요소 이동',
+          delete: c.after?.deleted ? '요소 삭제' : '요소 복원',
+          copy: '복사본 추가',
+          property: '속성 변경',
+        }[c.type] || '변경';
+  function reveal(change) {
+    if (!change.id) return;
+    if (pointTarget(change.id)) {
+      const p = pointTarget(change.id);
+      state.scene.showPointComment(p.x, p.y);
+    } else selectNode(change.id, { reveal: true });
+    if (change.type === 'comment') focusComment({ id: change.id });
+  }
   function render() {
     const list = $('#activity-list');
     list.replaceChildren();
     const all = $('#activity-scope').value === 'all',
-      filter = $('#activity-filter').value;
-    const entries = activityBranch(state, all);
+      filter = $('#activity-filter').value,
+      query = $('#activity-search').value.trim().toLowerCase();
+    const entries = activityBranch(state, all),
+      covered = new Set();
     $('#activity-branch').textContent =
-      state.timeline?.entries.find((e) => e.id === state.timeline.activeId)?.name || '현재 작업';
-    for (const event of entries) {
-      const changes =
-        filter === 'all'
-          ? event.changes
-          : event.changes.filter((c) =>
-              filter === 'layout' ? ['move', 'delete', 'copy'].includes(c.type) : c.type === filter,
-            );
-      if (filter !== 'all' && !changes.length) continue;
+      '현재 작업 기준 · ' +
+      (state.timeline?.entries.find((e) => e.id === state.timeline.activeId)?.name || '현재 작업');
+    function append(event, baseline = false) {
+      const changes = event.changes.filter((c) => {
+        const matches =
+          filter === 'all' ||
+          (filter === 'layout' ? ['move', 'delete', 'copy'].includes(c.type) : c.type === filter);
+        return (
+          matches &&
+          (!query ||
+            JSON.stringify([event.label, c.name, c.before, c.after]).toLowerCase().includes(query))
+        );
+      });
+      if ((filter !== 'all' || query) && !changes.length) return;
       const card = document.createElement('article');
       card.className = 'activity-event';
-      card.dataset.eventId = event.id;
-      const heading = document.createElement('strong');
-      heading.textContent = event.label;
+      if (event.id) card.dataset.eventId = event.id;
       const time = document.createElement('small');
-      time.textContent =
-        new Date(event.created_at).toLocaleTimeString('ko-KR', {
-          hour: '2-digit',
-          minute: '2-digit',
-        }) + (event.actor === 'agent' ? ' · 에이전트' : '');
+      time.textContent = baseline
+        ? '저장된 주석 · 이전 작업에서 유지됨'
+        : new Date(event.created_at).toLocaleTimeString('ko-KR', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }) + (event.actor === 'agent' ? ' · 에이전트' : '');
+      const heading = document.createElement('strong');
+      heading.textContent = changes.length === 1 ? label(changes[0]) : event.label;
       card.append(time, heading);
       for (const change of changes) {
         const button = document.createElement('button');
         button.className = 'activity-change';
-        button.textContent =
-          (labels[change.type] || '변경') +
-          ' · ' +
-          change.name +
-          (change.type === 'comment' ? '\n' + (change.after || '주석 삭제') : '');
+        button.dataset.targetId = change.id || '';
+        button.dataset.changeType = change.type;
+        const target = document.createElement('strong');
+        target.textContent = change.name;
+        const detail = document.createElement('span');
+        detail.textContent = changeDescription(change);
+        button.append(target, detail);
         button.disabled =
           !change.id || (!pointTarget(change.id) && !state.scene?.nodes.has(change.id));
-        button.addEventListener('click', () => {
-          if (!pointTarget(change.id)) selectNode(change.id, { reveal: true });
-          else {
-            const p = pointTarget(change.id);
-            state.scene.showPointComment(p.x, p.y);
-          }
-          if (change.type === 'comment') focusComment({ id: change.id });
-        });
+        button.addEventListener('click', () => reveal(change));
         card.append(button);
       }
       list.append(card);
     }
+    for (const event of entries) {
+      for (const c of event.changes) if (c.type === 'comment') covered.add(c.id);
+      append(event);
+    }
+    // Existing notes must remain visible even when a pre-history capture has no events.
+    for (const comment of state.scene?.comments() || [])
+      if (!covered.has(comment.id))
+        append(
+          {
+            label: '저장된 주석',
+            changes: [
+              {
+                id: comment.id,
+                name: comment.name,
+                type: 'comment',
+                before: '',
+                after: comment.text,
+              },
+            ],
+          },
+          true,
+        );
+    $('#activity-count').textContent = list.children.length;
     if (!list.children.length)
-      list.textContent = entries.length
-        ? '이 종류의 변경이 없습니다.'
-        : '이 버전의 변경 이력이 없습니다. 새 편집부터 시간순으로 기록합니다.';
+      list.textContent =
+        query || filter !== 'all'
+          ? '조건에 맞는 변경이 없습니다.'
+          : '아직 변경 이력이 없습니다. 편집과 주석이 시간순으로 모입니다.';
   }
   for (const id of ['#activity-scope', '#activity-filter'])
     $(id).addEventListener('change', render);
+  $('#activity-search').addEventListener('input', render);
   return { render };
 }

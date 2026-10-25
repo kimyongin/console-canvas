@@ -40,7 +40,11 @@ export function recordActivity(state, before, after, detail = {}) {
     changes.push({
       id,
       type:
-        !a.copy && b.copy ? 'copy' : a.deleted !== b.deleted ? 'delete' : detail.category || 'move',
+        !a.copy && b.copy
+          ? 'copy'
+          : !!a.deleted !== !!b.deleted
+            ? 'delete'
+            : detail.category || 'move',
       name: state.scene.nodes.get(id)?.name || id,
       before: a,
       after: b,

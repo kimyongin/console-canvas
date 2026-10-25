@@ -1,5 +1,4 @@
 import { CanvasScene, copy } from '../engine.js';
-import { renderPng } from '../export.js';
 export async function withVersionScene(snapshot, point, run) {
   const frame = document.createElement('iframe');
   frame.setAttribute('sandbox', 'allow-same-origin');
@@ -119,82 +118,14 @@ export function createVersionPreview({ $, state, commitCommentDraft }) {
   }
   for (const side of ['left', 'right'])
     $('#compare-' + side).addEventListener('change', () => renderSide(side));
-  $('#compare-button').addEventListener('click', () => open());
+  $('#compare-button').addEventListener('click', () =>
+    open(state.snapshotPreviewId || '@original', '@current'),
+  );
   $('#compare-dialog').addEventListener('close', () => {
     for (const side of ['left', 'right']) {
       scenes.set(side, { token: (scenes.get(side)?.token || 0) + 1 });
       $('#compare-' + side + '-view').replaceChildren();
     }
   });
-  const cache = new Map(),
-    pending = new Map();
-  let chain = Promise.resolve(),
-    observer;
-  function thumbnails() {
-    observer?.disconnect();
-    if ($('#snapshot-panel').hidden) return;
-    observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries)
-          if (entry.isIntersecting) {
-            observer.unobserve(entry.target);
-            loadThumbnail(entry.target);
-          }
-      },
-      { root: $('#properties-panel'), rootMargin: '100px' },
-    );
-    for (const image of document.querySelectorAll('[data-preview-id]')) observer.observe(image);
-  }
-  function loadThumbnail(image) {
-    const docId = state.snapshot.id,
-      id = image.dataset.previewId,
-      key = docId + '/' + id,
-      point = state.timeline.entries.find((e) => e.id === id)?.state;
-    if (!point) return;
-    if (cache.has(key)) {
-      image.src = cache.get(key);
-      return;
-    }
-    if (!pending.has(key)) {
-      const capture = state.snapshot;
-      const task = chain
-        .catch(() => {})
-        .then(async () => {
-          if (state.snapshot?.id !== docId) return null;
-          return withVersionScene(capture, point, async (scene) => {
-            const size = scene.contentSize(),
-              blob = await renderPng(scene.serialize(), size.width, size.height),
-              bitmap = await createImageBitmap(blob);
-            const canvas = document.createElement('canvas');
-            canvas.width = 240;
-            canvas.height = Math.max(80, Math.min(180, (240 * size.height) / size.width));
-            canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-            bitmap.close();
-            return canvas.toDataURL('image/png');
-          });
-        })
-        .then((value) => {
-          if (value) {
-            cache.set(key, value);
-            if (cache.size > 40) cache.delete(cache.keys().next().value);
-          }
-          return value;
-        })
-        .finally(() => pending.delete(key));
-      chain = task.catch(() => {});
-      pending.set(key, task);
-    }
-    pending.get(key).then(
-      (value) => {
-        if (value && image.isConnected) image.src = value;
-      },
-      () => {
-        if (image.isConnected) {
-          image.removeAttribute('src');
-          image.alt = '미리보기 생성 불가 · 비교 화면을 열어 보세요.';
-        }
-      },
-    );
-  }
-  return { open, thumbnails };
+  return { open };
 }

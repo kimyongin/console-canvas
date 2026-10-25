@@ -32,6 +32,7 @@ export function createEditorController(options) {
       last_action: state.lastAction || null,
       snapshot_count: options.snapshotHistory?.list().length || 0,
       active_snapshot_id: state.timeline?.activeId || null,
+      preview_snapshot_id: state.snapshotPreviewId || null,
       snapshot_dirty: options.snapshotHistory?.dirty() || false,
     };
   }

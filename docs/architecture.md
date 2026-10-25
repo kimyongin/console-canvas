@@ -1,4 +1,4 @@
-# 0.8 개발 구조
+# 개발 구조
 
 ## 편집과 명령
 
@@ -60,3 +60,10 @@ IndexedDB `console-canvas-workspace`의 세 저장소를 사용한다.
 - `handoff-image.js`는 현재 결과의 변경·주석을 대상별로 묶고 화면 위에 같은 번호의 하이라이트를 그린다. 하단 카드는 두 열이며 글꼴 크기를 고정하고 높이를 늘린다. 삭제 전 참고·작은 영역 확대·추가 설명도 같은 PNG에 포함한다. 이미지 생성은 별도의 version scene에서 수행해 현재 선택·편집·이력을 변경하지 않는다.
 - 데스크톱 `render-image.cjs`는 신뢰한 editor mainFrame의 IPC만 받는다. 임시 Chromium 세션에는 preload·Node·JavaScript가 없고 sandbox/contextIsolation/webSecurity를 유지한다. 페이지 스크립트는 실행하지 않으며 캡처 후 창과 임시 저장소를 정리한다. 브라우저·확장은 기존 SVG foreignObject 경로를 사용하므로 외부 리소스·폰트 표현에 차이가 생길 수 있다.
 - MCP `get_review_image`는 같은 PNG를 image content block으로 반환한다. 읽기 도중 revision이 바뀌면 거절하고 편집 모달·드래그 중에는 busy를 반환한다. 이미지 응답만 별도 45초 기한·20MB PNG 한도를 적용하며 편집 요청의 기존 크기/시간 제한은 유지한다. `list_history`는 현재 가지 또는 모든 가지를 페이지로 반환한다.
+
+## 0.15 그래프 탐색과 통합 이력
+
+- `snapshot-graph.js`는 `snapshot-tree.js`의 유효한 조상을 따라 깊이와 줄을 배정한다. 가로 위치는 부모 깊이, 새 줄은 형제 분기다. SVG 선은 실제 부모 ID로만 연결한다. 저장 시각은 연결 판단에 사용하지 않는다. 삭제된 조상과 잘못된 순환은 트리 정제 단계에서 다룬다.
+- `ui/snapshot-panel.js`의 미리보기 선택 `state.snapshotPreviewId`는 `timeline.activeId`와 별개다. 노드 선택은 현재 편집·revision·저장 버전을 바꾸지 않는다. 별도의 스크립트 없는 버전 장면을 아래 iframe에 표시하고 세대 토큰으로 늦게 도착한 이전 미리보기를 버린다. 이름 모달 저장 직후 그래프를 열며 명시적인 적용 버튼만 실제 버전을 복원한다.
+- MCP `get_screen`은 `preview_snapshot_id`와 `active_snapshot_id`를 구분한다. `list_snapshots.parent_id`는 그래프와 같은 저장 부모다. 기존 MCP 편집·복원 경로와 저장 형식은 유지한다.
+- 오른쪽은 탭 없는 변경 이력 하나다. `ui/activity-panel.js`가 배치·속성의 전후 값과 주석 내용·복사·삭제를 통합한다. 이전 작업의 저장된 주석은 시각을 만들지 않고 별도 보존 표시로 제공한다. 위치·정렬 입력은 도구 모음의 요소 편집 모달로 옮겼다. 패널의 너비·접힘 저장 키는 유지한다.
