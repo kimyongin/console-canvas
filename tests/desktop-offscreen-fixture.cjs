@@ -13,7 +13,8 @@ require.cache[require.resolve('electron')].exports = {
   ...electron,
   BrowserWindow: OffscreenWindow,
 };
-const capture = require.resolve('../desktop/capture.cjs');
+const appRoot = process.env.CONSOLE_CANVAS_TEST_APP_ROOT || path.resolve(__dirname, '..');
+const capture = require.resolve(path.join(appRoot, 'desktop/capture.cjs'));
 require(capture);
 require.cache[capture].exports = {
   captureWebsite: async (contents, root) => {

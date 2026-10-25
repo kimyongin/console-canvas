@@ -12,7 +12,8 @@ dialog.showErrorBox = (title, message) => {
   console.error(title + ': ' + message);
   app.exit(1);
 };
-require('../desktop/main.cjs');
+const appRoot = process.env.CONSOLE_CANVAS_TEST_APP_ROOT || path.resolve(__dirname, '..');
+require(path.join(appRoot, 'desktop/main.cjs'));
 async function until(read, message, timeout = 30000) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {

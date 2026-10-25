@@ -4,6 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 import net from 'node:net';
 const root = path.resolve(import.meta.dirname, '..');
+const appRoot = process.env.CONSOLE_CANVAS_TEST_APP_ROOT || root;
 const offscreen = process.argv.includes('--offscreen');
 const fixture = offscreen ? 'tests/desktop-offscreen-fixture.cjs' : 'tests/desktop-fixture.cjs';
 const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'console-canvas-desktop-check-'));
@@ -68,7 +69,7 @@ try {
   ]);
   const sdk = start(process.execPath, ['scripts/verify_mcp.mjs'], {
     CONSOLE_CANVAS_MCP_ARGS: JSON.stringify([
-      path.join(root, 'mcp/server.py'),
+      path.join(appRoot, 'mcp/server.py'),
       '--state-dir',
       env.CONSOLE_CANVAS_STATE_DIR,
       '--port',

@@ -5,6 +5,7 @@ const path = require('node:path');
 const os = require('node:os');
 const http = require('node:http');
 const root = path.resolve(__dirname, '..');
+const appRoot = process.env.CONSOLE_CANVAS_TEST_APP_ROOT || root;
 let server, profile, window;
 app.on('window-all-closed', () => {});
 async function main() {
@@ -14,8 +15,9 @@ async function main() {
   server = http.createServer(async (request, response) => {
     try {
       const name = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
-      const filename = path.resolve(root, '.' + name);
-      if (!filename.startsWith(root + path.sep)) throw new Error('Invalid path');
+      const assetRoot = name.startsWith('/tests/') ? root : appRoot;
+      const filename = path.resolve(assetRoot, '.' + name);
+      if (!filename.startsWith(assetRoot + path.sep)) throw new Error('Invalid path');
       const content = await fs.readFile(filename);
       response.setHeader(
         'Content-Type',

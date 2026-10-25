@@ -1,6 +1,6 @@
 # 개발 구조
 
-제품 요구사항과 사용자 동작의 기준은 [PRD](PRD.md), 실제 확인 결과는 [검증 기록](verification.md)에서 관리한다. 아래는 0.16.0의 구현 구조다. 전환 범위와 설치/직접 사용 잔여는 [개선 티켓](https://github.com/kimyongin/console-canvas/issues/1)과 검증 기록에서 구분한다.
+제품 요구사항과 사용자 동작의 기준은 [PRD](PRD.md), 실제 확인 결과는 [검증 기록](verification.md)에서 관리한다. 아래는 0.16.1의 구현 구조다. 최신 실행 결과는 [0.16 검증](release-0.16-verification.md), 전환 범위와 설치/직접 사용 잔여는 [개선 티켓](https://github.com/kimyongin/console-canvas/issues/1)과 검증 기록에서 구분한다.
 
 ## 편집과 명령
 
@@ -82,3 +82,5 @@ IndexedDB `console-canvas-workspace`의 세 저장소를 사용한다.
 - UI 복원·휴지통 복구하고 적용·MCP 복원은 `restorePersisted`를 사용한다. 저장 중 사용자 입력을 잠시 막고 실패 시 장면·timeline·active/preview·revision·activity·undo/redo를 복구한 뒤 이전 상태를 다시 저장 큐에 넣는다. 오류는 숨기지 않는다. 성공 시에는 기존처럼 자동 보관과 이후/병렬 버전을 유지한다. 동기 `restore`는 엔진 수준 조립/회귀 검사 용도이고 사용자 복원 명령은 영구 저장 결과를 기다린다.
 - PNG 저장기는 PNG 시그니처·이름/크기와 기존 IPC 프레임 경계를 검사하고 네이티브 PNG 필터·임시 파일/rename을 사용한다. 주석 완료 표시는 실제 flush를 기다린다.
 - `npm run test:desktop:offscreen`은 잠금 환경에서 실제 DOM과 가상 NORTH 스크린샷을 사용한 별도 조건의 SDK/PNG 파일/종료·재실행 검사다. 표준 화면 캡처 검사나 설치 창 직접 조작을 대체했다고 보고하지 않는다.
+
+개발용 `ui/react/contracts.ts`는 snapshot·이력·MCP 결과·editor preload의 타입 진입점이다. 전역 Window 선언은 TypeScript UI에서 사용하며 배포 런타임에 추가 코드를 만들지 않는다. JS/IPC/MCP의 런타임 검증을 대체하지 않는다.

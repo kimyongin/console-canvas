@@ -103,3 +103,7 @@ PRD를 [기능 전수 대조표](feature-audit.md)와 다시 비교했다. 정�
 - shadcn 공통 소스와 native dialog/menu/resize 어댑터의 선택/차이는 [구조](architecture.md)와 `ui/react/SOURCES.md`에 기록한다. 화면/엔진 저장 형식은 유지한다.
 
 설치 앱·기존 자료 전후 비교·직접 QA·설치 스킬·실제 앱 MCP·업데이트 버튼의 최종 결과는 아래에 별도로 기록한다.
+
+## 0.16.1 설치본 최종 검사 (2026-10-25)
+
+설치본 Chromium 257개·명시적 offscreen 공식 SDK 22개/정상 재실행, 실제 0.15→0.16 업데이트·주석/분기/PNG 직접 사용과 7문서/13스냅샷 전체 세션 보존 결과를 [0.16 실행 결과](release-0.16-verification.md)에 기록했다. 0.16.1 마지막 직접 창과 일반 프로필 활성 화면 MCP 조회·실제 Chrome 확장 권한은 잠금/미검증으로 남아 있다.
