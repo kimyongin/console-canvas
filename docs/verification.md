@@ -1,5 +1,13 @@
 # 버전별 검증 기록
 
+## 2026-10-26 · WebMCP 제품화 PRD·티켓 정리
+
+[제품화 계획](webmcp-productization.md)에 FR-18~20·AC-27~33과 상위 #28/구현 #29~#35를 연결했다. 신규 티켓은 모두 계획/미구현·열림이며 선행 조건·정상/오류 검증·자료 보존과 완료 기준을 명시했다. 기존 #7은 #33의 Chrome 수집/권한 증빙을 연결하고 나머지 OS/Electron 잔여를 유지하며, #27의 사용자 앱 배포는 독립적으로 추적한다.
+
+이번 작업은 문서/티켓 변경이며 제품 코드를 구현하거나 버전·런타임·설치 앱·스킬을 변경하지 않았다. 기존 실험 성공과 아래 실행 결과를 새로운 제품 완료로 표시하지 않는다.
+
+문서의 FR 20개·AC 33개 ID 순서/중복·계획 표시, 로컬 링크·신규 이슈 8개 링크와 선행 관계의 비순환을 확인했다. GitHub 티켓 본문/열린 상태를 다시 조회했으며 전체 35개 중 닫힘 25·열림 10개(#7/#27/#28~#35)다. `npm run check`는 종료 코드 0으로 타입·포맷·빌드·Python 39·Node 27·Chromium 321을 통과했다. 실행 로그는 Git 제외 경로 `local/webmcp-planning-check.log`에 있다. Electron 통합·앱 설치·새로운 WebMCP 제품 검증을 수행한 결과는 아니다.
+
 ## 2026-10-26 · Chrome 확장 WebMCP 실험 · 소스 0.19.2
 
 공식 MCP SDK → Chrome DevTools MCP 1.12.0 → 격리 headless Chrome 155 → 실제 `chrome-extension://` 편집기의 네이티브 `document.modelContext` → 기존 공통 controller 연결을 검증했다. 별도 Native Messaging 호스트·우리 Python MCP/브리지 없이 **37개 검사 통과**. 확장 액션으로 HTTP NORTH 원본을 수집하고 11개 도구 발견, 실제 DOM 이동·주석/이력·undo/redo·재시도/충돌·A→B→C/A→D·미래 복원·탭 새로고침 보존·원본 무변경을 확인했다.
