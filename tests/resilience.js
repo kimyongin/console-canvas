@@ -23,6 +23,17 @@ try {
   await app.state.saving;
   const initial = app.state.snapshot.id;
   const originalRevision = app.state.revision;
+  const node = [...app.state.scene.nodes.values()].find((n) => n.locator.id === 'new-customer');
+  app.selectNode(node.id);
+  doc.querySelector('#component-comment').value = 'uncommitted draft';
+  const inputSignature = async () =>
+    JSON.stringify({
+      selected: app.state.scene.selected,
+      draft: doc.querySelector('#component-comment').value,
+      metadata: app.controller.metadata(),
+      persisted: await db.getDocument(initial),
+    });
+  const inputBefore = await inputSignature();
   for (const same of [false, true]) {
     const bad = structuredClone(app.state.snapshot);
     if (!same) bad.id = crypto.randomUUID();
@@ -42,8 +53,26 @@ try {
     );
     if (!same)
       check('Invalid document has no metadata record', !(await db.getDocumentMetadata(bad.id)));
+    check(
+      'Invalid input preserves selection, draft, MCP and stored session for ' +
+        (same ? 'same' : 'new') +
+        ' ID',
+      (await inputSignature()) === inputBefore,
+    );
   }
-  const node = [...app.state.scene.nodes.values()].find((n) => n.locator.id === 'new-customer');
+  const badCopy = structuredClone(app.state.snapshot);
+  badCopy.edits = { n999999: { copy: { nodes: [] } } };
+  let copyRejected = false;
+  try {
+    await app.importFile(new win.File([JSON.stringify(badCopy)], 'bad-copy.json'));
+  } catch {
+    copyRejected = true;
+  }
+  check(
+    'Malformed copy input leaves the active document and DB untouched',
+    copyRejected && (await inputSignature()) === inputBefore,
+  );
+  doc.querySelector('#component-comment').value = '';
   app.selectNode(node.id);
   app.state.scene.setPosition(24, 0);
   const a = app.snapshotHistory.create('A');
@@ -79,6 +108,23 @@ try {
       !!app.state.lastSaveError &&
       doc.querySelector('#toast').textContent.includes('긴급'),
   );
+  win.ConsoleCanvasDesktop.saveFile = async () => ({ canceled: true });
+  doc.querySelector('#save-document').click();
+  await until(() => !doc.querySelector('#save-document').disabled);
+  check(
+    'Cancelling an emergency backup keeps the DB error visible',
+    !!app.state.lastSaveError && doc.querySelector('#toast').textContent.includes('취소'),
+  );
+  win.ConsoleCanvasDesktop.saveFile = async () => {
+    throw Error('Injected file write failure');
+  };
+  doc.querySelector('#save-document').click();
+  await until(() => !doc.querySelector('#save-document').disabled);
+  check(
+    'File write failure is reported without clearing the DB error',
+    !!app.state.lastSaveError &&
+      doc.querySelector('#toast').textContent.includes('Injected file write failure'),
+  );
   const before = JSON.stringify({
     edits: app.state.scene.edits,
     annotations: app.state.scene.annotations,
@@ -109,6 +155,39 @@ try {
     'Failed snapshot persistence rolls back the complete UI/history/undo state',
     failed && before === after && !app.state.transactionBusy && !doc.body.inert,
   );
+  const mcp = await app.controller.execute({
+    name: 'restore_snapshot',
+    arguments: {
+      editor_id: app.controller.metadata().editor_id,
+      expected_revision: app.state.revision,
+      snapshot_id: a.id,
+    },
+    document_id: initial,
+    deadline: Date.now() / 1000 + 30,
+  });
+  check(
+    'MCP restoration reports snapshot_error and leaves the protected work unchanged',
+    !mcp.ok &&
+      mcp.error.code === 'snapshot_error' &&
+      app.state.scene.edits[node.id].dx === 48 &&
+      app.state.timeline.activeId === a.id &&
+      app.state.revision === JSON.parse(before).revision,
+  );
+  app.snapshotHistory.trash(a.id);
+  await app.state.saving;
+  let recoveryFailed = false;
+  try {
+    await app.snapshotHistory.restorePersisted(a.id, {}, { recover: true });
+  } catch {
+    recoveryFailed = true;
+  }
+  check(
+    'Failed recover-and-apply keeps the snapshot in trash and current work intact',
+    recoveryFailed &&
+      !!app.state.timeline.entries.find((e) => e.id === a.id).deletedAt &&
+      app.state.scene.edits[node.id].dx === 48 &&
+      !app.state.transactionBusy,
+  );
   win.IDBDatabase.prototype.transaction = transaction;
   delete win.ConsoleCanvasDesktop;
   const portable = structuredClone(backup);
@@ -124,6 +203,31 @@ try {
   check(
     'Storage recovery allows a successful retry',
     app.state.scene.edits[node.id]?.dx === 24 && app.state.timeline.activeId === a.id,
+  );
+  const timeline = structuredClone(app.state.timeline);
+  const parent = timeline.entries[0].id;
+  while (app.state.timeline.entries.length < 500) {
+    app.state.timeline.entries.push({
+      ...structuredClone(timeline.entries[0]),
+      id: 'limit-' + app.state.timeline.entries.length,
+      parentId: parent,
+      kind: 'manual',
+    });
+  }
+  app.state.scene.setPosition(99, 0);
+  await app.state.saving;
+  const limitBefore = JSON.stringify([app.state.timeline, app.state.revision, app.state.undo]);
+  let limitRejected = false;
+  try {
+    await app.snapshotHistory.restorePersisted(parent);
+  } catch (error) {
+    limitRejected = error.message.includes('500');
+  }
+  check(
+    'Snapshot limit refuses navigation without losing unsaved work or history',
+    limitRejected &&
+      app.state.scene.edits[node.id].dx === 99 &&
+      JSON.stringify([app.state.timeline, app.state.revision, app.state.undo]) === limitBefore,
   );
   await app.state.saving;
   document.querySelector('#status').textContent = JSON.stringify({

@@ -92,6 +92,7 @@ export function renderActivityRows(host: Element, rows: ActivityRow[], empty: st
                 variant="ghost"
                 key={change.id + '/' + index}
                 className="activity-change"
+                size="content"
                 data-target-id={change.id}
                 data-change-type={change.type}
                 disabled={change.disabled}
@@ -130,6 +131,7 @@ export function renderDocumentRows(host: Element, rows: DocumentRow[], loading: 
           <Button
             variant="ghost"
             className="document-item"
+            size="content"
             disabled={row.disabled}
             data-document-id={row.id}
             aria-current={row.current ? 'true' : undefined}

@@ -145,7 +145,11 @@ try {
   doc.querySelector('#close-snapshots').click();
   app.selectNode(node.id);
   doc.querySelector('#edit-selected-comment').click();
-  doc.querySelector('#component-comment').value = 'React UI에서도 저장되는 주석';
+  const longComment =
+    'React UI에서도 저장되는 주석입니다. 좁은 패널에서도 내용이 다음 변경 이력과 겹치지 않고 줄바꿈되어야 합니다. '.repeat(
+      5,
+    );
+  doc.querySelector('#component-comment').value = longComment;
   doc.querySelector('#save-comment').click();
   await app.state.saving;
   check(
@@ -154,6 +158,31 @@ try {
       doc.querySelector('#activity-list').textContent.includes('속성 변경') &&
       !doc.querySelector('.activity-tabs'),
   );
+  const commentCard = [...doc.querySelectorAll('.activity-change')].find((el) =>
+    el.textContent.includes(longComment.trim()),
+  );
+  const cardBounds = commentCard.getBoundingClientRect();
+  const textBounds = commentCard.querySelector('span').getBoundingClientRect();
+  const eventBounds = commentCard.closest('.activity-event').getBoundingClientRect();
+  const nextBounds = commentCard
+    .closest('.activity-event')
+    .nextElementSibling.getBoundingClientRect();
+  check(
+    'Long comments grow inside narrow history cards without overlapping the next event',
+    textBounds.bottom <= cardBounds.bottom &&
+      cardBounds.bottom <= eventBounds.bottom + 1 &&
+      eventBounds.bottom <= nextBounds.top + 1,
+  );
+  doc.querySelector('#document-menu-button').click();
+  doc.querySelector('#documents-button').click();
+  await until(() => doc.querySelector('.document-item small'));
+  const documentCard = doc.querySelector('.document-item');
+  check(
+    'Document cards contain all metadata rows without clipping',
+    documentCard.querySelector('small').getBoundingClientRect().bottom <=
+      documentCard.getBoundingClientRect().bottom,
+  );
+  doc.querySelector('#documents-dialog .dialog-close').click();
   document.querySelector('#status').textContent = JSON.stringify({
     passed: results.length,
     failed: 0,

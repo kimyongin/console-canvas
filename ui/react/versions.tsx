@@ -71,6 +71,7 @@ export function renderSnapshotGraph(
             variant="ghost"
             type="button"
             className="snapshot-entry"
+            size="content"
             data-snapshot-id={entry.id}
             data-parent-id={entry.parentId || ''}
             disabled={!!entry.deletedAt}
