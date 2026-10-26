@@ -47,7 +47,7 @@ try {
       return (
         panel.contains(button) &&
         r.top >= p.top &&
-        r.bottom <= p.top + 44 &&
+        r.bottom <= panel.querySelector('.panel-topbar').getBoundingClientRect().bottom &&
         frame.contentWindow.getComputedStyle(button.querySelector('span')).display === 'none'
       );
     }),
@@ -82,7 +82,7 @@ try {
               doc.querySelector('.canvas-panel').getBoundingClientRect().height,
           ) < 1 &&
           button.getBoundingClientRect().top <
-            doc.querySelector('.canvas-panel').getBoundingClientRect().top + 44 &&
+            button.closest('.panel-toggle-slot').getBoundingClientRect().bottom &&
           button.getAttribute('aria-expanded') === 'false'
         );
       }),

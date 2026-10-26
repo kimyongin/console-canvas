@@ -335,12 +335,13 @@ export function renderTargetPreview(
   html: string,
   size: { width: number; height: number },
   rect: { x: number; y: number; width: number; height: number },
+  maxHeight = 130,
 ) {
   const width = Math.min(size.width, Math.max(280, rect.width + 64)),
     height = Math.min(size.height, Math.max(110, rect.height + 48));
   const x = Math.max(0, Math.min(size.width - width, rect.x + rect.width / 2 - width / 2)),
     y = Math.max(0, Math.min(size.height - height, rect.y + rect.height / 2 - height / 2));
-  const scale = Math.min(1, (host.clientWidth || 380) / width, 130 / height);
+  const scale = Math.min(1, (host.clientWidth || 380) / width, maxHeight / height);
   renderReact(
     host,
     <div className="target-crop" style={{ width: width * scale, height: height * scale }}>

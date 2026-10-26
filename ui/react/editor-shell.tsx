@@ -462,6 +462,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             <p id="activity-branch" className="activity-branch"></p>
             <div id="activity-list" className="activity-list"></div>
           </section>
+          <div className="history-foot">항목을 누르면 해당 대상을 확인합니다.</div>
         </aside>
         <aside
           id="properties-rail"
@@ -716,14 +717,16 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
               required={true}
               autoComplete="off"
             />
+          </div>
+          <div className="snapshot-save-actions">
+            <Button id="cancel-snapshot" type="button" variant="outline">
+              {'취소'}
+            </Button>
             <Button id="save-snapshot" className="primary" type="submit" variant="outline">
               {'저장'}
             </Button>
           </div>
         </form>
-        <Button id="cancel-snapshot" type="button" variant="outline">
-          {'취소'}
-        </Button>
       </DialogSurface>
       <DialogSurface id="comment-dialog" aria-labelledby="comment-dialog-title">
         <div className="popover-heading">
@@ -737,13 +740,11 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             <Button id="comment-previous" variant="outline" aria-label="이전 요청">
               ← 이전
             </Button>
-            <div className="comment-request-pick">
-              <NativeSelect id="comment-request" aria-label="검토할 요청"></NativeSelect>
-              <span id="comment-progress" role="status"></span>
-            </div>
+            <NativeSelect id="comment-request" aria-label="검토할 요청"></NativeSelect>
             <Button id="comment-next" variant="outline" aria-label="다음 요청">
               다음 →
             </Button>
+            <span id="comment-progress" role="status"></span>
           </div>
           <strong id="comment-target-title"></strong>
           <div
@@ -762,16 +763,18 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
               maxLength={4000}
               placeholder="예: 버튼을 오른쪽 위로 옮기고, 문구를 ‘고객 추가’로 바꿔 주세요."
             ></Textarea>
-            <div className="comment-actions">
-              <Button id="clear-comment" variant="outline">
-                {'주석 삭제'}
-              </Button>
-              <Button id="save-comment" className="primary" variant="outline">
-                {'완료'}
-              </Button>
-            </div>
-            <span id="comment-status" role="status"></span>
           </div>
+        </div>
+        <div className="comment-dialog-footer">
+          <div className="comment-actions">
+            <Button id="clear-comment" variant="outline">
+              {'주석 삭제'}
+            </Button>
+            <Button id="save-comment" className="primary" variant="outline">
+              {'완료'}
+            </Button>
+          </div>
+          <span id="comment-status" role="status"></span>
         </div>
       </DialogSurface>
       <DialogSurface id="rename-dialog" aria-labelledby="rename-title">

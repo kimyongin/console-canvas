@@ -1,0 +1,282 @@
+/* Shared geometry for editor chrome. Captured-page styles stay inside the iframe. */
+:root {
+  --workspace-heading-height: 48px;
+  --workspace-footer-height: 44px;
+}
+.cc-ui :where(button[data-size='default']) {
+  height: var(--control-height, 32px);
+  line-height: 18px;
+}
+#editor-root .canvas-tools,
+#editor-root .canvas-toolbar,
+#editor-root .panel-topbar,
+#editor-root .panel-rail .panel-toggle-slot {
+  box-sizing: border-box;
+  height: var(--workspace-heading-height);
+  min-height: var(--workspace-heading-height);
+  max-height: var(--workspace-heading-height);
+  flex-shrink: 0;
+}
+#editor-root .canvas-tools {
+  align-items: center;
+  gap: 8px;
+  padding-right: 12px;
+}
+#editor-root .canvas-toolbar {
+  flex: 1;
+  align-self: stretch;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  flex-wrap: nowrap;
+  padding: 7px 12px;
+}
+#editor-root .canvas-tools > button {
+  align-self: center;
+}
+#editor-root .panel-topbar {
+  padding: 7px 12px;
+}
+#editor-root .panel-toggle {
+  height: 28px;
+  min-height: 28px;
+}
+#editor-root .canvas-tools button:not(#document-menu-button) {
+  height: 32px;
+  min-height: 32px;
+}
+#editor-root .left-foot,
+#editor-root .canvas-footer,
+#editor-root .history-foot {
+  height: var(--workspace-footer-height);
+  min-height: var(--workspace-footer-height);
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 7px 12px;
+  border-top: 1px solid var(--line);
+  background: white;
+}
+#editor-root .left-foot,
+#editor-root .history-foot {
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--muted);
+  overflow: hidden;
+}
+#editor-root .left-foot #save-status {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+#editor-root .right-panel {
+  overflow: hidden;
+  min-height: 0;
+}
+#editor-root #history-panel {
+  min-height: 0;
+  padding: 12px;
+}
+#editor-root .layer-search {
+  padding: 12px;
+}
+#editor-root .artboard-space {
+  padding-top: 56px;
+}
+#editor-root .panel-rail::after {
+  content: '';
+  width: 100%;
+  min-height: var(--workspace-footer-height);
+  height: var(--workspace-footer-height);
+  margin-top: auto;
+  flex: none;
+  border-top: 1px solid var(--line);
+}
+#editor-root .comment-navigation {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 64px;
+  gap: 6px 8px;
+  align-items: start;
+}
+#editor-root #comment-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 20px;
+}
+#editor-root #comment-dialog > .popover-heading,
+#editor-root .comment-dialog-footer {
+  flex: none;
+}
+#editor-root #comment-editor-host {
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-width: thin;
+  /* Let the overlay scrollbar sit in the dialog's outer padding, past the fields. */
+  padding: 3px 11px 3px 3px;
+  margin: 12px -11px 0 -3px;
+  border: 0;
+}
+#editor-root .comment-dialog-footer {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+#editor-root #comment-status {
+  min-height: 16px;
+  margin-top: 4px;
+  line-height: 16px;
+  font-size: 10px;
+}
+#editor-root #comment-dialog .component-comment {
+  margin-top: 12px;
+}
+#editor-root #comment-dialog textarea {
+  min-height: 96px;
+}
+#editor-root .intent-suggestions {
+  gap: 4px;
+}
+#editor-root .comment-dialog-footer .comment-actions {
+  margin: 0;
+}
+#editor-root .comment-navigation > button,
+#editor-root #comment-request {
+  height: 32px;
+  min-height: 32px;
+  width: 100%;
+  margin: 0;
+}
+#editor-root #comment-progress {
+  grid-column: 1 / -1;
+  text-align: center;
+  line-height: 16px;
+}
+#editor-root .intent-suggestions > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+#editor-root .intent-suggestions button {
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 36px;
+  line-height: 16px;
+  padding: 6px 8px;
+  word-break: keep-all;
+}
+#editor-root .comment-actions > button {
+  min-width: 80px;
+  height: 32px;
+}
+#editor-root .coordinate-fields {
+  gap: 8px;
+}
+#editor-root .coordinate-fields label {
+  min-width: 0;
+  height: 40px;
+}
+#editor-root .coordinate-fields input[data-slot='input'] {
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+#editor-root .alignment-grid,
+#editor-root .nudge-controls {
+  gap: 8px;
+}
+#editor-root .alignment-grid button,
+#editor-root .nudge-controls button {
+  height: 32px;
+}
+#editor-root .snapshot-create {
+  align-items: center;
+}
+#editor-root #snapshot-save-dialog #snapshot-form {
+  padding: 0;
+}
+#editor-root .snapshot-save-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+#editor-root .snapshot-save-actions button {
+  height: 32px;
+  min-width: 88px;
+}
+#editor-root #snapshot-name,
+#editor-root #save-snapshot,
+#editor-root #snapshot-search,
+#editor-root #snapshot-find-current {
+  height: 32px;
+  min-height: 32px;
+}
+#editor-root .handoff-label {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 12px;
+}
+#editor-root .handoff-label select {
+  width: 100%;
+}
+#editor-root .compare-tools select {
+  height: 32px;
+  margin: 0;
+}
+#editor-root .compare-step button {
+  height: 32px;
+}
+#editor-root .export-actions > button,
+#editor-root .rename-actions > button {
+  height: 32px;
+  min-width: 88px;
+}
+#editor-root .ai-request-actions {
+  align-items: center;
+}
+#editor-root .ai-request-actions label {
+  min-height: 32px;
+}
+#editor-root .ai-request-actions :is(button, input, select) {
+  height: 32px;
+  min-height: 32px;
+}
+#editor-root .ai-preview-heading {
+  min-height: 48px;
+  height: 48px;
+  padding: 7px 8px;
+}
+#editor-root .ai-preview-heading select {
+  height: 32px;
+}
+#editor-root .implementation-controls {
+  align-items: end;
+}
+#editor-root .implementation-controls > label,
+#editor-root .implementation-result-control {
+  grid-template-rows: 18px 32px;
+  line-height: 18px;
+}
+#editor-root .implementation-controls > button,
+#editor-root .implementation-controls select {
+  height: 32px;
+}
+#editor-root .implementation-result-label {
+  min-height: 18px;
+}
+@media (max-width: 400px) {
+  #editor-root .intent-suggestions > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #editor-root .comment-navigation {
+    grid-template-columns: 58px minmax(0, 1fr) 58px;
+    column-gap: 6px;
+  }
+}

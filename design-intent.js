@@ -1,14 +1,14 @@
 import { elementLabel } from './ui/element-labels.js';
 export const RESPONSIVE_INTENTS = [
   {
-    label: '좁으면 다음 줄·전체 너비',
+    label: '다음 줄·전체 너비',
     text: '좁은 화면에서는 다음 줄로 내려 전체 너비로 표시해 주세요.',
   },
   {
-    label: '좁으면 세로로 쌓기',
+    label: '세로로 쌓기',
     text: '좁은 화면에서는 요소들을 세로로 쌓고 화면 너비에 맞춰 주세요.',
   },
-  { label: '좁아져도 구조 유지', text: '좁은 화면에서도 현재 순서와 배치 구조를 유지해 주세요.' },
+  { label: '구조 유지', text: '좁은 화면에서도 현재 순서와 배치 구조를 유지해 주세요.' },
 ];
 // Geometry is evidence for a suggestion, never an inferred user instruction.
 export function suggestDesignIntents(scene, id) {

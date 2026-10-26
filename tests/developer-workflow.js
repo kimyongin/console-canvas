@@ -69,9 +69,9 @@ try {
   click('#context-comment');
   const intentButtons = [...doc.querySelectorAll('#comment-intent-suggestions button')];
   intentButtons.find((b) => b.textContent.includes('검색 영역')).click();
-  intentButtons.find((b) => b.textContent === '좁으면 다음 줄·전체 너비').click();
+  intentButtons.find((b) => b.textContent === '다음 줄·전체 너비').click();
   const beforeReplacing = doc.querySelector('#component-comment').value;
-  intentButtons.find((b) => b.textContent === '좁으면 세로로 쌓기').click();
+  intentButtons.find((b) => b.textContent === '세로로 쌓기').click();
   check(
     'Responsive choices replace only earlier preset lines and preserve the selected relationship',
     beforeReplacing.includes(RESPONSIVE_INTENTS[0].text) &&
@@ -97,7 +97,7 @@ try {
     .find((b) => b.textContent === '남은 2개 같은 너비')
     .click();
   [...doc.querySelectorAll('#comment-intent-suggestions button')]
-    .find((b) => b.textContent === '좁으면 세로로 쌓기')
+    .find((b) => b.textContent === '세로로 쌓기')
     .click();
   click('#save-comment');
   check(
