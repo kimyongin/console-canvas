@@ -410,7 +410,8 @@ try {
     () =>
       app.state.ready &&
       app.state.snapshot.id === savedId &&
-      !doc.querySelector('#documents-dialog').open,
+      !doc.querySelector('#documents-dialog').open &&
+      !doc.querySelector('#documents-live').disabled,
   );
   check(
     'Switching saved documents restores copy geometry, comments and snapshot futures',

@@ -91,6 +91,12 @@ IndexedDB `console-canvas-workspace`의 세 저장소를 사용한다.
 
 가이드는 빌드된 동일 SKILL.md를 반환한다. 이미지 생성은 native 실행 반환 뒤 별도 작업으로 시작하고 같은 인수의 재조회로 결과를 전달한다. 로컬 blob 미리보기는 `review-image.html`에서만 로드하고 5분 또는 도구 철회 시 해제한다. 공식 Chrome MCP의 `new_page`→`take_screenshot(fullPage:true)`가 실제 MCP 이미지 콘텐츠를 반환한다. 상세 계약·실패 정책은 [Chrome 안내](chrome-webmcp.md), 실행 증빙은 [0.20](webmcp-0.20.md)에 있다.
 
+## 개발 전달·구현 검토 · 0.22
+
+`design-intent.js`는 이동 후 주변 영역/삭제 후 형제에 근거한 문장과 반응형 정형 문구를 제안한다. 사용자가 선택한 문구는 기존 annotations로 저장한다. `handoff-image.js`는 전달 정책·버전/경로/너비 맥락을 PNG에 그리며, 후속 요청 필터가 원래 번호를 유지한다.
+
+`workflow-state.js`는 `handoffSettings`와 `implementationReviews`를 검증한다. immutable 원본 캡처에 넣지 않고 기존 세션 저장 큐와 편집 파일에 포함한다. 구현 검토의 고정 목표 point와 별도 결과 캡처/point·요청별 판정/메모는 캔버스 undo/분기와 독립적이다. `ui/implementation-review.js`가 저장/별도 버전 장면 렌더를 조정하고 React UI는 두 장면·공통 확대·검토 상태를 표시한다. 원본 ID/selector 대응은 유일할 때만 추정 하이라이트로 표시한다. 원본 소스 편집과 자동 판정은 수행하지 않는다. [흐름·한도·검증](developer-workflow-0.22.md).
+
 ## AI 시안 · 0.21
 
 `code-patches.js`가 inert DOM에서 선언적 HTML/CSS를 검증하고 `CanvasScene.setCodePatches`가 같은 iframe 안에 복원한다. immutable 캡처와 `codePatches`를 분리하며 session/checkpoint/timeline/JSON/비교/PNG가 같은 포인트를 사용한다. 생성 요소는 a… ID, 캡처/복사 ID·locator와 주석 참조는 유지한다. 코드 레이아웃 뒤에 기존 이동 오프셋을 적용한다.

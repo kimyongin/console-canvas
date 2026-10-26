@@ -1,0 +1,69 @@
+<!doctype html><meta charset="utf-8" /><title>구현 결과 재수집 테스트</title>
+<style>
+  body {
+    font: 14px system-ui;
+    margin: 16px;
+  }
+  iframe {
+    width: 1360px;
+    height: 980px;
+  }
+  button,
+  select {
+    padding: 8px;
+    margin: 6px;
+  }
+  header {
+    position: sticky;
+    top: 0;
+    background: white;
+  }
+</style>
+<header>
+  <strong>가상 NORTH 콘솔 · 구현 결과 테스트</strong
+  ><select id="fixture-mode" aria-label="가상 구현 상태">
+    <option value="partial">일부 반영</option>
+    <option value="full">전체 반영</option></select
+  ><select id="fixture-width" aria-label="가상 구현 너비">
+    <option value="1360">데스크톱 1360px</option>
+    <option value="640">좁은 화면 640px</option></select
+  ><button id="capture-result" disabled>이 구현 화면 가져오기</button
+  ><span id="status" role="status"></span>
+</header>
+<iframe id="source" title="수정된 가상 웹 프로젝트"></iframe>
+<script src="../capture.js"></script>
+<script type="module">
+  import { applyImplementationFixture } from './implementation-fixture.js';
+  import { saveCapture, saveSession } from '../db.js';
+  const frame = document.querySelector('#source'),
+    button = document.querySelector('#capture-result'),
+    mode = document.querySelector('#fixture-mode'),
+    status = document.querySelector('#status');
+  frame.addEventListener('load', () => {
+    applyImplementationFixture(frame.contentDocument, mode.value === 'partial');
+    button.disabled = false;
+    status.textContent = '구현 화면 준비됨';
+  });
+  const width = document.querySelector('#fixture-width');
+  const load = () => {
+    button.disabled = true;
+    frame.style.width = width.value + 'px';
+    frame.src = '../fixtures/console.html?qa=' + Date.now();
+  };
+  mode.addEventListener('change', load);
+  width.addEventListener('change', load);
+  load();
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    try {
+      const snapshot = await UICloneCapture.capture(frame.contentDocument);
+      snapshot.documentName = frame.contentDocument.title;
+      await saveCapture(snapshot);
+      await saveSession(snapshot.id, { documentName: snapshot.documentName });
+      location.href = '../editor.html?id=' + encodeURIComponent(snapshot.id);
+    } catch (error) {
+      status.textContent = error.message;
+      button.disabled = false;
+    }
+  });
+</script>

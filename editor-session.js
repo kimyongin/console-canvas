@@ -109,6 +109,8 @@ export function createEditorSession({
       codePatches: state.scene.codePatches,
       aiRequests: state.aiRequests || [],
       aiDraft: state.aiDraft,
+      handoffSettings: state.handoffSettings,
+      implementationReviews: state.implementationReviews || [],
       edits: state.scene.edits,
       annotations: state.scene.annotations,
       timeline: state.timeline,

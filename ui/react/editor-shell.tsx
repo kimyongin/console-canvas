@@ -46,12 +46,24 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
               {'0'}
             </span>
           </Button>
+          <Button
+            id="implementation-button"
+            disabled={!view?.ready}
+            variant="outline"
+            onClick={() => dispatchEditorCommand('implementation-review')}
+          >
+            구현 결과 확인
+          </Button>
+          <span id="review-launch-status" role="status" className="sr-only" />
           <Button id="export-button" className="primary" disabled={true} variant="outline">
             {'\n          변경 내용 전달 '}
             <span aria-hidden="true">{'↗'}</span>
           </Button>
         </div>
       </header>
+      <DialogSurface id="implementation-dialog" aria-label="구현 결과 확인">
+        <div id="implementation-content" />
+      </DialogSurface>
       <DialogSurface id="ai-dialog">
         <div id="ai-dialog-content" />
       </DialogSurface>
@@ -310,6 +322,14 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             </div>
           </div>
           <div id="selection-actions" role="toolbar" aria-label="선택 요소 작업" hidden={true}>
+            <Button
+              id="selection-toolbar-handle"
+              aria-label="선택 도구 모음 이동"
+              title="드래그 또는 방향키로 도구 모음 이동 · Home으로 자동 위치 복원"
+              variant="ghost"
+            >
+              ⠿
+            </Button>
             <Button
               id="context-ai"
               aria-label="선택 요소 AI 시안 만들기"
@@ -732,6 +752,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             aria-label="주석 대상 미리보기"
           ></div>
           <small id="comment-preview-label"></small>
+          <div id="comment-intent-suggestions" />
           <div className="component-comment">
             <label htmlFor="component-comment">{'이 요소에 주석 남기기'}</label>
             <p>{'어떻게 바꾸고 싶은지 적어 주세요. 입력 내용은 자동 저장됩니다.'}</p>
@@ -812,6 +833,13 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             {'전달 기준'}
             <NativeSelect id="handoff-version"></NativeSelect>
           </label>
+          <label className="handoff-label">
+            그림의 용도
+            <NativeSelect id="handoff-mode">
+              <option value="reference">배치 참고 · 주석 요청 우선</option>
+              <option value="exact">확정 시안 · 주석의 예외 우선</option>
+            </NativeSelect>
+          </label>
           <div id="export-summary" className="export-summary" role="status"></div>
           <div id="handoff-items" className="handoff-items" aria-label="번호별 요청 검토"></div>
           <label className="review-note-label">
@@ -827,6 +855,9 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
         </div>
         <div className="export-footer">
           <div className="export-actions">
+            <Button id="handoff-verify" variant="outline">
+              구현 결과 확인
+            </Button>
             <Button id="copy-summary" variant="outline">
               {'이미지 복사'}
             </Button>

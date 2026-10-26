@@ -1,3 +1,5 @@
+import { suggestDesignIntents, RESPONSIVE_INTENTS, appendIntent } from '../design-intent.js';
+import { renderIntentSuggestions } from './react/intent-suggestions.tsx';
 import { handoffRequests } from '../handoff-image.js';
 import { renderTargetPreview, renderVersionOptions } from './react/versions.tsx';
 import { clearReact } from './react/mount.tsx';
@@ -70,6 +72,20 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
       reference?.size || scene.contentSize(),
       rect,
     );
+    renderIntentSuggestions(
+      $('#comment-intent-suggestions'),
+      suggestDesignIntents(scene, id),
+      RESPONSIVE_INTENTS,
+      (text, responsive) => {
+        try {
+          field.value = appendIntent(field.value, text, { responsive });
+          field.dispatchEvent(new Event('input', { bubbles: true }));
+          field.focus();
+        } catch (error) {
+          $('#comment-status').textContent = error.message;
+        }
+      },
+    );
     field.focus();
   }
   field.addEventListener('input', () => {
@@ -108,10 +124,12 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
     }
   });
   dialog.addEventListener('close', () => {
+    if (dialog.open) return;
     clearTimeout(timer);
     state.commentTarget = null;
     requests = [];
     clearReact($('#comment-target-preview'));
+    clearReact($('#comment-intent-suggestions'));
   });
   $('#close-comment-dialog').addEventListener('click', () => {
     commit();

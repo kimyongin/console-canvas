@@ -1,3 +1,4 @@
+import { cleanImplementationReviews } from './workflow-state.js';
 import { validateAiRequests } from './ai-requests.js';
 import { buildCodeDocument } from './code-patches.js';
 import { cleanLayerNames } from './layer-names.js';
@@ -10,6 +11,7 @@ export function validateDocumentInput(snapshot, edits, annotations, timeline) {
   validateSnapshot(snapshot);
   cleanLayerNames(snapshot.layerNames);
   validateAiRequests(snapshot.aiRequests, snapshot);
+  cleanImplementationReviews(snapshot.implementationReviews, snapshot);
   for (const value of [edits, annotations])
     if (value != null && (typeof value !== 'object' || Array.isArray(value)))
       throw new Error('편집/주석 형식이 올바르지 않습니다.');

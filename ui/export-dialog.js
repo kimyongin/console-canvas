@@ -15,6 +15,8 @@ export function createExportDialog({
   prepareEditor,
   toast,
   focusComment,
+  save,
+  implementationReview,
 }) {
   let generation = 0,
     latest = null,
@@ -82,6 +84,7 @@ export function createExportDialog({
           scene,
           version.state.note,
           (m) => ($('#export-status').textContent = m),
+          { mode: state.handoffSettings?.mode, versionName: version.name },
         );
       });
       if (token !== generation || !$('#export-dialog').open) return;
@@ -111,14 +114,31 @@ export function createExportDialog({
     commitCommentDraft();
     renderVersionOptions($('#handoff-version'), versionOptions(state));
     $('#handoff-version').value = '@current';
+    $('#handoff-mode').value = state.handoffSettings?.mode || 'reference';
     $('#export-dialog').showModal();
     refresh();
+  });
+  $('#handoff-mode').addEventListener('change', () => {
+    state.handoffSettings = { mode: $('#handoff-mode').value === 'exact' ? 'exact' : 'reference' };
+    save();
+    refresh();
+  });
+  $('#handoff-verify').addEventListener('click', async () => {
+    const option = chosen();
+    if (!option) return;
+    $('#export-dialog').close();
+    try {
+      await implementationReview.open(option);
+    } catch (error) {
+      toast(error.message);
+    }
   });
   $('#handoff-version').addEventListener('change', refresh);
   $('#review-note').addEventListener('change', () => {
     if ($('#export-dialog').open) refresh();
   });
   $('#export-dialog').addEventListener('close', () => {
+    if ($('#export-dialog').open) return;
     generation++;
     latest = null;
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -180,6 +200,10 @@ export function createExportDialog({
         state.activityHead,
         state.aiRequests,
         state.aiDraft,
+        {
+          handoffSettings: state.handoffSettings,
+          implementationReviews: state.implementationReviews,
+        },
       );
       const result = await download(
         'console-canvas-' + state.snapshot.id.slice(0, 8) + '.uiclone.json',

@@ -20,6 +20,7 @@ export function createEditorController(options) {
       url: state.snapshot.source.url,
       revision: state.revision,
       request_revision: state.aiRequestRevision || 0,
+      handoff_mode: state.handoffSettings?.mode || 'reference',
       element_count: state.scene.nodes.size,
       comment_count: Object.keys(state.scene.annotations).length,
     };
@@ -143,14 +144,18 @@ export function createEditorController(options) {
     }
     if (name === 'get_review_image') {
       if (screen().busy) return failure('editor_busy', '편집을 마친 뒤 이미지를 요청해 주세요.');
-      const revision = state.revision;
+      const revision = state.revision,
+        handoffMode = state.handoffSettings?.mode || 'reference';
       try {
         const result = await options.buildHandoffImage(
           args.snapshot_id,
           args.request_id,
           args.candidate_id,
         );
-        if (state.revision !== revision)
+        if (
+          state.revision !== revision ||
+          (state.handoffSettings?.mode || 'reference') !== handoffMode
+        )
           return failure(
             'revision_conflict',
             '이미지를 만드는 동안 화면이 바뀌었습니다. 다시 요청해 주세요.',

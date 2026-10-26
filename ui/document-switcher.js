@@ -197,6 +197,7 @@ export function createDocumentSwitcher({
     });
   $('#document-search').addEventListener('input', render);
   dialog.addEventListener('close', () => {
+    if (dialog.open) return;
     generation++;
     renderDocumentRows(list, [], false);
   });

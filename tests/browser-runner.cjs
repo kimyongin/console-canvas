@@ -50,6 +50,7 @@ async function main() {
   for (const suite of [
     'integration',
     'ai-variants',
+    'developer-workflow',
     'snapshots',
     'panels',
     'storage',

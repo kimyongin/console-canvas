@@ -1232,7 +1232,11 @@ export class CanvasScene {
     } finally {
       this.setEdits(edits);
       this.setComments(annotations);
-      this.select(selected, { ids: selection });
+      // A reference render must not fire user-selection callbacks. In particular,
+      // opening a deleted target's comment must not close its own editor.
+      this.selected = selected;
+      this.selection = new Set(selection);
+      this.drawSelection();
     }
   }
 }

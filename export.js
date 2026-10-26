@@ -1,3 +1,4 @@
+import { cleanHandoffSettings } from './workflow-state.js';
 import { cleanAiDraft } from './ai-draft.js';
 const encoder = new TextEncoder();
 export function changeActionLabel(change) {
@@ -102,6 +103,7 @@ export function reviewPayload(
   activityHead = null,
   aiRequests = [],
   aiDraft,
+  workflow = {},
 ) {
   return {
     format: 'console-canvas-review',
@@ -113,6 +115,8 @@ export function reviewPayload(
     codePatches: scene.codePatches || [],
     aiRequests,
     aiDraft: cleanAiDraft(aiDraft),
+    handoffSettings: cleanHandoffSettings(workflow.handoffSettings),
+    implementationReviews: workflow.implementationReviews || [],
     edits: scene.edits,
     annotations: scene.annotations,
     comments: scene.comments(),
@@ -317,6 +321,7 @@ export async function buildReview(
       session.activityHead || null,
       session.aiRequests || [],
       session.aiDraft,
+      session,
     ),
     warnings = [];
   const files = {

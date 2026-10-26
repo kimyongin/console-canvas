@@ -103,6 +103,8 @@ export function createWebMcpClient({ controller, onStatus }) {
                       metadata.document_id,
                       metadata.revision,
                       metadata.title,
+                      metadata.request_revision,
+                      metadata.handoff_mode,
                       tool.name,
                       args,
                     ]);

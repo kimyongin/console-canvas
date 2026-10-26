@@ -1,3 +1,5 @@
+import { createImplementationReview } from './ui/implementation-review.js';
+import { cleanHandoffSettings, cleanImplementationReviews } from './workflow-state.js';
 import { cleanAiDraft } from './ai-draft.js';
 import { buildAiContext } from './ai-context.js';
 import { createAiPanel } from './ui/ai-panel.js';
@@ -395,7 +397,13 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
   areaSelection.reset();
   clipboard.reset();
   commentEditor.reset();
-  for (const id of ['#compare-dialog', '#export-dialog', '#properties-dialog', '#ai-dialog'])
+  for (const id of [
+    '#compare-dialog',
+    '#export-dialog',
+    '#properties-dialog',
+    '#ai-dialog',
+    '#implementation-dialog',
+  ])
     if ($(id).open) $(id).close();
   const documentName = snapshot.documentName
     ? cleanDocumentName(snapshot.documentName)
@@ -416,6 +424,8 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
     codePatches: storedCodePatches,
     aiRequests: storedAiRequests,
     aiDraft: storedAiDraft,
+    handoffSettings: storedHandoffSettings,
+    implementationReviews: storedImplementationReviews,
     timeline: storedTimeline,
     edits: storedEdits,
     annotations: storedComments,
@@ -431,6 +441,8 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
   state.timeline = null;
   state.aiRequests = validateAiRequests(storedAiRequests, snapshot);
   state.aiDraft = cleanAiDraft(storedAiDraft);
+  state.handoffSettings = cleanHandoffSettings(storedHandoffSettings);
+  state.implementationReviews = cleanImplementationReviews(storedImplementationReviews, snapshot);
   state.snapshot = {
     ...capture,
     layerNames: cleanLayerNames(storedLayerNames),
@@ -575,6 +587,8 @@ async function importFile(file) {
         codePatches: data.codePatches,
         aiRequests: data.aiRequests,
         aiDraft: cleanAiDraft(data.aiDraft),
+        handoffSettings: cleanHandoffSettings(data.handoffSettings),
+        implementationReviews: data.implementationReviews,
       },
       data.edits,
       data.note || '',
@@ -615,16 +629,8 @@ for (const button of document.querySelectorAll('[data-align]'))
     editSafely(() => state.scene?.align(button.dataset.align)),
   );
 $('#zoom-selection').addEventListener('click', fitSelection);
-$('#component-comment').addEventListener('input', () => {
-  $('#comment-status').textContent = '작성 중 · 저장하거나 다른 요소를 선택하면 기록됩니다.';
-  $('#clear-comment').disabled =
-    !$('#component-comment').value.trim() && !state.scene?.annotations[state.commentTarget];
-});
 $('#component-comment').addEventListener('change', commitCommentDraft);
-$('#save-comment').addEventListener('click', () => {
-  commitCommentDraft();
-  renderInspector();
-});
+$('#save-comment').addEventListener('click', renderInspector);
 $('#clear-comment').addEventListener('click', () => {
   $('#component-comment').value = '';
   $('#clear-comment').disabled = true;
@@ -727,11 +733,22 @@ $('#viewport').addEventListener(
 );
 document.addEventListener('keydown', onKey);
 $('#review-note').addEventListener('change', () => changeCommitted({ label: '추가 설명 수정' }));
+const implementationReview = createImplementationReview({
+  $,
+  state,
+  adapter,
+  save,
+  flushEditor,
+  commitCommentDraft,
+  toast,
+});
 createExportDialog({
   $,
   state,
   commitCommentDraft,
   editorId,
+  implementationReview,
+  save,
   flushEditor,
   prepareEditor,
   toast,
@@ -790,7 +807,14 @@ const controller = createEditorController({
         : checkpoint();
     if (!point) throw new Error('해당 스냅샷을 찾을 수 없습니다.');
     return withVersionScene(state.snapshot, point, (scene) =>
-      buildHandoffImage(state.snapshot, scene, point.note),
+      buildHandoffImage(state.snapshot, scene, point.note, undefined, {
+        mode: state.handoffSettings?.mode,
+        versionName: requestId
+          ? aiRequests.find(requestId).candidates.find((c) => c.id === candidateId)?.name
+          : id
+            ? state.timeline.entries.find((e) => e.id === id)?.name
+            : '현재 작업',
+      }),
     );
   },
   isBusy: () =>
@@ -958,7 +982,9 @@ window.ConsoleCanvas = {
   aiRequests,
   buildHandoffImage: () =>
     withVersionScene(state.snapshot, checkpoint(), (scene) =>
-      buildHandoffImage(state.snapshot, scene, $('#review-note').value),
+      buildHandoffImage(state.snapshot, scene, $('#review-note').value, undefined, {
+        mode: state.handoffSettings?.mode,
+      }),
     ),
   buildReview: () =>
     buildReview(state.snapshot, state.scene, $('#review-note').value, undefined, state.timeline, {
@@ -966,6 +992,8 @@ window.ConsoleCanvas = {
       activityHead: state.activityHead,
       aiRequests: state.aiRequests,
       aiDraft: state.aiDraft,
+      handoffSettings: state.handoffSettings,
+      implementationReviews: state.implementationReviews,
     }),
 };
 function connectDesktopIfReady() {

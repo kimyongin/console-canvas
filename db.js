@@ -1,3 +1,4 @@
+import { cleanHandoffSettings } from './workflow-state.js';
 import { cleanAiDraft } from './ai-draft.js';
 // Captures are immutable; edits and lightweight recent-document metadata are separate.
 export const DATABASE_NAME = 'console-canvas-workspace';
@@ -41,6 +42,8 @@ export function captureFromDocument(value) {
     codePatches,
     aiRequests,
     aiDraft,
+    handoffSettings,
+    implementationReviews,
     edits,
     annotations,
     timeline,
@@ -79,6 +82,8 @@ export async function saveSession(id, value) {
     codePatches = [],
     aiRequests = [],
     aiDraft,
+    handoffSettings,
+    implementationReviews,
     edits = {},
     annotations = {},
     timeline = null,
@@ -93,6 +98,8 @@ export async function saveSession(id, value) {
     codePatches,
     aiRequests,
     aiDraft: cleanAiDraft(aiDraft),
+    handoffSettings: cleanHandoffSettings(handoffSettings),
+    implementationReviews: implementationReviews || [],
     edits,
     annotations,
     timeline,

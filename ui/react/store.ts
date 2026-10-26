@@ -12,6 +12,7 @@ export interface EditorView {
   save: { pending: boolean; error: string | null; message: string };
 }
 export type EditorCommand =
+  | 'implementation-review'
   | 'ai'
   | 'ai-new'
   | 'undo'

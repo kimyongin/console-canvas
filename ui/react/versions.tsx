@@ -154,7 +154,7 @@ export interface PreviewHighlight {
   missing?: boolean;
   point?: boolean;
 }
-function VersionFrame({
+export function VersionFrame({
   html,
   size,
   title,

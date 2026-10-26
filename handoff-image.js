@@ -1,3 +1,4 @@
+import { cleanHandoffSettings, sourcePath } from './workflow-state.js';
 import { renderPng } from './export.js';
 import { elementLabel } from './ui/element-labels.js';
 export function handoffRequests(scene) {
@@ -87,9 +88,23 @@ function badge(ctx, n, x, y) {
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
 }
-export async function buildHandoffImage(snapshot, scene, note = '', progress = () => {}) {
+export async function buildHandoffImage(
+  snapshot,
+  scene,
+  note = '',
+  progress = () => {},
+  options = {},
+) {
   progress('변경 후 화면과 요청 카드를 만들고 있습니다.');
-  const requests = handoffRequests(scene),
+  const mode = cleanHandoffSettings(options).mode;
+  const requests = handoffRequests(scene)
+      .filter((r) => !Array.isArray(options.requestIds) || options.requestIds.includes(r.id))
+      .map((r) => ({
+        ...r,
+        text:
+          r.text +
+          (options.requestNotes?.[r.id] ? '\n추가 수정: ' + options.requestNotes[r.id] : ''),
+      })),
     currentSize = scene.contentSize(),
     reference = requests.some((r) => r.deleted) ? scene.referenceFrame() : null,
     size = {
@@ -115,7 +130,25 @@ export async function buildHandoffImage(snapshot, scene, note = '', progress = (
       (snapshot.documentName || snapshot.source.title || '화면') + ' · UI 변경 요청',
       width - margin * 2,
     );
-    const screenY = 144 + (titleLines.length - 1) * 46;
+    ctx.font = '20px system-ui';
+    const context = {
+      mode,
+      versionName: options.versionName || '현재 작업',
+      path: sourcePath(snapshot.source),
+      viewport: snapshot.source.viewport,
+      capturedAt: snapshot.capturedAt,
+      policy:
+        mode === 'exact'
+          ? '확정 시안 · 그림을 기준으로 구현하되 주석의 예외·반응형 조건을 우선합니다.'
+          : '배치 참고 · 주석 요청 우선. 그림의 빈자리·겹침은 완성된 배치를 뜻하지 않습니다.',
+    };
+    const metadataLines = [
+      `${context.path} · 기준 ${context.viewport.width} × ${context.viewport.height}px`,
+      `버전: ${context.versionName} · 가져온 시각: ${context.capturedAt || '기록 없음'}`,
+      context.policy,
+    ].flatMap((line) => wrap(ctx, line, width - margin * 2));
+    const metadataY = 94 + (titleLines.length - 1) * 46;
+    const screenY = metadataY + metadataLines.length * 28 + 20;
     ctx.font = '22px system-ui';
     const cards = requests.map((r) => ({
       ...r,
@@ -136,7 +169,13 @@ export async function buildHandoffImage(snapshot, scene, note = '', progress = (
     }
     ctx.font = '22px system-ui';
     const noteLines = note.trim() ? wrap(ctx, note, width - margin * 2 - 40) : [];
-    const height = Math.ceil(y + 112 + (noteLines.length ? noteLines.length * 32 + 70 : 0));
+    ctx.font = '20px system-ui';
+    const footerText =
+      '구현 기준: 고정 좌표 대신 정렬·간격·줄바꿈 의도를 반영하고 여러 화면 너비에서 확인하세요. 별도 요청이 없는 기존 버튼·검색·입력 동작은 유지하세요. 주석에는 그림에 아직 반영되지 않은 구현 요청이 포함될 수 있습니다.';
+    const footerLines = wrap(ctx, footerText, width - margin * 2);
+    const height = Math.ceil(
+      y + 70 + footerLines.length * 29 + (noteLines.length ? noteLines.length * 32 + 70 : 0),
+    );
     if (height > 32760 || width * height > 100_000_000)
       throw new Error(
         '요청 내용을 한 이미지에 담기에는 너무 큽니다. 주석을 간결하게 정리하거나 전달할 스냅샷을 나누어 주세요.',
@@ -150,11 +189,8 @@ export async function buildHandoffImage(snapshot, scene, note = '', progress = (
     titleLines.forEach((line, i) => ctx.fillText(line, margin, 58 + i * 46));
     ctx.font = '21px system-ui';
     ctx.fillStyle = '#72798d';
-    ctx.fillText(
-      '변경 후 화면 · 같은 번호의 하이라이트와 주석 카드를 확인해 주세요.',
-      margin,
-      screenY - 41,
-    );
+    ctx.font = '20px system-ui';
+    metadataLines.forEach((line, i) => ctx.fillText(line, margin, metadataY + i * 28));
     ctx.drawImage(after, margin, screenY, screenWidth, screenHeight);
     // Number badges never form leader lines. Deleted targets are dashed at their old location.
     const occupied = [],
@@ -259,15 +295,11 @@ export async function buildHandoffImage(snapshot, scene, note = '', progress = (
     }
     ctx.fillStyle = '#696c86';
     ctx.font = '20px system-ui';
-    const footer = wrap(
-      ctx,
-      '구현 기준: 고정 좌표 대신 정렬·간격·줄바꿈 의도를 반영하고, 여러 화면 너비에서 확인해 주세요.',
-      width - margin * 2,
-    );
+    const footer = footerLines;
     footer.forEach((line, i) => ctx.fillText(line, margin, y + 38 + i * 29));
     const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
     if (!blob) throw new Error('전달 이미지 생성 실패');
-    return { blob, requests, width, height, hotspots };
+    return { blob, requests, width, height, hotspots, context };
   } finally {
     after.close();
     before?.close();

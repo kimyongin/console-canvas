@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8" /><title>Developer handoff workflow checks</title>
+<style>
+  body {
+    font: 14px system-ui;
+  }
+  #editor {
+    width: 1280px;
+    height: 720px;
+  }
+  #implemented-source {
+    position: fixed;
+    left: -20000px;
+    width: 1360px;
+    height: 980px;
+  }
+  pre {
+    white-space: pre-wrap;
+  }
+</style>
+<div id="status">Running…</div>
+<pre id="results"></pre>
+<iframe id="editor" src="../editor.html?sample=1" title="Design intent editor"></iframe>
+<iframe
+  id="implemented-source"
+  src="../fixtures/console.html"
+  title="Separately implemented web source"
+></iframe>
+<script src="../capture.js"></script>
+<script type="module" src="developer-workflow.js"></script>

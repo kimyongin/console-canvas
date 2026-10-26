@@ -392,3 +392,230 @@
   margin: 0;
   font-size: 11px;
 }
+.intent-suggestions {
+  margin: 10px 0;
+  display: grid;
+  gap: 6px;
+}
+.intent-suggestions > strong {
+  font-size: 11px;
+  color: #655c7c;
+}
+.intent-suggestions > div {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.intent-suggestions button {
+  font-size: 11px;
+  min-height: 28px;
+  padding: 5px 8px;
+  white-space: normal;
+}
+.intent-suggestions small {
+  color: #7c748b;
+  font-size: 10px;
+}
+#implementation-dialog {
+  width: min(1440px, 96vw);
+  max-width: 96vw;
+  padding: 0;
+  max-height: 94vh;
+}
+.implementation-review {
+  height: 90vh;
+  padding: 18px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.implementation-review header,
+.implementation-review footer,
+.implementation-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex: none;
+}
+.implementation-review h2 {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+.implementation-review header p,
+.implementation-review footer span,
+.implementation-context {
+  margin: 0;
+  font-size: 11px;
+  color: #716981;
+  line-height: 1.6;
+}
+.implementation-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+.implementation-controls > label,
+.implementation-result-control {
+  display: grid;
+  gap: 5px;
+  font-size: 11px;
+  min-width: 0;
+}
+.implementation-controls select {
+  width: 100%;
+}
+.implementation-context label {
+  flex: none;
+}
+.implementation-context select {
+  width: 85px;
+}
+.implementation-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  min-height: 0;
+  flex: 1;
+  gap: 12px;
+}
+.implementation-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 0;
+  gap: 10px;
+}
+.implementation-comparison > section {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+}
+.implementation-frame {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #e3dfec;
+  background: #f5f6fb;
+  border-radius: 8px;
+  padding: 8px;
+}
+.implementation-frame > p {
+  padding: 20px;
+  font-size: 12px;
+  color: #706a80;
+  line-height: 1.8;
+}
+.implementation-requests {
+  overflow: auto;
+  font-size: 12px;
+  min-width: 0;
+}
+.implementation-requests > strong {
+  display: block;
+  padding-bottom: 8px;
+}
+.implementation-requests section {
+  padding: 10px;
+  border: 1px solid #e3dfec;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.implementation-requests section.is-current {
+  border-color: #9c8fe8;
+  background: #f8f6ff;
+}
+.implementation-request-pick {
+  text-align: left;
+  white-space: normal;
+  width: 100%;
+  justify-content: flex-start;
+  font-size: 12px;
+}
+.implementation-requests p {
+  font-size: 11px;
+  color: #6a627c;
+  line-height: 1.7;
+}
+.implementation-requests textarea {
+  width: 100%;
+  min-height: 60px;
+  margin-top: 8px;
+  font-size: 11px;
+}
+.implementation-requests select {
+  width: 100%;
+}
+.implementation-warning {
+  font-size: 11px;
+  margin: 0;
+  color: #925c14;
+}
+#implementation-status {
+  flex: none;
+  margin: 0;
+  font-size: 12px;
+}
+#implementation-status:empty {
+  display: none;
+}
+#selection-toolbar-handle {
+  cursor: move;
+  touch-action: none;
+  min-width: 22px;
+  padding: 2px 4px;
+  color: #8b829b;
+}
+@media (max-width: 850px) {
+  .implementation-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+  .implementation-controls > button {
+    grid-column: 1 / -1;
+  }
+  .implementation-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(160px, 1fr) 140px;
+  }
+  .implementation-requests {
+    display: flex;
+    gap: 8px;
+  }
+  .implementation-requests > strong {
+    display: none;
+  }
+  .implementation-requests > section {
+    min-width: 200px;
+    width: 220px;
+    flex: none;
+  }
+  .implementation-review footer span {
+    display: none;
+  }
+  .implementation-context {
+    flex-wrap: wrap;
+  }
+}
+.implementation-result-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+.implementation-result-label button {
+  font-size: 10px;
+  min-height: 18px;
+  padding: 0 4px;
+}
+@media (max-width: 850px) {
+  .implementation-review {
+    height: 92vh;
+    gap: 8px;
+    padding: 12px;
+  }
+  .implementation-body {
+    grid-template-rows: minmax(0, 1fr) 110px;
+  }
+}
