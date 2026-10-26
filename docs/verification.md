@@ -170,3 +170,11 @@ PRD를 [기능 전수 대조표](feature-audit.md)와 다시 비교했다. 정�
 실제 읽기 전용 `experiments/agent-trigger/probe.mjs`에서 설치 SDK 1.32.2의 2025-11-25 이하 지원, 앱 stdio의 modern discovery/구독 미구현, Chrome MCP 1.12.0의 메타데이터를 확인했다. Codex CLI 0.147.0 help/생성 스키마의 app-server API 형태도 확인했다. 최신 SDK/서버 실행·현재 데스크톱 호스트의 구독 수신/idle 모델 실행·인증·다중 후보 생성은 검증하지 않았으며 #37은 열어 둔다. 개인 대화·문서·브라우저나 모델 turn은 사용하지 않았다.
 
 공통 `npm run check`는 타입·포맷·빌드, Python 40·Node 30·Chromium 321·standalone/영역 드래그를 통과했다. 이는 최신 MCP 준수 검사가 아니다. 재현 결과 `local/agent-trigger/installed-report.json`, 생성 CLI 스키마와 `local/agent-trigger-research-check.log`는 Git 제외다. 앱 기능/버전 0.20.0·설치 앱/스킬·사용자 자료는 유지한다.
+
+## 세 편집 경로·API 인증 계획 갱신 · 2026-10-26
+
+[편집 경로·인증 계획](editing-paths-plan.md), PRD FR-26/27·AC-41~43과 #43/#44를 추가하고 상위 #36 및 #37~#42를 갱신했다. 직접 편집·AI API(코드/프롬프트→수정 코드/패치)·외부 로컬 에이전트 MCP가 공통 문서/패치/후보/undo/이력/분기를 공유하도록 정의했다. API 키와 ChatGPT OAuth는 두 번째 경로의 인증 선택이며 API 실행은 외부 MCP 성공과 독립적이다.
+
+OpenAI Docs에서 구독 로그인·제품/계정 자격·동의/권한·현재 기능 제한을 확인했다. 공개 저장소를 OSS 적격으로 단정하지 않았고 루트 LICENSE 미확인·실제 계정/추론 미검증을 #44에 남겼다. 인증 정보 추출·로그인·키 입력·모델 요청/과금은 수행하지 않았다.
+
+FR 27개·AC 43개의 고유/연속 ID, 문서 상대 링크와 API/MCP 경로의 선행 관계 비순환, GitHub #36/#41/#42/#43/#44의 본문·열린 상태를 확인했다. 기본 npm run check는 타입·포맷·빌드와 Python 40·Node 30·Chromium 321·standalone/영역 드래그를 통과했다. 로그는 Git 제외 local/editing-paths-plan-check.log다. 이는 새 AI/인증 기능이나 최신 MCP의 실제 지원 검증이 아니다. 소스 버전 0.20.0·앱 실행 코드/설치본·사용자 자료·설치 스킬은 유지하며 이번 변경은 문서/티켓뿐이다.
