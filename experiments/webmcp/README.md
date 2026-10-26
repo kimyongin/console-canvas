@@ -4,7 +4,7 @@
 
 ## 0.20 제품 코드 검증
 
-`node experiments/webmcp/run.mjs --product`는 어댑터를 주입하지 않고 **최종 Chrome 전용 ZIP**을 풀어 설치한다. 공통 13개 도구를 실제 native API에 공개하고 공식 MCP로 실행한다. `--headed`를 추가하면 별도 프로필의 일반 Chrome 창으로 실행한다. 제품 모드는 Python으로 스키마를 추출하지 않는다. QA의 ZIP 압축 해제에만 Python 표준 라이브러리를 쓰며 확장 실행에는 필요 없다.
+`node experiments/webmcp/run.mjs --product`는 어댑터를 주입하지 않고 **최종 Chrome 전용 ZIP**을 풀어 설치한다. 공통 19개 도구를 실제 native API에 공개하고 공식 MCP로 실행한다. `--headed`를 추가하면 별도 프로필의 일반 Chrome 창으로 실행한다. 제품 모드는 Python으로 스키마를 추출하지 않는다. QA의 ZIP 압축 해제에만 Python 표준 라이브러리를 쓰며 확장 실행에는 필요 없다.
 
 실제 도구 호출과 준비/동의·오류 주입·상태 관찰을 구별한다. 편집 명령은 `execute_webmcp_tool`을 사용하고 UI 공개 버튼·IDB 저장 실패 주입과 관찰에는 `evaluate_script`를 사용한다. PNG는 반환한 정확한 blob 미리보기 탭의 크기/출처를 대조한 후 공식 MCP `image/png` 콘텐츠로 수신한다. 주석만·10개 요청·삭제 전 참고·저장 버전과 조회 비변경, 공개 철회·이전 세대·busy/한도·저장 실패/롤백을 포함해 55개를 확인했다. [상세 증빙·남은 QA](../../docs/webmcp-0.20.md)를 따른다.
 

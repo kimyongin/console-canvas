@@ -12,6 +12,7 @@ export function createEditorSession({
 }) {
   function checkpoint() {
     return {
+      codePatches: copy(state.scene.codePatches || []),
       edits: copy(state.scene.edits),
       annotations: copy(state.scene.annotations),
       selected: state.scene.selected,
@@ -24,6 +25,7 @@ export function createEditorSession({
   function applyCheckpoint(point) {
     state.commentTarget = null;
     state.activityHead = point.activityHead || null;
+    state.scene.setCodePatches(point.codePatches || [], point.edits, point.annotations);
     state.scene.setEdits(point.edits);
     state.scene.setComments(point.annotations);
     state.scene.select(point.selected, {
@@ -104,6 +106,8 @@ export function createEditorSession({
     state.saving = saveQueue.enqueue(state.snapshot.id, {
       documentName: state.snapshot.documentName,
       layerNames: state.snapshot.layerNames || {},
+      codePatches: state.scene.codePatches,
+      aiRequests: state.aiRequests || [],
       edits: state.scene.edits,
       annotations: state.scene.annotations,
       timeline: state.timeline,

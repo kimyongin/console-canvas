@@ -1,3 +1,4 @@
+import { buildCodeDocument } from './code-patches.js';
 import { selectionRoots, alignmentOperations, snapDelta } from './selection-tools.js';
 import { expandCopyNodes } from './copy-model.js';
 import { indexNodes } from './node-index.js';
@@ -99,6 +100,8 @@ export class CanvasScene {
     this.callbacks = callbacks;
     this.nodes = new Map(snapshot.nodes.map((node) => [node.id, node]));
     this.originalNodes = new Map(this.nodes);
+    this.captureNodes = new Map(this.nodes);
+    this.codePatches = [];
     this.copySignature = '{}';
     Object.assign(this, indexNodes(snapshot.nodes));
     this.edits = {};
@@ -155,6 +158,7 @@ export class CanvasScene {
         if (el.tagName === 'INPUT' && el.type === 'password') el.value = '';
       }
     await this.rasterFallbacks();
+    this.codeBaseHtml = '<!doctype html>' + this.doc.documentElement.outerHTML;
     const originalTree = this.doc.documentElement.cloneNode(true);
     this.originalElements = new Map(
       [...originalTree.querySelectorAll('[data-uic-id]')].map((el) => [el.dataset.uicId, el]),
@@ -326,9 +330,13 @@ export class CanvasScene {
   }
   hidden(id) {
     return (
+      !!this.nodes.get(id)?.codeDeleted ||
       !!this.nodes.get(id)?.copyHidden ||
       !!this.edits[id]?.deleted ||
-      this.ancestors(id).some((p) => this.edits[p]?.deleted || this.nodes.get(p)?.copyHidden)
+      this.ancestors(id).some(
+        (p) =>
+          this.edits[p]?.deleted || this.nodes.get(p)?.copyHidden || this.nodes.get(p)?.codeDeleted,
+      )
     );
   }
   offset(id) {
@@ -528,6 +536,52 @@ export class CanvasScene {
     lift.placeholder.replaceWith(lift.element);
     lift.wrapper.remove();
     this.lifts.delete(id);
+  }
+  setCodePatches(patches = [], targetEdits = this.edits, targetAnnotations = this.annotations) {
+    if (JSON.stringify(patches) === JSON.stringify(this.codePatches)) return;
+    // Prepare in an inert document first; invalid patches never touch the live scene.
+    const prepared = buildCodeDocument(this.codeBaseHtml, this.captureNodes, patches);
+    const edits = cleanEdits(targetEdits, prepared.nodes),
+      annotations = copy(targetAnnotations);
+    for (const lift of this.lifts.values()) {
+      lift.wrapper.remove();
+      lift.placeholder.remove();
+    }
+    this.lifts.clear();
+    this.portal.replaceChildren();
+    this.doc.head.replaceWith(this.doc.importNode(prepared.doc.head, true));
+    this.doc.body.replaceWith(this.doc.importNode(prepared.doc.body, true));
+    this.codePatches = prepared.patches;
+    this.nodes = prepared.nodes;
+    this.originalNodes = new Map(this.nodes);
+    Object.assign(this, indexNodes([...this.nodes.values()]));
+    this.elements = new Map(
+      [...this.doc.querySelectorAll('[data-uic-id]')].map((el) => [el.dataset.uicId, el]),
+    );
+    this.defaults = new Map(
+      [...this.elements].map(([id, el]) => [
+        id,
+        {
+          visibility: el.style.visibility,
+          opacity: el.style.opacity,
+          translate: el.style.translate,
+        },
+      ]),
+    );
+    this.baseRects = new Map([...this.elements.keys()].map((id) => [id, this.rect(id)]));
+    for (const [id, node] of this.nodes)
+      if (node.generated && this.baseRects.has(id)) node.rect = { ...this.baseRects.get(id) };
+    // Keep detached source subtrees too: existing copies retain their source
+    // identity even when a later code patch removes the original.
+    this.originalElements = new Map(
+      [...prepared.elements].map(([id, el]) => [id, el.cloneNode(true)]),
+    );
+    this.copySignature = null;
+    for (const node of this.nodes.values())
+      if (node.position === 'fixed' && node.visible && this.elements.has(node.id))
+        this.lift(node.id, node.rect);
+    this.setEdits(edits);
+    this.setComments(annotations);
   }
   setEdits(edits) {
     const cleaned = cleanEdits(edits, this.originalNodes);
@@ -1113,6 +1167,28 @@ export class CanvasScene {
         affectedDescendants: descendants,
       });
     }
+    for (const op of this.codePatches) {
+      const id = op.element_id || this.captureNodes.keys().next().value;
+      if (result.some((change) => change.id === id)) continue;
+      const node = this.nodes.get(id);
+      if (!node || this.ancestors(id).some((parent) => this.nodes.get(parent)?.codeDeleted))
+        continue;
+      result.push({
+        id,
+        name: node.name,
+        kind: node.kind,
+        tag: node.tag,
+        parentId: node.parentId,
+        locator: node.locator,
+        action: node.codeDeleted ? 'delete' : 'code',
+        delta: { x: 0, y: 0 },
+        effectiveDelta: this.offset(id),
+        before: node.rect,
+        after: this.hidden(id) ? null : this.rect(id),
+        affectedDescendants: this.descendantCounts.get(id),
+        codeType: op.type,
+      });
+    }
     return result;
   }
   serialize() {
@@ -1123,12 +1199,15 @@ export class CanvasScene {
     return '<!doctype html>' + clone.outerHTML;
   }
   async beforeHtml() {
+    const patches = copy(this.codePatches);
     const edits = copy(this.edits),
       annotations = copy(this.annotations),
       selection = [...this.selection],
       selected = this.selected;
+    this.setCodePatches([], {});
     this.setEdits({});
     const result = this.serialize();
+    this.setCodePatches(patches, edits, annotations);
     this.setEdits(edits);
     this.setComments(annotations);
     this.select(selected, { ids: selection });

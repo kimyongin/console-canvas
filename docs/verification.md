@@ -178,3 +178,12 @@ PRD를 [기능 전수 대조표](feature-audit.md)와 다시 비교했다. 정�
 OpenAI Docs에서 구독 로그인·제품/계정 자격·동의/권한·현재 기능 제한을 확인했다. 공개 저장소를 OSS 적격으로 단정하지 않았고 루트 LICENSE 미확인·실제 계정/추론 미검증을 #44에 남겼다. 인증 정보 추출·로그인·키 입력·모델 요청/과금은 수행하지 않았다.
 
 FR 27개·AC 43개의 고유/연속 ID, 문서 상대 링크와 API/MCP 경로의 선행 관계 비순환, GitHub #36/#41/#42/#43/#44의 본문·열린 상태를 확인했다. 기본 npm run check는 타입·포맷·빌드와 Python 40·Node 30·Chromium 321·standalone/영역 드래그를 통과했다. 로그는 Git 제외 local/editing-paths-plan-check.log다. 이는 새 AI/인증 기능이나 최신 MCP의 실제 지원 검증이 아니다. 소스 버전 0.20.0·앱 실행 코드/설치본·사용자 자료·설치 스킬은 유지하며 이번 변경은 문서/티켓뿐이다.
+
+## 2026-10-26 · 0.21 AI 시안 MVP
+
+- `npm run check` 종료 코드 0: TypeScript·포맷·스킬/런타임 패키징, Python 43, Node 33, Chromium 시나리오 360 + standalone/native-area smoke 2 통과. 새 AI 시나리오 38개는 draft 동결·독립 후보/형제 분기·코드 구조/정제·복사 출처 삭제·참조 혼선·DB/JSON·API mock UI/이미지/취소/키 비노출을 포함한다.
+- `npm run test:desktop:offscreen`: 기존 v1 SDK 22 + 공식 `@modelcontextprotocol/client@2.4.0` pinned 2026-07-28 SDK 17 통과. 실제 후보 PNG·구독/알림/취소/재구독·코드/undo·가이드·정상 종료/재실행과 주석/분기/휴지통/패널 보존. 표면 없는 가상 캡처 조건이며 OS 수집/설치 앱 직접 사용이 아니다.
+- `node experiments/webmcp/run.mjs --product`: 최종 Chrome ZIP·별도 Chrome 155 프로필·공식 Chrome MCP 1.12.0으로 native WebMCP 62개 통과. 공개된 19개 계약·기준 HTML/CSS·세 후보·후보 이미지·이력/분기·재시도/저장 실패/공개 해제를 확인했다.
+- CUA로 별도 localhost 가상 문서에서 직접 요청 작성→공식 MCP v2로 세 가지 배치/강조 후보 반환→기준/후보 비교→명시적 선택 적용→undo/redo→형제 그래프→과거/미래 버전 이동을 수행했다. 비교/적용/그래프 화면은 Git 제외 `local/ai-variants-*.png`, 실행 로그는 `local/ai-variants-check.log`, `local/ai-modern-desktop.log`, `local/ai-chrome-product-final.log`에 있다. 사용자 문서/개인 프로필은 사용하지 않았다.
+- 스킬 quick_validate 통과. 가이드/ZIP은 같은 SKILL.md로 다시 빌드했다. 설치된 개인 스킬과 사용자 앱은 교체하지 않았다. 배포는 #27이다.
+- API 검사는 가짜 키·결정적 SSE 응답의 mock이다. 실제 키로 완료한 추론·실제 요금/모델/한도와 ChatGPT OAuth 자격/동의/서명/갱신/철회·자동 보정 반복/대화 시작은 미완료다. #36~#44의 남은 조건을 통과로 표시하지 않는다. [구현 범위](ai-variants-0.21.md).

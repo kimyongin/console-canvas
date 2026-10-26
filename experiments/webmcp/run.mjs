@@ -561,6 +561,47 @@ try {
       'Comment-only request produces an agent image',
       (await reviewImage({}, 'agent-comments-only.png')).request_count === 1,
     );
+    const aiBefore = (await web('get_screen', base)).screen;
+    const aiRequest = await write('create_ai_request', {
+      prompt: 'Native Chrome alternatives',
+      count: 3,
+    });
+    let aiContext;
+    for (let i = 0; i < 300; i++) {
+      aiContext = await web('get_ai_context', { ...base, request_id: aiRequest.request.id });
+      if (!aiContext.pending) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    check(
+      'Native WebMCP reads frozen HTML/CSS and source locators',
+      aiContext.html.includes('data-uic-id') &&
+        aiContext.elements.some((n) => n.id === button.id && n.locator.id === 'new-customer'),
+    );
+    const alternatives = [];
+    for (const [i, color] of ['#ef4444', '#22c55e', '#3b82f6'].entries()) {
+      alternatives.push(
+        (
+          await write('register_ai_candidate', {
+            request_id: aiRequest.request.id,
+            name: 'Chrome variant ' + (i + 1),
+            summary: 'Native HTML/CSS candidate',
+            patches: [
+              { type: 'style', element_id: button.id, properties: { 'background-color': color } },
+            ],
+          })
+        ).candidate,
+      );
+    }
+    check(
+      'Native WebMCP registers three alternatives without auto-apply',
+      (await web('list_ai_requests', base)).requests.find((r) => r.id === aiRequest.request.id)
+        .candidates.length === 3 &&
+        (await web('get_screen', base)).screen.revision === aiBefore.revision,
+    );
+    await reviewImage(
+      { request_id: aiRequest.request.id, candidate_id: alternatives[1].id },
+      'agent-ai-candidate.png',
+    );
     const buttons = (await web('list_elements', { ...base, limit: 200 })).elements
       .filter((n) => n.tag === 'button' && !n.deleted && n.id !== button.id)
       .slice(0, 9);

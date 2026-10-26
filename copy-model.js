@@ -50,6 +50,7 @@ export function expandCopyNodes(value, originals) {
         parentId: record.parentId,
         rect: clean.rect,
         copiedFrom: source.id,
+        codeDeleted: false,
         copyRoot: id,
         copyHidden: clean.hidden,
       });

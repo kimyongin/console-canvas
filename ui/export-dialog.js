@@ -178,6 +178,7 @@ export function createExportDialog({
         state.timeline,
         state.activity,
         state.activityHead,
+        state.aiRequests,
       );
       const result = await download(
         'console-canvas-' + state.snapshot.id.slice(0, 8) + '.uiclone.json',

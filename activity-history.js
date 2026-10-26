@@ -1,3 +1,4 @@
+import { codeDifferenceIds } from './code-patches.js';
 // Each event points to its predecessor. Restoring a snapshot changes the head,
 // preserving events in other branches without copying the log into snapshots.
 export function cleanActivity(value) {
@@ -29,7 +30,13 @@ export function activityBranch(state, all = false) {
   return result;
 }
 export function recordActivity(state, before, after, detail = {}) {
-  const changes = [];
+  const changes = codeDifferenceIds(before?.codePatches, after.codePatches).map((id) => ({
+    id: id === '@stylesheet' ? undefined : id,
+    type: 'code',
+    name: state.scene.nodes.get(id)?.name || '공통 스타일',
+    before: 'HTML·CSS 이전 버전',
+    after: 'HTML·CSS 수정',
+  }));
   for (const id of new Set([
     ...Object.keys(before?.edits || {}),
     ...Object.keys(after.edits || {}),

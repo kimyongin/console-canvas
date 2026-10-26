@@ -1,5 +1,7 @@
 # Console Canvas · 화면 복제 편집기
 
+0.21.0: ✨ AI 시안 요청·독립 HTML/CSS 후보·실제 미리보기·사용자 선택 적용·형제 스냅샷을 구현했습니다. 일반 API 키의 메모리 보관/직접 생성과 MCP 19개 도구, 최신 2026-07-28 stdio 발견·구독을 제공합니다. 실제 API 계정 추론·ChatGPT 로그인·대화 자동 시작은 미검증/후속입니다. [사용법·보존·검증 범위](docs/ai-variants-0.21.md)를 확인하세요.
+
 0.20.0: Chrome 확장에 명시적 WebMCP 공개/해제와 공통 13개 도구·최신 가이드·PNG 이미지 전달을 구현했다. 공식 Chrome MCP 1.12.0과 격리 Chrome 155에서 검증했다. [설정·사용·제약](docs/chrome-webmcp.md), [구현 증빙과 남은 배포 조건](docs/webmcp-0.20.md)을 따른다. 일반 Chrome 리소스/권한과 최종 업데이트 검증은 계속 진행 중이다.
 
 0.19.1: 드롭다운 여백·공통 폼/체크박스·메뉴·닫기 버튼·변경 이력 카드의 디자인을 정리했다. [디자인 보정과 검증 상태](docs/design-0.19.1.md)를 확인한다. 스냅샷/비교/요청 탐색은 [0.19 UX 기록](docs/ux-0.19.md)에 있다.
@@ -193,7 +195,7 @@ python3 -m http.server 8848 --bind 127.0.0.1 --directory /absolute/path/to/conso
 
 0.16.0에서 TypeScript·포맷·빌드, Chromium 247개·Python 39개·Node 24개와 공식 SDK 22개를 표준 전체 검사로 통과했습니다. 실제 DOM/표시 표면 캡처·네이티브 PNG 파일 저장·정상 종료/재실행을 포함합니다. 잠금 상태의 별도 offscreen 검사·설치 창 직접 사용·배포 상태는 [docs/verification.md](docs/verification.md)에 구분합니다. **개인 Chrome 확장의 설치/탭 권한 경계는 별도 검증 대상입니다.**
 
-Chrome 확장의 권한은 `activeTab`, `scripting`, `storage`, `unlimitedStorage`와 로컬 MCP 연결용 `http://127.0.0.1/*` 접근입니다. 원격 서버나 AI API에 데이터를 전송하는 기능은 없습니다.
+Chrome 확장의 권한은 `activeTab`, `scripting`, `storage`, `unlimitedStorage`와 로컬 MCP 연결용 `http://127.0.0.1/*` 접근입니다. AI API 실행을 사용자가 선택하면 별도 권한 `https://api.openai.com/*`을 요청하고 코드·주석·화면 이미지를 OpenAI로 보냅니다. 직접 편집과 MCP 경로에는 API 키가 필요하지 않습니다. API 키는 실행 중 메모리에만 보관합니다.
 
 구조와 저장·종료 흐름은 [docs/architecture.md](docs/architecture.md)에 정리했습니다. `editor.js`는 모듈을 연결하고, `ui/`는 화면별 표시, `editor-session.js`는 편집 기록·저장, `edit-commands.js`는 수동 편집과 MCP의 공통 명령을 담당합니다.
 

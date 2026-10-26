@@ -10,7 +10,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 const root = path.resolve(import.meta.dirname, '../..');
 const adapter =
-  "from mcp.server import stdio; stdio({'url':'http://127.0.0.1:1','token':'disposable-probe'})";
+  "import mcp.server as server; server.request=lambda *args,**kwargs:{'ok':True,'screens':[]}; server.stdio({'url':'http://127.0.0.1:1','token':'disposable-probe'})";
 const meta = {
   'io.modelcontextprotocol/protocolVersion': '2026-07-28',
   'io.modelcontextprotocol/clientCapabilities': {},
@@ -55,7 +55,7 @@ const report = {
   limitations: [
     'No live Codex desktop host capability capture',
     'No model turn or user chat message',
-    'No modern SDK/client installed or tested',
+    'This metadata-only probe is separate from verify_modern_mcp.mjs live SDK v2 tests',
     'Metadata-only Chrome MCP probe; no browser tool calls',
   ],
 };

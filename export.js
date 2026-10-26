@@ -1,12 +1,14 @@
 const encoder = new TextEncoder();
 export function changeActionLabel(change) {
-  return change.action === 'copy'
-    ? '복사본 추가'
-    : change.action === 'delete'
-      ? change.copiedFrom
-        ? '복사본 삭제'
-        : '삭제'
-      : '이동';
+  return change.action === 'code'
+    ? 'HTML·CSS 수정'
+    : change.action === 'copy'
+      ? '복사본 추가'
+      : change.action === 'delete'
+        ? change.copiedFrom
+          ? '복사본 삭제'
+          : '삭제'
+        : '이동';
 }
 const escapeHtml = (value) =>
   String(value).replace(
@@ -49,13 +51,15 @@ export function instructionText(snapshot, changes, note = '', comments = []) {
         ' (' +
         change.tag +
         '): ' +
-        (change.action === 'copy'
-          ? '복사본 추가 (원본 ' + change.copiedFrom + ')'
-          : change.action === 'delete'
-            ? change.copiedFrom
-              ? '복사본 삭제 (참조 원본 ' + change.copiedFrom + '은 유지)'
-              : '삭제'
-            : '가로 ' + change.delta.x + 'px, 세로 ' + change.delta.y + 'px 이동') +
+        (change.action === 'code'
+          ? 'HTML·CSS 수정'
+          : change.action === 'copy'
+            ? '복사본 추가 (원본 ' + change.copiedFrom + ')'
+            : change.action === 'delete'
+              ? change.copiedFrom
+                ? '복사본 삭제 (참조 원본 ' + change.copiedFrom + '은 유지)'
+                : '삭제'
+              : '가로 ' + change.delta.x + 'px, 세로 ' + change.delta.y + 'px 이동') +
         (change.affectedDescendants
           ? ' · 하위 ' + change.affectedDescendants + '개 요소 포함'
           : ''),
@@ -95,6 +99,7 @@ export function reviewPayload(
   timeline = null,
   activity = [],
   activityHead = null,
+  aiRequests = [],
 ) {
   return {
     format: 'console-canvas-review',
@@ -103,6 +108,8 @@ export function reviewPayload(
     activity,
     activityHead,
     snapshot,
+    codePatches: scene.codePatches || [],
+    aiRequests,
     edits: scene.edits,
     annotations: scene.annotations,
     comments: scene.comments(),
@@ -283,7 +290,14 @@ export async function zipFiles(files) {
   ev.setUint32(16, offset, true);
   return new Blob([...chunks, ...directory, end], { type: 'application/zip' });
 }
-export async function buildReview(snapshot, scene, note, onProgress = () => {}, timeline = null) {
+export async function buildReview(
+  snapshot,
+  scene,
+  note,
+  onProgress = () => {},
+  timeline = null,
+  session = {},
+) {
   onProgress('변경 전후 화면을 정리하고 있어요.');
   const before = await scene.beforeHtml(),
     after = scene.serialize(),
@@ -291,7 +305,15 @@ export async function buildReview(snapshot, scene, note, onProgress = () => {}, 
     size = scene.contentSize();
   const comments = scene.comments(),
     instructions = instructionText(snapshot, changes, note, comments),
-    payload = reviewPayload(snapshot, scene, note, timeline),
+    payload = reviewPayload(
+      snapshot,
+      scene,
+      note,
+      timeline,
+      session.activity || [],
+      session.activityHead || null,
+      session.aiRequests || [],
+    ),
     warnings = [];
   const files = {
     'changes.json': JSON.stringify(

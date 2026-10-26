@@ -3,6 +3,7 @@ import { renderActivityRows } from './react/lists.tsx';
 import { activityBranch } from '../activity-history.js';
 import { pointTarget } from '../edit-commands.js';
 export function changeDescription(change) {
+  if (change.type === 'code') return 'HTML·CSS를 수정했습니다. 스냅샷 비교에서 확인할 수 있습니다.';
   if (change.type === 'comment') return change.after || '주석이 삭제되었습니다.';
   const a = change.before || {},
     b = change.after || {};
@@ -26,6 +27,7 @@ export function createActivityPanel({ $, state, selectNode, focusComment }) {
           delete: c.after?.deleted ? '요소 삭제' : '요소 복원',
           copy: '복사본 추가',
           property: '속성 변경',
+          code: 'HTML·CSS 변경',
         }[c.type] || '변경';
   function reveal(change) {
     if (!change.id) return;
@@ -51,7 +53,11 @@ export function createActivityPanel({ $, state, selectNode, focusComment }) {
       const changes = event.changes.filter((c) => {
         const matches =
           filter === 'all' ||
-          (filter === 'layout' ? ['move', 'delete', 'copy'].includes(c.type) : c.type === filter);
+          (filter === 'layout'
+            ? ['move', 'delete', 'copy'].includes(c.type)
+            : filter === 'property'
+              ? ['property', 'code'].includes(c.type)
+              : c.type === filter);
         return (
           matches &&
           (!selectedOnly || state.scene?.selection.has(c.id)) &&

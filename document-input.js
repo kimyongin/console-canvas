@@ -1,3 +1,5 @@
+import { validateAiRequests } from './ai-requests.js';
+import { buildCodeDocument } from './code-patches.js';
 import { cleanLayerNames } from './layer-names.js';
 import { validateSnapshot, cleanEdits, cleanComments } from './engine.js';
 import { expandCopyNodes } from './copy-model.js';
@@ -7,6 +9,7 @@ import { createSnapshotHistory } from './snapshot-history.js';
 export function validateDocumentInput(snapshot, edits, annotations, timeline) {
   validateSnapshot(snapshot);
   cleanLayerNames(snapshot.layerNames);
+  validateAiRequests(snapshot.aiRequests, snapshot);
   for (const value of [edits, annotations])
     if (value != null && (typeof value !== 'object' || Array.isArray(value)))
       throw new Error('편집/주석 형식이 올바르지 않습니다.');
@@ -33,10 +36,15 @@ export function validateDocumentInput(snapshot, edits, annotations, timeline) {
       throw new Error('변경 이력 정보가 올바르지 않습니다.');
     events.add(event.id);
   }
-  const originals = new Map(snapshot.nodes.map((node) => [node.id, node]));
+  const captureNodes = new Map(snapshot.nodes.map((node) => [node.id, node]));
+  const originals = buildCodeDocument(
+    snapshot.html,
+    captureNodes,
+    snapshot.codePatches || [],
+  ).nodes;
   const cleaned = cleanEdits(edits, originals);
   const nodes = expandCopyNodes(cleaned, originals).nodes;
   const point = { edits: cleaned, annotations: cleanComments(annotations, nodes) };
-  const temporary = { scene: { nodes }, timeline: null };
+  const temporary = { snapshot, scene: { nodes, captureNodes }, timeline: null };
   createSnapshotHistory({ state: temporary, checkpoint: () => point }).initialise(timeline);
 }

@@ -13,7 +13,7 @@ test('Python MCP and native WebMCP consume identical resolved contracts', () => 
       { cwd: new URL('../..', import.meta.url), encoding: 'utf8' },
     ),
   );
-  assert.equal(python.length, 13);
+  assert.equal(python.length, 19);
   assert.deepEqual(python, toolContract.tools);
   const valid = {
     editor_id: 'editor',

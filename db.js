@@ -37,6 +37,8 @@ async function transact(stores, mode, action) {
 }
 export function captureFromDocument(value) {
   const {
+    codePatches,
+    aiRequests,
     edits,
     annotations,
     timeline,
@@ -72,6 +74,8 @@ export async function saveCapture(value) {
 }
 export async function saveSession(id, value) {
   const {
+    codePatches = [],
+    aiRequests = [],
     edits = {},
     annotations = {},
     timeline = null,
@@ -83,6 +87,8 @@ export async function saveSession(id, value) {
     documentName,
   } = value;
   const session = {
+    codePatches,
+    aiRequests,
     edits,
     annotations,
     timeline,

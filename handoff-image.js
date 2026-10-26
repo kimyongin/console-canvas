@@ -21,11 +21,13 @@ export function handoffRequests(scene) {
         id: c.id,
         name: elementLabel(scene.nodes.get(c.id), scene.snapshot.layerNames),
         text:
-          c.action === 'delete'
-            ? '이 요소를 제거하고 주변 배치와 간격을 자연스럽게 정리해 주세요.'
-            : c.action === 'copy'
-              ? '추가한 복사본을 포함해 그림의 구조와 간격을 반응형으로 구현해 주세요.'
-              : '그림의 변경 후 배치를 기준으로 주변 요소와 정렬·간격을 맞추고, 좁은 화면에서는 자연스럽게 줄바꿈해 주세요.',
+          c.action === 'code'
+            ? '그림의 HTML·CSS 변경 결과를 기준으로 색상·글꼴·간격과 반응형 구조를 반영해 주세요.'
+            : c.action === 'delete'
+              ? '이 요소를 제거하고 주변 배치와 간격을 자연스럽게 정리해 주세요.'
+              : c.action === 'copy'
+                ? '추가한 복사본을 포함해 그림의 구조와 간격을 반응형으로 구현해 주세요.'
+                : '그림의 변경 후 배치를 기준으로 주변 요소와 정렬·간격을 맞추고, 좁은 화면에서는 자연스럽게 줄바꿈해 주세요.',
         rect: c.after || c.before,
         before: c.before,
         deleted: c.action === 'delete',

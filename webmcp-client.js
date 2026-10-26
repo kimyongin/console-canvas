@@ -23,6 +23,7 @@ export function createWebMcpClient({ controller, onStatus }) {
       documentId: controller.metadata()?.document_id || null,
       replay,
       imageJob: null,
+      contextJob: null,
       urls: new Set(),
     };
     session = current;
@@ -96,16 +97,18 @@ export function createWebMcpClient({ controller, onStatus }) {
                     arguments: args,
                     deadline: Date.now() / 1000 + 45,
                   };
-                  if (tool.name === 'get_review_image') {
+                  if (['get_review_image', 'get_ai_context'].includes(tool.name)) {
+                    const slot = tool.name === 'get_review_image' ? 'imageJob' : 'contextJob';
                     const signature = JSON.stringify([
                       metadata.document_id,
                       metadata.revision,
                       metadata.title,
-                      args.snapshot_id,
+                      tool.name,
+                      args,
                     ]);
-                    if (current.imageJob?.signature !== signature) {
+                    if (current[slot]?.signature !== signature) {
                       const job = { signature, result: null };
-                      current.imageJob = job;
+                      current[slot] = job;
                       setTimeout(async () => {
                         if (session !== current) {
                           job.result = { ok: false, error: { code: 'disconnected' } };
@@ -154,15 +157,17 @@ export function createWebMcpClient({ controller, onStatus }) {
                         }
                       }, 0);
                     }
-                    const result = current.imageJob.result;
-                    if (result) current.imageJob = null;
+                    const result = current[slot].result;
+                    if (result) current[slot] = null;
                     return (
                       result || {
                         ok: true,
                         pending: true,
                         revision: metadata.revision,
                         message:
-                          'Image rendering. Call get_review_image again with the same arguments to retrieve preview_url.',
+                          'Rendering. Call ' +
+                          tool.name +
+                          ' again with identical arguments to retrieve the result.',
                       }
                     );
                   }

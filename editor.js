@@ -1,3 +1,6 @@
+import { buildAiContext } from './ai-context.js';
+import { createAiPanel } from './ui/ai-panel.js';
+import { createAiRequests, validateAiRequests } from './ai-requests.js';
 import { snapshotChangeLabel } from './ui/snapshot-delta.js';
 import { createWebMcpClient } from './webmcp-client.js';
 import { configureModelessInspector } from './ui/modeless-inspector.js';
@@ -190,6 +193,7 @@ function closeDocument(id) {
     .catch(() => {})
     .then(async () => {
       if (state.snapshot?.id !== id) return;
+      await aiPanel.cancelJobs({ persist: false });
       state.ready = false;
       state.desktopConnection = await mcpBridge.suspend();
       areaSelection.reset();
@@ -311,6 +315,25 @@ const { showSnapshots, renderSnapshots } = createSnapshotPanel({
   renameDialog,
   flushEditor,
 });
+const aiRequests = createAiRequests({
+  prepare: prepareEditor,
+  state,
+  checkpoint,
+  getDraft: () => {
+    const point = checkpoint();
+    if (state.commentTarget) {
+      const text = $('#component-comment').value.trim();
+      if (text) point.annotations[state.commentTarget] = text;
+      else delete point.annotations[state.commentTarget];
+    }
+    return point;
+  },
+  save,
+  flush,
+  snapshotHistory,
+  render: () => aiPanel.render(),
+});
+const aiPanel = createAiPanel({ $, state, manager: aiRequests, adapter, toast });
 const activityPanel = createActivityPanel({ $, state, selectNode, focusComment });
 function onKey(event) {
   if (event.defaultPrevented) return;
@@ -366,11 +389,12 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
   if (existingMeta?.deletedAt)
     throw new Error('휴지통에 있는 문서입니다. 문서 목록의 휴지통에서 먼저 복구해 주세요.');
   webMcp?.invalidate();
+  await aiPanel.cancelJobs();
   await flushEditor();
   areaSelection.reset();
   clipboard.reset();
   commentEditor.reset();
-  for (const id of ['#compare-dialog', '#export-dialog', '#properties-dialog'])
+  for (const id of ['#compare-dialog', '#export-dialog', '#properties-dialog', '#ai-dialog'])
     if ($(id).open) $(id).close();
   const documentName = snapshot.documentName
     ? cleanDocumentName(snapshot.documentName)
@@ -388,6 +412,8 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
   $('#export-button').disabled = true;
   $('#snapshots-button').disabled = true;
   const {
+    codePatches: storedCodePatches,
+    aiRequests: storedAiRequests,
     timeline: storedTimeline,
     edits: storedEdits,
     annotations: storedComments,
@@ -401,6 +427,7 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
   } = snapshot;
   timeline = timeline || storedTimeline;
   state.timeline = null;
+  state.aiRequests = validateAiRequests(storedAiRequests, snapshot);
   state.snapshot = {
     ...capture,
     layerNames: cleanLayerNames(storedLayerNames),
@@ -464,6 +491,7 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
     clipboard.bindScene(scene);
     if (generation !== state.generation) return;
     scene.interactionMode = state.mode;
+    scene.setCodePatches(storedCodePatches || []);
     scene.setEdits(edits);
     scene.setComments(annotations);
     snapshotHistory.initialise(timeline);
@@ -537,7 +565,13 @@ async function importFile(file) {
   if (data.format === 'console-canvas-review') {
     if (data.version !== 1) throw new Error('지원하지 않는 편집 파일 버전입니다.');
     await openSnapshot(
-      { ...data.snapshot, activity: data.activity, activityHead: data.activityHead },
+      {
+        ...data.snapshot,
+        activity: data.activity,
+        activityHead: data.activityHead,
+        codePatches: data.codePatches,
+        aiRequests: data.aiRequests,
+      },
       data.edits,
       data.note || '',
       data.annotations || {},
@@ -735,14 +769,21 @@ const controller = createEditorController({
   state,
   editorId,
   checkpoint,
+  applyCheckpoint,
+  aiRequests,
   historyBefore,
   changeCommitted,
   undo,
   snapshotHistory,
-  buildHandoffImage: async (id) => {
-    const point = id
-      ? state.timeline.entries.find((e) => e.id === id && !e.deletedAt)?.state
-      : checkpoint();
+  buildAiContext: (point, options) => buildAiContext(state.snapshot, point, options),
+  buildHandoffImage: async (id, requestId, candidateId) => {
+    if ((requestId && !candidateId) || (!requestId && candidateId) || (id && requestId))
+      throw new Error('조회할 버전 하나를 지정해 주세요.');
+    const point = requestId
+      ? aiRequests.find(requestId).candidates.find((c) => c.id === candidateId)?.point
+      : id
+        ? state.timeline.entries.find((e) => e.id === id && !e.deletedAt)?.state
+        : checkpoint();
     if (!point) throw new Error('해당 스냅샷을 찾을 수 없습니다.');
     return withVersionScene(state.snapshot, point, (scene) =>
       buildHandoffImage(state.snapshot, scene, point.note),
@@ -856,7 +897,10 @@ if (window.ConsoleCanvasDesktop) {
     commitCommentDraft();
     undo(command);
   });
-  window.ConsoleCanvasDesktop.onFlush(flushEditor);
+  window.ConsoleCanvasDesktop.onFlush(async () => {
+    await aiPanel.cancelJobs();
+    return flushEditor();
+  });
   window.ConsoleCanvasDesktop.onSnapshot((value) =>
     openSnapshot(value).catch((error) => notice(error.message)),
   );
@@ -907,12 +951,17 @@ window.ConsoleCanvas = {
   selectNode,
   controller,
   snapshotHistory,
+  aiRequests,
   buildHandoffImage: () =>
     withVersionScene(state.snapshot, checkpoint(), (scene) =>
       buildHandoffImage(state.snapshot, scene, $('#review-note').value),
     ),
   buildReview: () =>
-    buildReview(state.snapshot, state.scene, $('#review-note').value, undefined, state.timeline),
+    buildReview(state.snapshot, state.scene, $('#review-note').value, undefined, state.timeline, {
+      activity: state.activity,
+      activityHead: state.activityHead,
+      aiRequests: state.aiRequests,
+    }),
 };
 function connectDesktopIfReady() {
   if (state.desktopConnection && state.ready && !mcpBridge.isConnected()) {

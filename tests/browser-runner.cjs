@@ -49,6 +49,7 @@ async function main() {
   const reports = [];
   for (const suite of [
     'integration',
+    'ai-variants',
     'snapshots',
     'panels',
     'storage',

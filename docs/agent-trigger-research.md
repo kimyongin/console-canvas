@@ -49,3 +49,9 @@ OpenAI Docs에는 app-server의 thread/resume·turn/start·진행 이벤트·int
 4. 다중 시안은 같은 기준의 HTML/CSS 후보를 에이전트가 생성·이미지 확인·등록하는 애플리케이션 흐름으로 구현한다. deprecated Sampling은 신규 핵심 경로에서 제외한다.
 
 남은 조건은 현대 SDK/서버 구독 실험, 실제 호스트 idle/진행 중/재연결 수신과 작업 시작, 별도 실행 어댑터의 실제 인증/모델 turn·취소, 수동 요청→후보 반환이다. #37은 아직 완료하지 않는다. 이번 결과로 자동 연결이 모든 에이전트에서 불가능하다고 단정하지 않는다.
+
+## 0.21 구현 후속 · 2026-10-26
+
+위 설치본 표는 0.20 시점의 역사적 실험이다. 후속에서 공식 SDK v2 `@modelcontextprotocol/client@2.4.0`을 개발 의존성으로 추가하고 stdio를 dual-era로 구현했다. pinned 2026-07-28 연결의 발견·요청별 메타데이터·캐시 메타데이터·명시적 AI 요청 리소스·subscriptions/listen acknowledged/알림·취소/재구독·후보 등록/이미지와 직접 패치/undo 및 live guide 17개를 통과했다. 기존 v1 SDK 22개는 과거 호환 증빙으로 구별한다. [공식 v2 버전 정책](https://ts.sdk.modelcontextprotocol.io/v2/protocol-versions), [구현 기록](ai-variants-0.21.md).
+
+이는 서버→클라이언트 알림이 실제로 도착한다는 증빙이며 기존 임의 에이전트 채팅을 깨우는 증빙은 아니다. 제품은 API 직접 호출과 외부 에이전트 요청 문장 복사를 제공한다. 폐기 예정 Sampling을 신규 의존으로 채택하지 않는다.

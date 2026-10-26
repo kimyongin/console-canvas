@@ -52,6 +52,9 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           </Button>
         </div>
       </header>
+      <DialogSurface id="ai-dialog">
+        <div id="ai-dialog-content" />
+      </DialogSurface>
       <div id="notice" className="notice" role="status" hidden={true}></div>
       <main className="workspace" id="workspace">
         <aside className="left-panel" id="layers-panel" aria-label="레이어 패널">
@@ -228,6 +231,14 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
               </div>
             </div>
             <Button
+              id="ai-variants-button"
+              disabled={!view?.ready}
+              onClick={() => dispatchEditorCommand('ai')}
+              variant="outline"
+            >
+              ✨ AI 시안
+            </Button>
+            <Button
               id="snapshot-dropdown"
               disabled={true}
               popoverTarget="snapshot-panel"
@@ -299,7 +310,15 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             </div>
           </div>
           <div id="selection-actions" role="toolbar" aria-label="선택 요소 작업" hidden={true}>
-            {' '}
+            <Button
+              id="context-ai"
+              aria-label="선택 요소 AI 시안 만들기"
+              disabled={!view?.selected || !!view?.selectedHidden}
+              onClick={() => dispatchEditorCommand('ai')}
+              variant="outline"
+            >
+              ✨ 시안 만들기
+            </Button>{' '}
             <Button
               id="context-comment"
               onClick={() => dispatchEditorCommand('comment')}

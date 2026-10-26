@@ -1,8 +1,9 @@
+import { buildCodeDocument, validateCodePatches } from './code-patches.js';
 import { copy, cleanEdits, cleanComments } from './engine.js';
 import { expandCopyNodes } from './copy-model.js';
 
 // Versions share the captured DOM; only editing data is copied into each entry.
-function snapshotPoint(value, nodes) {
+export function snapshotPoint(value, nodes, baseHtml) {
   if (
     !value ||
     typeof value !== 'object' ||
@@ -13,9 +14,12 @@ function snapshotPoint(value, nodes) {
     (value.note != null && typeof value.note !== 'string')
   )
     throw new Error('스냅샷 편집 상태 형식이 올바르지 않습니다.');
+  const codePatches = validateCodePatches(value?.codePatches);
+  if (codePatches.length && baseHtml) nodes = buildCodeDocument(baseHtml, nodes, codePatches).nodes;
   const edits = cleanEdits(value?.edits, nodes);
   nodes = expandCopyNodes(edits, new Map([...nodes].filter(([, n]) => !n.copiedFrom))).nodes;
   return {
+    codePatches,
     edits,
     annotations: cleanComments(value?.annotations, nodes),
     selected: nodes.has(value?.selected) ? value.selected : null,
@@ -28,18 +32,23 @@ function snapshotPoint(value, nodes) {
     activityHead: typeof value?.activityHead === 'string' ? value.activityHead : null,
   };
 }
-function snapshotSignature(point) {
+export function snapshotSignature(point) {
   const edits = Object.entries(point.edits)
     .filter(([, e]) => e.dx || e.dy || e.deleted || e.copy)
     .sort(([a], [b]) => a.localeCompare(b));
   const comments = Object.entries(point.annotations).sort(([a], [b]) => a.localeCompare(b));
-  return JSON.stringify([edits, comments, point.note]);
+  return JSON.stringify([edits, comments, point.note, point.codePatches || []]);
 }
 export function createSnapshotHistory(options) {
   const { state } = options;
-  const current = () => snapshotPoint(options.checkpoint(), state.scene.nodes);
+  const current = () =>
+    snapshotPoint(
+      options.checkpoint(),
+      state.scene.captureNodes || state.scene.nodes,
+      state.snapshot?.html,
+    );
   function initialise(value) {
-    const nodes = state.scene.nodes;
+    const nodes = state.scene.captureNodes || state.scene.nodes;
     if (value != null) {
       if (value.version !== 1 || !Array.isArray(value.entries) || value.entries.length > 500)
         throw new Error('스냅샷 목록 형식이 올바르지 않습니다.');
@@ -65,7 +74,7 @@ export function createSnapshotHistory(options) {
           createdAt: entry.createdAt,
           kind: ['initial', 'automatic', 'manual'].includes(entry.kind) ? entry.kind : 'manual',
           parentId: typeof entry.parentId === 'string' ? entry.parentId : null,
-          state: snapshotPoint(entry.state, nodes),
+          state: snapshotPoint(entry.state, nodes, state.snapshot?.html),
           ...(entry.deletedAt ? { deletedAt: entry.deletedAt } : {}),
         };
       });
@@ -125,9 +134,12 @@ export function createSnapshotHistory(options) {
         parent_id: entry.parentId,
         ...(entry.deletedAt ? { deleted_at: entry.deletedAt } : {}),
         active: entry.id === state.timeline.activeId,
-        change_count: Object.values(entry.state.edits).filter(
-          (e) => e.dx || e.dy || e.deleted || e.copy,
-        ).length,
+        change_count: new Set([
+          ...Object.entries(entry.state.edits)
+            .filter(([, e]) => e.dx || e.dy || e.deleted || e.copy)
+            .map(([id]) => id),
+          ...(entry.state.codePatches || []).map((op) => op.element_id || '@stylesheet'),
+        ]).size,
         comment_count: Object.keys(entry.state.annotations).length,
       }));
   }
@@ -155,7 +167,7 @@ export function createSnapshotHistory(options) {
     options.historyBefore();
     options.apply(copy(entry.state));
     state.timeline.activeId = id;
-    options.changed({ ...detail, label: '스냅샷 복원 · ' + entry.name });
+    options.changed({ ...detail, label: detail.label || '스냅샷 복원 · ' + entry.name });
     return { restored_id: id, automatic_snapshot_id: automatic?.id || null };
   }
   function manage(id, action, name) {
@@ -223,6 +235,24 @@ export function createSnapshotHistory(options) {
   }
   return {
     initialise,
+    addDetached(name, point, parentId) {
+      if (state.timeline.entries.length >= 500)
+        throw new Error('스냅샷은 500개까지 저장할 수 있습니다.');
+      const entry = {
+        id: crypto.randomUUID(),
+        name,
+        createdAt: new Date().toISOString(),
+        kind: 'manual',
+        parentId: state.timeline.entries.some((e) => e.id === parentId) ? parentId : null,
+        state: snapshotPoint(
+          point,
+          state.scene.captureNodes || state.scene.nodes,
+          state.snapshot?.html,
+        ),
+      };
+      state.timeline.entries.push(entry);
+      return entry;
+    },
     dirty,
     list,
     create,

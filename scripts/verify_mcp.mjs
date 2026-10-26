@@ -35,7 +35,7 @@ async function tool(name, args = {}, allowError = false) {
 try {
   await client.connect(transport);
   const tools = await client.listTools();
-  check('Official SDK discovers thirteen MCP tools', tools.tools.length === 13);
+  check('Official SDK discovers nineteen MCP tools', tools.tools.length === 19);
   const guide = await tool('get_agent_guide');
   check(
     'Agent reads the app-bundled skill through MCP',

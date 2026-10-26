@@ -79,6 +79,21 @@ try {
   const sdkOutput = await sdk.done;
   const sdkReport = JSON.parse(sdkOutput);
   console.log(`Real SDK: ${sdkReport.passed} checks passed`);
+  const modernSdk = start(process.execPath, ['scripts/verify_modern_mcp.mjs'], {
+    CONSOLE_CANVAS_MCP_ARGS: JSON.stringify([
+      path.join(appRoot, 'mcp/server.py'),
+      '--state-dir',
+      env.CONSOLE_CANVAS_STATE_DIR,
+      '--port',
+      String(port),
+    ]),
+  });
+  const modernReport = JSON.parse(await modernSdk.done);
+  console.log(`Modern SDK: ${modernReport.passed} checks passed`);
+  await fs.writeFile(
+    path.join(root, 'local/mcp-modern-verification.json'),
+    JSON.stringify(modernReport, null, 2),
+  );
   await fs.writeFile(path.join(temporary, 'sdk-complete'), 'done');
   await active.done;
   active = null;
@@ -105,6 +120,8 @@ try {
     capture,
     reopened,
     officialSdkChecks: sdkReport.passed,
+    modernSdkChecks: modernReport.passed,
+    modernProtocol: modernReport.protocol,
     normalQuitAndRelaunch: true,
   };
   await fs.writeFile(

@@ -1,6 +1,6 @@
 {
   "name": "console-canvas",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "private": true,
   "description": "Embedded Chromium console UI editor with MCP control",
   "main": "desktop/main.cjs",
@@ -19,6 +19,7 @@
     "test:desktop:offscreen": "node scripts/check-desktop.mjs --offscreen"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
     "@modelcontextprotocol/sdk": "1.32.2",
     "@tailwindcss/postcss": "4.3.3",
     "@types/react": "19.3.0",

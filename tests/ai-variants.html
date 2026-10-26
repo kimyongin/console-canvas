@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>AI variants checks</title>
+    <style>
+      body {
+        font: 14px/1.8 system-ui;
+        padding: 24px;
+        background: #f5f6fa;
+        color: #30384c;
+      }
+      iframe {
+        width: 1440px;
+        height: 950px;
+        border: 1px solid #ddd;
+      }
+      pre {
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>AI variants, code and persistence checks</h1>
+    <div id="status" role="status">Running…</div>
+    <pre id="results"></pre>
+    <iframe id="editor" src="../editor.html?sample=1" title="Snapshot editor under test"></iframe>
+    <script type="module" src="ai-variants.js"></script>
+  </body>
+</html>

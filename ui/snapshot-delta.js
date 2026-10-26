@@ -1,3 +1,4 @@
+import { codeDifferenceIds } from '../code-patches.js';
 // Compare visible editing state; selection and activity bookkeeping are not edits.
 const editValue = (value = {}) => [
   value.dx || 0,
@@ -12,8 +13,11 @@ export function editingDifferenceIds(left = {}, right = {}) {
     ...Object.keys(left.annotations || {}),
     ...Object.keys(right.annotations || {}),
   ]);
+  const codeIds = codeDifferenceIds(left.codePatches, right.codePatches);
+  for (const id of codeIds) ids.add(id);
   return [...ids].filter(
     (id) =>
+      codeIds.includes(id) ||
       JSON.stringify(editValue(left.edits?.[id])) !==
         JSON.stringify(editValue(right.edits?.[id])) ||
       (left.annotations?.[id] || '') !== (right.annotations?.[id] || ''),

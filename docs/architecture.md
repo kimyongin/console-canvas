@@ -87,6 +87,16 @@ IndexedDB `console-canvas-workspace`의 세 저장소를 사용한다.
 
 ## Chrome WebMCP · 0.20
 
-`tool-contract.json`은 13개 도구 스키마·읽기/쓰기 annotations·계약 버전의 공통 원본이다. `tool-contract.js`와 `mcp/server.py`가 `edit-policy.json`의 한도를 해석한다. `webmcp-client.js`는 명시적으로 공개한 문서의 native `document.modelContext` 등록/철회·직렬 실행·최근 200개 성공 operation_id 결과만 담당한다. 편집·저장·실행 취소·분기는 기존 `editor-controller.js`와 세션/엔진에 위임한다. Electron IPC와 Python 브리지는 Chrome 실행 경로의 의존성이 아니다.
+`tool-contract.json`은 19개 도구 스키마·읽기/쓰기 annotations·계약 버전의 공통 원본이다. `tool-contract.js`와 `mcp/server.py`가 `edit-policy.json`의 한도를 해석한다. `webmcp-client.js`는 명시적으로 공개한 문서의 native `document.modelContext` 등록/철회·직렬 실행·최근 200개 성공 operation_id 결과만 담당한다. 편집·저장·실행 취소·분기는 기존 `editor-controller.js`와 세션/엔진에 위임한다. Electron IPC와 Python 브리지는 Chrome 실행 경로의 의존성이 아니다.
 
 가이드는 빌드된 동일 SKILL.md를 반환한다. 이미지 생성은 native 실행 반환 뒤 별도 작업으로 시작하고 같은 인수의 재조회로 결과를 전달한다. 로컬 blob 미리보기는 `review-image.html`에서만 로드하고 5분 또는 도구 철회 시 해제한다. 공식 Chrome MCP의 `new_page`→`take_screenshot(fullPage:true)`가 실제 MCP 이미지 콘텐츠를 반환한다. 상세 계약·실패 정책은 [Chrome 안내](chrome-webmcp.md), 실행 증빙은 [0.20](webmcp-0.20.md)에 있다.
+
+## AI 시안 · 0.21
+
+`code-patches.js`가 inert DOM에서 선언적 HTML/CSS를 검증하고 `CanvasScene.setCodePatches`가 같은 iframe 안에 복원한다. immutable 캡처와 `codePatches`를 분리하며 session/checkpoint/timeline/JSON/비교/PNG가 같은 포인트를 사용한다. 생성 요소는 a… ID, 캡처/복사 ID·locator와 주석 참조는 유지한다. 코드 레이아웃 뒤에 기존 이동 오프셋을 적용한다.
+
+`ai-requests.js`가 frozen baseline과 독립 후보·상태를 세션에 보관한다. 요청/등록은 캔버스 revision/undo를 바꾸지 않는다. 사용자 선택 때 기준/후보를 형제 스냅샷으로 등록하고 `restorePersisted`로 현재 작업 보호와 한 undo 단계를 공유한다. 재생성은 기준 요청/선택 후보의 계보를 참조한다.
+
+React 갤러리와 `ai-provider.js`는 MCP와 같은 후보 등록 경로를 사용한다. API 키는 제공자 closure의 메모리만 사용한다. Responses API의 완료된 strict JSON 패치만 등록하고 불완전 스트림은 적용하지 않는다. API UI 테스트는 별도 test-only fetch transport이며 배포 번들에는 포함하지 않는다. 실제 OAuth/추론·자동 보정 루프는 후속이다.
+
+Python `mcp/modern.py`는 2026-07-28 발견·요청별 메타데이터·결과/캐시 메타데이터·명시적 AI 요청 리소스와 구독/취소를 처리한다. `server.py`의 legacy initialize 경로와 분리한다. 브리지는 화면 세대와 request_revision을 검증하며 알림은 공개 화면에만 제공한다. SDK v2는 개발 검사 의존성이고 배포 Python에 외부 패키지를 요구하지 않는다.

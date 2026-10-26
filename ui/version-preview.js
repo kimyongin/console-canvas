@@ -13,6 +13,7 @@ export async function withVersionScene(snapshot, point, run) {
   try {
     const scene = new CanvasScene(frame, copy(snapshot));
     await scene.mount();
+    scene.setCodePatches(point.codePatches || []);
     scene.setEdits(point.edits || {});
     scene.setComments(point.annotations || {});
     return await run(scene);
@@ -27,6 +28,7 @@ export function versionOptions(state) {
       id: '@current',
       name: '현재 작업',
       state: {
+        codePatches: state.scene.codePatches,
         edits: state.scene.edits,
         annotations: state.scene.annotations,
         note: document.querySelector('#review-note').value,

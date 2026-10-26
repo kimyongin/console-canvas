@@ -248,3 +248,7 @@ E는 최초 editor.html(0.16.0에는 ui/react/editor-shell.tsx로 이전), S는 
 | S-20 | `#check-update` | FR-14 | desktop/shell.cjs / desktop/updater.cjs |
 | S-21 | `#download-update` | FR-14 | desktop/shell.cjs / desktop/updater.cjs |
 | S-22 | `#install-update` | FR-14 | desktop/shell.cjs / desktop/updater.cjs |
+
+## 0.21 AI 시안 추가 대조
+
+FR-21~27 / AC-34~43: `ai-requests.js`(고정 요청/후보/분기), `code-patches.js`/`engine.js`(HTML/CSS), `ui/react/ai-variants.tsx`/`ui/ai-panel.js`(요청/비교/선택), `ai-provider.js`(Responses API), `mcp/modern.py`(2026 발견/구독), `editor-controller.js`/`tool-contract.json`(19개 계약). `tests/ai-variants.js`, `tests/unit/ai-provider.test.mjs`, `tests/test_modern_mcp.py`, `scripts/verify_modern_mcp.mjs`가 저장/보존·정제·UI/mock API·공식 modern SDK를 대조한다. [구현과 미검증 조건](ai-variants-0.21.md)에서 실제 API/OAuth·자동 보정/대화 실행·설치 배포를 구분한다.

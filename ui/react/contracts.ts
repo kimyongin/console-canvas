@@ -5,6 +5,7 @@ export interface SaveView {
   message: string;
 }
 export interface SnapshotPoint {
+  codePatches?: unknown[];
   edits: Record<string, { dx?: number; dy?: number; deleted?: boolean; copy?: unknown }>;
   annotations: Record<string, string>;
   selected: string | null;

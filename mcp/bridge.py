@@ -85,7 +85,12 @@ class Broker:
         for key in ('revision', 'element_count', 'comment_count'):
             if type(meta.get(key)) is not int or meta[key] < 0:
                 raise ValueError('Invalid screen revision or counts')
+        request_revision = meta.get('request_revision')
+        if request_revision is not None and (type(request_revision) is not int or request_revision < 0):
+            raise ValueError('Invalid AI request revision')
         meta = {k: meta[k] for k in ('editor_id', 'document_id', 'title', 'url', 'revision', 'element_count', 'comment_count')}
+        if request_revision is not None:
+            meta['request_revision'] = request_revision
         with self.condition:
             editor_id = meta['editor_id']
             session = self.sessions.setdefault(editor_id, {'queue': deque(), 'closed': False})
