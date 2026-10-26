@@ -150,10 +150,17 @@ try {
   const splitter = doc.querySelector('#snapshot-splitter');
   const splitterEdits = JSON.stringify(app.state.scene.edits),
     splitterUndo = app.state.undo.length;
+  splitter.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+  const minimumGraphHeight = doc
+    .querySelector('#snapshot-graph-scroll')
+    .getBoundingClientRect().height;
   splitter.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
   check(
     'Keyboard resizing adjusts graph height',
-    doc.querySelector('#snapshot-graph-scroll').getBoundingClientRect().height > height,
+    doc.querySelector('#snapshot-graph-scroll').getBoundingClientRect().height >
+      minimumGraphHeight &&
+      doc.querySelector('#snapshot-graph-scroll').getBoundingClientRect().height <=
+        Number(splitter.getAttribute('aria-valuemax')),
   );
   check(
     'Graph resizing keys do not nudge canvas elements or create undo steps',

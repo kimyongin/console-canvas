@@ -239,3 +239,156 @@
   color: #68637b;
   padding: 6px 0;
 }
+
+/* Review keeps candidate switching beside the rendered comparison. */
+.ai-context {
+  padding: 10px 12px;
+  background: #f5f3ff;
+  border-radius: 8px;
+  color: #514779;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.ai-review-mode {
+  height: 88vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  padding: 16px 20px;
+}
+.ai-review-mode > header,
+.ai-review-mode > details,
+.ai-review-mode > label,
+.ai-review-mode > .ai-apply-row,
+.ai-selected-summary {
+  flex: none;
+  margin: 0;
+}
+.ai-review-mode > header {
+  position: static;
+  padding: 0 0 8px;
+}
+.ai-review-mode .ai-new-request > summary,
+.ai-review-mode .ai-request-details summary {
+  padding: 3px 0;
+}
+.ai-review-mode > .ai-request-details[open] {
+  max-height: 150px;
+  overflow: auto;
+}
+.ai-review-workspace {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 12px;
+  min-height: 200px;
+}
+.ai-review-mode .ai-review-workspace {
+  flex: 1;
+  min-height: 0;
+}
+.ai-review-workspace .ai-candidate-list {
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  margin: 0;
+  min-height: 0;
+}
+.ai-candidate-list button {
+  flex: none;
+  padding: 10px;
+  font-size: 12px;
+}
+.ai-candidate-list span {
+  display: none;
+}
+.ai-candidate-list small {
+  font-size: 10px;
+  color: #6b6381;
+}
+.ai-candidate-list .ai-current-badge {
+  color: #146c54;
+  font-weight: 600;
+}
+.ai-review-workspace .ai-comparison {
+  min-height: 0;
+  gap: 10px;
+}
+.ai-review-mode .ai-preview {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.ai-review-mode .ai-preview-scroll {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+.ai-preview-heading {
+  min-height: 40px;
+  flex: none;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.ai-preview-heading strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-preview-heading select {
+  width: 84px;
+  flex: none;
+}
+.ai-selected-summary {
+  color: #68637b;
+  font-size: 12px;
+  line-height: 1.5;
+  max-height: 36px;
+  overflow: auto;
+}
+.ai-review-mode .ai-apply-row {
+  position: static;
+  padding: 8px 0 0;
+}
+#ai-status:empty {
+  display: none;
+}
+.ai-review-mode #ai-status {
+  margin: 0;
+  min-height: 0;
+  flex: none;
+}
+@media (max-width: 900px) {
+  .ai-review-workspace {
+    grid-template-columns: 140px minmax(0, 1fr);
+  }
+}
+@media (max-width: 760px) {
+  .ai-review-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 72px minmax(0, 1fr);
+  }
+  .ai-review-workspace .ai-candidate-list {
+    flex-direction: row;
+  }
+  .ai-candidate-list button {
+    width: 170px;
+  }
+  .ai-review-workspace .ai-comparison {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ai-review-mode .ai-apply-row p {
+    display: none;
+  }
+  .ai-review-mode .ai-apply-row {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+}
+.ai-review-mode #ai-request-state {
+  flex: none;
+  margin: 0;
+  font-size: 11px;
+}

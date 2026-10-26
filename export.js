@@ -1,3 +1,4 @@
+import { cleanAiDraft } from './ai-draft.js';
 const encoder = new TextEncoder();
 export function changeActionLabel(change) {
   return change.action === 'code'
@@ -100,6 +101,7 @@ export function reviewPayload(
   activity = [],
   activityHead = null,
   aiRequests = [],
+  aiDraft,
 ) {
   return {
     format: 'console-canvas-review',
@@ -110,6 +112,7 @@ export function reviewPayload(
     snapshot,
     codePatches: scene.codePatches || [],
     aiRequests,
+    aiDraft: cleanAiDraft(aiDraft),
     edits: scene.edits,
     annotations: scene.annotations,
     comments: scene.comments(),
@@ -313,6 +316,7 @@ export async function buildReview(
       session.activity || [],
       session.activityHead || null,
       session.aiRequests || [],
+      session.aiDraft,
     ),
     warnings = [];
   const files = {

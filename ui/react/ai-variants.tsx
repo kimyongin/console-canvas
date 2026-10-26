@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { renderReact } from './mount';
 import { Button } from './components/button';
 import { Input } from './components/input';
@@ -25,7 +25,21 @@ interface Request {
     failures?: { code: string }[];
   };
 }
+interface Draft {
+  prompt: string;
+  count: number;
+  route: string;
+}
 interface Actions {
+  draft(): Draft;
+  saveDraft(value: Draft): void;
+  initialNew(): boolean;
+  context(): { target: string; comments: number; version: string };
+  currentCandidate(request: string): string;
+  remembered(): { requestId?: string; candidateId?: string };
+  remember(value: { requestId: string; candidateId: string }): void;
+  connection(): boolean;
+  connect(): void;
   create(value: {
     prompt: string;
     count: number;
@@ -76,7 +90,24 @@ function Preview({
       current = false;
     };
   }, [point, actions]);
-  const scale = result ? (zoom === 'fit' ? Math.min(1, 460 / result.size.width) : Number(zoom)) : 1;
+  const viewport = useRef<HTMLDivElement>(null);
+  const [bounds, setBounds] = useState({ width: 460, height: 350 });
+  useLayoutEffect(() => {
+    const host = viewport.current!;
+    const measure = () => setBounds({ width: host.clientWidth, height: host.clientHeight });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, []);
+  const scale = result
+    ? zoom === 'fit'
+      ? Math.max(
+          0.05,
+          Math.min(1, bounds.width / result.size.width, bounds.height / result.size.height),
+        )
+      : Number(zoom)
+    : 1;
   return (
     <section className="ai-preview">
       <div className="ai-preview-heading">
@@ -91,7 +122,7 @@ function Preview({
           <option value="1">100%</option>
         </NativeSelect>
       </div>
-      <div className="ai-preview-scroll">
+      <div className="ai-preview-scroll" ref={viewport}>
         {result ? (
           <div
             style={{
@@ -124,20 +155,49 @@ function Preview({
   );
 }
 function AiVariants({ requests, actions }: { requests: Request[]; actions: Actions }) {
-  const [prompt, setPrompt] = useState(''),
-    [count, setCount] = useState(3),
-    [route, setRoute] = useState(requests.at(-1)?.route || 'mcp'),
-    [formOpen, setFormOpen] = useState(!requests.length),
+  const [prompt, setPrompt] = useState(actions.draft().prompt),
+    [count, setCount] = useState(actions.draft().count),
+    [route, setRoute] = useState(actions.draft().route),
+    [formOpen, setFormOpen] = useState(actions.initialNew() || !requests.length),
     [apiKey, setApiKey] = useState(''),
     [model, setModel] = useState(actions.apiStatus().model),
     [configured, setConfigured] = useState(actions.apiStatus().configured),
-    [requestId, setRequestId] = useState(requests.at(-1)?.id || ''),
-    [candidateId, setCandidateId] = useState(''),
+    [requestId, setRequestId] = useState(
+      () =>
+        [...requests].reverse().find((r) => actions.currentCandidate(r.id))?.id ||
+        actions.remembered().requestId ||
+        requests.at(-1)?.id ||
+        '',
+    ),
+    [candidateId, setCandidateId] = useState(() =>
+      requestId
+        ? actions.currentCandidate(requestId) ||
+          (actions.remembered().requestId === requestId ? actions.remembered().candidateId : '') ||
+          ''
+        : '',
+    ),
+    [authOpen, setAuthOpen] = useState(
+      actions.draft().route === 'api' && !actions.apiStatus().configured,
+    ),
     [previewZoom, setPreviewZoom] = useState('fit'),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState('');
   const request = requests.find((r) => r.id === requestId),
     candidate = request?.candidates.find((c) => c.id === candidateId) || request?.candidates[0];
+  const currentCandidateId = request ? actions.currentCandidate(request.id) : '';
+  const context = actions.context();
+  const apiBlocked = route === 'api' && !configured;
+  function updateDraft(next: Partial<Draft>) {
+    const value = { prompt, count, route, ...next };
+    setPrompt(value.prompt);
+    setCount(value.count);
+    setRoute(value.route);
+    actions.saveDraft(value);
+  }
+  function chooseCandidate(id: string) {
+    setCandidateId(id);
+    actions.remember({ requestId, candidateId: id });
+  }
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
     setMessage('');
@@ -150,7 +210,7 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
     }
   }
   return (
-    <div className="ai-variants">
+    <div className={'ai-variants' + (candidate && !formOpen ? ' ai-review-mode' : '')}>
       <header>
         <div>
           <h2>AI 시안</h2>
@@ -166,7 +226,14 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
         onToggle={(e) => setFormOpen(e.currentTarget.open)}
       >
         <summary>새 시안 요청</summary>
-        <details className="ai-auth">
+        <p className="ai-context" id="ai-context-summary">
+          대상: {context.target} · 문서 주석 {context.comments}개 · 기준: {context.version}
+        </p>
+        <details
+          className="ai-auth"
+          open={authOpen}
+          onToggle={(e) => setAuthOpen(e.currentTarget.open)}
+        >
           <summary>AI API 연결 {configured ? '· 키 등록됨' : ''}</summary>
           <p className="ai-help">
             일반 OpenAI API 사용량으로 별도 과금됩니다. 키는 이 창의 메모리에만 보관하며 재실행 시
@@ -220,7 +287,14 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
         <div className="ai-request-form">
           <label className="ai-request-picker">
             실행 방식
-            <NativeSelect id="ai-route" value={route} onChange={(e) => setRoute(e.target.value)}>
+            <NativeSelect
+              id="ai-route"
+              value={route}
+              onChange={(e) => {
+                updateDraft({ route: e.target.value });
+                if (e.target.value === 'api' && !configured) setAuthOpen(true);
+              }}
+            >
               <option value="mcp">외부 에이전트 · MCP</option>
               <option value="api">AI API 직접 호출 · 별도 과금</option>
             </NativeSelect>
@@ -229,7 +303,7 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
           <Textarea
             id="ai-prompt"
             value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
+            onChange={(e) => updateDraft({ prompt: e.target.value })}
             placeholder="예: 검색 조건을 한 줄로 정리하고 중요한 작업 버튼을 강조해 줘"
             maxLength={8000}
           />
@@ -242,29 +316,48 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
                 min={1}
                 max={12}
                 value={count}
-                onChange={(e) => setCount(Number(e.target.value))}
+                onChange={(e) => updateDraft({ count: Number(e.target.value) })}
               />
             </label>
             <Button
               id="ai-create"
-              disabled={busy}
+              disabled={busy || apiBlocked}
+              aria-describedby="ai-readiness"
               onClick={() =>
                 run(async () => {
                   const item = await actions.create({ prompt, count, route });
+                  updateDraft({ prompt: '' });
                   setRequestId(item.id);
+                  actions.remember({ requestId: item.id, candidateId: '' });
                   setCandidateId('');
                   setFormOpen(false);
                   setMessage(
                     route === 'api'
                       ? '선택 영역의 코드·주석을 OpenAI API로 보내 시안을 생성하고 있습니다.'
-                      : '요청이 저장되었습니다. 요청 문장을 복사해 연결한 에이전트에게 보내세요.',
+                      : '요청을 보관했습니다. 요청 문장을 에이전트 대화에 전달하세요. 앱이 자동으로 실행하지는 않습니다.',
                   );
                 })
               }
             >
-              {route === 'api' ? 'API로 시안 생성' : '외부 에이전트에 요청'}
+              {route === 'api' ? 'API로 시안 생성' : '요청 보관하기'}
             </Button>
           </div>
+          <p id="ai-readiness" className="ai-help" role="status">
+            {route === 'api'
+              ? configured
+                ? 'API 키·모델 등록됨 · 실제 연결은 생성 시 확인합니다.'
+                : '생성하려면 위의 AI API 연결에서 키와 모델을 등록하세요.'
+              : actions.connection()
+                ? 'MCP 연결됨 · 요청 문장을 에이전트 대화에 전달해야 실행됩니다.'
+                : 'MCP 연결 안 됨 · 요청은 보관할 수 있으며 연결 후 에이전트 대화에 전달하세요.'}
+          </p>
+          <Button
+            id="ai-reset-draft"
+            disabled={busy}
+            onClick={() => updateDraft({ prompt: '', count: 3, route: 'mcp' })}
+          >
+            초안 초기화
+          </Button>
           <p className="ai-help">
             현재 선택·주석·편집을 기준으로 고정합니다. API 실행 시 해당 코드·주석과 화면 이미지를
             OpenAI에 전송합니다. 에이전트가 시안을 반환해도 선택 전까지 캔버스는 유지됩니다.
@@ -280,7 +373,9 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
               value={requestId}
               onChange={(e) => {
                 setRequestId(e.target.value);
-                setCandidateId('');
+                const id = actions.currentCandidate(e.target.value);
+                setCandidateId(id);
+                actions.remember({ requestId: e.target.value, candidateId: id });
               }}
             >
               {requests.map((r) => (
@@ -297,8 +392,21 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
           </label>
           {request && (
             <>
+              <p id="ai-request-state" role="status" className="ai-help">
+                {request.status === 'canceled'
+                  ? '취소됨'
+                  : request.status === 'failed'
+                    ? '생성 실패'
+                    : request.status === 'ready'
+                      ? `후보 ${request.candidates.length}개 완료 · 비교 후 적용하세요.`
+                      : request.candidates.length
+                        ? `후보 ${request.candidates.length}/${request.count}개 수신 · 완성된 안부터 비교할 수 있습니다.`
+                        : request.route === 'api'
+                          ? 'API 생성 준비·실행 중'
+                          : '요청 보관됨 · 수동 전달 필요 · 자동 실행되지 않음'}
+              </p>
               <details className="ai-request-details" open={!request.candidates.length}>
-                <summary>요청 전달 정보</summary>
+                <summary>요청 전달·추가 생성</summary>
                 <div className="ai-request-actions">
                   <Button
                     id="ai-copy-request"
@@ -319,90 +427,123 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
                   >
                     요청 취소
                   </Button>
+                  {request.route === 'mcp' && (
+                    <Button id="ai-connect-agent" onClick={actions.connect}>
+                      {actions.connection() ? '연결 상태 보기' : '에이전트 연결하기'}
+                    </Button>
+                  )}
                   <small>요청 ID: {request.id}</small>
                 </div>
-              </details>
-              {request.execution && (
-                <p className="ai-help">
-                  {request.execution.model} · 입력{' '}
-                  {request.execution.usage?.reduce((sum, u) => sum + u.input_tokens, 0) || 0} / 출력{' '}
-                  {request.execution.usage?.reduce((sum, u) => sum + u.output_tokens, 0) || 0} 토큰
-                  {request.execution.failures?.length
-                    ? ` · 실패 ${request.execution.failures.length}개 (${request.execution.failures.map((f) => f.code).join(', ')}) · 키·모델·한도를 확인하고 새 요청으로 다시 시도하세요.`
-                    : ''}
-                </p>
-              )}
-              <div className="ai-request-actions">
-                <Button
-                  id="ai-regenerate-baseline"
-                  disabled={busy}
-                  onClick={() =>
-                    run(async () => {
-                      const next = await actions.create({
-                        prompt: prompt || request.prompt,
-                        count,
-                        route,
-                        basis_request_id: request.id,
-                      });
-                      setRequestId(next.id);
-                      setCandidateId('');
-                    })
-                  }
-                >
-                  같은 기준으로 추가 생성
-                </Button>
-                <Button
-                  id="ai-regenerate-candidate"
-                  disabled={busy || !candidate}
-                  onClick={() =>
-                    run(async () => {
-                      const next = await actions.create({
-                        prompt: prompt || request.prompt,
-                        count,
-                        route,
-                        basis_request_id: request.id,
-                        basis_candidate_id: candidate?.id,
-                      });
-                      setRequestId(next.id);
-                      setCandidateId('');
-                    })
-                  }
-                >
-                  선택 시안에서 추가 생성
-                </Button>
-              </div>
-              <div className="ai-candidate-list" aria-label="시안 목록">
-                {request.candidates.map((c) => (
+                {request.execution && (
+                  <p className="ai-help">
+                    {request.execution.model} · 입력{' '}
+                    {request.execution.usage?.reduce((sum, u) => sum + u.input_tokens, 0) || 0} /
+                    출력{' '}
+                    {request.execution.usage?.reduce((sum, u) => sum + u.output_tokens, 0) || 0}{' '}
+                    토큰
+                    {request.execution.failures?.length
+                      ? ` · 실패 ${request.execution.failures.length}개 (${request.execution.failures.map((f) => f.code).join(', ')}) · 키·모델·한도를 확인하고 새 요청으로 다시 시도하세요.`
+                      : ''}
+                  </p>
+                )}
+                <div className="ai-request-actions">
                   <Button
-                    key={c.id}
-                    data-candidate-id={c.id}
-                    aria-pressed={candidate?.id === c.id}
-                    onClick={() => setCandidateId(c.id)}
+                    id="ai-regenerate-baseline"
+                    disabled={busy || apiBlocked}
+                    onClick={() =>
+                      run(async () => {
+                        const next = await actions.create({
+                          prompt: prompt || request.prompt,
+                          count,
+                          route,
+                          basis_request_id: request.id,
+                        });
+                        setRequestId(next.id);
+                        setCandidateId('');
+                      })
+                    }
                   >
-                    <strong>{c.name}</strong>
-                    <span>{c.summary}</span>
-                    {request.selectedId === c.id && <small>적용한 시안</small>}
+                    같은 기준으로 추가 생성
                   </Button>
-                ))}
-              </div>
-              {candidate ? (
-                <>
-                  <div className="ai-comparison">
-                    <Preview
-                      point={request.baseline}
-                      actions={actions}
-                      title="요청 기준"
-                      zoom={previewZoom}
-                      onZoom={setPreviewZoom}
-                    />
-                    <Preview
-                      point={candidate.point}
-                      actions={actions}
-                      title={candidate.name}
-                      zoom={previewZoom}
-                      onZoom={setPreviewZoom}
-                    />
+                  <Button
+                    id="ai-regenerate-candidate"
+                    disabled={busy || !candidate || apiBlocked}
+                    onClick={() =>
+                      run(async () => {
+                        const next = await actions.create({
+                          prompt: prompt || request.prompt,
+                          count,
+                          route,
+                          basis_request_id: request.id,
+                          basis_candidate_id: candidate?.id,
+                        });
+                        setRequestId(next.id);
+                        setCandidateId('');
+                      })
+                    }
+                  >
+                    선택 시안에서 추가 생성
+                  </Button>
+                </div>
+                {apiBlocked && (
+                  <p className="ai-help">
+                    API로 추가 생성하려면 새 시안 요청에서 키와 모델을 등록하세요.
+                  </p>
+                )}
+              </details>
+              <div className="ai-review-workspace">
+                <div className="ai-candidate-list" aria-label="시안 목록">
+                  {request.candidates.map((c) => (
+                    <Button
+                      key={c.id}
+                      data-candidate-id={c.id}
+                      aria-pressed={candidate?.id === c.id}
+                      onClick={() => chooseCandidate(c.id)}
+                    >
+                      <strong>{c.name}</strong>
+                      <span>{c.summary}</span>
+                      {currentCandidateId === c.id && (
+                        <small className="ai-current-badge">현재 캔버스</small>
+                      )}
+                      {candidate?.id === c.id && <small>비교 중</small>}
+                      {request.selectedId === c.id && <small>마지막으로 적용</small>}
+                    </Button>
+                  ))}
+                </div>
+                {candidate ? (
+                  <>
+                    <div className="ai-comparison">
+                      <Preview
+                        point={request.baseline}
+                        actions={actions}
+                        title="요청 기준"
+                        zoom={previewZoom}
+                        onZoom={setPreviewZoom}
+                      />
+                      <Preview
+                        point={candidate.point}
+                        actions={actions}
+                        title={candidate.name}
+                        zoom={previewZoom}
+                        onZoom={setPreviewZoom}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="ai-waiting">
+                    {request.status === 'failed'
+                      ? '시안 생성에 실패했습니다. 키·모델·사용 한도를 확인해 주세요.'
+                      : request.status === 'canceled'
+                        ? '요청을 취소했습니다. 완성된 시안은 보존됩니다.'
+                        : request.route === 'api'
+                          ? 'API가 시안을 준비하고 있습니다. 편집을 계속해도 됩니다.'
+                          : '요청 보관됨 · 수동 전달 필요. 요청 문장을 에이전트 대화에 붙여넣으세요. 자동으로 실행되지는 않습니다.'}
                   </div>
+                )}
+              </div>
+              {candidate && (
+                <>
+                  <p className="ai-selected-summary">{candidate.summary}</p>
                   <div className="ai-apply-row">
                     <p>
                       현재 미저장 작업과 다른 시안을 스냅샷으로 보존합니다. 적용 후 실행 취소할 수
@@ -425,16 +566,6 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
                     </Button>
                   </div>
                 </>
-              ) : (
-                <div className="ai-waiting">
-                  {request.status === 'failed'
-                    ? '시안 생성에 실패했습니다. API 키·모델·사용 한도를 확인한 뒤 다시 요청하세요.'
-                    : request.status === 'canceled'
-                      ? '요청을 취소했습니다. 이미 완성된 시안은 보존됩니다.'
-                      : request.route === 'api'
-                        ? 'API가 시안을 생성하고 있습니다. 이 창을 닫고 편집을 계속해도 됩니다.'
-                        : '에이전트의 시안을 기다리고 있습니다. 이 창을 닫고 편집을 계속해도 됩니다.'}
-                </div>
               )}
             </>
           )}

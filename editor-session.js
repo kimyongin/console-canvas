@@ -108,6 +108,7 @@ export function createEditorSession({
       layerNames: state.snapshot.layerNames || {},
       codePatches: state.scene.codePatches,
       aiRequests: state.aiRequests || [],
+      aiDraft: state.aiDraft,
       edits: state.scene.edits,
       annotations: state.scene.annotations,
       timeline: state.timeline,

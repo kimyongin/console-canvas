@@ -314,7 +314,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
               id="context-ai"
               aria-label="선택 요소 AI 시안 만들기"
               disabled={!view?.selected || !!view?.selectedHidden}
-              onClick={() => dispatchEditorCommand('ai')}
+              onClick={() => dispatchEditorCommand('ai-new')}
               variant="outline"
             >
               ✨ 시안 만들기

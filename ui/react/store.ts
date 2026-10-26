@@ -13,6 +13,7 @@ export interface EditorView {
 }
 export type EditorCommand =
   | 'ai'
+  | 'ai-new'
   | 'undo'
   | 'redo'
   | 'delete'

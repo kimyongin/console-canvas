@@ -1,3 +1,4 @@
+import { cleanAiDraft } from './ai-draft.js';
 import { buildAiContext } from './ai-context.js';
 import { createAiPanel } from './ui/ai-panel.js';
 import { createAiRequests, validateAiRequests } from './ai-requests.js';
@@ -333,7 +334,7 @@ const aiRequests = createAiRequests({
   snapshotHistory,
   render: () => aiPanel.render(),
 });
-const aiPanel = createAiPanel({ $, state, manager: aiRequests, adapter, toast });
+const aiPanel = createAiPanel({ $, state, manager: aiRequests, adapter, toast, save, checkpoint });
 const activityPanel = createActivityPanel({ $, state, selectNode, focusComment });
 function onKey(event) {
   if (event.defaultPrevented) return;
@@ -414,6 +415,7 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
   const {
     codePatches: storedCodePatches,
     aiRequests: storedAiRequests,
+    aiDraft: storedAiDraft,
     timeline: storedTimeline,
     edits: storedEdits,
     annotations: storedComments,
@@ -428,6 +430,7 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
   timeline = timeline || storedTimeline;
   state.timeline = null;
   state.aiRequests = validateAiRequests(storedAiRequests, snapshot);
+  state.aiDraft = cleanAiDraft(storedAiDraft);
   state.snapshot = {
     ...capture,
     layerNames: cleanLayerNames(storedLayerNames),
@@ -571,6 +574,7 @@ async function importFile(file) {
         activityHead: data.activityHead,
         codePatches: data.codePatches,
         aiRequests: data.aiRequests,
+        aiDraft: cleanAiDraft(data.aiDraft),
       },
       data.edits,
       data.note || '',
@@ -961,6 +965,7 @@ window.ConsoleCanvas = {
       activity: state.activity,
       activityHead: state.activityHead,
       aiRequests: state.aiRequests,
+      aiDraft: state.aiDraft,
     }),
 };
 function connectDesktopIfReady() {

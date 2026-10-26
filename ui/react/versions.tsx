@@ -160,24 +160,36 @@ function VersionFrame({
   title,
   zoom,
   highlight,
+  fitHeight = false,
 }: {
   html: string;
   size: { width: number; height: number };
   title: string;
   zoom?: number;
   highlight?: PreviewHighlight;
+  fitHeight?: boolean;
 }) {
   const space = useRef<HTMLDivElement>(null),
     [scale, setScale] = useState(0.5);
   useLayoutEffect(() => {
     const host = space.current!.parentElement!;
     const fit = () =>
-      setScale(zoom ?? Math.max(0.05, Math.min(1, (host.clientWidth - 16) / size.width)));
+      setScale(
+        zoom ??
+          Math.max(
+            0.05,
+            Math.min(
+              1,
+              (host.clientWidth - 16) / size.width,
+              fitHeight ? (host.clientHeight - 16) / size.height : 1,
+            ),
+          ),
+      );
     fit();
     const observer = new ResizeObserver(fit);
     observer.observe(host);
     return () => observer.disconnect();
-  }, [size.width, zoom]);
+  }, [size.width, size.height, zoom, fitHeight]);
   return (
     <div
       ref={space}
@@ -222,8 +234,18 @@ export function renderVersionFrame(
   title: string,
   zoom?: number,
   highlight?: PreviewHighlight,
+  fitHeight = false,
 ) {
-  renderReact(host, <VersionFrame {...result} title={title} zoom={zoom} highlight={highlight} />);
+  renderReact(
+    host,
+    <VersionFrame
+      {...result}
+      title={title}
+      zoom={zoom}
+      highlight={highlight}
+      fitHeight={fitHeight}
+    />,
+  );
 }
 export function renderImage(host: Element, url: string) {
   renderReact(host, <img src={url} alt="변경 후 화면과 번호별 주석 카드가 포함된 전달 이미지" />);

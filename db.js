@@ -1,3 +1,4 @@
+import { cleanAiDraft } from './ai-draft.js';
 // Captures are immutable; edits and lightweight recent-document metadata are separate.
 export const DATABASE_NAME = 'console-canvas-workspace';
 export async function database() {
@@ -39,6 +40,7 @@ export function captureFromDocument(value) {
   const {
     codePatches,
     aiRequests,
+    aiDraft,
     edits,
     annotations,
     timeline,
@@ -76,6 +78,7 @@ export async function saveSession(id, value) {
   const {
     codePatches = [],
     aiRequests = [],
+    aiDraft,
     edits = {},
     annotations = {},
     timeline = null,
@@ -89,6 +92,7 @@ export async function saveSession(id, value) {
   const session = {
     codePatches,
     aiRequests,
+    aiDraft: cleanAiDraft(aiDraft),
     edits,
     annotations,
     timeline,

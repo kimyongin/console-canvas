@@ -457,6 +457,181 @@ try {
     apiApp.state.aiRequests.length === 2 &&
       !apiDoc.querySelector('.ai-auth').textContent.includes('키 등록됨'),
   );
+  // Regression coverage for the usability walkthrough (#45–#51).
+  apiDoc.querySelector('#ai-close').click();
+  await apiApp.snapshotHistory.restorePersisted(
+    apiApp.state.aiRequests[0].candidates[1].snapshotId,
+  );
+  apiDoc.querySelector('#ai-variants-button').click();
+  const currentId = apiApp.state.aiRequests[0].candidates[1].id;
+  check(
+    'Gallery follows the current version instead of defaulting to the first candidate',
+    apiDoc.querySelector('[data-candidate-id="' + currentId + '"]').getAttribute('aria-pressed') ===
+      'true' &&
+      apiDoc
+        .querySelector('[data-candidate-id="' + currentId + '"]')
+        .textContent.includes('현재 캔버스'),
+  );
+  apiDoc.querySelector('#ai-close').click();
+  apiApp.state.scene.setPosition(17, 19);
+  apiDoc.querySelector('#ai-variants-button').click();
+  check(
+    'Manual edits do not retain a false current-canvas badge',
+    !apiDoc.querySelector('.ai-current-badge'),
+  );
+  apiDoc.querySelector('#ai-close').click();
+  apiApp.selectNode(apiNode.id);
+  apiDoc.querySelector('#context-ai').click();
+  check(
+    'Element sparkle opens composition with visible target and basis',
+    apiDoc.querySelector('.ai-new-request').open &&
+      apiDoc.querySelector('#ai-context-summary').textContent.includes('고객 등록') &&
+      apiDoc.querySelector('#ai-context-summary').textContent.includes('기준:'),
+  );
+  check(
+    'Unconfigured API blocks generation and exposes setup before submission',
+    apiDoc.querySelector('.ai-auth').open &&
+      apiDoc.querySelector('#ai-create').disabled &&
+      apiDoc.querySelector('#ai-readiness').textContent.includes('키와 모델'),
+  );
+  input('#ai-prompt', 'Preserve my unsent design instructions');
+  input('#ai-count', '5');
+  await apiApp.state.saving;
+  const savedId = apiApp.state.snapshot.id;
+  apiDoc.querySelector('#ai-close').click();
+  apiDoc.querySelector('#ai-variants-button').click();
+  check(
+    'Closing and reopening keeps prompt, count and route draft',
+    apiDoc.querySelector('#ai-prompt').value === 'Preserve my unsent design instructions' &&
+      apiDoc.querySelector('#ai-count').value === '5' &&
+      apiDoc.querySelector('#ai-route').value === 'api',
+  );
+  const draftDocument = await getDocument(savedId);
+  check(
+    'Persisted draft contains only allowed non-secret fields',
+    draftDocument.aiDraft.prompt === 'Preserve my unsent design instructions' &&
+      Object.keys(draftDocument.aiDraft).sort().join(',') === 'count,prompt,route' &&
+      !JSON.stringify(draftDocument).includes('qa-fake-key'),
+  );
+  const draftPayload = reviewPayload(
+    apiApp.state.snapshot,
+    apiApp.state.scene,
+    '',
+    apiApp.state.timeline,
+    apiApp.state.activity,
+    apiApp.state.activityHead,
+    apiApp.state.aiRequests,
+    { ...apiApp.state.aiDraft, key: 'must-not-export', model: 'must-not-export' },
+  );
+  await apiApp.importFile(
+    new apiWindow.File([JSON.stringify(draftPayload)], 'draft-roundtrip.uiclone.json'),
+  );
+  check(
+    'Portable file roundtrip preserves draft, code, comments and candidates without credential fields',
+    apiApp.state.aiDraft.prompt === 'Preserve my unsent design instructions' &&
+      apiApp.state.aiDraft.count === 5 &&
+      apiApp.state.aiRequests[0].candidates.length === 3 &&
+      apiApp.state.scene.codePatches.length > 0 &&
+      !JSON.stringify(draftPayload).includes('must-not-export'),
+  );
+  const other = await (await fetch('../sample.uiclone.json')).json();
+  other.id = crypto.randomUUID();
+  await apiApp.openSnapshot(other);
+  apiDoc.querySelector('#ai-variants-button').click();
+  check(
+    'A different document never inherits another document request draft',
+    apiDoc.querySelector('#ai-prompt').value === '' &&
+      apiDoc.querySelector('#ai-count').value === '3',
+  );
+  const previousGraphHeight = localStorage.getItem('console-canvas-graph-height');
+  localStorage.setItem('console-canvas-graph-height', '360');
+  const loaded = new Promise((resolve) =>
+    apiFrame.addEventListener('load', resolve, { once: true }),
+  );
+  apiFrame.src = '/editor.html?id=' + savedId;
+  await loaded;
+  await wait(() => apiFrame.contentWindow.ConsoleCanvas?.state.ready);
+  const restarted = apiFrame.contentDocument;
+  restarted.querySelector('#ai-variants-button').click();
+  check(
+    'A fresh renderer restores the per-document draft and existing candidates',
+    restarted.querySelector('#ai-prompt').value === 'Preserve my unsent design instructions' &&
+      restarted.querySelector('#ai-count').value === '5' &&
+      apiFrame.contentWindow.ConsoleCanvas.state.aiRequests[0].candidates.length === 3,
+  );
+  restarted.querySelector('#ai-reset-draft').click();
+  await wait(() => restarted.querySelector('#ai-prompt').value === '');
+  check(
+    'Explicit reset clears only the composition draft',
+    restarted.querySelector('#ai-prompt').value === '' &&
+      apiFrame.contentWindow.ConsoleCanvas.state.aiRequests.length === 2,
+  );
+  restarted.querySelector('#ai-create').click();
+  await wait(() => apiFrame.contentWindow.ConsoleCanvas.state.aiRequests.length === 3);
+  await wait(() =>
+    restarted.querySelector('.ai-waiting')?.textContent.includes('자동으로 실행되지는'),
+  );
+  check(
+    'MCP request storage is clearly distinguished from automatic execution',
+    restarted.querySelector('#ai-request-state').textContent.includes('수동') &&
+      restarted.querySelector('.ai-waiting').textContent.includes('자동으로 실행되지는') &&
+      restarted.querySelector('#ai-connect-agent'),
+  );
+  restarted.querySelector('#ai-close').click();
+  // Exercise actual layout geometry at short and narrow viewports.
+  apiFrame.style.width = '1280px';
+  apiFrame.style.height = '720px';
+  const lastRequest = apiFrame.contentWindow.ConsoleCanvas.state.aiRequests[0];
+  await apiFrame.contentWindow.ConsoleCanvas.snapshotHistory.restorePersisted(
+    lastRequest.candidates[1].snapshotId,
+  );
+  restarted.querySelector('#ai-variants-button').click();
+  await wait(() => restarted.querySelectorAll('.ai-preview iframe').length === 2);
+  await new Promise((resolve) =>
+    apiFrame.contentWindow.requestAnimationFrame(() =>
+      apiFrame.contentWindow.requestAnimationFrame(resolve),
+    ),
+  );
+  const layoutFits = () => {
+    const a = restarted.querySelector('.ai-review-workspace').getBoundingClientRect();
+    const b = restarted.querySelector('#ai-apply').getBoundingClientRect();
+    return (
+      a.height > 180 && a.bottom <= b.top + 1 && b.bottom <= apiFrame.contentWindow.innerHeight
+    );
+  };
+  check(
+    '720px review keeps candidate controls and full comparison viewport above apply',
+    layoutFits(),
+  );
+  apiFrame.style.width = '700px';
+  apiFrame.style.height = '600px';
+  await new Promise((resolve) =>
+    apiFrame.contentWindow.requestAnimationFrame(() =>
+      apiFrame.contentWindow.requestAnimationFrame(resolve),
+    ),
+  );
+  check(
+    'Narrow review retains comparison and apply without horizontal page overflow',
+    layoutFits() &&
+      restarted.querySelector('.ai-review-workspace').getBoundingClientRect().right <= 700,
+  );
+  restarted.querySelector('#ai-close').click();
+  apiFrame.style.width = '1280px';
+  apiFrame.style.height = '720px';
+  restarted.querySelector('#snapshot-dropdown').click();
+  await wait(() => restarted.querySelector('#snapshot-preview-view iframe'));
+  await new Promise((resolve) =>
+    apiFrame.contentWindow.requestAnimationFrame(() =>
+      apiFrame.contentWindow.requestAnimationFrame(resolve),
+    ),
+  );
+  const previewRect = restarted.querySelector('#snapshot-preview-view').getBoundingClientRect();
+  check(
+    'Snapshot graph reserves visible preview area in a 720px window',
+    previewRect.height >= 110 && previewRect.top < 600 && previewRect.bottom <= 720,
+  );
+  if (previousGraphHeight === null) localStorage.removeItem('console-canvas-graph-height');
+  else localStorage.setItem('console-canvas-graph-height', previousGraphHeight);
   document.querySelector('#status').textContent = JSON.stringify({
     passed: results.length,
     failed: 0,

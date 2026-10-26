@@ -1,14 +1,56 @@
+import { cleanAiDraft } from '../ai-draft.js';
+import { snapshotSignature } from '../snapshot-history.js';
+import { elementLabel } from './element-labels.js';
 import { createAiProvider } from '../ai-provider.js';
 import { buildAiContext } from '../ai-context.js';
 import { renderAiVariants } from './react/ai-variants.tsx';
 import { clearReact } from './react/mount.tsx';
 import { withVersionScene } from './version-preview.js';
-export function createAiPanel({ $, state, manager, adapter, toast }) {
+export function createAiPanel({ $, state, manager, adapter, toast, save, checkpoint }) {
   const provider = createAiProvider();
   const jobs = new Set();
-  let epoch = 0;
+  let epoch = 0,
+    newRequest = false;
+  const selections = new Map();
   const actions = {
     apiStatus: provider.status,
+    draft: () => cleanAiDraft(state.aiDraft),
+    saveDraft(value) {
+      state.aiDraft = cleanAiDraft(value);
+      save();
+    },
+    initialNew: () => newRequest,
+    context() {
+      const ids = [...state.scene.selection];
+      const names = ids.map((id) =>
+        elementLabel(state.scene.nodes.get(id), state.snapshot.layerNames),
+      );
+      const version =
+        state.timeline?.entries.find((e) => e.id === state.timeline.activeId)?.name || '현재 작업';
+      return {
+        target: names.length
+          ? names.slice(0, 3).join(', ') + (names.length > 3 ? ` 외 ${names.length - 3}개` : '')
+          : '전체 화면',
+        comments: Object.keys(state.scene.annotations).length,
+        version,
+      };
+    },
+    currentCandidate(requestId) {
+      const signature = snapshotSignature(checkpoint());
+      return (
+        manager.find(requestId).candidates.find((c) => snapshotSignature(c.point) === signature)
+          ?.id || ''
+      );
+    },
+    remembered: () => selections.get(state.snapshot.id) || {},
+    remember(value) {
+      selections.set(state.snapshot.id, value);
+    },
+    connection: () => $('#mcp-button').classList.contains('connected'),
+    connect() {
+      $('#ai-dialog').close();
+      $('#mcp-button').click();
+    },
     async configureApi(value) {
       if (
         globalThis.chrome?.permissions &&
@@ -91,12 +133,18 @@ export function createAiPanel({ $, state, manager, adapter, toast }) {
   function render() {
     if ($('#ai-dialog').open) renderAiVariants($('#ai-dialog-content'), manager.list(), actions);
   }
-  adapter.register('ai', () => {
+  function open(compose) {
     if (!state.ready) return;
+    newRequest = compose;
+    clearReact($('#ai-dialog-content'));
     $('#ai-dialog').showModal();
     render();
+  }
+  adapter.register('ai', () => open(false));
+  adapter.register('ai-new', () => open(true));
+  $('#ai-dialog').addEventListener('close', () => {
+    if (!$('#ai-dialog').open) clearReact($('#ai-dialog-content'));
   });
-  $('#ai-dialog').addEventListener('close', () => clearReact($('#ai-dialog-content')));
   return {
     render,
     async cancelJobs({ persist = true } = {}) {

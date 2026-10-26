@@ -28,13 +28,33 @@ export function createSnapshotPanel({
   try {
     preferredHeight = Number(localStorage.getItem('console-canvas-graph-height')) || null;
   } catch {}
+  function availableHeight() {
+    const r = $('#snapshot-dropdown').getBoundingClientRect();
+    return innerHeight - Math.min(r.bottom + 8, Math.min(80, innerHeight * 0.12)) - 18;
+  }
   function graphHeight(natural = 170) {
-    const h = Math.max(
+    const panel = $('#snapshot-panel');
+    const header =
+      panel.querySelector('.snapshot-navigation-header').getBoundingClientRect().height || 150;
+    const heading =
+      panel.querySelector('.snapshot-preview-heading').getBoundingClientRect().height || 55;
+    const limit = Math.max(
       100,
-      Math.min(preferredHeight || natural, Math.min(360, innerHeight * 0.42)),
+      Math.min(360, availableHeight() - header - heading - 36 - 60 - 160),
     );
+    const h = Math.max(100, Math.min(preferredHeight || natural, limit));
     $('#snapshot-graph-scroll').style.height = h + 'px';
     $('#snapshot-splitter').setAttribute('aria-valuenow', String(Math.round(h)));
+    $('#snapshot-splitter').setAttribute('aria-valuemax', String(Math.round(limit)));
+  }
+  function placePanel() {
+    const r = $('#snapshot-dropdown').getBoundingClientRect(),
+      panel = $('#snapshot-panel');
+    panel.style.top = Math.min(r.bottom + 8, Math.min(80, innerHeight * 0.12)) + 'px';
+    panel.style.left = '24px';
+    panel.style.height = Math.max(280, availableHeight()) + 'px';
+    panel.style.maxHeight = Math.max(280, availableHeight()) + 'px';
+    graphHeight($('#snapshot-list').offsetHeight);
   }
   const splitter = $('#snapshot-splitter');
   let resizing = null;
@@ -85,7 +105,9 @@ export function createSnapshotPanel({
     graphHeight();
     storeHeight();
   });
-  window.addEventListener('resize', () => graphHeight($('#snapshot-list').offsetHeight));
+  window.addEventListener('resize', () => {
+    if ($('#snapshot-panel').matches(':popover-open')) placePanel();
+  });
   const selected = () =>
     state.timeline?.entries.find((e) => e.id === state.snapshotPreviewId && !e.deletedAt);
   function updateLabel() {
@@ -145,7 +167,14 @@ export function createSnapshotPanel({
       }));
       if (token !== generation || state.snapshot?.id !== capture.id || selected()?.id !== entry.id)
         return;
-      renderVersionFrame($('#snapshot-preview-view'), result, entry.name + ' 미리보기 화면');
+      renderVersionFrame(
+        $('#snapshot-preview-view'),
+        result,
+        entry.name + ' 미리보기 화면',
+        undefined,
+        undefined,
+        true,
+      );
       $('#snapshot-preview-status').textContent =
         (entry.id === state.timeline.activeId
           ? '현재 작업의 기준 버전'
@@ -448,6 +477,7 @@ export function createSnapshotPanel({
       if (!$('#snapshot-panel').matches(':popover-open')) $('#snapshot-panel').showPopover();
       requestAnimationFrame(() => {
         $('#snapshot-panel').scrollTop = 0;
+        placePanel();
         renderPreview();
         revealNode(state.snapshotPreviewId);
       });
@@ -457,14 +487,10 @@ export function createSnapshotPanel({
     if (e.newState === 'open') {
       renderSnapshots();
       $('#snapshot-panel').scrollTop = 0;
-      const r = $('#snapshot-dropdown').getBoundingClientRect(),
-        panel = $('#snapshot-panel');
-      panel.style.top = Math.min(r.bottom + 8, innerHeight * 0.22) + 'px';
-      panel.style.left = '24px';
-      panel.style.maxHeight =
-        Math.max(280, innerHeight - Math.min(r.bottom + 8, innerHeight * 0.22) - 18) + 'px';
+      placePanel();
       requestAnimationFrame(() => {
         $('#snapshot-panel').scrollTop = 0;
+        placePanel();
         renderPreview();
         revealNode(state.snapshotPreviewId);
       });
