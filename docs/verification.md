@@ -162,3 +162,11 @@ PRD를 [기능 전수 대조표](feature-audit.md)와 다시 비교했다. 정�
 25개 FR·40개 AC의 고유/연속 ID, 문서 상대 링크·7개 티켓 링크·선행 관계 비순환과 GitHub 새 티켓의 본문/열린 상태를 확인했다. 기본 `npm run check`는 타입·포맷·빌드, Python 40·Node 30·Chromium 321과 standalone/영역 드래그를 포함해 통과했다. 로그는 Git 제외 `local/ai-variants-plan-check.log`다. 새 AI 기능 검증을 의미하지 않는다.
 
 소스 0.20.0·기존 실행 코드/13개 MCP 도구·런타임 번들·설치 앱/스킬·사용자 자료는 변경하지 않았다. 에이전트에 메시지를 보내거나 새 세션/모델 실행을 하지 않았다. 이번 변경은 문서/티켓과 문헌 조사이며 #36~#42는 계획·미구현으로 열어 둔다. 기존 #7/#27/#28/#33/#35는 유지한다.
+
+## 최신 MCP 실행 경로 조사 · 2026-10-26
+
+[조사 기록](agent-trigger-research.md)은 공식 latest→2026-07-28과 변경 기록·deprecated/Sampling·MRTR·구독/전송을 원문 대조했다. 신규 시안 기능에서 deprecated Sampling을 핵심 의존으로 채택하지 않도록 PRD와 #37/#40을 보완했다.
+
+실제 읽기 전용 `experiments/agent-trigger/probe.mjs`에서 설치 SDK 1.32.2의 2025-11-25 이하 지원, 앱 stdio의 modern discovery/구독 미구현, Chrome MCP 1.12.0의 메타데이터를 확인했다. Codex CLI 0.147.0 help/생성 스키마의 app-server API 형태도 확인했다. 최신 SDK/서버 실행·현재 데스크톱 호스트의 구독 수신/idle 모델 실행·인증·다중 후보 생성은 검증하지 않았으며 #37은 열어 둔다. 개인 대화·문서·브라우저나 모델 turn은 사용하지 않았다.
+
+공통 `npm run check`는 타입·포맷·빌드, Python 40·Node 30·Chromium 321·standalone/영역 드래그를 통과했다. 이는 최신 MCP 준수 검사가 아니다. 재현 결과 `local/agent-trigger/installed-report.json`, 생성 CLI 스키마와 `local/agent-trigger-research-check.log`는 Git 제외다. 앱 기능/버전 0.20.0·설치 앱/스킬·사용자 자료는 유지한다.
