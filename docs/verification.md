@@ -1,5 +1,9 @@
 # 검증 기록
 
+## 2026-10-29 · 티켓/PRD 후속 정리 검사
+
+`npm run check` 종료 코드 1. 타입·포맷·빌드·Python 43·Node 33 이후 Chromium iframe suite의 실제 캡처 픽셀 검사에서 녹색 대신 흰색(255,255,255)이 나왔다. 원인은 미확인이고 #65에서 재현/수정 대상으로 추적한다. 이번 요청은 문서/티켓 정리이며 기능 코드를 추가 수정하지 않았다. 이전 통과 기록을 지우거나 이번 실행을 통과로 바꾸지 않는다. [계획·현황](capture-quality-plan.md). 로컬 로그: `local/ticket-docs-check-2026-10-29.log`.
+
 ## 2026-10-29 · 0.23.0 iframe DOM/이미지 폴백
 
 `npm run check` 종료 코드 0: Python 43·Node 33·Chromium 420 + smoke 2. 신규 19개는 실제 제품 Electron 수집 경로와 실제 렌더 픽셀, 동일 출처·중첩·opaque 프레임, 부분 화면과 저장 복원을 검사했다. `npm run test:desktop:offscreen`은 SDK 22+17 및 정상 종료/재실행 보존을 통과했다. 오프스크린 앱의 스크린샷은 기존 fixture 대체물이므로 OS 수집 검증과 구별한다. 신규 iframe 픽셀 검사는 별도 Chromium 창의 실제 `capturePage` 결과다. [상세](iframe-capture.md). 일반 Chrome 설치 확장은 아직 0.22.2이며 배포 확인은 별도다.

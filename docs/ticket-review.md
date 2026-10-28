@@ -2,9 +2,19 @@
 
 ## 현재 추적 상태 · 0.23.0
 
+2026-10-29 현재 사용자 이슈를 **기존 #62/#63 보완 + 신규 #64/#65/#66**으로 정리했다. 다섯 티켓 모두 열림이며 #62의 미커밋 수정·회귀 통과를 실제 네이버 검증 완료로 보지 않는다. 전체 66개 중 닫힘 47개·열림 19개다. 이번 필수 검사 재실행에서 iframe 캡처 픽셀 불일치가 발생했으며 #65에 미해결로 추가했다. 이전 통과와 이번 실패를 구별한다. 구현 순서·수용 조건·10개 사이트 대상은 [가져오기 품질 계획](capture-quality-plan.md)에 정리했다.
+
+| 순서 | 티켓 | 상태 | 수용 기준 |
+| --- | --- | --- | --- |
+| 1 | [#64](https://github.com/kimyongin/console-canvas/issues/64) 프레임별 DOM 우선 수집 | 미구현 | AC-61 |
+| 2 | [#66](https://github.com/kimyongin/console-canvas/issues/66) 이미지 데이터 내장/캡처 | 미구현 | AC-63 |
+| 3 | [#65](https://github.com/kimyongin/console-canvas/issues/65) 긴 iframe 전체 이미지 보완 | 미해결 | AC-62 |
+| 4 | [#62](https://github.com/kimyongin/console-canvas/issues/62) 내부 클릭 선택 | 부분 진행·실제 네이버 검증 남음 | AC-64 |
+| 5 | [#63](https://github.com/kimyongin/console-canvas/issues/63) 10개 사이트 원본/복제 비교 | 일부 수집·최종 비교/수정 미완료 | AC-65 |
+
 [#61](https://github.com/kimyongin/console-canvas/issues/61): 접근 가능한 iframe DOM 복제와 읽을 수 없는 iframe의 전체/부분 화면 이미지 폴백을 구현했다. 신규 19개와 공통 420개, 격리 앱 SDK 39개를 통과했다. [범위](iframe-capture.md). 일반 사이트 10종 비교와 내부 요소 클릭 UX는 후속 진행한다.
 
-일반 Chrome 설치 중 발견한 background 시작 오류 [#60](https://github.com/kimyongin/console-canvas/issues/60)를 수정·실제 설치/수집·서비스 워커 회귀 검사로 완료했다. 총 61개·닫힘 47개·열림 14개다. #33의 일반 Chrome 설치/가상 수집 증빙을 추가했지만 나머지 리소스·권한 조건, #35의 배포/업데이트, #27의 사용자 앱 배포는 유지한다. [증빙](chrome-install-0.22.2.md).
+일반 Chrome 설치 중 발견한 background 시작 오류 [#60](https://github.com/kimyongin/console-canvas/issues/60)를 수정·실제 설치/수집·서비스 워커 회귀 검사로 완료했다. 당시 총 61개·닫힘 47개·열림 14개였다. #33의 일반 Chrome 설치/가상 수집 증빙을 추가했지만 나머지 리소스·권한 조건, #35의 배포/업데이트, #27의 사용자 앱 배포는 유지한다. [증빙](chrome-install-0.22.2.md).
 
 정렬 개선 [#59](https://github.com/kimyongin/console-canvas/issues/59)는 FR-02·AC-58에 연결해 구현·웹 검증으로 완료했다. 당시 총 59개·닫힘 45개·열림 14개였다. [정렬 개선 증빙](alignment-0.22.1.md)을 따른다. 설치 배포 #27과 기존 미완료 조건은 유지한다.
 
