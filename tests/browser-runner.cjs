@@ -48,6 +48,7 @@ async function main() {
   });
   const reports = [];
   for (const suite of [
+    'iframes',
     'integration',
     'ai-variants',
     'developer-workflow',
@@ -66,7 +67,31 @@ async function main() {
     'followup',
     'navigation',
   ]) {
+    let iframeSnapshot, iframeSourceUnchanged;
+    if (suite === 'iframes') {
+      window.setContentSize(900, 700);
+      await window.loadURL(`http://127.0.0.1:${server.address().port}/fixtures/iframes.html`);
+      const before = await window.webContents.executeJavaScript(
+        `JSON.stringify({html:document.documentElement.outerHTML,scroll:document.querySelector('#same').contentWindow.scrollY,actions:document.querySelector('#same').contentWindow.actions})`,
+      );
+      await window.webContents.executeJavaScript(
+        'new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))',
+      );
+      iframeSnapshot = await require(path.join(appRoot, 'desktop/capture.cjs')).captureWebsite(
+        window.webContents,
+        appRoot,
+      );
+      const after = await window.webContents.executeJavaScript(
+        `JSON.stringify({html:document.documentElement.outerHTML,scroll:document.querySelector('#same').contentWindow.scrollY,actions:document.querySelector('#same').contentWindow.actions})`,
+      );
+      iframeSourceUnchanged = before === after;
+      window.setContentSize(1600, 1100);
+    }
     await window.loadURL(`http://127.0.0.1:${server.address().port}/tests/${suite}.html`);
+    if (iframeSnapshot)
+      await window.webContents.executeJavaScript(
+        `globalThis.iframeSnapshot=${JSON.stringify(iframeSnapshot)};globalThis.iframeSourceUnchanged=${iframeSourceUnchanged};dispatchEvent(new Event('snapshotready'));`,
+      );
     const deadline = Date.now() + 120000;
     let result;
     do {

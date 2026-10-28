@@ -131,7 +131,7 @@ Console Canvas 자체를 수정할 때 공통 편집기 UI·디자인·패널·�
 python3 <SKILL_ROOT>/scripts/console_canvas.py prepare --output <새 작업폴더>/console-canvas-local
 ```
 
-출력 `extension_directory`를 Chrome 개발자 모드의 압축해제 확장으로 로드하고 원하는 사이트에서 확장 버튼으로 가져온다. 독립 HTML 샘플은 실제 사이트 수집 검증과 구분한다. iframe/Canvas/영상은 한 레이어이며 미렌더링 가상 행·닫힌 Shadow DOM·다른 페이지는 수집하지 않는다. 입력값·문구·이미지가 포함될 수 있으나 비밀번호는 제외한다.
+출력 `extension_directory`를 Chrome 개발자 모드의 압축해제 확장으로 로드하고 원하는 사이트에서 확장 버튼으로 가져온다. 독립 HTML 샘플은 실제 사이트 수집 검증과 구분한다. 접근 가능한 iframe은 내부 요소로 복제한다. `locator.frames`는 원본 프레임 경로이고 selector/ID는 해당 프레임 안의 원본 식별자다. `frame.mode`가 `image`인 iframe과 Canvas/영상은 이미지 한 레이어이며 내부 요소 개별 편집을 지원한다고 안내하지 않는다. 부분 이미지 폴백은 화면에 보였던 부분만 원래 위치·크기로 유지하고 화면 밖 내용은 포함하지 않는다. 미렌더링 가상 행·닫힌 Shadow DOM·다른 페이지는 수집하지 않는다. 입력값·문구·이미지가 포함될 수 있으나 비밀번호는 제외한다.
 
 기존 ZIP 또는 재편집용 JSON을 받은 경우에만 아래 helper로 작게 요약한다. PNG 요청에는 이 명령을 사용하지 않는다.
 

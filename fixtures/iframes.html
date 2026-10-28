@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Iframe capture QA</title>
+    <style>
+      body {
+        margin: 0;
+        background: #fff;
+        font: 14px system-ui;
+      }
+      iframe {
+        display: block;
+        border: 4px solid #222;
+        width: 360px;
+        height: 200px;
+        margin: 20px;
+      }
+      #partial {
+        position: absolute;
+        left: 760px;
+        top: 30px;
+        width: 400px;
+        height: 260px;
+        margin: 0;
+      }
+      #offscreen {
+        position: absolute;
+        top: 1000px;
+      }
+      #same {
+        height: 250px;
+      }
+    </style>
+  </head>
+  <body>
+    <iframe
+      id="same"
+      title="편집 가능한 콘솔"
+      srcdoc="<style>body{margin:12px;background:#eef2ff;font:16px system-ui}.fixed{position:fixed;right:0;top:10px;width:50px;height:25px;background:#ed4}button{width:140px;height:32px}iframe{width:200px;height:60px;border:2px solid green}</style><button id='child-button' onclick='window.actions++'>고객 추가</button><div class='fixed'>고정</div><iframe id='nested' srcdoc='&lt;body style=&quot;margin:5px;background:#eee&quot;&gt;&lt;button id=&quot;nested-button&quot;&gt;중첩 버튼&lt;/button&gt;'></iframe><div style='height:450px'>스크롤 영역</div><script>window.actions=0</script>"
+    ></iframe>
+    <iframe
+      id="opaque"
+      title="이미지 콘솔"
+      sandbox="allow-scripts"
+      srcdoc="<body style='margin:0;background:rgb(20,180,90)'><h2>이미지로 가져올 화면</h2><button>선택</button>"
+    ></iframe>
+    <iframe
+      id="partial"
+      title="부분 표시 콘솔"
+      sandbox
+      srcdoc="<body style='margin:0;background:rgb(210,60,120)'>부분 화면"
+    ></iframe>
+    <iframe id="offscreen" title="화면 밖 콘솔" sandbox srcdoc="<body>화면 밖</body>"></iframe>
+    <script>
+      window.addEventListener('load', () => {
+        document.querySelector('#same').contentWindow.scrollTo(0, 8);
+        window.framesReady = true;
+      });
+    </script>
+  </body>
+</html>

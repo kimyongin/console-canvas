@@ -59,6 +59,7 @@ export function createEditorController(options) {
       parent_id: node.parentId,
       ...(node.copiedFrom ? { copied_from: node.copiedFrom } : {}),
       locator: node.locator,
+      ...(node.frame ? { frame: node.frame } : {}),
       captured_visible: node.visible,
       deleted,
       original_rect: node.rect,

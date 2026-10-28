@@ -76,20 +76,24 @@
     const nodes = [],
       warnings = [],
       assets = new Set(),
-      imageJobs = [];
+      contexts = new Map([[doc, { x: scrollX, y: scrollY, sx: 1, sy: 1, frames: [] }]]);
     let counter = 0,
       traversed = 0;
     const maxElements = options.maxElements || 15000;
-    const bounds = (element) => {
-      const r = element.getBoundingClientRect();
+    const project = (r, owner) => {
+      const c = contexts.get(owner);
       return {
-        x: Math.round((r.left + scrollX) * 100) / 100,
-        y: Math.round((r.top + scrollY) * 100) / 100,
-        width: Math.round(r.width * 100) / 100,
-        height: Math.round(r.height * 100) / 100,
+        x: Math.round((r.left * c.sx + c.x) * 100) / 100,
+        y: Math.round((r.top * c.sy + c.y) * 100) / 100,
+        width: Math.round(r.width * c.sx * 100) / 100,
+        height: Math.round(r.height * c.sy * 100) / 100,
       };
     };
+    const bounds = (element) => project(element.getBoundingClientRect(), element.ownerDocument);
     function styles(element, pseudo) {
+      const doc = element.ownerDocument,
+        win = doc.defaultView,
+        sourceUrl = doc.baseURI;
       const result = doc.createElement('span').style,
         computed = win.getComputedStyle(element, pseudo);
       for (const property of PROPS) {
@@ -107,6 +111,7 @@
       return { css: result.cssText, computed };
     }
     function locator(element) {
+      const doc = element.ownerDocument;
       const parts = [];
       let current = element;
       for (
@@ -134,11 +139,12 @@
         role: element.getAttribute('role'),
         label: element.getAttribute('aria-label'),
         text: short(element.textContent),
+        ...(contexts.get(doc).frames.length ? { frames: contexts.get(doc).frames } : {}),
       };
     }
     function record(element, parentId, kind = 'element', extra = {}) {
       const id = 'n' + ++counter,
-        computed = win.getComputedStyle(element),
+        computed = element.ownerDocument.defaultView.getComputedStyle(element),
         rect = bounds(element);
       const label =
         element.getAttribute('aria-label') ||
@@ -180,6 +186,8 @@
           rect.height > 0,
         ...extra,
       };
+      const clip = contexts.get(element.ownerDocument).clip;
+      if (clip) node.captureClip = clip;
       nodes.push(node);
       return node;
     }
@@ -206,7 +214,10 @@
         tag: '#text',
         name: short(text),
         text,
-        rect: { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height },
+        rect: project(r, source.ownerDocument),
+        ...(contexts.get(source.ownerDocument).clip
+          ? { captureClip: contexts.get(source.ownerDocument).clip }
+          : {}),
         locator: {
           ...locator(parent),
           text: short(text),
@@ -247,6 +258,7 @@
         name: '생성된 ' + position + (text ? ' · ' + short(text) : ' 아이콘'),
         text,
         rect: parent.rect,
+        ...(parent.captureClip ? { captureClip: parent.captureClip } : {}),
         locator: { ...parent.locator, pseudo: position },
         position: computed.position,
         visible: true,
@@ -315,6 +327,81 @@
           } catch {}
         }
       clone.dataset.uicId = node.id;
+      if (source.tagName === 'IFRAME') {
+        const sx = node.rect.width / (source.offsetWidth || node.rect.width || 1),
+          sy = node.rect.height / (source.offsetHeight || node.rect.height || 1);
+        node.frame = {
+          mode: 'image',
+          url: absolute(source.getAttribute('src') || '', source.ownerDocument.baseURI),
+          contentRect: {
+            x: node.rect.x + source.clientLeft * sx,
+            y: node.rect.y + source.clientTop * sy,
+            width: source.clientWidth * sx,
+            height: source.clientHeight * sy,
+          },
+        };
+        if (clone.style.display === 'inline') clone.style.display = 'inline-block';
+        let child;
+        try {
+          child = source.contentDocument;
+        } catch {}
+        {
+          const parent = contexts.get(source.ownerDocument);
+          if (child?.body && child.defaultView && parent.frames.length < 5 && contexts.size < 33) {
+            const sx = node.rect.width / (source.offsetWidth || node.rect.width || 1),
+              sy = node.rect.height / (source.offsetHeight || node.rect.height || 1),
+              x = node.rect.x + source.clientLeft * sx,
+              y = node.rect.y + source.clientTop * sy,
+              width = child.defaultView.innerWidth,
+              height = child.defaultView.innerHeight;
+            const viewport = { x, y, width: width * sx, height: height * sy };
+            let clip = viewport;
+            if (parent.clip) {
+              const left = Math.max(x, parent.clip.x),
+                top = Math.max(y, parent.clip.y);
+              clip = {
+                x: left,
+                y: top,
+                width: Math.max(
+                  0,
+                  Math.min(x + viewport.width, parent.clip.x + parent.clip.width) - left,
+                ),
+                height: Math.max(
+                  0,
+                  Math.min(y + viewport.height, parent.clip.y + parent.clip.height) - top,
+                ),
+              };
+            }
+            contexts.set(child, {
+              x,
+              y,
+              sx,
+              sy,
+              clip,
+              frames: [
+                ...parent.frames,
+                { selector: node.locator.selector, url: child.location.href },
+              ],
+            });
+            node.kind = 'element';
+            node.frame = { mode: 'dom', url: child.location.href };
+            clone.style.overflow = 'hidden';
+            if (clone.style.display === 'inline') clone.style.display = 'inline-block';
+            const viewportElement = doc.createElement('div'),
+              content = doc.createElement('div');
+            viewportElement.style.cssText = `position:relative;width:${width}px;height:${height}px;overflow:hidden;transform:translateZ(0);background:${child.defaultView.getComputedStyle(child.documentElement).backgroundColor}`;
+            content.style.cssText = `position:relative;width:${width}px;transform:translate(${-child.defaultView.scrollX}px,${-child.defaultView.scrollY}px)`;
+            const body = cloneElement(child.body, node.id),
+              bodyBox = doc.createElement('div');
+            for (const attr of [...body.attributes]) bodyBox.setAttribute(attr.name, attr.value);
+            bodyBox.append(...body.childNodes);
+            content.append(bodyBox);
+            viewportElement.append(content);
+            clone.append(viewportElement);
+            return clone;
+          }
+        }
+      }
       if (raster) {
         let data;
         try {
@@ -335,7 +422,7 @@
         } else {
           clone.textContent =
             source.tagName === 'IFRAME'
-              ? '삽입된 외부 화면'
+              ? 'iframe 이미지 · 보이는 영역을 가져옵니다'
               : '이미지로 가져오지 못한 ' + source.localName;
           clone.style.background = '#f2f4f7';
           clone.style.color = '#667085';
@@ -350,7 +437,7 @@
       }
       if (source.tagName === 'IMG') {
         const data = imageData(source, doc),
-          url = absolute(source.currentSrc || source.src, sourceUrl);
+          url = absolute(source.currentSrc || source.src, source.ownerDocument.baseURI);
         clone.src = data || url;
         clone.removeAttribute('srcset');
         clone.loading = 'eager';
@@ -393,7 +480,7 @@
     }
     const clonedBody = cloneElement(doc.body, null);
     let fonts = '';
-    function fontRules(sheet) {
+    function fontRules(sheet, base) {
       let rules;
       try {
         rules = sheet.cssRules;
@@ -404,14 +491,15 @@
         if (rule.type === 5)
           fonts +=
             rule.cssText.replace(/url\(["']?(.*?)["']?\)/g, (all, url) => {
-              const full = absolute(url, sheet.href || sourceUrl);
+              const full = absolute(url, sheet.href || base);
               if (/^https?:/.test(full)) assets.add(full);
               return 'url("' + full.replace(/"/g, '%22') + '")';
             }) + '\n';
-        if (rule.styleSheet) fontRules(rule.styleSheet);
+        if (rule.styleSheet) fontRules(rule.styleSheet, base);
       }
     }
-    for (const sheet of doc.styleSheets) fontRules(sheet);
+    for (const owner of contexts.keys())
+      for (const sheet of owner.styleSheets) fontRules(sheet, owner.baseURI);
     const width = Math.max(sourceWidth, doc.documentElement.scrollWidth),
       height = Math.max(sourceHeight, doc.documentElement.scrollHeight, doc.body.scrollHeight);
     const policy =
@@ -503,5 +591,15 @@
       screenshot: null,
     };
   }
-  globalThis.UICloneCapture = { capture, version: VERSION };
+  function matchesView(doc, source) {
+    const win = doc.defaultView;
+    return (
+      doc.location.href === source.url &&
+      win.innerWidth === source.viewport.width &&
+      win.innerHeight === source.viewport.height &&
+      win.scrollX === source.scroll.x &&
+      win.scrollY === source.scroll.y
+    );
+  }
+  globalThis.UICloneCapture = { capture, matchesView, version: VERSION };
 })();

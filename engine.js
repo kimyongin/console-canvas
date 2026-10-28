@@ -271,7 +271,15 @@ export class CanvasScene {
     return this;
   }
   async rasterFallbacks() {
-    if (!this.snapshot.screenshot) return;
+    if (!this.snapshot.screenshot) {
+      for (const node of this.nodes.values())
+        if (node.frame?.mode === 'image') {
+          const element = this.elements.get(node.id);
+          if (element)
+            element.textContent = 'iframe 이미지 없음 · 화면을 유지한 채 다시 가져와 주세요';
+        }
+      return;
+    }
     const image = new Image();
     image.src = this.snapshot.screenshot;
     try {
@@ -285,30 +293,42 @@ export class CanvasScene {
       if (node.kind === 'raster') {
         const element = this.elements.get(node.id);
         if (!element || element.querySelector('img')) continue;
-        const r = node.rect,
+        const r = node.frame?.contentRect || node.rect,
           x = r.x - scroll.x,
           y = r.y - scroll.y;
-        if (
-          x < 0 ||
-          y < 0 ||
-          x + r.width > view.width + 1 ||
-          y + r.height > view.height + 1 ||
-          !r.width ||
-          !r.height
-        )
+        const clip = node.captureClip,
+          left = Math.max(0, x, clip ? clip.x - scroll.x : 0),
+          top = Math.max(0, y, clip ? clip.y - scroll.y : 0),
+          right = Math.min(
+            view.width,
+            x + r.width,
+            clip ? clip.x + clip.width - scroll.x : view.width,
+          ),
+          bottom = Math.min(
+            view.height,
+            y + r.height,
+            clip ? clip.y + clip.height - scroll.y : view.height,
+          );
+        if (right <= left || bottom <= top || !r.width || !r.height) {
+          if (node.frame)
+            element.textContent = 'iframe 이미지 · 화면 밖 영역은 가져오지 못했습니다';
           continue;
+        }
         const canvas = document.createElement('canvas'),
-          ratio = image.width / view.width;
-        canvas.width = Math.max(1, Math.round(r.width * ratio));
-        canvas.height = Math.max(1, Math.round(r.height * ratio));
+          ratioX = image.width / view.width,
+          ratioY = image.height / view.height,
+          pixels = (right - left) * ratioX * (bottom - top) * ratioY,
+          scale = Math.min(1, Math.sqrt(16_000_000 / pixels));
+        canvas.width = Math.max(1, Math.round((right - left) * ratioX * scale));
+        canvas.height = Math.max(1, Math.round((bottom - top) * ratioY * scale));
         canvas
           .getContext('2d')
           .drawImage(
             image,
-            x * ratio,
-            y * ratio,
-            r.width * ratio,
-            r.height * ratio,
+            left * ratioX,
+            top * ratioY,
+            (right - left) * ratioX,
+            (bottom - top) * ratioY,
             0,
             0,
             canvas.width,
@@ -316,8 +336,20 @@ export class CanvasScene {
           );
         const img = this.doc.createElement('img');
         img.src = canvas.toDataURL();
-        img.style.cssText = 'display:block;width:100%;height:100%;object-fit:fill';
-        element.replaceChildren(img);
+        img.style.cssText = `position:absolute;display:block;max-width:none;left:${((left - x) / r.width) * 100}%;top:${((top - y) / r.height) * 100}%;width:${((right - left) / r.width) * 100}%;height:${((bottom - top) / r.height) * 100}%;object-fit:fill`;
+        const holder = this.doc.createElement('div');
+        holder.style.cssText =
+          'position:relative;width:100%;height:100%;overflow:hidden;background:#f2f4f7';
+        holder.dataset.uicRasterCoverage =
+          left === x && top === y && right === x + r.width && bottom === y + r.height
+            ? 'full'
+            : 'partial';
+        holder.title =
+          holder.dataset.uicRasterCoverage === 'partial'
+            ? '화면에 보였던 부분만 이미지로 가져왔습니다. 전체 영역을 보이게 한 뒤 다시 가져올 수 있습니다.'
+            : '이미지로 가져온 영역입니다. 내부 요소는 개별 편집할 수 없습니다.';
+        holder.append(img);
+        element.replaceChildren(holder);
       }
   }
   parent(id) {
@@ -962,6 +994,11 @@ export class CanvasScene {
         lift.wrapper.style.left = lift.base.x + offset.x + 'px';
         lift.wrapper.style.top = lift.base.y + offset.y + 'px';
         lift.wrapper.style.zIndex = this.selected === id ? '10' : '1';
+        const clip = this.nodes.get(id)?.captureClip;
+        if (clip && lift.baseline && !this.edits[id]?.dx && !this.edits[id]?.dy) {
+          const b = lift.base;
+          lift.wrapper.style.clipPath = `inset(${Math.max(0, clip.y - b.y)}px ${Math.max(0, b.x + b.width - clip.x - clip.width)}px ${Math.max(0, b.y + b.height - clip.y - clip.height)}px ${Math.max(0, clip.x - b.x)}px)`;
+        } else lift.wrapper.style.clipPath = '';
       }
     }
     this.drawSelection();

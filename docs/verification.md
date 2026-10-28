@@ -1,3 +1,9 @@
+# 검증 기록
+
+## 2026-10-29 · 0.23.0 iframe DOM/이미지 폴백
+
+`npm run check` 종료 코드 0: Python 43·Node 33·Chromium 420 + smoke 2. 신규 19개는 실제 제품 Electron 수집 경로와 실제 렌더 픽셀, 동일 출처·중첩·opaque 프레임, 부분 화면과 저장 복원을 검사했다. `npm run test:desktop:offscreen`은 SDK 22+17 및 정상 종료/재실행 보존을 통과했다. 오프스크린 앱의 스크린샷은 기존 fixture 대체물이므로 OS 수집 검증과 구별한다. 신규 iframe 픽셀 검사는 별도 Chromium 창의 실제 `capturePage` 결과다. [상세](iframe-capture.md). 일반 Chrome 설치 확장은 아직 0.22.2이며 배포 확인은 별도다.
+
 # 버전별 검증 기록
 
 ## 2026-10-28 · 0.22.2 일반 Chrome 설치·서비스 워커 #60

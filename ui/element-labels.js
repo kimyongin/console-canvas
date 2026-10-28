@@ -18,6 +18,11 @@ export function elementLabel(node, aliases = {}) {
   if (typeof aliases[node.id] === 'string') return aliases[node.id];
   if (node.copiedFrom && node.copyRoot === node.id)
     return elementLabel({ ...node, copiedFrom: null }) + ' · 복사본';
+  if (node.tag === 'iframe')
+    return (
+      (node.name && node.name !== 'iframe' ? node.name.slice(0, 24) : '삽입 화면') +
+      (node.frame?.mode === 'dom' ? ' · 요소' : ' · 이미지')
+    );
   const name = (node.locator?.label || node.name || '').replace(/\s+/g, ' ').trim();
   const region =
     !['text', 'icon', 'raster'].includes(node.kind) &&
@@ -53,6 +58,7 @@ export function isMajorElement(node) {
     node.kind === 'raster' ||
     [
       'body',
+      'iframe',
       'main',
       'aside',
       'header',

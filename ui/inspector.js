@@ -48,6 +48,16 @@ export function createInspector({ $, state, kinds, selectNode }) {
     }
     $('#element-kind').textContent =
       count > 1 ? '다중 선택 · ' + count + '개' : (kinds[node.kind] || '요소') + ' · ' + node.tag;
+    if (count === 1 && node.frame) {
+      const coverage = scene.elements.get(id)?.querySelector('[data-uic-raster-coverage]')
+        ?.dataset.uicRasterCoverage;
+      $('#element-kind').textContent =
+        node.frame.mode === 'dom'
+          ? '삽입 화면 · 내부 요소 개별 편집 가능'
+          : coverage === 'partial'
+            ? '삽입 화면 · 보이는 부분만 이미지로 가져옴'
+            : '삽입 화면 · 이미지 전체 이동·삭제·주석 가능';
+    }
     $('#element-name').textContent =
       count > 1 ? count + '개 요소 선택' : elementLabel(node, state.snapshot.layerNames);
     const path = $('#element-path');
