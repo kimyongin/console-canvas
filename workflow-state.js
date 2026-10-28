@@ -1,8 +1,7 @@
 import { copy, validateSnapshot } from './engine.js';
 import { snapshotPoint } from './snapshot-history.js';
-export function cleanHandoffSettings(value) {
-  return { mode: value?.mode === 'exact' ? 'exact' : 'reference' };
-}
+import { cleanHandoffSettings } from './handoff-settings.js';
+export { cleanHandoffSettings } from './handoff-settings.js';
 export function sourcePath(source) {
   try {
     const url = new URL(source.url);

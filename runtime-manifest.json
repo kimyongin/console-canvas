@@ -29,6 +29,7 @@
     "fixtures/console.html",
     "fixtures/console.js",
     "handoff-image.js",
+    "handoff-settings.js",
     "layer-names.js",
     "node-index.js",
     "preview.html",
@@ -89,7 +90,7 @@
     "workflow-state.js"
   ],
   "files": {
-    "README.md": "4514497c062095db48c8c23793104efb2d52bf5ef0cefeb258951b39c525b19f",
+    "README.md": "354f922f6d5eefd9a01a76eeebdbcfde7e18d481b94f2e495eb3d51a26c0656d",
     "THIRD_PARTY_NOTICES.txt": "5f231d5788ac0c20a23b3c2dc6f89d405314ca0a18b9d38f0bf9f693a2431ebd",
     "activity-history.js": "16464676f61d11e094df60c5a0ea67d9d7f6c232129bad2b4cda0e0e581df8f3",
     "agent-guide.md": "f7a1cf5861f528a6c2f7a0d28bde79c9d322f98c333fd9258337156c2f98199a",
@@ -102,7 +103,7 @@
     "capture.js": "1fb993f9eec1f6de0f967bd3ac4c0baa6aad2e154bcf7b56e1f038677582ac0a",
     "code-patches.js": "e754cb0c8c4578e8e53288e29a6f5c7a36f7315f9f44ff0f3beee7406bfb6e1f",
     "copy-model.js": "1fdc606735436ca82b533fe6bf1da21c3d8f8f8a64f64591a06ae410a615671e",
-    "db.js": "f28d9a29bacc4cd9ed475b4d4a70d0d6ebd4be74467383798e3332eab0e9e8e0",
+    "db.js": "cec55ce167eefc63d4f47359a7bd2d5f93075e4f6c4b498b6cb76d9d348132b0",
     "design-intent.js": "dea11d2540a29150a36e63b4dd664ebf8d9931a567507711e77d5a4dfbfc009d",
     "desktop/capture.cjs": "84d1d45fbae4253dd016373b3559a4202393d3b1c4b422bff97dbef01fa043ae",
     "desktop/files.cjs": "f47aae589eae845c696429e8098c5235b1d392457cd54a77cece87cb8683b148",
@@ -124,7 +125,7 @@
     "edit-policy.json": "825ffca619fc44952adfab20fb41d9480f2fdfdb930c1190eb31b2a99d33bc62",
     "editor-controller.js": "54ee74d2670678d6c277d4459781b015e0740d15b31fb0ad126953a3c38b057a",
     "editor-runtime.css": "42c06adf3cc8652053a0699494258082c901b2b8b9619f83cb05bffd2190f499",
-    "editor-runtime.js": "ffcdb02a5e6a2906075fcdee557ff9537d696d9c2ff149231cd8e236b590fb61",
+    "editor-runtime.js": "fbb368416492a90e9150aa2216ef1beeb8e1df4af0e979a90c1eea9658e93f8c",
     "editor-session.js": "940ad35f7cf61fa036de2e72a26c78a69067726215274b7a230f9ed0336a55fc",
     "editor.css": "27b2648996f5afea0cb925580c088508c1288cd7852d8031b726903e3136075d",
     "editor.html": "00c625f4bbf1f47c7256ef05641d6c09a032b321abd127ff63f77297bb7c6f00",
@@ -135,16 +136,17 @@
     "fixtures/console.html": "a8802e78c4cb71b73fa404e3707a9cfe382efa2aa8b7820c1049dc54d31bd77b",
     "fixtures/console.js": "2fdf91284b91a9465b165c778a481b0c0745c1508a895bc108393c101fdb8d94",
     "handoff-image.js": "e27632a200cda571f9855ab0e9f053b618461216776f099fd9b9329ecfebe0fa",
+    "handoff-settings.js": "40ec281a7cbe8876819c4b51bd160f2b3ac091fc2a362720db683707824ab869",
     "layer-names.js": "279841cdf2a296ada224f2acdcb134c3c5b0bab5dc2523cbc65555961d28faeb",
-    "manifest.json": "cc0d72183fdf9f6b9dab9ea42a616e15bbf657975599ecda7ed30f556911b03b",
+    "manifest.json": "4b1dc43678bd193bec53219f8706a3d3d4eeeaf6ec8542788ce4404930af0643",
     "mcp/app_update.py": "6b0caa949e6abc80d158408d39d3756803f31b10b8998f50e0e569996ef07d6c",
     "mcp/bridge.py": "b4d7521ddfd4afb3e5150545348be3ab95fb8184ed2839ce89d594bf395789d2",
     "mcp/modern.py": "0d44ae0bd1bea863556367b761d1e1c9e69e374ab6135993e84218a772f3a683",
     "mcp/server.py": "665a67675dfd8b2650ef9b4f1aebbe3e41cac5848dd9221d365c7738383ba5b3",
     "mcp/skill_install.py": "5fa7b457bf234d8020ebf2b9d3181c8ba1b22bce1f955775322a31a75da05397",
     "node-index.js": "c6f454f9ec03fede28a554f1eac9a337a8eb3ca93bffa76726a82afebc2ba573",
-    "package.json": "0cba380f7b6e6abb6f81495c2d9a966d44a8e598d70e8d44bf258304622281b0",
-    "preview.html": "08f5fe326421b0e061a757661cb14b569dd11e142c5c917bde0f2320fe1854f6",
+    "package.json": "52d03b06e8a8a06d7a172ac7ad2b3c07006f8e4c764f01ab964f8b2a56b9c321",
+    "preview.html": "f7245fd611aed56e49fbc7f626dacb59ffaa902dcdd9e9bc8397a792a02e24e2",
     "review-image.html": "43880b236da7cf6ca65ceb38cf5ac88e0ee90e09ed073b4e7bb14966d71e1e39",
     "review-image.js": "f2f9a61f0aae01a09a26ffa7d97684410c6b12c31c56640b992d35bd172c75bd",
     "sample.uiclone.json": "a90e333b7ff628b0a41f7ef6091c5731096d360ffdb7acebe564b081691c0cb1",
@@ -199,6 +201,6 @@
     "ui/version-preview.js": "34a0e375d448d40f53fa926cd331b2ecc375740ecfde61c76ccfce933f8421a5",
     "ui/workspace-layout.js": "f0a27f4836174c776dad855e69de0585066d311dce9c723c12963e35b30d7d92",
     "webmcp-client.js": "6333b7aa916b1c47d2efe704fd448e0e47b5fbea0769cf90cd4c61ae584ae8ec",
-    "workflow-state.js": "d28deb6a00cad94c48284a703fc53e47b5b5b31db7857fa9d476d678fc44542e"
+    "workflow-state.js": "ed8d05bc2385769fb71fcf432594a6ba651738fe7d0908ab074e910c9aa273ea"
   }
 }

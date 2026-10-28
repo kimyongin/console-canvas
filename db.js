@@ -1,4 +1,4 @@
-import { cleanHandoffSettings } from './workflow-state.js';
+import { cleanHandoffSettings } from './handoff-settings.js';
 import { cleanAiDraft } from './ai-draft.js';
 // Captures are immutable; edits and lightweight recent-document metadata are separate.
 export const DATABASE_NAME = 'console-canvas-workspace';

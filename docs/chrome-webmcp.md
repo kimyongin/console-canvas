@@ -1,5 +1,7 @@
 # Chrome 확장과 에이전트 연결 · 0.20
 
+2026-10-28 추가 검증: 0.22.2를 일반 Chrome 156.0.8078.48에 압축 해제로 설치하고 도구 모음 버튼→로컬 가상 NORTH 수집→364요소 편집기/자동 저장을 확인했다. 0.22.1의 background JSON 모듈 로드 실패를 수정하고 같은 경로/ID로 다시 로드했다. [설치와 검증 범위](chrome-install-0.22.2.md). 이 확인은 일반 사이트 리소스 전체·WebMCP 실연결·스토어/동일 ID 장기 업데이트 검증 완료를 의미하지 않는다.
+
 확장 단독 편집에는 Node·Python·별도 호스트가 필요 없다. `npm run build`가 만드는 `dist/console-canvas-chrome.zip`을 풀고 Chrome 확장 관리의 개발자 모드에서 `console-canvas` 폴더를 로드한다. 원하는 HTTP/HTTPS 페이지에서 확장 버튼을 누르면 복제본 편집기를 연다. 원본 화면은 수정하지 않는다.
 
 현재는 개발자용 압축 해제 배포다. Chrome 웹 스토어에 게시하거나 승인받은 상태가 아니다. 확인한 환경은 macOS Apple Silicon, Chrome **155.0.8059.85**, 공식 Chrome DevTools MCP **1.12.0**의 격리 headless 프로필과 `--enable-features=WebMCP`다. 이 조합을 최소 지원 버전이나 일반 창 검증 완료로 해석하지 않는다. WebMCP가 없어도 일반 편집은 사용할 수 있다.
