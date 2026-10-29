@@ -119,7 +119,15 @@ export async function buildHandoffImage(
   const size = { width: view.width, height: view.height };
   const after = await createImageBitmap(await screenshot(scene.serialize(), renderSize));
   let before;
-  if (reference) before = await createImageBitmap(await screenshot(reference.html, renderSize));
+  if (reference) {
+    // The before bitmap and annotation rectangles must share the current view's
+    // origin, including areas exposed by moving beyond a captured crop.
+    const html = reference.html.replace(
+      /(<meta name="console-canvas-view" content=")[^"]*(">)/,
+      (_match, start, end) => start + [view.x, view.y, view.width, view.height].join(',') + end,
+    );
+    before = await createImageBitmap(await screenshot(html, renderSize));
+  }
   try {
     const width = Math.max(1440, Math.min(2200, size.width + 80)),
       margin = 40,

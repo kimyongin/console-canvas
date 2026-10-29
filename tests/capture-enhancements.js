@@ -1,3 +1,5 @@
+import { CanvasScene } from '../engine.js';
+import { buildHandoffImage } from '../handoff-image.js';
 import { buildCapturedPhoto, coveredArea } from '../capture-reference.js';
 import { prepareCaptureScope, renderScope } from '../capture-scope.js';
 import { resourceCandidates, validateResourcePatch, decodeResource } from '../resource-repair.js';
@@ -221,6 +223,77 @@ try {
       app.state.timeline.entries.some((e) => e.id === a.id) &&
       app.state.timeline.entries.some((e) => e.id === b.id),
   );
+  const scratch = document.createElement('iframe');
+  document.body.append(scratch);
+  const rectangle = (x, y, width, height) => ({ x, y, width, height });
+  const fixture = {
+    format: 'console-canvas-snapshot',
+    version: 1,
+    id: 'crop-deleted-reference',
+    capturedAt: '2026-10-29T00:00:00Z',
+    source: {
+      url: 'https://example.test/console',
+      title: 'Crop reference regression',
+      width: 1000,
+      height: 500,
+      viewport: { width: 1000, height: 500 },
+      scroll: { x: 0, y: 0 },
+    },
+    warnings: [],
+    captureScope: { mode: 'region', rect: rectangle(100, 100, 400, 200) },
+    html: '<!doctype html><body data-uic-id="n1" style="margin:0;width:1000px;height:500px;background:white"><div data-uic-id="n2" style="position:absolute;left:150px;top:150px;width:30px;height:30px;background:#ff0000"></div><div data-uic-id="n3" style="position:absolute;left:280px;top:150px;width:20px;height:20px;background:blue"></div></body>',
+    nodes: [
+      {
+        id: 'n1',
+        parentId: null,
+        tag: 'body',
+        name: 'Canvas',
+        kind: 'element',
+        visible: true,
+        position: 'static',
+        rect: rectangle(0, 0, 1000, 500),
+      },
+      {
+        id: 'n2',
+        parentId: 'n1',
+        tag: 'div',
+        name: 'Red target',
+        kind: 'element',
+        visible: true,
+        position: 'absolute',
+        rect: rectangle(150, 150, 30, 30),
+      },
+      {
+        id: 'n3',
+        parentId: 'n1',
+        tag: 'div',
+        name: 'Blue moved target',
+        kind: 'element',
+        visible: true,
+        position: 'absolute',
+        rect: rectangle(280, 150, 20, 20),
+      },
+    ],
+  };
+  const scopedScene = await new CanvasScene(scratch, fixture).mount();
+  scopedScene.setEdits({ n3: { dx: -250, dy: 0 }, n2: { deleted: true } });
+  const handoff = await buildHandoffImage(fixture, scopedScene);
+  const bitmap = await createImageBitmap(handoff.blob),
+    proof = document.createElement('canvas');
+  proof.width = bitmap.width;
+  proof.height = bitmap.height;
+  const context = proof.getContext('2d');
+  context.drawImage(bitmap, 0, 0);
+  const pixels = context.getImageData(0, 0, proof.width, proof.height).data;
+  let red = 0;
+  for (let i = 0; i < pixels.length; i += 4)
+    if (pixels[i] > 240 && pixels[i + 1] < 20 && pixels[i + 2] < 20) red++;
+  check(
+    'Deleted-reference thumbnail keeps its red target after a cropped canvas expands left',
+    red > 100,
+  );
+  bitmap.close();
+  scratch.remove();
   document.querySelector('#status').textContent = results.length + '/' + results.length + ' passed';
   document.body.dataset.result = 'pass';
 } catch (error) {
