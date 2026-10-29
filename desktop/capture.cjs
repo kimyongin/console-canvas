@@ -3,10 +3,11 @@ const path = require('node:path');
 const { webUrl } = require('./security.cjs');
 const { captureWithProtocol } = require('./capture-cdp.cjs');
 const { prepareCaptureView } = require('./capture-view.cjs');
+const { readPublicResource } = require('./capture-resources.cjs');
 async function captureWebsite(contents, root, options = {}) {
   webUrl(contents.getURL());
-  const prepared = await prepareCaptureView(contents);
   const code = await fs.readFile(path.join(root, 'capture.js'), 'utf8');
+  const prepared = await prepareCaptureView(contents, code);
   const protocol = contents.debugger;
   if (protocol.isAttached())
     throw Error('원본 화면 개발자 도구가 연결되어 있습니다. 연결을 마친 뒤 다시 가져와 주세요.');
@@ -43,6 +44,7 @@ async function captureWebsite(contents, root, options = {}) {
         }
       },
       code,
+      readResource: (url) => readPublicResource(url, require('electron').net.fetch),
       onProgress: options.onProgress,
       getTargets: () => targets,
       beforeScreenshot: async () => {

@@ -5,6 +5,7 @@ const nap = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const message = (error) => String(error?.message || error || 'Frame capture unavailable');
 export async function captureChromeTab(chrome, tab, layoutAttempt = 0) {
   const target = { tabId: tab.id };
+  await chrome.scripting.executeScript({ target, files: ['capture.js'] });
   // Load lazy content before collecting DOM, while preserving the source view.
   await chrome.scripting.executeScript({
     target,
@@ -16,15 +17,16 @@ export async function captureChromeTab(chrome, tab, layoutAttempt = 0) {
         for (
           let y = 0, steps = 0;
           y <
-            Math.min(
-              24000,
-              Math.max(document.documentElement.scrollHeight, document.body.scrollHeight),
-            ) && steps < 32;
+            Math.min(24000, (document.scrollingElement || document.documentElement).scrollHeight) &&
+          steps < 32;
           y += Math.max(300, innerHeight - 200), steps++
         ) {
           if (location.href !== original.url) throw Error('가져오는 동안 주소가 바뀌었습니다.');
           scrollTo({ left: original.x, top: y, behavior: 'instant' });
-          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+          await Promise.race([
+            new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
+            new Promise((r) => setTimeout(r, 250)),
+          ]);
           await Promise.race([
             Promise.all(
               [...document.images]
@@ -36,6 +38,7 @@ export async function captureChromeTab(chrome, tab, layoutAttempt = 0) {
             ),
             new Promise((r) => setTimeout(r, 400)),
           ]);
+          await globalThis.UICloneCapture?.settleVisibleMedia?.(document);
         }
       } finally {
         if (location.href === original.url) {
@@ -206,7 +209,10 @@ export async function captureChromeTab(chrome, tab, layoutAttempt = 0) {
               window.scrollTo({ left: x, top: y, behavior: 'instant' });
               await new Promise((r) => setTimeout(r, 200));
               window.scrollTo({ left: x, top: y, behavior: 'instant' });
-              await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+              await Promise.race([
+                new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
+                new Promise((r) => setTimeout(r, 250)),
+              ]);
               return { x: scrollX, y: scrollY, width: innerWidth, height: innerHeight };
             },
             [x, y],
@@ -246,9 +252,7 @@ export async function captureChromeTab(chrome, tab, layoutAttempt = 0) {
           24000,
           Math.max(
             limitHeight,
-            await run(() =>
-              Math.max(document.documentElement.scrollHeight, document.body.scrollHeight),
-            ),
+            await run(() => (document.scrollingElement || document.documentElement).scrollHeight),
           ),
         );
         if (last.rect.y + last.rect.height >= limitHeight) break;
@@ -283,7 +287,10 @@ export async function captureChromeTab(chrome, tab, layoutAttempt = 0) {
   if (!interrupted && (await sameViewport().catch(() => false))) {
     try {
       await run(async () => {
-        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        await Promise.race([
+          new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
+          new Promise((r) => setTimeout(r, 250)),
+        ]);
         await Promise.race([
           Promise.all(
             document
@@ -373,7 +380,10 @@ export async function captureChromeTab(chrome, tab, layoutAttempt = 0) {
           scrollTo({ left: 0, top: y, behavior: 'instant' });
           await new Promise((r) => setTimeout(r, 200));
           scrollTo({ left: 0, top: y, behavior: 'instant' });
-          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+          await Promise.race([
+            new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
+            new Promise((r) => setTimeout(r, 250)),
+          ]);
           return { x: scrollX, y: scrollY, width: innerWidth, height: innerHeight };
         },
         [Math.max(0, snapshot.source.height - initial.viewport.height)],

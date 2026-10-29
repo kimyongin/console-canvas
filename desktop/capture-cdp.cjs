@@ -7,6 +7,7 @@ async function captureWithProtocol({
   onProgress = () => {},
   getTargets = () => [],
   beforeScreenshot = async () => {},
+  readResource,
 }) {
   const screenshot = async (params) => {
     await beforeScreenshot();
@@ -57,6 +58,17 @@ async function captureWithProtocol({
   }
   const call = (frame, method, params = {}) => send(method, params, frame.session);
   async function resourceContent(frame, resource) {
+    try {
+      return await inspectorResourceContent(frame, resource);
+    } catch (error) {
+      // The source CSP may allow font-src/img-src but reject connect-src.
+      // Read only an observed resource, with no source cookies or auth headers.
+      if (readResource && ['Font', 'Image'].includes(resource.type))
+        return readResource(resource.url);
+      throw error;
+    }
+  }
+  async function inspectorResourceContent(frame, resource) {
     try {
       return await call(frame, 'Page.getResourceContent', { frameId: frame.id, url: resource.url });
     } catch {
@@ -372,7 +384,7 @@ async function captureWithProtocol({
               for (let attempt = 0; attempt < 4; attempt++) {
                 scroll = await evaluate(
                   root,
-                  `(async()=>{if(location.href!==${JSON.stringify(snapshot.source.url)})throw Error('Source navigated');scrollTo({left:0,top:${y},behavior:'instant'});await new Promise(r=>setTimeout(r,200));scrollTo({left:0,top:${y},behavior:'instant'});await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(r))));return {x:scrollX,y:scrollY}})()`,
+                  `(async()=>{if(location.href!==${JSON.stringify(snapshot.source.url)})throw Error('Source navigated');scrollTo({left:0,top:${y},behavior:'instant'});await new Promise(r=>setTimeout(r,200));scrollTo({left:0,top:${y},behavior:'instant'});await Promise.race([new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(r)))),new Promise(r=>setTimeout(r,250))]);return {x:scrollX,y:scrollY}})()`,
                 );
                 tile = await screenshot({
                   format: 'png',
@@ -430,7 +442,7 @@ async function captureWithProtocol({
           } finally {
             await evaluate(
               root,
-              `(async()=>{if(location.href!==${JSON.stringify(snapshot.source.url)})return;scrollTo({left:${current.x},top:${current.y},behavior:'instant'});await new Promise(r=>setTimeout(r,250));await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));})()`,
+              `(async()=>{if(location.href!==${JSON.stringify(snapshot.source.url)})return;scrollTo({left:${current.x},top:${current.y},behavior:'instant'});await new Promise(r=>setTimeout(r,250));await Promise.race([new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))),new Promise(r=>setTimeout(r,250))]);})()`,
             );
           }
         }
@@ -472,7 +484,7 @@ async function captureWithProtocol({
               if (snapshot.screenshotTiles.length >= 32) break;
               const view = await evaluate(
                 root,
-                `(async()=>{scrollTo({left:${Math.max(0, area.x - 20)},top:${Math.max(0, y - 50)},behavior:'instant'});await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(r))));return {x:scrollX,y:scrollY,width:innerWidth,height:innerHeight};})()`,
+                `(async()=>{scrollTo({left:${Math.max(0, area.x - 20)},top:${Math.max(0, y - 50)},behavior:'instant'});await Promise.race([new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(r)))),new Promise(r=>setTimeout(r,250))]);return {x:scrollX,y:scrollY,width:innerWidth,height:innerHeight};})()`,
               );
               const x = Math.max(area.x, view.x),
                 top = Math.max(area.y, view.y),
@@ -497,7 +509,7 @@ async function captureWithProtocol({
         } finally {
           await evaluate(
             root,
-            `(async()=>{if(location.href!==${JSON.stringify(snapshot.source.url)})return;scrollTo({left:${current.x},top:${current.y},behavior:'instant'});await new Promise(r=>setTimeout(r,250));await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));})()`,
+            `(async()=>{if(location.href!==${JSON.stringify(snapshot.source.url)})return;scrollTo({left:${current.x},top:${current.y},behavior:'instant'});await new Promise(r=>setTimeout(r,250));await Promise.race([new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))),new Promise(r=>setTimeout(r,250))]);})()`,
           );
         }
         snapshot.captureCorrections = correctedFrames;
@@ -578,6 +590,13 @@ async function captureWithProtocol({
               }) +
               ')';
             if (frame === root) {
+              // Reading/decoding a lazy page can itself finish deferred image
+              // paint. Prime the tree before photographs, then serialize the
+              // final tree below so screenshots do not contain stale blanks.
+              await evaluate(
+                root,
+                `(async()=>{await ${expression};await Promise.race([new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))),new Promise(r=>setTimeout(r,250))]);return true})()`,
+              );
               const source = await evaluate(
                 root,
                 '({url:location.href,viewport:{width:innerWidth,height:innerHeight},scroll:{x:scrollX,y:scrollY}})',

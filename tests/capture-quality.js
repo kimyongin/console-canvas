@@ -24,6 +24,10 @@ try {
   );
   const frames = snapshot.nodes.filter((n) => n.tag === 'iframe');
   check(
+    'A clipped root keeps the actual scrollable canvas instead of hidden body height',
+    globalThis.clippedRootHeight,
+  );
+  check(
     'Scroll-driven layout collapse is aligned using original element anchors ' +
       JSON.stringify({
         mode: snapshot.captureReport.screenshotMode,
@@ -99,6 +103,16 @@ try {
   const scene = await new CanvasScene(document.querySelector('#clone'), snapshot, {
     smartSelection: true,
   }).mount();
+  check(
+    'Readable compressed photos retain original JPEG bytes instead of expanding to PNG',
+    scene.elements.get(node('compressed-photo').id).src.startsWith('data:image/jpeg;'),
+  );
+  check(
+    'Gradient border images retain their paint definition',
+    scene.doc.defaultView
+      .getComputedStyle(scene.elements.get(node('gradient-border').id))
+      .borderImageSource.startsWith('linear-gradient('),
+  );
   check(
     'Frame backgrounds and body content preserve positions',
     frames.every((n) => near(scene.rect(n.id).x, n.rect.x) && near(scene.rect(n.id).y, n.rect.y)),

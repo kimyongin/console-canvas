@@ -1,8 +1,23 @@
 // Bring lazy-loaded public view content into the renderer before freezing the
 // DOM/resources. Only the viewport moves; no service controls are activated.
-async function prepareCaptureView(contents) {
-  const read = (expression) =>
-    contents.executeJavaScriptInIsolatedWorld(1002, [{ code: expression }]);
+async function prepareCaptureView(contents, collectorCode = '', { timeoutMs = 10000 } = {}) {
+  const read = async (expression) => {
+    let timer;
+    try {
+      return await Promise.race([
+        contents.executeJavaScriptInIsolatedWorld(1002, [{ code: expression }]),
+        new Promise((_, reject) => {
+          timer = setTimeout(
+            () => reject(Error('원본 화면 응답이 지연되어 가져오기를 중단했습니다.')),
+            timeoutMs,
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  if (collectorCode) await read(collectorCode);
   const original = await read(
     '({url:location.href,x:scrollX,y:scrollY,width:innerWidth,height:innerHeight})',
   );
@@ -12,9 +27,7 @@ async function prepareCaptureView(contents) {
       let y = 0;
       y <
         Math.min(
-          await read(
-            'Math.max(document.documentElement.scrollHeight,document.body?.scrollHeight||0)',
-          ),
+          await read('(document.scrollingElement||document.documentElement).scrollHeight'),
           24000,
         ) && steps < 32;
       y += Math.max(300, original.height - 200)
@@ -22,14 +35,14 @@ async function prepareCaptureView(contents) {
       if ((await read('location.href')) !== original.url)
         throw Error('가져오는 동안 원본 주소가 변경되었습니다.');
       await read(
-        `(async()=>{scrollTo({left:${original.x},top:${y},behavior:'instant'});await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));const images=[...document.images].filter(i=>{const r=i.getBoundingClientRect();return r.bottom>0&&r.top<innerHeight});await Promise.race([Promise.all(images.map(i=>i.decode().catch(()=>{}))),new Promise(r=>setTimeout(r,500))]);})()`,
+        `(async()=>{scrollTo({left:${original.x},top:${y},behavior:'instant'});await Promise.race([new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))),new Promise(r=>setTimeout(r,250))]);await globalThis.UICloneCapture?.settleVisibleMedia(document);})()`,
       );
       steps++;
     }
   } finally {
     if ((await read('location.href')) === original.url)
       await read(
-        `(async()=>{scrollTo({left:${original.x},top:${original.y},behavior:'instant'});await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));})()`,
+        `(async()=>{scrollTo({left:${original.x},top:${original.y},behavior:'instant'});await Promise.race([new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))),new Promise(r=>setTimeout(r,250))]);})()`,
       );
   }
   await read(

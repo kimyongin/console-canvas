@@ -31,6 +31,7 @@
     border-top-width border-right-width border-bottom-width border-left-width border-top-style border-right-style border-bottom-style border-left-style
     border-top-color border-right-color border-bottom-color border-left-color border-top-left-radius border-top-right-radius border-bottom-left-radius border-bottom-right-radius
     border-collapse border-spacing table-layout caption-side empty-cells vertical-align
+    border-image-source border-image-slice border-image-width border-image-outset border-image-repeat
     color background-color background-image background-size background-position background-repeat background-origin background-clip background-attachment
     font-family font-size font-size-adjust font-weight font-style font-stretch font-variant font-feature-settings font-kerning font-variation-settings font-optical-sizing font-palette font-synthesis font-language-override line-height letter-spacing word-spacing
     text-align text-align-last text-decoration text-transform text-indent text-overflow text-shadow text-rendering white-space word-break overflow-wrap direction writing-mode
@@ -684,6 +685,8 @@
         let data;
         try {
           const canvas = source.tagName === 'CANVAS' ? source : doc.createElement('canvas');
+          // Prefer the raw frame: a composited screenshot can bake HTML text
+          // and gradients over the video and duplicate those editable overlays.
           if (source.tagName === 'VIDEO') {
             canvas.width = source.videoWidth;
             canvas.height = source.videoHeight;
@@ -696,6 +699,11 @@
           const image = doc.createElement('img');
           image.src = data;
           image.style.cssText = 'width:100%;height:100%;object-fit:fill;display:block';
+          if (source.tagName === 'VIDEO') {
+            const style = source.ownerDocument.defaultView.getComputedStyle(source);
+            image.style.objectFit = style.objectFit;
+            image.style.objectPosition = style.objectPosition;
+          }
           clone.append(image);
         } else {
           clone.textContent =
@@ -709,7 +717,11 @@
           type: 'raster',
           id: node.id,
           message:
-            source.localName + ' 영역은 한 개의 레이어입니다. 내부 개체는 분리되지 않습니다.',
+            source.localName +
+            ' 영역은 한 개의 레이어입니다. 내부 개체는 분리되지 않습니다.' +
+            (source.tagName === 'VIDEO'
+              ? ' 영상은 수집 시점의 정지 이미지이며 다른 촬영 시점과 다를 수 있습니다.'
+              : ''),
         });
         return clone;
       }
@@ -744,7 +756,7 @@
           },
         };
         imageJobs.push({ node, clone, url, data });
-        if (!data && /^https?:/.test(url)) assets.add(url);
+        if (/^https?:/.test(url)) assets.add(url);
       }
       if (source.tagName === 'INPUT') {
         clone.setAttribute('value', source.type === 'password' ? '' : source.value);
@@ -817,7 +829,7 @@
     for (const owner of contexts.keys())
       for (const sheet of owner.styleSheets) fontRules(sheet, owner.baseURI);
     const width = Math.max(sourceWidth, doc.documentElement.scrollWidth),
-      height = Math.max(sourceHeight, doc.documentElement.scrollHeight, doc.body.scrollHeight);
+      height = Math.max(sourceHeight, (doc.scrollingElement || doc.documentElement).scrollHeight);
     const policy =
       "default-src 'none'; script-src 'none'; img-src data: blob: https: http:; style-src 'unsafe-inline'; font-src data: https: http:; frame-src 'none'; connect-src 'none'; form-action 'none'; base-uri 'none';";
     // Embed resources when the source page can read them. Unreadable cross-origin URLs remain explicit.
@@ -900,7 +912,13 @@
         cacheSize += data.length;
       }
     for (const job of imageJobs) {
-      const candidate = job.data || available.get(job.url);
+      const original = available.get(job.url);
+      // Keep the original compressed photo when available. Re-encoding every
+      // readable JPEG/WebP as PNG can exceed the document budget manyfold.
+      const candidate =
+        original && !/^data:image\/(?:svg\+xml|gif);/.test(original)
+          ? original
+          : job.data || original;
       let staticWebp = false;
       if (typeof candidate === 'string' && /^data:image\/webp;base64,/.test(candidate)) {
         try {
@@ -1060,6 +1078,39 @@
       win.innerHeight === source.viewport.height &&
       win.scrollX === source.scroll.x &&
       win.scrollY === source.scroll.y
+    );
+  }
+  async function settleVisibleMedia(doc = document, timeout = 800) {
+    const win = doc.defaultView,
+      jobs = [],
+      urls = new Set();
+    for (const element of [...doc.querySelectorAll('*')].slice(0, 15000)) {
+      const r = element.getBoundingClientRect();
+      if (
+        !r.width ||
+        !r.height ||
+        r.bottom <= 0 ||
+        r.top >= win.innerHeight ||
+        r.right <= 0 ||
+        r.left >= win.innerWidth
+      )
+        continue;
+      if (element.localName === 'img') jobs.push(element.decode().catch(() => {}));
+      for (const pseudo of [null, '::before', '::after'])
+        for (const match of win
+          .getComputedStyle(element, pseudo)
+          .backgroundImage.matchAll(/url\(["']?([^)'"\s]+)["']?\)/g))
+          urls.add(absolute(match[1], doc.baseURI));
+    }
+    for (const url of urls) {
+      const image = new win.Image();
+      image.src = url;
+      jobs.push(image.decode().catch(() => {}));
+    }
+    await deadline(Promise.all(jobs), timeout);
+    await deadline(
+      new Promise((r) => win.requestAnimationFrame(() => win.requestAnimationFrame(r))),
+      250,
     );
   }
   let surfaceStop = () => {},
@@ -1268,6 +1319,7 @@
   globalThis.UICloneCapture = {
     capture,
     matchesView,
+    settleVisibleMedia,
     fingerprint,
     anchors,
     headerInset,

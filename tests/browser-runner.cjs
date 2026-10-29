@@ -28,6 +28,7 @@ async function main() {
           '.json': 'application/json',
           '.svg': 'image/svg+xml',
           '.webp': 'image/webp',
+          '.jpg': 'image/jpeg',
         }[path.extname(filename)] || 'application/octet-stream',
       );
       response.end(content);
@@ -71,7 +72,11 @@ async function main() {
     'followup',
     'navigation',
   ]) {
-    let iframeSnapshot, iframeNativeSnapshot, iframeSourceUnchanged, truncatedPngRejected;
+    let iframeSnapshot,
+      iframeNativeSnapshot,
+      iframeSourceUnchanged,
+      truncatedPngRejected,
+      clippedRootHeight;
     if (['iframes', 'capture-quality'].includes(suite)) {
       window.setContentSize(900, 700);
       await window.loadURL(
@@ -110,6 +115,14 @@ async function main() {
         `JSON.stringify({html:document.documentElement.outerHTML,scroll:document.querySelector('#same')?.contentWindow.scrollY,actions:document.querySelector('#same')?.contentWindow.actions})`,
       );
       iframeSourceUnchanged = before === after;
+      if (suite === 'capture-quality')
+        clippedRootHeight = await window.webContents.executeJavaScriptInIsolatedWorld(1001, [
+          {
+            code:
+              code +
+              `\n;(async()=>{const html=document.documentElement,old=html.getAttribute('style'),bodyOld=document.body.getAttribute('style');try{html.style.height='100vh';html.style.overflow='hidden';document.body.style.position='fixed';const result=await UICloneCapture.capture(document,{includeFrames:false,fetchAssets:false});return result.source.height===innerHeight && document.body.scrollHeight>innerHeight;}finally{if(old===null)html.removeAttribute('style');else html.setAttribute('style',old);if(bodyOld===null)document.body.removeAttribute('style');else document.body.setAttribute('style',bodyOld);}})()`,
+          },
+        ]);
       window.setContentSize(1600, 1100);
     }
     if (suite === 'capture-quality')
@@ -120,7 +133,7 @@ async function main() {
     await window.loadURL(`http://127.0.0.1:${server.address().port}/tests/${suite}.html`);
     if (iframeSnapshot)
       await window.webContents.executeJavaScript(
-        `globalThis.iframeSnapshot=${JSON.stringify(iframeSnapshot)};globalThis.iframeNativeSnapshot=${JSON.stringify(iframeNativeSnapshot)};globalThis.iframeSourceUnchanged=${iframeSourceUnchanged};globalThis.truncatedPngRejected=${JSON.stringify(truncatedPngRejected)};dispatchEvent(new Event('snapshotready'));`,
+        `globalThis.iframeSnapshot=${JSON.stringify(iframeSnapshot)};globalThis.iframeNativeSnapshot=${JSON.stringify(iframeNativeSnapshot)};globalThis.iframeSourceUnchanged=${iframeSourceUnchanged};globalThis.truncatedPngRejected=${JSON.stringify(truncatedPngRejected)};globalThis.clippedRootHeight=${JSON.stringify(clippedRootHeight)};dispatchEvent(new Event('snapshotready'));`,
       );
     const deadline = Date.now() + 120000;
     let result;

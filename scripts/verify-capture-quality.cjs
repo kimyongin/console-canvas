@@ -293,10 +293,23 @@ async function checkCase(item, base) {
       );
       result.replayed = true;
     } else {
-      await Promise.race([
-        source.loadURL(url),
-        new Promise((_, reject) => setTimeout(() => reject(Error('Source load timeout')), 45000)),
-      ]);
+      let ready, loadTimer;
+      const domReady = new Promise((resolve) => {
+        ready = resolve;
+        source.webContents.once('dom-ready', ready);
+      });
+      try {
+        await Promise.race([
+          source.loadURL(url),
+          domReady,
+          new Promise((_, reject) => {
+            loadTimer = setTimeout(() => reject(Error('Source DOM load timeout')), 45000);
+          }),
+        ]);
+      } finally {
+        clearTimeout(loadTimer);
+        source.webContents.removeListener('dom-ready', ready);
+      }
       await evaluate(
         source.webContents,
         'Promise.race([Promise.all([document.fonts.ready,...[...document.images].map(i=>i.decode().catch(()=>{}))]),new Promise(r=>setTimeout(r,10000))])',
@@ -314,8 +327,10 @@ async function checkCase(item, base) {
     result.sourceTitle = current.source.title;
     result.nodes = current.nodes.length;
     if (
-      /access denied|robot check|captcha|just a moment|forbidden/i.test(result.sourceTitle) ||
-      /봇 확인 절차|간단한 봇 확인|verify you are human|Checking your browser/i.test(
+      /access denied|robot check|captcha|just a moment|forbidden|잠시만 기다리|보안 확인/i.test(
+        result.sourceTitle,
+      ) ||
+      /봇 확인 절차|간단한 봇 확인|보안 확인 수행 중|verify you are human|Checking your browser/i.test(
         current.nodes.map((n) => n.locator?.text || '').join(' '),
       ) ||
       current.nodes.length < 30
@@ -354,6 +369,16 @@ async function checkCase(item, base) {
     );
     const height = Math.min(current.source.height, 12000);
     const width = current.source.viewport.width;
+    if (process.env.CAPTURE_QA_RENDERING && !process.env.CAPTURE_QA_REPLAY) {
+      result.sourceRendering = await evaluate(
+        source.webContents,
+        `(()=>({deferred:[...document.querySelectorAll('*')].filter(e=>getComputedStyle(e).contentVisibility==='auto').slice(0,20).map(e=>({tag:e.localName,cls:e.className})),animations:document.getAnimations({subtree:true}).slice(0,20).map(a=>({state:a.playState,target:a.effect?.target?.localName,cls:a.effect?.target?.className,frames:a.effect?.getKeyframes()}))}))()`,
+      );
+      await fs.writeFile(
+        path.join(directory, 'source-after-dom.png'),
+        (await screenshot(source.webContents, { x: 0, y: 0, width, height })).toPNG(),
+      );
+    }
     const regions = [
       { name: 'viewport', x: 0, y: 0, width, height: current.source.viewport.height },
       { name: 'page', x: 0, y: 0, width, height },
