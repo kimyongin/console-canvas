@@ -32,7 +32,7 @@
     border-top-color border-right-color border-bottom-color border-left-color border-top-left-radius border-top-right-radius border-bottom-left-radius border-bottom-right-radius
     border-collapse border-spacing table-layout caption-side empty-cells vertical-align
     color background-color background-image background-size background-position background-repeat background-origin background-clip background-attachment
-    font-family font-size font-weight font-style font-stretch font-variant font-feature-settings font-kerning font-variation-settings font-optical-sizing line-height letter-spacing word-spacing
+    font-family font-size font-size-adjust font-weight font-style font-stretch font-variant font-feature-settings font-kerning font-variation-settings font-optical-sizing font-palette font-synthesis font-language-override line-height letter-spacing word-spacing
     text-align text-align-last text-decoration text-transform text-indent text-overflow text-shadow text-rendering white-space word-break overflow-wrap direction writing-mode
     line-clamp -webkit-line-clamp -webkit-box-orient -webkit-box-align -webkit-box-pack -webkit-box-flex
     opacity visibility overflow-x overflow-y clip clip-path box-shadow filter backdrop-filter mix-blend-mode isolation
@@ -71,6 +71,22 @@
       .slice(0, 100);
   const deadline = (promise, ms) =>
     Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(null), ms))]);
+  const isFontRule = (rule) =>
+    /^@font-(?:face|feature-values|palette-values)\b/i.test(rule.cssText);
+  function completeImageData(data, win) {
+    if (typeof data !== 'string') return false;
+    if (!/^data:image\/png;base64,/i.test(data)) return true;
+    try {
+      // Blink can decode a truncated PNG and report complete/naturalWidth
+      // while silently painting missing scanlines white. Require its end chunk.
+      return (
+        win.atob(data.slice(data.indexOf(',') + 1).slice(-32)).slice(-12) ===
+        '\x00\x00\x00\x00IEND\xae\x42\x60\x82'
+      );
+    } catch {
+      return false;
+    }
+  }
   function absolute(value, base) {
     try {
       return new URL(value, base).href;
@@ -582,7 +598,8 @@
             try {
               const sheet = new win.CSSStyleSheet();
               sheet.replaceSync(style.textContent);
-              for (const rule of sheet.cssRules) if (rule.type === 5) extraFonts.push(rule.cssText);
+              for (const rule of sheet.cssRules)
+                if (isFontRule(rule)) extraFonts.push(rule.cssText);
             } catch {}
           for (const warning of captured.warnings || [])
             warnings.push({
@@ -700,7 +717,9 @@
         const url = absolute(source.currentSrc || source.src, source.ownerDocument.baseURI),
           cached = options.assetData?.[url],
           data =
-            cached && /^data:image\/(?:jpeg|jpg|png|avif);/.test(cached)
+            cached &&
+            completeImageData(cached, win) &&
+            /^data:image\/(?:jpeg|jpg|png|avif);/.test(cached)
               ? cached
               : imageData(source, doc);
         clone.src = data || url;
@@ -779,7 +798,7 @@
         return;
       }
       for (const rule of rules) {
-        if (rule.type === 5)
+        if (isFontRule(rule))
           fonts +=
             rule.cssText.replace(/url\(["']?(.*?)["']?\)/g, (all, url) => {
               const full = absolute(url, sheet.href || base);
@@ -872,6 +891,7 @@
       ...Object.entries(options.assetData || {}),
       ...assetResults.filter((r) => r.data).map((r) => [r.url, r.data]),
     ]);
+    for (const [url, data] of available) if (!completeImageData(data, win)) available.delete(url);
     let cacheSize = 0;
     resourceCache.clear();
     for (const [url, data] of available)
@@ -903,6 +923,7 @@
         job.clone.src = data;
         job.node.image.mode = 'embedded';
       } else {
+        job.node.image.mode = 'screenshot';
         job.clone.src = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
         job.clone.dataset.uicImageFallback = 'screenshot';
       }

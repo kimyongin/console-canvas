@@ -48,6 +48,19 @@ try {
   );
   check('Font faces inside CSS layers are retained', snapshot.html.includes('CaptureNested'));
   check(
+    'A decodable PNG missing its end chunk is rejected as a complete resource',
+    globalThis.truncatedPngRejected,
+  );
+  check(
+    'Named OpenType feature definitions inside CSS layers survive font collection',
+    snapshot.html.includes('@font-feature-values CaptureNested') &&
+      snapshot.html.includes('capture-shapes: 1 2'),
+  );
+  check(
+    'Independent frame font feature names survive merging into the editable copy',
+    snapshot.html.includes('frame-shapes: 3'),
+  );
+  check(
     'Repeated frame URLs are mapped to separate original owners',
     node('duplicate-one').id !== node('duplicate-two').id &&
       snapshot.nodes.filter((n) => n.locator.id === 'add' && n.tag === 'button').length === 3,
@@ -131,6 +144,29 @@ try {
       scene.elements.get(externalSvg.id).querySelector('img')?.src.startsWith('data:image/png'),
   );
   const bottom = node('bottom');
+  const damaged = copy(snapshot);
+  const parser = new DOMParser().parseFromString(damaged.html, 'text/html');
+  const damagedImage = parser.querySelector('[data-uic-id="' + bottom.id + '"]');
+  const repairCanvas = document.createElement('canvas');
+  repairCanvas.width = 200;
+  repairCanvas.height = 200;
+  repairCanvas.getContext('2d').fillRect(0, 0, 200, 200);
+  damagedImage.src =
+    'data:image/png;base64,' + btoa(atob(repairCanvas.toDataURL().split(',')[1]).slice(0, -12));
+  damaged.html = '<!doctype html>' + parser.documentElement.outerHTML;
+  damaged.nodes.find((n) => n.id === bottom.id).image.mode = 'embedded';
+  const repairFrame = document.createElement('iframe');
+  repairFrame.setAttribute('sandbox', 'allow-same-origin');
+  document.body.append(repairFrame);
+  const repaired = await new CanvasScene(repairFrame, damaged).mount();
+  check(
+    'Older partial PNG captures recover their visible pixels without changing immutable content',
+    repaired.elements.get(bottom.id).dataset.uicImageRendering === 'source-pixels' &&
+      repaired.elements.get(bottom.id).dataset.uicImageCoverage === 'full' &&
+      damaged.html.includes(damagedImage.src) &&
+      damaged.nodes.find((n) => n.id === bottom.id).image.mode === 'embedded',
+  );
+  repairFrame.remove();
   check(
     'Static WebP keeps its complete embedded image without flattening overlays',
     node('static-webp').image.mode === 'embedded' &&

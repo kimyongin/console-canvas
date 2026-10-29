@@ -33,7 +33,8 @@ try {
       const e = scene.elements.get(n.id);
       if (!e) return false;
       return (
-        (n.image?.mode === 'screenshot' && e.dataset.uicImageCoverage !== 'full') ||
+        ((n.image?.mode === 'screenshot' || e.dataset.uicImageRendering === 'source-pixels') &&
+          e.dataset.uicImageCoverage !== 'full') ||
         (n.background?.mode === 'screenshot' && e.dataset.uicBackgroundCoverage !== 'full') ||
         (n.kind === 'raster' &&
           e.dataset.uicRasterCoverage &&

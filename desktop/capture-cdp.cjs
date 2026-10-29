@@ -233,7 +233,11 @@ async function captureWithProtocol({
               : Buffer.from(value.content);
             if (bytes.length > 5_000_000 || assetBytes + bytes.length > 25_000_000) return;
             if (resource.type === 'Stylesheet') {
-              for (const match of bytes.toString().matchAll(/@font-face\s*\{[^}]*\}/gi))
+              for (const match of bytes
+                .toString()
+                .matchAll(
+                  /@font-(?:face|feature-values|palette-values)\b[^{}]*\{(?:[^{}]|\{[^{}]*\})*\}/gi,
+                ))
                 fontCss.push(
                   match[0].replace(/url\(\s*['"]?([^)'"\s]+)['"]?\s*\)/g, (all, url) => {
                     try {

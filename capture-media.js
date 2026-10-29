@@ -120,7 +120,18 @@ export async function applyCaptureMedia(scene) {
         element.style.webkitMaskImage = 'none';
       }
     }
-    if (node.image?.mode === 'screenshot') {
+    let incompletePng = false;
+    if (node.image && /^data:image\/png;base64,/i.test(element.getAttribute('src') || ''))
+      try {
+        const src = element.getAttribute('src');
+        incompletePng =
+          doc.defaultView.atob(src.slice(src.indexOf(',') + 1).slice(-32)).slice(-12) !==
+          '\x00\x00\x00\x00IEND\xae\x42\x60\x82';
+      } catch {
+        incompletePng = true;
+      }
+    // Repair older captures too, without rewriting their immutable HTML/nodes.
+    if (node.image?.mode === 'screenshot' || incompletePng) {
       const result = crop(node.image.contentRect || node.rect, node.captureClip);
       element.dataset.uicImageCoverage = result?.coverage || 'unavailable';
       element.dataset.uicImageRendering = 'source-pixels';

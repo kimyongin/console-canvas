@@ -32,6 +32,8 @@ function pngCompare(a, b, tolerance = 16) {
     right = b.toBitmap(),
     diff = Buffer.alloc(left.length);
   let same = 0,
+    exact = 0,
+    within8 = 0,
     delta = 0;
   for (let i = 0; i < left.length; i += 4) {
     let max = 0;
@@ -40,6 +42,8 @@ function pngCompare(a, b, tolerance = 16) {
       delta += Math.abs(left[i + j] - right[i + j]);
     }
     if (max <= tolerance) same++;
+    if (max === 0) exact++;
+    if (max <= 8) within8++;
     diff[i] = max > tolerance ? 70 : 255;
     diff[i + 1] = max > tolerance ? 45 : 255;
     diff[i + 2] = max > tolerance ? 230 : 255;
@@ -47,6 +51,8 @@ function pngCompare(a, b, tolerance = 16) {
   }
   return {
     matchedPixels: (100 * same) / (size.width * size.height),
+    exactPixels: (100 * exact) / (size.width * size.height),
+    matchedWithin8: (100 * within8) / (size.width * size.height),
     meanChannelDifference: delta / (3 * size.width * size.height),
     threshold: tolerance,
     width: size.width,

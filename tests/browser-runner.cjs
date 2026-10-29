@@ -71,7 +71,7 @@ async function main() {
     'followup',
     'navigation',
   ]) {
-    let iframeSnapshot, iframeNativeSnapshot, iframeSourceUnchanged;
+    let iframeSnapshot, iframeNativeSnapshot, iframeSourceUnchanged, truncatedPngRejected;
     if (['iframes', 'capture-quality'].includes(suite)) {
       window.setContentSize(900, 700);
       await window.loadURL(
@@ -91,6 +91,21 @@ async function main() {
         { code: code + '\n;globalThis.UICloneCapture.capture(document)' },
       ]);
       iframeSnapshot.screenshot = iframeNativeSnapshot.screenshot;
+      if (suite === 'capture-quality')
+        truncatedPngRejected = await window.webContents.executeJavaScriptInIsolatedWorld(1001, [
+          {
+            code:
+              code +
+              `\n;(async()=>{
+            const canvas=document.createElement('canvas');canvas.width=200;canvas.height=200;
+            const ctx=canvas.getContext('2d');ctx.fillStyle='#44bb88';ctx.fillRect(0,0,200,200);
+            const broken='data:image/png;base64,'+btoa(atob(canvas.toDataURL().split(',')[1]).slice(0,-12));
+            const image=document.querySelector('#static-webp');
+            const result=await UICloneCapture.capture(document,{includeFrames:false,fetchAssets:false,assetData:{[image.currentSrc]:broken}});
+            return result.nodes.find(n=>n.locator.id==='static-webp').image.mode==='screenshot';
+          })()`,
+          },
+        ]);
       const after = await window.webContents.executeJavaScript(
         `JSON.stringify({html:document.documentElement.outerHTML,scroll:document.querySelector('#same')?.contentWindow.scrollY,actions:document.querySelector('#same')?.contentWindow.actions})`,
       );
@@ -105,7 +120,7 @@ async function main() {
     await window.loadURL(`http://127.0.0.1:${server.address().port}/tests/${suite}.html`);
     if (iframeSnapshot)
       await window.webContents.executeJavaScript(
-        `globalThis.iframeSnapshot=${JSON.stringify(iframeSnapshot)};globalThis.iframeNativeSnapshot=${JSON.stringify(iframeNativeSnapshot)};globalThis.iframeSourceUnchanged=${iframeSourceUnchanged};dispatchEvent(new Event('snapshotready'));`,
+        `globalThis.iframeSnapshot=${JSON.stringify(iframeSnapshot)};globalThis.iframeNativeSnapshot=${JSON.stringify(iframeNativeSnapshot)};globalThis.iframeSourceUnchanged=${iframeSourceUnchanged};globalThis.truncatedPngRejected=${JSON.stringify(truncatedPngRejected)};dispatchEvent(new Event('snapshotready'));`,
       );
     const deadline = Date.now() + 120000;
     let result;
