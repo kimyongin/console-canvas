@@ -2,6 +2,29 @@
 (() => {
   'use strict';
   const VERSION = 1;
+  const registeredShadows = new WeakMap();
+  const resourceCaches = new WeakMap();
+  const frameIdentities = new WeakMap(),
+    frameCounters = new WeakMap();
+  function frameIndex(element) {
+    if (!frameIdentities.has(element)) {
+      const next = frameCounters.get(element.ownerDocument) || 0;
+      frameIdentities.set(element, next);
+      frameCounters.set(element.ownerDocument, next + 1);
+    }
+    return frameIdentities.get(element);
+  }
+  function frameElements(owner) {
+    const frames = [];
+    function visit(element) {
+      if (element.localName === 'iframe') frames.push(element);
+      const shadow = element.shadowRoot || registeredShadows.get(element);
+      for (const child of shadow?.children || element.children || []) visit(child);
+      if (shadow) for (const child of element.children || []) visit(child);
+    }
+    if (owner.documentElement) visit(owner.documentElement);
+    return [...new Set(frames)];
+  }
   const PROPS =
     `display position top right bottom left z-index float clear box-sizing width height min-width min-height max-width max-height
     margin-top margin-right margin-bottom margin-left padding-top padding-right padding-bottom padding-left
@@ -9,13 +32,17 @@
     border-top-color border-right-color border-bottom-color border-left-color border-top-left-radius border-top-right-radius border-bottom-left-radius border-bottom-right-radius
     border-collapse border-spacing table-layout caption-side empty-cells vertical-align
     color background-color background-image background-size background-position background-repeat background-origin background-clip background-attachment
-    font-family font-size font-weight font-style font-stretch font-variant font-feature-settings font-kerning line-height letter-spacing word-spacing
+    font-family font-size font-weight font-style font-stretch font-variant font-feature-settings font-kerning font-variation-settings font-optical-sizing line-height letter-spacing word-spacing
     text-align text-align-last text-decoration text-transform text-indent text-overflow text-shadow text-rendering white-space word-break overflow-wrap direction writing-mode
+    line-clamp -webkit-line-clamp -webkit-box-orient -webkit-box-align -webkit-box-pack -webkit-box-flex
     opacity visibility overflow-x overflow-y clip clip-path box-shadow filter backdrop-filter mix-blend-mode isolation
-    transform transform-origin perspective object-fit object-position aspect-ratio appearance accent-color outline outline-offset
+    transform transform-origin translate rotate scale zoom perspective object-fit object-position aspect-ratio appearance accent-color outline outline-offset
     flex-direction flex-wrap flex-grow flex-shrink flex-basis justify-content align-items align-self align-content order gap row-gap column-gap
     grid-template-columns grid-template-rows grid-template-areas grid-auto-columns grid-auto-rows grid-auto-flow grid-column-start grid-column-end grid-row-start grid-row-end
     justify-items justify-self list-style-type list-style-position list-style-image fill fill-rule fill-opacity stroke stroke-width stroke-linecap stroke-linejoin stroke-opacity
+    mask-image mask-mode mask-repeat mask-position mask-size mask-origin mask-clip mask-composite mask-type
+    -webkit-mask-image -webkit-mask-repeat -webkit-mask-position -webkit-mask-size -webkit-mask-origin -webkit-mask-clip -webkit-mask-composite
+    unicode-bidi text-orientation text-wrap-style text-wrap-mode -webkit-font-smoothing
     -webkit-text-fill-color -webkit-text-stroke-width -webkit-text-stroke-color -webkit-background-clip`
       .split(/\s+/)
       .filter(Boolean);
@@ -66,9 +93,18 @@
   }
   async function capture(doc = document, options = {}) {
     const win = doc.defaultView;
+    const resourceCache = resourceCaches.get(doc) || new Map();
+    resourceCaches.set(doc, resourceCache);
     if (!doc.body || !win)
       throw new Error('아직 화면이 준비되지 않았습니다. 로딩 후 다시 가져와 주세요.');
     const sourceUrl = doc.location.href;
+    function canvasBackground(owner) {
+      const html = owner.defaultView.getComputedStyle(owner.documentElement),
+        body = owner.defaultView.getComputedStyle(owner.body);
+      return html.backgroundColor === 'rgba(0, 0, 0, 0)' && html.backgroundImage === 'none'
+        ? body.backgroundColor
+        : html.backgroundColor;
+    }
     const sourceWidth = win.innerWidth,
       sourceHeight = win.innerHeight;
     const scrollX = win.scrollX,
@@ -76,6 +112,8 @@
     const nodes = [],
       warnings = [],
       assets = new Set(),
+      extraFonts = [],
+      imageJobs = [],
       contexts = new Map([[doc, { x: scrollX, y: scrollY, sx: 1, sy: 1, frames: [] }]]);
     let counter = 0,
       traversed = 0;
@@ -97,17 +135,58 @@
       const result = doc.createElement('span').style,
         computed = win.getComputedStyle(element, pseudo);
       for (const property of PROPS) {
-        const value = computed.getPropertyValue(property);
+        let value = computed.getPropertyValue(property);
+        value = value.replace(/url\(["']?([^)'"\s]+)["']?\)/g, (all, url) => {
+          const full = absolute(url, doc.baseURI),
+            hash = full.indexOf('#');
+          return hash >= 0 && full.slice(0, hash) === doc.location.href.split('#')[0]
+            ? 'url("' + full.slice(hash) + '")'
+            : all;
+        });
         if (value) result.setProperty(property, value);
         for (const match of value.matchAll(/url\(["']?(.*?)["']?\)/g)) {
           const url = absolute(match[1], sourceUrl);
-          if (/^https?:/.test(url)) assets.add(url);
+          if (/^https?:/.test(url) && !match[1].startsWith('#')) assets.add(url);
         }
+      }
+      // Blink may report flow-root for a line-clamped legacy WebKit box.
+      // Re-establish its required formatting context, not just the clamp count.
+      if (parseInt(computed.webkitLineClamp, 10) > 0 && computed.webkitBoxOrient === 'vertical') {
+        result.display = computed.display.startsWith('inline')
+          ? '-webkit-inline-box'
+          : '-webkit-box';
+        result.webkitBoxOrient = 'vertical';
+        result.webkitLineClamp = computed.webkitLineClamp;
       }
       result.setProperty('animation', 'none', 'important');
       result.setProperty('transition', 'none', 'important');
       result.setProperty('caret-color', 'transparent');
       result.setProperty('scroll-behavior', 'auto');
+      // Used pixel heights turn an auto-height parent into a definite-height
+      // box and change margin collapsing (notably dl/dd paragraphs).
+      if (
+        !pseudo &&
+        !['absolute', 'fixed'].includes(computed.position) &&
+        !(parseInt(computed.webkitLineClamp, 10) > 0 && computed.webkitBoxOrient === 'vertical') &&
+        !['IMG', 'SVG', 'CANVAS', 'VIDEO', 'IFRAME', 'INPUT', 'TEXTAREA', 'SELECT'].includes(
+          element.tagName,
+        )
+      )
+        try {
+          const typed = element.computedStyleMap?.();
+          if (typed?.get('height')?.toString() === 'auto') result.height = 'auto';
+        } catch {}
+      if (!pseudo)
+        try {
+          const typed = element.computedStyleMap?.();
+          for (const property of [
+            'margin-left',
+            'margin-right',
+            'margin-inline-start',
+            'margin-inline-end',
+          ])
+            if (typed?.get(property)?.toString() === 'auto') result.setProperty(property, 'auto');
+        } catch {}
       return { css: result.cssText, computed };
     }
     function locator(element) {
@@ -133,7 +212,14 @@
         if (siblings.length > 1) part += ':nth-of-type(' + (siblings.indexOf(current) + 1) + ')';
         parts.unshift(part);
       }
+      const shadows = [];
+      let boundary = element.getRootNode();
+      while (boundary.host) {
+        shadows.unshift({ selector: locator(boundary.host).selector, mode: boundary.mode });
+        boundary = boundary.host.getRootNode();
+      }
       return {
+        ...(shadows.length ? { shadows } : {}),
         selector: parts.join(' > ') || 'body',
         id: element.id || null,
         role: element.getAttribute('role'),
@@ -194,7 +280,7 @@
     function textNode(source, parentId) {
       const text = source.textContent;
       if (!text.trim()) return doc.createTextNode(text);
-      const parent = source.parentElement;
+      const parent = source.parentElement || source.getRootNode()?.host;
       if (['OPTION', 'TEXTAREA', 'TITLE'].includes(parent?.tagName))
         return doc.createTextNode(text);
       const range = doc.createRange();
@@ -242,7 +328,18 @@
           text = content.slice(1, -1);
         }
       } else return;
-      if (!text && !(parseFloat(computed.width) > 0 && parseFloat(computed.height) > 0)) return;
+      if (
+        !text &&
+        !(parseFloat(computed.width) > 0 && parseFloat(computed.height) > 0) &&
+        computed.clear === 'none' &&
+        !['top', 'right', 'bottom', 'left'].some((side) =>
+          ['padding-' + side, 'margin-' + side, 'border-' + side + '-width'].some(
+            (key) => Math.abs(parseFloat(computed.getPropertyValue(key))) > 0,
+          ),
+        ) &&
+        computed.aspectRatio === 'auto'
+      )
+        return;
       const span = doc.createElement('span'),
         id = 'n' + ++counter;
       span.textContent = text;
@@ -276,6 +373,57 @@
           name: (iconLabel ? iconLabel + ' ' : '') + '아이콘',
         }),
         clone = source.cloneNode(true);
+      if (
+        [...source.querySelectorAll('image,use')].some((el) =>
+          [...el.attributes].some(
+            (a) => /href$/i.test(a.name) && a.value && !a.value.startsWith('#'),
+          ),
+        ) ||
+        source.querySelector('mask,filter,radialGradient') ||
+        /url\(/i.test(source.ownerDocument.defaultView.getComputedStyle(source).backgroundImage)
+      ) {
+        const placeholder = doc.createElement('span'),
+          css = source.ownerDocument.defaultView.getComputedStyle(source),
+          px = (key) => parseFloat(css.getPropertyValue(key)) || 0;
+        placeholder.style.cssText = styles(source).css;
+        if (placeholder.style.display === 'inline') placeholder.style.display = 'inline-block';
+        if (source.id) placeholder.id = source.id;
+        placeholder.dataset.uicId = node.id;
+        node.kind = 'raster';
+        node.rasterReason = source.querySelector('mask,filter,radialGradient')
+          ? 'svg_complex_paint'
+          : 'svg_external_reference';
+        const sx =
+            node.rect.width /
+            (source.clientWidth + px('border-left-width') + px('border-right-width') ||
+              node.rect.width ||
+              1),
+          sy =
+            node.rect.height /
+            (source.clientHeight + px('border-top-width') + px('border-bottom-width') ||
+              node.rect.height ||
+              1);
+        const left = (px('border-left-width') + px('padding-left')) * sx,
+          top = (px('border-top-width') + px('padding-top')) * sy;
+        node.rasterContentRect = {
+          x: node.rect.x + left,
+          y: node.rect.y + top,
+          width: Math.max(
+            0,
+            node.rect.width - left - (px('border-right-width') + px('padding-right')) * sx,
+          ),
+          height: Math.max(
+            0,
+            node.rect.height - top - (px('border-bottom-width') + px('padding-bottom')) * sy,
+          ),
+        };
+        warnings.push({
+          type: 'raster',
+          id: node.id,
+          message: '복합 효과·외부 참조 SVG는 당시 픽셀을 담은 이미지 한 레이어로 가져왔습니다.',
+        });
+        return placeholder;
+      }
       clone
         .querySelectorAll('script,foreignObject,animate,animateMotion,animateTransform,set')
         .forEach((el) => el.remove());
@@ -313,7 +461,7 @@
       if (source.namespaceURI === 'http://www.w3.org/2000/svg') return cloneSvg(source, parentId);
       if (source.tagName === 'INPUT' && source.type === 'hidden') return null;
       const raster = ['CANVAS', 'VIDEO', 'IFRAME'].includes(source.tagName),
-        closedShadow = source.shadowRoot;
+        closedShadow = source.shadowRoot || registeredShadows.get(source);
       const node = record(source, parentId, raster ? 'raster' : 'element');
       const tag = raster ? 'div' : source.localName.includes('-') ? 'div' : source.localName;
       const clone = doc.createElement(tag),
@@ -328,10 +476,12 @@
         }
       clone.dataset.uicId = node.id;
       if (source.tagName === 'IFRAME') {
+        const frameKey = frameIndex(source);
         const sx = node.rect.width / (source.offsetWidth || node.rect.width || 1),
           sy = node.rect.height / (source.offsetHeight || node.rect.height || 1);
         node.frame = {
           mode: 'image',
+          index: frameKey,
           url: absolute(source.getAttribute('src') || '', source.ownerDocument.baseURI),
           contentRect: {
             x: node.rect.x + source.clientLeft * sx,
@@ -341,9 +491,120 @@
           },
         };
         if (clone.style.display === 'inline') clone.style.display = 'inline-block';
+        const external =
+          source.ownerDocument === doc && options.frames?.find((f) => f.index === frameKey);
+        if (external?.snapshot) {
+          const captured = external.snapshot,
+            parsed = new win.DOMParser().parseFromString(captured.html, 'text/html');
+          const ids = new Map(captured.nodes.map((child) => [child.id, 'n' + ++counter]));
+          const area = node.frame.contentRect,
+            scroll = captured.source.scroll;
+          const mapRect = (r) => ({
+            x: area.x + (r.x - scroll.x) * sx,
+            y: area.y + (r.y - scroll.y) * sy,
+            width: r.width * sx,
+            height: r.height * sy,
+          });
+          const intersect = (a, b) => {
+            const x = Math.max(a.x, b.x),
+              y = Math.max(a.y, b.y);
+            return {
+              x,
+              y,
+              width: Math.max(0, Math.min(a.x + a.width, b.x + b.width) - x),
+              height: Math.max(0, Math.min(a.y + a.height, b.y + b.height) - y),
+            };
+          };
+          const clip = node.captureClip ? intersect(area, node.captureClip) : area;
+          for (const child of captured.nodes) {
+            const imported = {
+              ...child,
+              id: ids.get(child.id),
+              parentId: ids.get(child.parentId) || node.id,
+              rect: mapRect(child.rect),
+              captureClip: child.captureClip ? intersect(clip, mapRect(child.captureClip)) : clip,
+              locator: {
+                ...child.locator,
+                frames: [
+                  ...(node.locator.frames || []),
+                  { selector: node.locator.selector, url: captured.source.url },
+                  ...(child.locator.frames || []),
+                ],
+              },
+            };
+            if (child.rasterContentRect)
+              imported.rasterContentRect = mapRect(child.rasterContentRect);
+            if (child.image?.contentRect)
+              imported.image = { ...child.image, contentRect: mapRect(child.image.contentRect) };
+            if (child.frame?.contentRect)
+              imported.frame = { ...child.frame, contentRect: mapRect(child.frame.contentRect) };
+            nodes.push(imported);
+          }
+          const body = doc.createElement('div');
+          for (const attr of [...parsed.body.attributes]) body.setAttribute(attr.name, attr.value);
+          body.append(...parsed.body.childNodes);
+          for (const el of [body, ...body.querySelectorAll('[data-uic-id]')]) {
+            if (ids.has(el.dataset.uicId)) el.dataset.uicId = ids.get(el.dataset.uicId);
+          }
+          // Frame documents have independent ID scopes. Retain original IDs in
+          // locators while namespacing rendered IDs and their local references.
+          const prefix = node.id + '-',
+            scoped = new Map(
+              [...body.querySelectorAll('[id]')].map((el) => [el.id, prefix + el.id]),
+            );
+          if (body.id) scoped.set(body.id, prefix + body.id);
+          for (const el of [body, ...body.querySelectorAll('*')])
+            for (const attr of [...el.attributes]) {
+              let value = attr.value;
+              if (attr.name === 'id') value = scoped.get(value) || value;
+              else if (
+                [
+                  'for',
+                  'aria-labelledby',
+                  'aria-describedby',
+                  'aria-controls',
+                  'aria-activedescendant',
+                ].includes(attr.name)
+              )
+                value = value
+                  .split(/\s+/)
+                  .map((id) => scoped.get(id) || id)
+                  .join(' ');
+              else if (['href', 'xlink:href'].includes(attr.name) && value.startsWith('#'))
+                value = '#' + (scoped.get(value.slice(1)) || value.slice(1));
+              else if (attr.name === 'style')
+                value = value.replace(/url\(["']?#([^)'" ]+)["']?\)/g, (all, id) =>
+                  scoped.has(id) ? 'url("#' + scoped.get(id) + '")' : all,
+                );
+              if (value !== attr.value) el.setAttribute(attr.name, value);
+            }
+          for (const style of parsed.querySelectorAll('head style'))
+            try {
+              const sheet = new win.CSSStyleSheet();
+              sheet.replaceSync(style.textContent);
+              for (const rule of sheet.cssRules) if (rule.type === 5) extraFonts.push(rule.cssText);
+            } catch {}
+          for (const warning of captured.warnings || [])
+            warnings.push({
+              ...warning,
+              ...(ids.has(warning.id) ? { id: ids.get(warning.id) } : {}),
+            });
+          const viewport = doc.createElement('div'),
+            content = doc.createElement('div');
+          viewport.style.cssText = `position:relative;width:${captured.source.viewport.width}px;height:${captured.source.viewport.height}px;overflow:hidden;transform:translateZ(0);background:${captured.source.background || 'transparent'}`;
+          content.style.cssText = `position:relative;width:${captured.source.viewport.width}px;transform:translate(${-scroll.x}px,${-scroll.y}px)`;
+          content.append(body);
+          viewport.append(content);
+          clone.append(viewport);
+          clone.style.overflow = 'hidden';
+          node.kind = 'element';
+          node.frame = { ...node.frame, mode: 'dom', url: captured.source.url };
+          return clone;
+        }
+        if (external?.error) node.frame.failure = external.error;
         let child;
         try {
-          child = source.contentDocument;
+          if (options.includeFrames !== false) child = source.contentDocument;
         } catch {}
         {
           const parent = contexts.get(source.ownerDocument);
@@ -384,12 +645,12 @@
               ],
             });
             node.kind = 'element';
-            node.frame = { mode: 'dom', url: child.location.href };
+            node.frame = { ...node.frame, mode: 'dom', url: child.location.href };
             clone.style.overflow = 'hidden';
             if (clone.style.display === 'inline') clone.style.display = 'inline-block';
             const viewportElement = doc.createElement('div'),
               content = doc.createElement('div');
-            viewportElement.style.cssText = `position:relative;width:${width}px;height:${height}px;overflow:hidden;transform:translateZ(0);background:${child.defaultView.getComputedStyle(child.documentElement).backgroundColor}`;
+            viewportElement.style.cssText = `position:relative;width:${width}px;height:${height}px;overflow:hidden;transform:translateZ(0);background:${canvasBackground(child)}`;
             content.style.cssText = `position:relative;width:${width}px;transform:translate(${-child.defaultView.scrollX}px,${-child.defaultView.scrollY}px)`;
             const body = cloneElement(child.body, node.id),
               bodyBox = doc.createElement('div');
@@ -436,11 +697,34 @@
         return clone;
       }
       if (source.tagName === 'IMG') {
-        const data = imageData(source, doc),
-          url = absolute(source.currentSrc || source.src, source.ownerDocument.baseURI);
+        const url = absolute(source.currentSrc || source.src, source.ownerDocument.baseURI),
+          cached = options.assetData?.[url],
+          data =
+            cached && /^data:image\/(?:jpeg|jpg|png|avif);/.test(cached)
+              ? cached
+              : imageData(source, doc);
         clone.src = data || url;
         clone.removeAttribute('srcset');
         clone.loading = 'eager';
+        const computed = source.ownerDocument.defaultView.getComputedStyle(source),
+          px = (key) => parseFloat(computed.getPropertyValue(key)) || 0,
+          bx = px('border-left-width') + px('padding-left'),
+          by = px('border-top-width') + px('padding-top'),
+          right = px('border-right-width') + px('padding-right'),
+          bottom = px('border-bottom-width') + px('padding-bottom');
+        const sx = node.rect.width / (source.offsetWidth || node.rect.width || 1),
+          sy = node.rect.height / (source.offsetHeight || node.rect.height || 1);
+        node.image = {
+          mode: data ? 'embedded' : 'screenshot',
+          url,
+          contentRect: {
+            x: node.rect.x + bx * sx,
+            y: node.rect.y + by * sy,
+            width: Math.max(0, node.rect.width - (bx + right) * sx),
+            height: Math.max(0, node.rect.height - (by + bottom) * sy),
+          },
+        };
+        imageJobs.push({ node, clone, url, data });
         if (!data && /^https?:/.test(url)) assets.add(url);
       }
       if (source.tagName === 'INPUT') {
@@ -460,7 +744,13 @@
       }
       if (source.tagName === 'BUTTON') clone.type = 'button';
       if (source.tagName === 'A') clone.removeAttribute('href');
-      const children = closedShadow ? closedShadow.childNodes : source.childNodes;
+      const assigned =
+        source.localName === 'slot' ? source.assignedNodes?.({ flatten: true }) : null;
+      const children = assigned?.length
+        ? assigned
+        : closedShadow
+          ? closedShadow.childNodes
+          : source.childNodes;
       for (const child of children) {
         if (child.nodeType === 3) clone.append(textNode(child, node.id));
         else if (child.nodeType === 1) {
@@ -479,7 +769,8 @@
       return clone;
     }
     const clonedBody = cloneElement(doc.body, null);
-    let fonts = '';
+    const rootStyle = styles(doc.documentElement).css;
+    let fonts = [...extraFonts, ...(options.fontCss || [])].join('\n');
     function fontRules(sheet, base) {
       let rules;
       try {
@@ -496,6 +787,12 @@
               return 'url("' + full.replace(/"/g, '%22') + '")';
             }) + '\n';
         if (rule.styleSheet) fontRules(rule.styleSheet, base);
+        else if (
+          rule.cssRules &&
+          (!(rule instanceof win.CSSMediaRule) || win.matchMedia(rule.conditionText).matches) &&
+          (!(rule instanceof win.CSSSupportsRule) || win.CSS.supports(rule.conditionText))
+        )
+          fontRules({ cssRules: rule.cssRules, href: sheet.href }, base);
       }
     }
     for (const owner of contexts.keys())
@@ -504,8 +801,188 @@
       height = Math.max(sourceHeight, doc.documentElement.scrollHeight, doc.body.scrollHeight);
     const policy =
       "default-src 'none'; script-src 'none'; img-src data: blob: https: http:; style-src 'unsafe-inline'; font-src data: https: http:; frame-src 'none'; connect-src 'none'; form-action 'none'; base-uri 'none';";
+    // Embed resources when the source page can read them. Unreadable cross-origin URLs remain explicit.
+    const assetResults = await Promise.all(
+      [
+        ...new Set([
+          ...[...fonts.matchAll(/url\(["']?([^)'"\s]+)["']?\)/g)]
+            .map((m) => m[1])
+            .filter((url) => /^https?:/.test(url)),
+          ...assets,
+        ]),
+      ]
+        .slice(0, 180)
+        .map(async (url) => {
+          try {
+            const data = await deadline(
+              (async () => {
+                if (options.assetData?.[url]) return options.assetData[url];
+                if (resourceCache.has(url)) return resourceCache.get(url);
+                if (options.fetchAssets === false) return null;
+                const response = await win.fetch(url, { credentials: 'same-origin' });
+                if (!response.ok) return null;
+                let blob = await response.blob();
+                if (blob.size > 5_000_000) return null;
+                const magic = String.fromCharCode(
+                  ...new Uint8Array(await blob.slice(0, 4).arrayBuffer()),
+                );
+                if (
+                  magic === 'wOF2' ||
+                  magic === 'wOFF' ||
+                  magic === 'OTTO' ||
+                  magic === '\u0000\u0001\u0000\u0000'
+                )
+                  blob = new win.Blob([blob], {
+                    type:
+                      magic === 'wOF2' ? 'font/woff2' : magic === 'wOFF' ? 'font/woff' : 'font/ttf',
+                  });
+                if (
+                  !/^(image\/|font\/|application\/(font|x-font|octet-stream)|binary\/octet-stream)/.test(
+                    blob.type,
+                  )
+                )
+                  return null;
+                return await new Promise((resolve) => {
+                  const reader = new win.FileReader();
+                  reader.onload = () => resolve(reader.result);
+                  reader.onerror = () => resolve(null);
+                  reader.readAsDataURL(
+                    blob.type === 'binary/octet-stream'
+                      ? new win.Blob([blob], {
+                          type: new URL(url).pathname.endsWith('.woff2')
+                            ? 'font/woff2'
+                            : new URL(url).pathname.endsWith('.woff')
+                              ? 'font/woff'
+                              : 'application/octet-stream',
+                        })
+                      : blob,
+                  );
+                });
+              })(),
+              1800,
+            );
+            return { url, data };
+          } catch {
+            return { url, data: null };
+          }
+        }),
+    );
+    const available = new Map([
+      ...resourceCache,
+      ...Object.entries(options.assetData || {}),
+      ...assetResults.filter((r) => r.data).map((r) => [r.url, r.data]),
+    ]);
+    let cacheSize = 0;
+    resourceCache.clear();
+    for (const [url, data] of available)
+      if (typeof data === 'string' && cacheSize + data.length <= 35_000_000) {
+        resourceCache.set(url, data);
+        cacheSize += data.length;
+      }
+    for (const job of imageJobs) {
+      const candidate = job.data || available.get(job.url);
+      let staticWebp = false;
+      if (typeof candidate === 'string' && /^data:image\/webp;base64,/.test(candidate)) {
+        try {
+          const header = win.atob(candidate.split(',')[1].slice(0, 44));
+          staticWebp =
+            header.slice(0, 4) === 'RIFF' &&
+            header.slice(8, 12) === 'WEBP' &&
+            (header.slice(12, 16) !== 'VP8X' ||
+              (header.length > 20 && !(header.charCodeAt(20) & 2)));
+        } catch {}
+      }
+      const data =
+        typeof candidate === 'string' &&
+        candidate.startsWith('data:image/') &&
+        !/^data:image\/gif;/.test(candidate) &&
+        (!/^data:image\/webp;/.test(candidate) || staticWebp)
+          ? candidate
+          : null;
+      if (data) {
+        job.clone.src = data;
+        job.node.image.mode = 'embedded';
+      } else {
+        job.clone.src = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+        job.clone.dataset.uicImageFallback = 'screenshot';
+      }
+    }
+    // The same face is often declared in the main document and many frames.
+    // Canonicalize embedded sources before deduplicating, avoiding dozens of
+    // repeated copies of the same large font in the immutable document.
+    function embedUrls(text) {
+      const replacements = new Map();
+      for (const [url, data] of available)
+        if (data) {
+          replacements.set(url, data);
+          replacements.set(esc(url), data);
+        }
+      if (!replacements.size) return text;
+      const pattern = [...replacements.keys()]
+        .sort((a, b) => b.length - a.length)
+        .map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .join('|');
+      return text.replace(new RegExp(pattern, 'g'), (url) => replacements.get(url));
+    }
+    fonts = embedUrls(fonts);
+    try {
+      const sheet = new win.CSSStyleSheet();
+      sheet.replaceSync(fonts);
+      for (const rule of sheet.cssRules) {
+        if (rule.type !== 5) continue;
+        const embedded = rule.style
+          .getPropertyValue('src')
+          .match(/url\(\s*["']?(data:[^"')\s]+)["']?\s*\)/);
+        if (embedded) rule.style.setProperty('src', 'url("' + embedded[1] + '")');
+      }
+      fonts = [...new Set([...sheet.cssRules].map((rule) => rule.cssText))].join('\n');
+    } catch {}
+    // Inline sprite URLs repeat on many elements. Store their bytes once per
+    // captured subtree; inherited CSS variables survive offline frame merging.
+    const sharedImages = new Map(),
+      resourcePrefix = '--uic-asset-' + crypto.randomUUID().slice(0, 8) + '-';
+    for (const element of [clonedBody, ...clonedBody.querySelectorAll('[style]')]) {
+      for (const property of [...element.style]) {
+        if (property.startsWith('--')) continue;
+        const before = element.style.getPropertyValue(property);
+        const after = before.replace(/url\(\s*(["']?)(.*?)\1\s*\)/g, (all, quote, url) => {
+          const data = available.get(url) || url;
+          if (!data.startsWith('data:') || data.length < 1000) return all;
+          if (!sharedImages.has(data)) sharedImages.set(data, resourcePrefix + sharedImages.size);
+          return 'var(' + sharedImages.get(data) + ')';
+        });
+        if (after !== before)
+          element.style.setProperty(property, after, element.style.getPropertyPriority(property));
+      }
+    }
+    for (const [data, name] of sharedImages)
+      clonedBody.style.setProperty(name, 'url("' + data + '")');
+    const byId = new Map(nodes.map((node) => [node.id, node]));
+    for (const element of clonedBody.querySelectorAll('[data-uic-id]')) {
+      const node = byId.get(element.dataset.uicId);
+      if (
+        !node ||
+        node.kind === 'raster' ||
+        node.tag === 'img' ||
+        element.children.length ||
+        element.textContent.trim()
+      )
+        continue;
+      const paint = [
+        element.style.backgroundImage,
+        element.style.maskImage,
+        element.style.webkitMaskImage,
+      ].join(' ');
+      if (/url\(\s*["']?https?:/i.test(paint)) node.background = { mode: 'screenshot' };
+    }
     let html =
-      '<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="' +
+      '<!doctype html><html lang="' +
+      esc(doc.documentElement.lang || '') +
+      '" dir="' +
+      esc(doc.documentElement.dir || '') +
+      '" style="' +
+      esc(rootStyle) +
+      '"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="' +
       esc(policy) +
       '"><style>html{margin:0;padding:0;overflow:visible!important;min-height:100%;background:' +
       win.getComputedStyle(doc.documentElement).backgroundColor +
@@ -514,38 +991,7 @@
       '</style></head>' +
       clonedBody.outerHTML +
       '</html>';
-    // Embed resources when the source page can read them. Unreadable cross-origin URLs remain explicit.
-    const assetResults = await Promise.all(
-      [...assets].slice(0, 100).map(async (url) => {
-        try {
-          const data = await deadline(
-            (async () => {
-              const response = await win.fetch(url, { credentials: 'same-origin' });
-              if (!response.ok) return null;
-              const blob = await response.blob();
-              if (blob.size > 5_000_000) return null;
-              if (!/^(image\/|font\/|application\/(font|x-font|octet-stream))/.test(blob.type))
-                return null;
-              return await new Promise((resolve) => {
-                const reader = new win.FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = () => resolve(null);
-                reader.readAsDataURL(blob);
-              });
-            })(),
-            1800,
-          );
-          return { url, data };
-        } catch {
-          return { url, data: null };
-        }
-      }),
-    );
-    for (const { url, data } of assetResults)
-      if (data) {
-        html = html.split(esc(url)).join(data);
-        html = html.split(url).join(data);
-      }
+    html = embedUrls(html);
     const unresolved = assetResults.filter((item) => !item.data).map((item) => item.url);
     if (unresolved.length)
       warnings.push({
@@ -556,16 +1002,8 @@
           '개는 원래 주소를 참조합니다. 오프라인에서 일부 이미지·폰트가 달라질 수 있습니다.',
         urls: unresolved,
       });
-    if (assets.size > 100)
-      warnings.push({ type: 'assets', message: '100개를 넘는 리소스는 원래 주소를 참조합니다.' });
-    const maxRight = Math.max(
-      width,
-      ...nodes.filter((node) => node.visible).map((node) => node.rect.x + node.rect.width),
-    );
-    const maxBottom = Math.max(
-      height,
-      ...nodes.filter((node) => node.visible).map((node) => node.rect.y + node.rect.height),
-    );
+    if (assets.size > 180)
+      warnings.push({ type: 'assets', message: '180개를 넘는 리소스는 원래 주소를 참조합니다.' });
     const id =
       typeof crypto.randomUUID === 'function'
         ? crypto.randomUUID()
@@ -582,8 +1020,10 @@
         title: doc.title,
         viewport: { width: sourceWidth, height: sourceHeight },
         scroll: { x: scrollX, y: scrollY },
-        width: Math.ceil(maxRight),
-        height: Math.ceil(maxBottom),
+        width: Math.ceil(width),
+        height: Math.ceil(height),
+        background: canvasBackground(doc),
+        rootStyle,
       },
       html,
       nodes,
@@ -601,5 +1041,225 @@
       win.scrollY === source.scroll.y
     );
   }
-  globalThis.UICloneCapture = { capture, matchesView, version: VERSION };
+  let surfaceStop = () => {},
+    surfaceChanged = false;
+  function watchSurface(doc = document) {
+    surfaceStop();
+    surfaceChanged = false;
+    const win = doc.defaultView;
+    const onAnimation = (event) => {
+      const el = event.target;
+      if (!el?.getBoundingClientRect) return;
+      const rect = el.getBoundingClientRect(),
+        css = win.getComputedStyle(el);
+      if (
+        rect.width * rect.height > win.innerWidth * win.innerHeight * 0.6 &&
+        !['fixed', 'absolute'].includes(css.position)
+      )
+        surfaceChanged = true;
+    };
+    doc.addEventListener('animationstart', onAnimation, true);
+    doc.addEventListener('transitionrun', onAnimation, true);
+    surfaceStop = () => {
+      doc.removeEventListener('animationstart', onAnimation, true);
+      doc.removeEventListener('transitionrun', onAnimation, true);
+    };
+  }
+  function fingerprint(doc = document) {
+    const view = doc.defaultView;
+    // A loaded image/font or CSS entrance animation can change the rendered
+    // frame without changing outerHTML. Such a frame must use its photographed
+    // pixels rather than combine a different visual state with the parent.
+    const visual = [...doc.querySelectorAll('*')]
+      .slice(0, 15000)
+      .map((element) => {
+        const style = view.getComputedStyle(element),
+          r = element.getBoundingClientRect();
+        return (
+          [r.x, r.y, r.width, r.height].map((n) => Math.round(n * 100) / 100).join(',') +
+          '|' +
+          [
+            style.display,
+            style.visibility,
+            style.opacity,
+            style.transform,
+            style.backgroundImage,
+            style.fontFamily,
+            style.fontSize,
+          ].join('|') +
+          (element.localName === 'img'
+            ? '|' + element.complete + ',' + element.naturalWidth + ',' + element.currentSrc
+            : '')
+        );
+      })
+      .join('\n');
+    const html = doc.documentElement.outerHTML + '\n' + doc.fonts.status + '\n' + visual;
+    let hash = 2166136261;
+    for (let i = 0; i < html.length; i++) hash = Math.imul(hash ^ html.charCodeAt(i), 16777619);
+    return html.length + ':' + (hash >>> 0);
+  }
+  function collectAssets(doc = document) {
+    const urls = new Set(),
+      win = doc.defaultView;
+    for (const element of [...doc.querySelectorAll('*')].slice(0, 15000))
+      for (const pseudo of [null, '::before', '::after']) {
+        const style = win.getComputedStyle(element, pseudo);
+        for (const key of [
+          'background-image',
+          'mask-image',
+          '-webkit-mask-image',
+          'border-image-source',
+          'list-style-image',
+        ])
+          for (const match of style
+            .getPropertyValue(key)
+            .matchAll(/url\(["']?([^)'"\s]+)["']?\)/g)) {
+            const url = absolute(match[1], doc.baseURI);
+            if (/^https?:/.test(url)) urls.add(url);
+          }
+      }
+    return [...urls].slice(0, 180);
+  }
+  function anchorElement(doc, anchor) {
+    let element;
+    try {
+      element = doc.querySelector(anchor.selector);
+    } catch {}
+    if (
+      element &&
+      (element.currentSrc ||
+        element.textContent.trim().slice(0, 80) ||
+        element.id ||
+        element.getAttribute('src') ||
+        '') === anchor.key
+    )
+      return element;
+    if (anchor.tag === 'img') {
+      const images = [...doc.images].filter((i) => i.currentSrc === anchor.key);
+      if (images.length === 1) return images[0];
+    }
+    return null;
+  }
+  function anchors(doc = document) {
+    const win = doc.defaultView;
+    function selector(element) {
+      const parts = [];
+      for (let e = element; e && e.nodeType === 1; e = e.parentElement) {
+        if (e.id && doc.querySelectorAll('[id="' + win.CSS.escape(e.id) + '"]').length === 1) {
+          parts.unshift('#' + win.CSS.escape(e.id));
+          break;
+        }
+        const peers = [...(e.parentElement?.children || [])].filter(
+          (n) => n.localName === e.localName,
+        );
+        parts.unshift(e.localName + ':nth-of-type(' + (peers.indexOf(e) + 1) + ')');
+      }
+      return parts.join(' > ');
+    }
+    return [...doc.querySelectorAll('img,iframe,h1,h2,h3,p,button')]
+      .map((e) => {
+        const r = e.getBoundingClientRect();
+        if (
+          r.width < 60 ||
+          r.height < 16 ||
+          r.bottom < 100 ||
+          r.top > win.innerHeight - 40 ||
+          r.right < 0 ||
+          r.left > win.innerWidth
+        )
+          return null;
+        for (let p = e; p && p !== doc.documentElement; p = p.parentElement)
+          if (['fixed', 'sticky'].includes(win.getComputedStyle(p).position)) return null;
+        const key =
+          e.currentSrc || e.textContent.trim().slice(0, 80) || e.id || e.getAttribute('src');
+        return key
+          ? {
+              selector: selector(e),
+              key,
+              tag: e.localName,
+              x: r.x + win.scrollX,
+              y: r.y + win.scrollY,
+              area: r.width * r.height,
+            }
+          : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.area - a.area)
+      .slice(0, 8);
+  }
+  function headerInset(doc = document) {
+    const win = doc.defaultView;
+    return Math.min(
+      Math.min(200, win.innerHeight * 0.4),
+      Math.max(
+        0,
+        ...[
+          ...doc.querySelectorAll('header,nav,[role="banner"],[class*="header"],[class*="nav"]'),
+        ].map((e) => {
+          const r = e.getBoundingClientRect(),
+            p = win.getComputedStyle(e).position;
+          for (let ancestor = e; ancestor; ancestor = ancestor.parentElement) {
+            const style = win.getComputedStyle(ancestor);
+            if (
+              style.display === 'none' ||
+              style.visibility === 'hidden' ||
+              parseFloat(style.opacity) === 0
+            )
+              return 0;
+          }
+          return ['fixed', 'sticky'].includes(p) &&
+            r.top <= 1 &&
+            r.bottom > 0 &&
+            r.width > win.innerWidth * 0.6
+            ? r.bottom
+            : 0;
+        }),
+      ),
+    );
+  }
+  function alignAnchors(doc, groups) {
+    const win = doc.defaultView;
+    return groups.map((group) => {
+      const deltas = group
+        .map((anchor) => {
+          const e = anchorElement(doc, anchor);
+          if (!e) return null;
+          const r = e.getBoundingClientRect();
+          return {
+            x: anchor.x,
+            dx: r.x + win.scrollX - anchor.x,
+            dy: r.y + win.scrollY - anchor.y,
+          };
+        })
+        .filter(Boolean);
+      const stationary = deltas.filter((d) => Math.abs(d.dx) < 2);
+      if (!stationary.length) return null;
+      // A separately sticky/right ad column must not move the whole page.
+      // Prefer the leftmost visible flow and require a strict local majority.
+      const left = Math.min(...stationary.map((d) => d.x));
+      const flow = stationary.filter((d) => d.x <= left + win.innerWidth * 0.25);
+      const dy = [...flow].sort((a, b) => a.dy - b.dy)[Math.floor(flow.length / 2)].dy;
+      return flow.filter((d) => Math.abs(d.dy - dy) < 2).length > flow.length / 2
+        ? { dx: 0, dy }
+        : null;
+    });
+  }
+  globalThis.UICloneCapture = {
+    capture,
+    matchesView,
+    fingerprint,
+    anchors,
+    headerInset,
+    alignAnchors,
+    collectAssets,
+    watchSurface,
+    surfaceChanged: () => surfaceChanged,
+    stopSurfaceWatch: () => surfaceStop(),
+    version: VERSION,
+    registerShadow: (root) => {
+      if (root?.host) registeredShadows.set(root.host, root);
+    },
+    frameIndex,
+    frames: frameElements,
+  };
 })();

@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Console Canvas capture renderer QA</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: white;
+      }
+      iframe {
+        display: block;
+        border: 0;
+        margin: 0;
+      }
+      #results {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <pre id="results"></pre>
+    <iframe sandbox="allow-same-origin"></iframe>
+    <script type="module" src="capture-render.js"></script>
+  </body>
+</html>

@@ -106,3 +106,11 @@ IndexedDB `console-canvas-workspace`의 세 저장소를 사용한다.
 React 갤러리와 `ai-provider.js`는 MCP와 같은 후보 등록 경로를 사용한다. API 키는 제공자 closure의 메모리만 사용한다. Responses API의 완료된 strict JSON 패치만 등록하고 불완전 스트림은 적용하지 않는다. API UI 테스트는 별도 test-only fetch transport이며 배포 번들에는 포함하지 않는다. 실제 OAuth/추론·자동 보정 루프는 후속이다.
 
 Python `mcp/modern.py`는 2026-07-28 발견·요청별 메타데이터·결과/캐시 메타데이터·명시적 AI 요청 리소스와 구독/취소를 처리한다. `server.py`의 legacy initialize 경로와 분리한다. 브리지는 화면 세대와 request_revision을 검증하며 알림은 공개 화면에만 제공한다. SDK v2는 개발 검사 의존성이고 배포 Python에 외부 패키지를 요구하지 않는다.
+
+## 가져오기 품질 · 0.24
+
+`capture.js`는 DOM/스타일/원본 식별자·프레임/Shadow 경로를 읽는 공통 수집기다. `desktop/capture-view.cjs`는 지연 로딩 준비 스크롤·복원, `desktop/capture-cdp.cjs`는 각 프레임의 독립 격리 문맥·정확한 소유 iframe 연결·기존 페이지 리소스 내장·원본 타일 촬영을 담당한다. 동일 세션의 리소스 트리에서도 해당 frame.id의 자원을 찾아 다른 프레임 자원을 반복하지 않는다. 폰트 캐시가 비어 있으면 이미 관측한 리소스만 검사기 로더로 읽고 스트림을 닫는다.
+
+`chrome-capture.js`는 허용된 프레임의 DOM 수집·병합과 활성 탭 촬영을 조정한다. 스크롤 이후 지연 DOM을 다시 수집하므로 원본 하단과 편집 트리의 시점 차이를 줄인다. `capture-assets.js`는 기존 권한 안에서 쿠키 없는 공개 CORS fetch만 수행한다. 보안 격리와 host permissions를 넓히지 않는다. 프레임 신원이 모호하면 추정 병합하지 않는다.
+
+`capture-media.js`는 문서에 내장된 원본 타일만으로 실패한 IMG/래스터 영역을 자른다. 픽셀 합집합으로 full/partial/unavailable을 판단하고 부분을 전체로 늘리지 않는다. immutable capture v1의 추가 선택 필드이며 세션 저장 구조·타임라인 부모 관계는 바꾸지 않았다. MCP 요소 조회는 선택적인 image/coverage/raster_reason을 제공하고 기존 19개 도구와 revision/operation_id 계약을 유지한다. [범위·수치](capture-quality-0.24.md).

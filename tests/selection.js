@@ -177,6 +177,31 @@ try {
       app.state.undo.length === childrenBefore + 1,
   );
   app.undo();
+  app.selectNode(stats.id);
+  const clickBefore = JSON.stringify(scene.edits),
+    clickUndo = app.state.undo.length;
+  pointer(scene.elements.get(statText.id), 'pointerdown', 10, 10);
+  pointer(sceneRoot, 'pointerup', 10, 10);
+  check(
+    'Clicking inside a selected parent selects the child without deselecting first',
+    scene.selected === statText.id && scene.selection.size === 1,
+  );
+  check(
+    'Selection-only click does not create an edit or undo step',
+    JSON.stringify(scene.edits) === clickBefore && app.state.undo.length === clickUndo,
+  );
+  pointer(scene.elements.get(statText.id), 'pointerdown', 10, 10);
+  pointer(sceneRoot, 'pointerup', 10, 10);
+  check(
+    'Clicking the already selected child keeps that child selected',
+    scene.selected === statText.id,
+  );
+  app.selectNode(stats.id);
+  pointer(scene.elements.get(statText.id), 'pointerdown', 10, 10);
+  pointer(sceneRoot, 'pointercancel', 10, 10);
+  check('Canceled press retains the parent selection', scene.selected === stats.id);
+  app.selectNode(stats.id);
+  app.selectNode(first.id, { additive: true });
   pointer(scene.elements.get(statText.id), 'pointerdown', 10, 10, { altKey: true });
   pointer(sceneRoot, 'pointerup', 10, 10, { altKey: true });
   check(

@@ -1,0 +1,199 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Capture quality QA</title>
+    <style>
+      @keyframes capture-surface {
+        from {
+          opacity: 1;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      @layer capture-fonts {
+        @font-face {
+          font-family: CaptureNested;
+          src: local('Arial');
+        }
+      }
+      html,
+      body {
+        margin: 0;
+        font: 16px system-ui;
+        color: #243047;
+        background: #f8f9ff;
+      }
+      main {
+        padding: 24px;
+      }
+      .row {
+        display: flex;
+        gap: 24px;
+      }
+      .photo {
+        width: 220px;
+        height: 130px;
+        object-fit: contain;
+        border: 3px solid #4d3dcc;
+        padding: 8px;
+        background: white;
+      }
+      #hero {
+        width: 340px;
+        height: 130px;
+        color: white;
+        background-size: cover;
+        padding: 16px;
+        box-sizing: border-box;
+      }
+      iframe {
+        width: 350px;
+        height: 220px;
+        border: 4px solid #27344f;
+        display: block;
+        margin: 20px 0;
+      }
+      #long {
+        height: 1150px;
+      }
+      #bottom {
+        width: 190px;
+        height: 110px;
+      }
+      footer {
+        padding: 24px;
+      }
+      #aspect-thumb {
+        position: relative;
+        width: 180px;
+        overflow: hidden;
+      }
+      #aspect-thumb::before {
+        content: '';
+        display: block;
+        padding-top: 66.6667%;
+      }
+      #aspect-thumb img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+    </style>
+  </head>
+  <body style="animation: capture-surface 1s linear infinite">
+    <main>
+      <h1>원본 픽셀과 편집 가능한 복제본</h1>
+      <div id="responsive-banner">스크롤에 따라 접히는 원본 배너</div>
+      <div class="row">
+        <img id="remote-image" class="photo" alt="다른 출처 이미지" />
+        <div id="hero">
+          <h2>배경 위의 제목</h2>
+          <button>상세 보기</button>
+        </div>
+        <span
+          id="background-icon"
+          style="display: block; width: 42px; height: 42px; background-size: cover"
+        ></span>
+        <img id="static-webp" width="80" height="50" alt="정적 WebP" />
+      </div>
+      <div id="aspect-thumb"><img id="aspect-image" alt="비율 유지 이미지" /></div>
+      <iframe id="cross-frame" title="다른 출처 콘솔"></iframe
+      ><iframe id="duplicate-one" title="중복 주소 첫 화면"></iframe
+      ><iframe id="duplicate-two" title="중복 주소 두 번째 화면"></iframe
+      ><iframe
+        id="long"
+        sandbox
+        srcdoc="<body style='margin:0;background:#dae7ff;font:20px system-ui'><h2 style='margin:0;padding:24px'>긴 iframe 상단</h2><div style='height:950px;background:linear-gradient(#b8ddff,#c6bcff)'>중간 내용</div><button style='margin:24px'>화면 밖 하단 버튼</button>"
+      ></iframe>
+      <iframe
+        id="changing-frame"
+        title="계속 변경되는 프레임"
+        srcdoc="<p id='tick'>0</p><script>let count=0;setInterval(()=>document.getElementById('tick').textContent=String(++count),20)</script>"
+      ></iframe>
+      <svg id="external-svg" width="80" height="50" style="border: 2px solid #785ce8; padding: 3px">
+        <image width="80" height="50" />
+      </svg>
+      <svg id="svg-background" width="80" height="50"></svg>
+      <svg id="complex-svg" width="80" height="50" viewBox="0 0 80 50">
+        <defs>
+          <radialGradient id="complex-paint">
+            <stop stop-color="#32cf99" />
+            <stop offset="1" stop-color="#5d48d9" />
+          </radialGradient>
+          <mask id="complex-mask"><rect width="80" height="50" fill="white" /></mask>
+        </defs>
+        <rect width="80" height="50" fill="url(#complex-paint)" mask="url(#complex-mask)" />
+      </svg>
+      <p
+        id="clamped"
+        style="
+          width: 180px;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        "
+      >
+        줄 수가 제한된 카드 본문입니다. 원본에서 두 줄만 보인 문구를 가져온 뒤에도 두 줄로 유지하고
+        뒤의 이미지와 버튼 위치를 보존해야 합니다.
+      </p>
+      <ul style="width: 220px">
+        <li>
+          <a
+            id="clamped-padding"
+            style="
+              display: -webkit-box;
+              -webkit-line-clamp: 2;
+              -webkit-box-orient: vertical;
+              overflow: hidden;
+              padding: 7px 0;
+              border-bottom: 1px solid #ccc;
+              line-height: 16px;
+            "
+            >이미지 아래에 오는 두 줄짜리 뉴스 링크입니다. 패딩과 테두리가 있는 링크의 전체 높이도
+            유지해야 합니다.</a
+          >
+        </li>
+      </ul>
+      <footer>
+        <h2>페이지 하단</h2>
+        <img id="bottom" alt="화면 밖 이미지" />
+      </footer>
+    </main>
+    <script>
+      const other = 'http://localhost:' + location.port;
+      document.getElementById('static-webp').src = other + '/fixtures/capture-static.webp';
+      const responsiveBanner = document.getElementById('responsive-banner');
+      responsiveBanner.style.height = '180px';
+      addEventListener('scroll', () => {
+        if (scrollY === 0) responsiveBanner.style.height = '180px';
+        else if (scrollY > 300) responsiveBanner.style.height = '0px';
+      });
+      document.getElementById('aspect-image').src = other + '/fixtures/capture-image.svg';
+      document.getElementById('background-icon').style.backgroundImage =
+        'url("' + other + '/fixtures/capture-image.svg")';
+      document.getElementById('svg-background').style.backgroundImage =
+        'url("' + other + '/fixtures/capture-image.svg")';
+      document
+        .querySelector('#external-svg image')
+        .setAttribute('href', other + '/fixtures/capture-image.svg');
+      for (const id of ['remote-image', 'bottom'])
+        document.getElementById(id).src = other + '/fixtures/capture-image.svg';
+      document.getElementById('hero').style.backgroundImage =
+        'url("' + other + '/fixtures/capture-image.svg")';
+      for (const id of ['cross-frame', 'duplicate-one', 'duplicate-two'])
+        document.getElementById(id).src = other + '/fixtures/capture-frame.html';
+      const host = document.createElement('div');
+      host.id = 'closed-host';
+      host.style.cssText = 'padding:12px;background:#e4e0ff';
+      host.attachShadow({ mode: 'closed' }).innerHTML =
+        '<button id="closed-control" style="padding:12px">닫힌 Shadow DOM 버튼</button>';
+      document.querySelector('main').append(host);
+      window.actions = 0;
+    </script>
+  </body>
+</html>

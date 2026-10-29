@@ -68,6 +68,16 @@ await fs.writeFile(
   path.join(root, 'dist/editor.bundle.css'),
   styles.outputFiles[0].text + '\n' + theme.css,
 );
+const workerGraph = await build({
+  absWorkingDir: root,
+  entryPoints: ['background.js'],
+  bundle: true,
+  format: 'esm',
+  platform: 'browser',
+  target: 'chrome120',
+  write: false,
+  metafile: true,
+});
 const publicFiles = [
   ...new Set([
     'editor.html',
@@ -83,6 +93,7 @@ const publicFiles = [
     'fixtures/console.html',
     'fixtures/console.css',
     'fixtures/console.js',
+    ...Object.keys(workerGraph.metafile.inputs).filter((name) => !name.startsWith('node_modules/')),
     ...Object.keys(result.metafile.inputs).filter(
       (name) => name !== '<stdin>' && !name.startsWith('node_modules/'),
     ),

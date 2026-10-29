@@ -26,6 +26,8 @@ async function main() {
           '.js': 'text/javascript',
           '.css': 'text/css',
           '.json': 'application/json',
+          '.svg': 'image/svg+xml',
+          '.webp': 'image/webp',
         }[path.extname(filename)] || 'application/octet-stream',
       );
       response.end(content);
@@ -44,11 +46,13 @@ async function main() {
       contextIsolation: true,
       nodeIntegration: false,
       backgroundThrottling: false,
+      offscreen: true,
     },
   });
   const reports = [];
   for (const suite of [
     'iframes',
+    'capture-quality',
     'integration',
     'ai-variants',
     'developer-workflow',
@@ -67,30 +71,41 @@ async function main() {
     'followup',
     'navigation',
   ]) {
-    let iframeSnapshot, iframeSourceUnchanged;
-    if (suite === 'iframes') {
+    let iframeSnapshot, iframeNativeSnapshot, iframeSourceUnchanged;
+    if (['iframes', 'capture-quality'].includes(suite)) {
       window.setContentSize(900, 700);
-      await window.loadURL(`http://127.0.0.1:${server.address().port}/fixtures/iframes.html`);
+      await window.loadURL(
+        `http://127.0.0.1:${server.address().port}/fixtures/${suite === 'iframes' ? 'iframes' : 'capture-quality'}.html`,
+      );
       const before = await window.webContents.executeJavaScript(
-        `JSON.stringify({html:document.documentElement.outerHTML,scroll:document.querySelector('#same').contentWindow.scrollY,actions:document.querySelector('#same').contentWindow.actions})`,
+        `JSON.stringify({html:document.documentElement.outerHTML,scroll:document.querySelector('#same')?.contentWindow.scrollY,actions:document.querySelector('#same')?.contentWindow.actions})`,
       );
       await window.webContents.executeJavaScript(
         'new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))',
       );
-      iframeSnapshot = await require(path.join(appRoot, 'desktop/capture.cjs')).captureWebsite(
-        window.webContents,
-        appRoot,
-      );
+      iframeNativeSnapshot = await require(
+        path.join(appRoot, 'desktop/capture.cjs'),
+      ).captureWebsite(window.webContents, appRoot);
+      const code = await fs.readFile(path.join(appRoot, 'capture.js'), 'utf8');
+      iframeSnapshot = await window.webContents.executeJavaScriptInIsolatedWorld(1001, [
+        { code: code + '\n;globalThis.UICloneCapture.capture(document)' },
+      ]);
+      iframeSnapshot.screenshot = iframeNativeSnapshot.screenshot;
       const after = await window.webContents.executeJavaScript(
-        `JSON.stringify({html:document.documentElement.outerHTML,scroll:document.querySelector('#same').contentWindow.scrollY,actions:document.querySelector('#same').contentWindow.actions})`,
+        `JSON.stringify({html:document.documentElement.outerHTML,scroll:document.querySelector('#same')?.contentWindow.scrollY,actions:document.querySelector('#same')?.contentWindow.actions})`,
       );
       iframeSourceUnchanged = before === after;
       window.setContentSize(1600, 1100);
     }
+    if (suite === 'capture-quality')
+      window.webContents.session.webRequest.onBeforeRequest(
+        { urls: ['http://localhost:*/*'] },
+        (_details, callback) => callback({ cancel: true }),
+      );
     await window.loadURL(`http://127.0.0.1:${server.address().port}/tests/${suite}.html`);
     if (iframeSnapshot)
       await window.webContents.executeJavaScript(
-        `globalThis.iframeSnapshot=${JSON.stringify(iframeSnapshot)};globalThis.iframeSourceUnchanged=${iframeSourceUnchanged};dispatchEvent(new Event('snapshotready'));`,
+        `globalThis.iframeSnapshot=${JSON.stringify(iframeSnapshot)};globalThis.iframeNativeSnapshot=${JSON.stringify(iframeNativeSnapshot)};globalThis.iframeSourceUnchanged=${iframeSourceUnchanged};dispatchEvent(new Event('snapshotready'));`,
       );
     const deadline = Date.now() + 120000;
     let result;
@@ -103,6 +118,7 @@ async function main() {
     } while (Date.now() < deadline);
     console.log(`${suite}: ${result.text}`);
     reports.push({ suite, ...result });
+    if (suite === 'capture-quality') window.webContents.session.webRequest.onBeforeRequest(null);
     if (result.done !== 'pass') {
       console.error(
         await window.webContents.executeJavaScript(
@@ -174,7 +190,8 @@ async function finish(code) {
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
   }
-  if (profile) await fs.rm(profile, { recursive: true, force: true });
+  if (profile)
+    await fs.rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   app.exit(code);
 }
 main().then(

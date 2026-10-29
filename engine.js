@@ -1,3 +1,4 @@
+import { applyCaptureMedia } from './capture-media.js';
 import { buildCodeDocument } from './code-patches.js';
 import { selectionRoots, alignmentOperations, snapDelta } from './selection-tools.js';
 import { expandCopyNodes } from './copy-model.js';
@@ -41,6 +42,31 @@ export function validateSnapshot(value) {
   )
     throw new Error('원본 화면의 표시 크기가 올바르지 않습니다.');
   if (!Array.isArray(value.warnings)) value.warnings = [];
+  if (value.screenshotTiles !== undefined) {
+    if (!Array.isArray(value.screenshotTiles) || value.screenshotTiles.length > 32)
+      throw new Error('화면 캡처 영역 정보가 올바르지 않습니다.');
+    let size = 0;
+    for (const tile of value.screenshotTiles) {
+      if (
+        !tile?.rect ||
+        !['x', 'y', 'width', 'height'].every((k) => Number.isFinite(tile.rect[k])) ||
+        tile.rect.width <= 0 ||
+        tile.rect.height <= 0 ||
+        tile.rect.width > 60000 ||
+        tile.rect.height > 200000 ||
+        (tile.clip !== undefined &&
+          (!tile.clip ||
+            !['x', 'y', 'width', 'height'].every((k) => Number.isFinite(tile.clip[k])) ||
+            tile.clip.width <= 0 ||
+            tile.clip.height <= 0)) ||
+        typeof tile.data !== 'string' ||
+        !tile.data.startsWith('data:image/png;base64,')
+      )
+        throw new Error('화면 캡처 영역 정보가 올바르지 않습니다.');
+      size += tile.data.length;
+      if (size > 100_000_000) throw new Error('화면 캡처 이미지가 너무 큽니다.');
+    }
+  }
   const ids = new Set();
   for (const node of value.nodes) {
     if (
@@ -134,6 +160,18 @@ export class CanvasScene {
     await loaded;
     this.doc = this.frame.contentDocument;
     if (!this.doc?.body) throw new Error('복제 화면에 접근할 수 없습니다.');
+    // Capture sprite variables are globally unique. Hoist them in the copy so
+    // lifting a child out of its original body/frame keeps its image resources.
+    for (const element of this.doc.querySelectorAll('[style]')) {
+      for (const property of [...element.style]) {
+        if (!/^--uic-asset-[a-f0-9]{8,32}-\d+$/.test(property)) continue;
+        this.doc.documentElement.style.setProperty(
+          property,
+          element.style.getPropertyValue(property),
+        );
+        element.style.removeProperty(property);
+      }
+    }
     await Promise.race([this.doc.fonts.ready, new Promise((resolve) => setTimeout(resolve, 1000))]);
     for (const el of this.doc.querySelectorAll('[data-uic-id]')) {
       const id = el.dataset.uicId;
@@ -271,86 +309,7 @@ export class CanvasScene {
     return this;
   }
   async rasterFallbacks() {
-    if (!this.snapshot.screenshot) {
-      for (const node of this.nodes.values())
-        if (node.frame?.mode === 'image') {
-          const element = this.elements.get(node.id);
-          if (element)
-            element.textContent = 'iframe 이미지 없음 · 화면을 유지한 채 다시 가져와 주세요';
-        }
-      return;
-    }
-    const image = new Image();
-    image.src = this.snapshot.screenshot;
-    try {
-      await image.decode();
-    } catch {
-      return;
-    }
-    const view = this.snapshot.source.viewport,
-      scroll = this.snapshot.source.scroll;
-    for (const node of this.nodes.values())
-      if (node.kind === 'raster') {
-        const element = this.elements.get(node.id);
-        if (!element || element.querySelector('img')) continue;
-        const r = node.frame?.contentRect || node.rect,
-          x = r.x - scroll.x,
-          y = r.y - scroll.y;
-        const clip = node.captureClip,
-          left = Math.max(0, x, clip ? clip.x - scroll.x : 0),
-          top = Math.max(0, y, clip ? clip.y - scroll.y : 0),
-          right = Math.min(
-            view.width,
-            x + r.width,
-            clip ? clip.x + clip.width - scroll.x : view.width,
-          ),
-          bottom = Math.min(
-            view.height,
-            y + r.height,
-            clip ? clip.y + clip.height - scroll.y : view.height,
-          );
-        if (right <= left || bottom <= top || !r.width || !r.height) {
-          if (node.frame)
-            element.textContent = 'iframe 이미지 · 화면 밖 영역은 가져오지 못했습니다';
-          continue;
-        }
-        const canvas = document.createElement('canvas'),
-          ratioX = image.width / view.width,
-          ratioY = image.height / view.height,
-          pixels = (right - left) * ratioX * (bottom - top) * ratioY,
-          scale = Math.min(1, Math.sqrt(16_000_000 / pixels));
-        canvas.width = Math.max(1, Math.round((right - left) * ratioX * scale));
-        canvas.height = Math.max(1, Math.round((bottom - top) * ratioY * scale));
-        canvas
-          .getContext('2d')
-          .drawImage(
-            image,
-            left * ratioX,
-            top * ratioY,
-            (right - left) * ratioX,
-            (bottom - top) * ratioY,
-            0,
-            0,
-            canvas.width,
-            canvas.height,
-          );
-        const img = this.doc.createElement('img');
-        img.src = canvas.toDataURL();
-        img.style.cssText = `position:absolute;display:block;max-width:none;left:${((left - x) / r.width) * 100}%;top:${((top - y) / r.height) * 100}%;width:${((right - left) / r.width) * 100}%;height:${((bottom - top) / r.height) * 100}%;object-fit:fill`;
-        const holder = this.doc.createElement('div');
-        holder.style.cssText =
-          'position:relative;width:100%;height:100%;overflow:hidden;background:#f2f4f7';
-        holder.dataset.uicRasterCoverage =
-          left === x && top === y && right === x + r.width && bottom === y + r.height
-            ? 'full'
-            : 'partial';
-        holder.title =
-          holder.dataset.uicRasterCoverage === 'partial'
-            ? '화면에 보였던 부분만 이미지로 가져왔습니다. 전체 영역을 보이게 한 뒤 다시 가져올 수 있습니다.'
-            : '이미지로 가져온 영역입니다. 내부 요소는 개별 편집할 수 없습니다.';
-        holder.append(img);
-        element.replaceChildren(holder);
-      }
+    await applyCaptureMedia(this);
   }
   parent(id) {
     return this.nodes.get(id)?.parentId || null;
@@ -447,12 +406,23 @@ export class CanvasScene {
     this.commitOperations(alignmentOperations(this, kind));
   }
   targetId(event) {
-    let id = event.target.closest?.('[data-uic-id]')?.dataset.uicId;
+    let id =
+      event.target.closest?.('[data-uic-id]')?.dataset.uicId ||
+      event.target.closest?.('[data-uic-lift]')?.dataset.uicLift;
+    // A moved parent can cover a child lifted into the editor portal. Resolve
+    // logical descendants under the pointer before applying semantic selection.
+    if (id && this.selection.has(id)) {
+      const child = this.doc
+        .elementsFromPoint(event.clientX, event.clientY)
+        .map((el) => el.closest?.('[data-uic-id]')?.dataset.uicId)
+        .find((key) => key && key !== id && !this.hidden(key) && this.ancestors(key).includes(id));
+      if (child) id = child;
+    }
     if (this.callbacks.smartSelection && !event.altKey && id) {
       const semantic = [id, ...this.ancestors(id)].find((key) =>
         ['button', 'a', 'input', 'select', 'textarea', 'svg'].includes(this.nodes.get(key)?.tag),
       );
-      if (semantic) id = semantic;
+      if (semantic && !this.selection.has(semantic) && !this.selection.has(id)) id = semantic;
     }
     return event.shiftKey && id ? this.parent(id) || id : id;
   }
@@ -986,7 +956,10 @@ export class CanvasScene {
       element.style.setProperty('opacity', hidden ? '0' : defaults.opacity || '1', 'important');
       if (element === this.doc.body) {
         const own = this.edits[id] || {};
-        element.style.translate = (own.dx || 0) + 'px ' + (own.dy || 0) + 'px';
+        element.style.translate =
+          own.dx || own.dy
+            ? (own.dx || 0) + 'px ' + (own.dy || 0) + 'px'
+            : defaults.translate || '';
       }
       const lift = this.lifts.get(id);
       if (lift) {
@@ -1035,7 +1008,8 @@ export class CanvasScene {
       this.openComment(marker.dataset.uicComment);
       return;
     }
-    let id = this.targetId(event);
+    const clickedId = this.targetId(event);
+    let id = clickedId;
     if (
       this.callbacks.smartSelection &&
       this.interactionMode === 'edit' &&
@@ -1061,6 +1035,7 @@ export class CanvasScene {
       return;
     }
     this.beginDrag(event, id);
+    if (id !== clickedId) this.drag.clickTarget = clickedId;
   }
   beginDrag(event, id) {
     const ids = this.selectionRoots(),
@@ -1158,6 +1133,7 @@ export class CanvasScene {
     if (this.doc.documentElement.hasPointerCapture(event.pointerId))
       this.doc.documentElement.releasePointerCapture(event.pointerId);
     if (cancel) this.setEdits(d.before);
+    if (!cancel && !d.started && d.clickTarget) this.select(d.clickTarget);
     if (d.started) this.callbacks.onCommit?.({ cancel });
   }
   nudge(dx, dy) {

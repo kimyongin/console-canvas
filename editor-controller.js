@@ -60,6 +60,25 @@ export function createEditorController(options) {
       ...(node.copiedFrom ? { copied_from: node.copiedFrom } : {}),
       locator: node.locator,
       ...(node.frame ? { frame: node.frame } : {}),
+      ...(node.image
+        ? {
+            image: {
+              mode: node.image.mode,
+              url: /^https?:/.test(node.image.url) ? node.image.url : null,
+              coverage: scene.elements.get(node.id)?.dataset.uicImageCoverage || null,
+              rendering: scene.elements.get(node.id)?.dataset.uicImageRendering || null,
+            },
+          }
+        : {}),
+      ...(node.rasterReason ? { raster_reason: node.rasterReason } : {}),
+      ...(node.background
+        ? {
+            background_image: {
+              mode: node.background.mode,
+              coverage: scene.elements.get(node.id)?.dataset.uicBackgroundCoverage || null,
+            },
+          }
+        : {}),
       captured_visible: node.visible,
       deleted,
       original_rect: node.rect,

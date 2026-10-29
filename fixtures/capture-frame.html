@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Independent frame QA</title>
+    <style>
+      body {
+        margin: 12px;
+        background: #edf2ff;
+        font: 16px system-ui;
+      }
+      button {
+        padding: 10px;
+        color: white;
+        background: #5647d6;
+        border: 0;
+        border-radius: 6px;
+      }
+      #fixed {
+        position: fixed;
+        right: 8px;
+        bottom: 8px;
+        background: #ffe890;
+        padding: 6px;
+      }
+      svg {
+        width: 30px;
+        height: 30px;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>별도 출처 콘솔</h2>
+    <button id="add" onclick="window.actions++">고객 추가</button
+    ><svg viewBox="0 0 30 30">
+      <defs>
+        <linearGradient id="a">
+          <stop stop-color="#8546ed" />
+          <stop offset="1" stop-color="#37cbb5" />
+        </linearGradient>
+      </defs>
+      <rect width="30" height="30" fill="url(#a)" />
+    </svg>
+    <div id="fixed">고정 표시</div>
+    <script>
+      window.actions = 0;
+    </script>
+  </body>
+</html>

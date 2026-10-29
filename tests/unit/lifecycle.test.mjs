@@ -60,41 +60,56 @@ test('failed or missing acknowledgements do not overwrite last session and remov
   assert.equal(f.contents.listenerCount('destroyed'), 0);
   assert.equal(JSON.parse(await fs.readFile(f.options.sessionFile)).document_id, 'keep');
 });
-test('quit is deferred until persistence succeeds and stays cancellable on failure', async (t) => {
-  const f = await fixture(t);
-  const app = new EventEmitter();
-  let exited = 0,
-    error;
-  app.quit = () => {
-    let prevented = false;
-    app.emit('before-quit', {
-      preventDefault() {
-        prevented = true;
-      },
+test(
+  'quit is deferred until persistence succeeds and stays cancellable on failure',
+  { timeout: 3000 },
+  async (t) => {
+    const f = await fixture(t);
+    const app = new EventEmitter();
+    let exited = 0,
+      error;
+    let failed, quit;
+    const failureReady = new Promise((resolve) => {
+      failed = resolve;
     });
-    if (!prevented) exited++;
-  };
-  f.lifecycle.protectQuit(app, (e) => {
-    error = e;
-  });
-  f.contents.send = (channel, id) =>
-    setImmediate(() =>
-      f.ipcMain.emit('canvas:flushed', f.event, id, { ok: false, message: 'failed' }),
-    );
-  app.quit();
-  await new Promise((r) => setTimeout(r, 10));
-  assert.equal(exited, 0);
-  assert.equal(error.message, 'failed');
-  f.contents.send = (channel, id) =>
-    setImmediate(() =>
-      f.ipcMain.emit('canvas:flushed', f.event, id, { ok: true, document_id: 'saved' }),
-    );
-  app.quit();
-  assert.equal(exited, 0);
-  await new Promise((r) => setTimeout(r, 10));
-  assert.equal(exited, 1);
-  assert.equal(f.lifecycle.canQuit(), true);
-});
+    const quitReady = new Promise((resolve) => {
+      quit = resolve;
+    });
+    app.quit = () => {
+      let prevented = false;
+      app.emit('before-quit', {
+        preventDefault() {
+          prevented = true;
+        },
+      });
+      if (!prevented) {
+        exited++;
+        quit();
+      }
+    };
+    f.lifecycle.protectQuit(app, (e) => {
+      error = e;
+      failed();
+    });
+    f.contents.send = (channel, id) =>
+      setImmediate(() =>
+        f.ipcMain.emit('canvas:flushed', f.event, id, { ok: false, message: 'failed' }),
+      );
+    app.quit();
+    await failureReady;
+    assert.equal(exited, 0);
+    assert.equal(error.message, 'failed');
+    f.contents.send = (channel, id) =>
+      setImmediate(() =>
+        f.ipcMain.emit('canvas:flushed', f.event, id, { ok: true, document_id: 'saved' }),
+      );
+    app.quit();
+    assert.equal(exited, 0);
+    await quitReady;
+    assert.equal(exited, 1);
+    assert.equal(f.lifecycle.canQuit(), true);
+  },
+);
 test('security only trusts the exact mainFrame and HTTP(S) URLs without credentials', () => {
   const contents = { mainFrame: {} };
   assert.throws(() => trustFrame({ sender: contents, senderFrame: {} }, contents));

@@ -67,10 +67,19 @@ try {
   const crop = scene.elements
     .get(partial.id)
     .querySelector('[data-uic-raster-coverage="partial"] img');
+  await crop?.decode();
+  const partialCanvas = document.createElement('canvas');
+  partialCanvas.width = 1;
+  partialCanvas.height = 1;
+  if (crop)
+    partialCanvas
+      .getContext('2d')
+      .drawImage(crop, crop.naturalWidth - 1, Math.floor(crop.naturalHeight / 2), 1, 1, 0, 0, 1, 1);
   check(
-    'Partially visible iframe is cropped without stretching across the frame',
-    crop && parseFloat(crop.style.width) < 100 && parseFloat(crop.style.height) <= 100,
+    'Partially visible iframe keeps uncaptured pixels transparent instead of stretching',
+    crop && partialCanvas.getContext('2d').getImageData(0, 0, 1, 1).data[3] === 0,
   );
+
   check(
     'Fully offscreen frame does not fabricate an image',
     !scene.elements.get(offscreen.id).querySelector('img') &&
