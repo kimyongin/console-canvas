@@ -54,6 +54,7 @@ async function main() {
   for (const suite of [
     'iframes',
     'capture-quality',
+    'layout',
     'integration',
     'ai-variants',
     'developer-workflow',

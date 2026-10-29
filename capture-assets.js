@@ -1,5 +1,65 @@
 // Public CORS reads in the extension worker avoid the page's connect-src rules.
 // No host permissions, cookies, credentials or browser security settings change.
+export async function fetchPublicFontCss(urls) {
+  const rules = [];
+  for (let start = 0; start < Math.min(urls.length, 32); start += 8) {
+    const batch = await Promise.all(
+      [...new Set(urls)].slice(start, start + 8).map(async (url) => {
+        try {
+          const parsed = new URL(url);
+          if (!/^https?:$/.test(parsed.protocol) || parsed.username || parsed.password) return [];
+          const response = await fetch(parsed.href, {
+            credentials: 'omit',
+            cache: 'force-cache',
+            signal: AbortSignal.timeout(2000),
+          });
+          if (!response.ok || Number(response.headers.get('content-length')) > 2_000_000) {
+            await response.body?.cancel().catch(() => {});
+            return [];
+          }
+          const reader = response.body.getReader();
+          let length = 0,
+            parts = [];
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              length += value.length;
+              if (length > 2_000_000) return [];
+              parts.push(value);
+            }
+          } finally {
+            await reader.cancel().catch(() => {});
+          }
+          const bytes = new Uint8Array(length);
+          let offset = 0;
+          for (const part of parts) {
+            bytes.set(part, offset);
+            offset += part.length;
+          }
+          const css = new TextDecoder().decode(bytes);
+          return [
+            ...css.matchAll(
+              /@font-(?:face|feature-values|palette-values)\b[^{}]*\{(?:[^{}]|\{[^{}]*\})*\}/gi,
+            ),
+          ].map((m) =>
+            m[0].replace(
+              /url\(\s*['"]?([^)'"\s]+)['"]?\s*\)/g,
+              (_all, path) =>
+                'url("' +
+                new URL(path, response.url || parsed.href).href.replaceAll('"', '%22') +
+                '")',
+            ),
+          );
+        } catch {
+          return [];
+        }
+      }),
+    );
+    rules.push(...batch.flat());
+  }
+  return [...new Set(rules)];
+}
 export async function fetchPublicAssets(urls) {
   const result = {};
   let total = 0;

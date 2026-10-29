@@ -1,3 +1,4 @@
+import { restoreCapturedLayout } from './capture-layout.js';
 import { applyCaptureMedia } from './capture-media.js';
 import { buildCodeDocument } from './code-patches.js';
 import { selectionRoots, alignmentOperations, snapDelta } from './selection-tools.js';
@@ -124,7 +125,9 @@ export class CanvasScene {
     this.frame = frame;
     this.snapshot = snapshot;
     this.callbacks = callbacks;
-    this.nodes = new Map(snapshot.nodes.map((node) => [node.id, node]));
+    // Pseudo/generated geometry is refreshed for the rendering copy. Never
+    // write it back into the captured document when mounting or exporting.
+    this.nodes = new Map(snapshot.nodes.map((node) => [node.id, copy(node)]));
     this.originalNodes = new Map(this.nodes);
     this.captureNodes = new Map(this.nodes);
     this.codePatches = [];
@@ -160,6 +163,7 @@ export class CanvasScene {
     await loaded;
     this.doc = this.frame.contentDocument;
     if (!this.doc?.body) throw new Error('복제 화면에 접근할 수 없습니다.');
+    restoreCapturedLayout(this.doc, this.nodes);
     // Capture sprite variables are globally unique. Hoist them in the copy so
     // lifting a child out of its original body/frame keeps its image resources.
     for (const element of this.doc.querySelectorAll('[style]')) {
@@ -210,6 +214,14 @@ export class CanvasScene {
     this.portal.style.cssText =
       'position:absolute!important;left:0!important;top:0!important;width:0!important;height:0!important;z-index:2147480000!important;overflow:visible!important';
     this.doc.documentElement.append(this.portal);
+    // Captured fixed layers keep their source z-order; only user-detached
+    // editing layers belong in the elevated editor portal.
+    this.fixedPortal = this.doc.createElement('div');
+    this.fixedPortal.dataset.uicEditor = 'portal';
+    this.fixedPortal.style.cssText =
+      'position:absolute;left:0;top:0;width:0;height:0;overflow:visible';
+    this.doc.documentElement.append(this.fixedPortal);
+    this.fixedScopes = new Map();
     this.outline = this.doc.createElement('div');
     this.outline.dataset.uicEditor = 'selection';
     this.outline.style.cssText =
@@ -462,6 +474,53 @@ export class CanvasScene {
       element.style.height = rect.height + 'px';
     }
   }
+  fixedScope(placeholder) {
+    const ancestors = [];
+    for (
+      let owner = placeholder.parentElement;
+      owner && owner !== this.doc.documentElement;
+      owner = owner.parentElement
+    ) {
+      const style = this.doc.defaultView.getComputedStyle(owner);
+      // Rotated/scaled scopes need a complete matrix reconstruction. Retain
+      // the established document-coordinate path for those captures.
+      if (
+        (style.zoom && style.zoom !== '1' && style.zoom !== 'normal') ||
+        ['rotate', 'scale'].some((k) => style[k] && style[k] !== 'none')
+      )
+        return null;
+      if (style.transform !== 'none') {
+        const matrix = new this.doc.defaultView.DOMMatrixReadOnly(style.transform);
+        if (!matrix.is2D || matrix.a !== 1 || matrix.d !== 1 || matrix.b !== 0 || matrix.c !== 0)
+          return null;
+      }
+      ancestors.push({ owner, style });
+    }
+    const context = ancestors.find(
+      ({ style }) =>
+        style.isolation === 'isolate' ||
+        parseFloat(style.opacity) < 1 ||
+        style.transform !== 'none' ||
+        style.filter !== 'none' ||
+        style.perspective !== 'none' ||
+        (style.zIndex !== 'auto' && style.position !== 'static'),
+    )?.owner;
+    if (!context) return null;
+    if (!this.fixedScopes.has(context)) {
+      const portal = this.doc.createElement('div');
+      portal.dataset.uicEditor = 'portal';
+      portal.style.cssText = this.fixedPortal.style.cssText;
+      context.append(portal);
+      const r = portal.getBoundingClientRect();
+      this.fixedScopes.set(context, {
+        portal,
+        x: r.x,
+        y: r.y,
+        ownerId: context.closest('[data-uic-id]')?.dataset.uicId,
+      });
+    }
+    return this.fixedScopes.get(context);
+  }
   lift(id, forcedRect) {
     if (this.lifts.has(id)) return this.lifts.get(id);
     const element = this.elements.get(id),
@@ -526,8 +585,38 @@ export class CanvasScene {
         element.style.setProperty('line-height', base.height + 'px', 'important');
     }
     wrapper.append(element);
-    this.portal.append(wrapper);
-    const lift = { wrapper, element, placeholder, originalStyle, base, baseline: !!forcedRect };
+    let anchor = null,
+      scope = null;
+    const zIndex = element.style.zIndex || 'auto';
+    if (forcedRect) {
+      // A fixed backdrop inside a fixed dialog must remain in that dialog's
+      // stacking context, below its ordinary flex-item panel.
+      const ancestor = placeholder.closest('[data-uic-lift]');
+      anchor = ancestor ? this.lifts.get(ancestor.dataset.uicLift) : null;
+      if (anchor) {
+        // Viewport-fixed descendants escape an overflow scroll box. Keep them
+        // inside its stacking group without clipping them to its content box.
+        if (node.kind === 'pseudo' && node.locator?.pseudo === 'before')
+          anchor.wrapper.prepend(wrapper);
+        else anchor.wrapper.append(wrapper);
+      } else {
+        scope = this.fixedScope(placeholder);
+        (scope?.portal || this.fixedPortal).append(wrapper);
+      }
+      wrapper.style.isolation = 'isolate';
+      element.style.setProperty('z-index', 'auto', 'important');
+    } else this.portal.append(wrapper);
+    const lift = {
+      wrapper,
+      element,
+      placeholder,
+      originalStyle,
+      base,
+      baseline: !!forcedRect,
+      anchor,
+      scope,
+      zIndex,
+    };
     this.lifts.set(id, lift);
     return lift;
   }
@@ -551,6 +640,8 @@ export class CanvasScene {
     }
     this.lifts.clear();
     this.portal.replaceChildren();
+    this.fixedPortal.replaceChildren();
+    this.fixedScopes.clear();
     this.doc.head.replaceWith(this.doc.importNode(prepared.doc.head, true));
     this.doc.body.replaceWith(this.doc.importNode(prepared.doc.body, true));
     this.codePatches = prepared.patches;
@@ -964,9 +1055,29 @@ export class CanvasScene {
       const lift = this.lifts.get(id);
       if (lift) {
         const offset = this.offset(id);
-        lift.wrapper.style.left = lift.base.x + offset.x + 'px';
-        lift.wrapper.style.top = lift.base.y + offset.y + 'px';
-        lift.wrapper.style.zIndex = this.selected === id ? '10' : '1';
+        // Nested baseline layers already inherit their fixed parent's motion.
+        const anchorOffset = lift.anchor
+          ? this.offset(lift.anchor.element.dataset.uicId)
+          : lift.scope?.ownerId
+            ? this.offset(lift.scope.ownerId)
+            : { x: 0, y: 0 };
+        lift.wrapper.style.left =
+          lift.base.x -
+          (lift.anchor?.base.x ?? lift.scope?.x ?? 0) +
+          offset.x -
+          anchorOffset.x +
+          'px';
+        lift.wrapper.style.top =
+          lift.base.y -
+          (lift.anchor?.base.y ?? lift.scope?.y ?? 0) +
+          offset.y -
+          anchorOffset.y +
+          'px';
+        lift.wrapper.style.zIndex = lift.baseline ? lift.zIndex : this.selected === id ? '10' : '1';
+        if (lift.baseline) {
+          lift.wrapper.style.opacity = hidden ? '0' : defaults.opacity || '1';
+          element.style.setProperty('opacity', '1', 'important');
+        }
         const clip = this.nodes.get(id)?.captureClip;
         if (clip && lift.baseline && !this.edits[id]?.dx && !this.edits[id]?.dy) {
           const b = lift.base;

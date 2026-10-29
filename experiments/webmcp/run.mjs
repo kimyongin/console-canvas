@@ -270,10 +270,23 @@ try {
               /^\d+/,
             )[0],
           );
-          await evaluate(
-            sourcePage,
-            `async()=>{await Promise.race([document.fonts.ready,new Promise(r=>setTimeout(r,3000))]);return document.title}`,
-          );
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              await evaluate(
+                sourcePage,
+                `async()=>{await Promise.race([document.fonts.ready,new Promise(r=>setTimeout(r,3000))]);return document.title}`,
+              );
+              break;
+            } catch (error) {
+              if (
+                attempt === 2 ||
+                !/Execution context was destroyed|Cannot find context/i.test(error.message)
+              )
+                throw error;
+              site.readinessRetries = (site.readinessRetries || 0) + 1;
+              await new Promise((r) => setTimeout(r, 500));
+            }
+          }
           await call('trigger_extension_action', { id: extensionId });
           let editorId;
           for (let i = 0; i < 240; i++) {

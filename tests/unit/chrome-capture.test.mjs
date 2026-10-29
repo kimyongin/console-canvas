@@ -2,7 +2,55 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { captureChromeTab } from '../../chrome-capture.js';
-import { fetchPublicAssets } from '../../capture-assets.js';
+import { fetchPublicAssets, fetchPublicFontCss } from '../../capture-assets.js';
+test('public stylesheet rescue retains only font metadata with absolute resources', async () => {
+  const original = globalThis.fetch;
+  let options;
+  globalThis.fetch = async (_url, init) => {
+    options = init;
+    return new Response(
+      'body{display:none}@font-face{font-family:Demo;src:url(../fonts/a.woff2)}@font-feature-values Demo{@styleset{alt:1}}',
+    );
+  };
+  try {
+    const rules = await fetchPublicFontCss(['https://assets.example.test/css/main.css']);
+    assert.equal(options.credentials, 'omit');
+    assert.ok(options.signal instanceof AbortSignal);
+    assert.equal(rules.length, 2);
+    assert.ok(rules[0].includes('https://assets.example.test/fonts/a.woff2'));
+    assert.ok(rules.every((rule) => !rule.includes('body')));
+    assert.deepEqual(
+      await fetchPublicFontCss([
+        'file:///private/secret.css',
+        'https://user:secret@example.test/styles.css',
+      ]),
+      [],
+    );
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+test('public stylesheet rescue cancels a streaming response beyond its budget', async () => {
+  const original = globalThis.fetch;
+  let cancelled = false;
+  globalThis.fetch = async () =>
+    new Response(
+      new ReadableStream({
+        start(c) {
+          c.enqueue(new Uint8Array(2_000_001));
+        },
+        cancel() {
+          cancelled = true;
+        },
+      }),
+    );
+  try {
+    assert.deepEqual(await fetchPublicFontCss(['https://assets.example.test/styles.css']), []);
+    assert.equal(cancelled, true);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
 test('font bytes without Content-Type remain available offline', async () => {
   const original = globalThis.fetch;
   globalThis.fetch = async () => new Response(new Uint8Array([119, 79, 70, 50, 0, 0, 0, 0]));

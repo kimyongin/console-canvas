@@ -1,4 +1,4 @@
-import { fetchPublicAssets } from './capture-assets.js';
+import { fetchPublicAssets, fetchPublicFontCss } from './capture-assets.js';
 // Extension capture coordinator. Collector scripts only read DOM; viewport
 // scrolling for screenshot tiles is restored in finally and never clicks UI.
 const nap = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -71,11 +71,29 @@ export async function captureChromeTab(chrome, tab, layoutAttempt = 0) {
   let snapshot = results.find((r) => r.frameId === 0)?.result;
   if (!snapshot?.html)
     throw Error('화면을 가져오지 못했습니다. 로딩이 끝난 뒤 다시 시도해 주세요.');
-  let assetData = await fetchPublicAssets(
-    results.flatMap((r) =>
-      (r.result?.warnings || []).filter((w) => w.type === 'assets').flatMap((w) => w.urls || []),
+  // CSSOM access to an external sheet may fail even when its server permits
+  // a public CORS read. Keep only font declarations; never execute page CSS.
+  const sheetReads = await Promise.allSettled(
+    results.map((r) =>
+      chrome.scripting.executeScript({
+        target: { ...target, frameIds: [r.frameId] },
+        func: () => [...document.styleSheets].map((s) => s.href).filter(Boolean),
+      }),
     ),
   );
+  const fontCss = await fetchPublicFontCss(
+    sheetReads.flatMap((r) =>
+      r.status === 'fulfilled' ? r.value.flatMap((x) => x.result || []) : [],
+    ),
+  );
+  let assetData = await fetchPublicAssets([
+    ...fontCss.flatMap((css) =>
+      [...css.matchAll(/url\(\s*['"]?([^)'"\s]+)['"]?\s*\)/g)].map((m) => m[1]),
+    ),
+    ...results.flatMap((r) =>
+      (r.result?.warnings || []).filter((w) => w.type === 'assets').flatMap((w) => w.urls || []),
+    ),
+  ]);
   const failures = [],
     merged = new Map();
   let finalCollection = false,
@@ -113,19 +131,20 @@ export async function captureChromeTab(chrome, tab, layoutAttempt = 0) {
       frames.push({ index: node.frame?.index, ...entry });
     }
     let capture = result.result;
-    if (frames.length || Object.keys(assetData).length || finalCollection) {
+    if (frames.length || Object.keys(assetData).length || fontCss.length || finalCollection) {
       try {
         if (finalCollection && result.frameId === 0) finalScreenshot = await shot();
         capture = (
           await chrome.scripting.executeScript({
             target: { ...target, frameIds: [result.frameId] },
-            func: (frames, assetData) =>
+            func: (frames, assetData, fontCss) =>
               globalThis.UICloneCapture.capture(document, {
                 frames,
                 assetData,
                 fetchAssets: false,
+                fontCss,
               }),
-            args: [frames, assetData],
+            args: [frames, assetData, fontCss],
           })
         )[0].result;
       } catch (error) {
