@@ -36,3 +36,5 @@ MDN은 내장 1440×1000·Chrome 1600×1100, 문서 높이 5,245px다. GitHub는
 일반 Chrome은 동일 ID/설치 경로로 0.24.1을 활성화했다. 사용자 확장 문서 직접 열람은 기존 URL 정책 제한을 우회하지 않았으며 별도 프로필의 실제 확장 수집/재열기 검사와 구분한다. 설치는 백업을 동반한 직접 교체이며 업데이트 버튼의 자기 교체 흐름을 다시 검증한 것은 아니다.
 
 검사 로그는 `local/precision-final-check.log`, `local/precision-packaged-sdk.log`, `local/precision-chrome-product/`, 실제 사용자 보존 증빙은 `local/deployment-0241-backup/`다.
+
+배포 커밋 `1379672`, [v0.24.1 공개 프리릴리스](https://github.com/kimyongin/console-canvas/releases/tag/v0.24.1). 원격 5개 자산 digest와 로컬 SHA-256이 모두 일치했고 실제 설치 앱의 **업데이트 확인**에서 “최신 버전입니다”를 확인했다. #67은 완료로 종료했다.
