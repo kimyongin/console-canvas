@@ -120,8 +120,7 @@ export function createAiPanel({ $, state, manager, adapter, toast, save, checkpo
     instruction: manager.instruction,
     preview: (point) =>
       withVersionScene(state.snapshot, point, (scene) => ({
-        html: scene.serialize(),
-        size: scene.contentSize(),
+        ...scene.preview(),
       })),
     close: () => $('#ai-dialog').close(),
   };

@@ -54,6 +54,40 @@ try {
     base = { editor_id };
   let current = (await tool('get_screen', base)).screen;
   check('Real desktop screen is connected', current.element_count > 300);
+  check(
+    'Capture evidence separates original pixels, scope and severity',
+    current.capture_reference?.kind === 'captured_pixels' &&
+      current.capture_reference.visual_comparison === 'not_measured' &&
+      current.capture_scope.mode === 'document' &&
+      typeof current.capture_status.counts.loss === 'number',
+  );
+  check(
+    'MCP describes bounded offline resource patches',
+    tools.tools
+      .find((t) => t.name === 'apply_code_patches')
+      .inputSchema.properties.patches.items.properties.type.enum.includes('resource'),
+  );
+  const invalidResource = await tool(
+    'apply_code_patches',
+    {
+      ...base,
+      expected_revision: current.revision,
+      operation_id: randomUUID(),
+      patches: [
+        {
+          type: 'resource',
+          resource_url: 'https://unobserved.example.test/asset.png',
+          data: 'data:font/woff2;base64,d09GMgAAAAAAAABh',
+        },
+      ],
+    },
+    true,
+  );
+  check(
+    'Unobserved resource is rejected atomically through official SDK',
+    invalidResource.ok === false &&
+      (await tool('get_screen', base)).screen.revision === current.revision,
+  );
   const elements = (await tool('list_elements', { ...base, query: 'new-customer' })).elements;
   const button = elements.find((e) => e.tag === 'button' && e.locator.id === 'new-customer');
   assert.ok(button);

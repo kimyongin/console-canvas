@@ -1,3 +1,4 @@
+import { hasCapturedPhoto } from './capture-reference.js';
 import { captureAssessment } from './capture-status.js';
 import { buildCodeDocument } from './code-patches.js';
 import { activityBranch } from './activity-history.js';
@@ -29,9 +30,19 @@ export function createEditorController(options) {
   function screen() {
     const assessment = captureAssessment(state.snapshot, state.scene.elements);
     return {
+      capture_reference: {
+        available: hasCapturedPhoto(state.snapshot),
+        kind: 'captured_pixels',
+        visual_comparison: 'not_measured',
+      },
+      capture_scope: state.snapshot.captureScope || { mode: 'document' },
+      resource_repairs: (state.scene.codePatches || [])
+        .filter((p) => p.type === 'resource')
+        .map((p) => ({ url: p.resource_url, embedded: true })),
       capture_status: {
         visual_comparison: 'not_measured',
         issue_count: assessment.items.length,
+        counts: assessment.counts,
         issues: assessment.items.slice(0, 200).map(({ actionable, ...item }) => item),
         issues_truncated: assessment.items.length > 200,
       },
@@ -72,6 +83,7 @@ export function createEditorController(options) {
         ? {
             image: {
               mode: node.image.mode,
+              source_broken: !!node.image.broken,
               url: /^https?:/.test(node.image.url) ? node.image.url : null,
               coverage: scene.elements.get(node.id)?.dataset.uicImageCoverage || null,
               rendering: scene.elements.get(node.id)?.dataset.uicImageRendering || null,

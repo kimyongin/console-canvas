@@ -713,12 +713,99 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
         <p id="capture-status-empty" hidden>
           기록된 제한은 없습니다. 이미지·글자·배치가 원본과 같은지 확인한 뒤 편집하세요.
         </p>
+        <Button
+          id="repair-assets-button"
+          onClick={() => dispatchEditorCommand('repair-assets')}
+          variant="outline"
+        >
+          이미지·폰트 다시 읽기
+        </Button>
+        <p id="repair-assets-note"></p>
+        <Button
+          id="source-compare-button"
+          onClick={() => dispatchEditorCommand('source-compare')}
+          variant="outline"
+        >
+          원본 사진과 비교
+        </Button>
+        <p id="source-compare-unavailable" hidden>
+          원본 촬영 사진이 없는 문서입니다. 편집 전 복제본과 실제 원본 사진은 다릅니다.
+        </p>
         <Button id="capture-source-button" hidden={true} variant="outline">
           원본 사이트 확인
         </Button>
         <p id="capture-source-note" hidden>
           현재 사이트 상태는 가져온 시점과 다를 수 있습니다.
         </p>
+      </DialogSurface>
+      <DialogSurface id="repair-assets-dialog" aria-labelledby="repair-assets-title">
+        <form method="dialog">
+          <Button className="dialog-close" aria-label="자산 복구 닫기" variant="outline">
+            ×
+          </Button>
+        </form>
+        <h2 id="repair-assets-title">이미지·폰트 다시 읽기</h2>
+        <p>
+          저장된 주소에서 공개 자산을 다시 읽어 별도 미리보기를 만듭니다. 현재 편집과 촬영 원본은
+          유지되며, 적용한 복구는 실행 취소할 수 있습니다.
+        </p>
+        <p>최대 16개·각 900KB·합계 1.25MB. 로그인 자산·SVG·캡처에 없는 선언은 복구하지 않습니다.</p>
+        <ul id="repair-assets-results"></ul>
+        <Button id="repair-assets-fetch" variant="outline">
+          선택한 자산 다시 읽기
+        </Button>
+        <p id="repair-assets-status" role="status"></p>
+        <div id="repair-assets-preview" className="repair-view"></div>
+        <Button id="repair-assets-apply" variant="default" disabled>
+          미리보기 적용
+        </Button>
+      </DialogSurface>
+      <DialogSurface id="source-compare-dialog" aria-labelledby="source-compare-title">
+        <form method="dialog">
+          <Button className="dialog-close" aria-label="원본 사진 비교 닫기" variant="outline">
+            ×
+          </Button>
+        </form>
+        <h2 id="source-compare-title">원본 사진과 비교</h2>
+        <p>저장된 실제 사진과 복제본을 비교합니다. 현재 웹사이트를 다시 촬영하지 않습니다.</p>
+        <div className="reference-tools">
+          <label>
+            보기{' '}
+            <NativeSelect id="source-compare-mode">
+              <option value="side">좌우 비교</option>
+              <option value="overlay">겹쳐 보기</option>
+            </NativeSelect>
+          </label>
+          <label>
+            복제본{' '}
+            <NativeSelect id="source-compare-version">
+              <option value="baseline">편집 전 복제본</option>
+              <option value="current">현재 작업</option>
+            </NativeSelect>
+          </label>
+          <label>
+            배율{' '}
+            <NativeSelect id="source-compare-zoom">
+              <option value="fit">화면에 맞춤</option>
+              <option value=".5">50%</option>
+              <option value="1">100%</option>
+              <option value="1.5">150%</option>
+            </NativeSelect>
+          </label>
+          <label id="source-compare-blend-label" hidden>
+            복제본 농도{' '}
+            <Input id="source-compare-blend" type="range" min="0" max="100" defaultValue="50" />
+          </label>
+        </div>
+        <div className="source-comparison-labels">
+          <strong>가져오기 당시 실제 원본 사진</strong>
+          <strong id="source-compare-clone-label">편집 전 복제본</strong>
+        </div>
+        <div id="source-compare-grid" className="source-comparison-grid">
+          <div id="source-compare-photo" className="reference-view"></div>
+          <div id="source-compare-clone" className="reference-view"></div>
+        </div>
+        <p id="source-compare-status" role="status"></p>
       </DialogSurface>
       <DialogSurface id="snapshot-save-dialog" aria-labelledby="snapshot-save-title">
         <h2 id="snapshot-save-title">{'스냅샷 저장'}</h2>

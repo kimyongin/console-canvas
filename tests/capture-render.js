@@ -15,7 +15,7 @@ try {
   const testedHeight = Math.min(snapshot.source.height, 12000);
   const missingMedia = [...scene.nodes.values()]
     .filter((n) => {
-      if (!n.visible) return false;
+      if (!n.visible || n.image?.broken) return false;
       const r = n.rect,
         c = n.captureClip || {
           x: 0,

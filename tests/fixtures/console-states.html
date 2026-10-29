@@ -1,0 +1,200 @@
+<!doctype html><meta charset="utf-8" /><title>Console state capture regression</title>
+<style>
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    background: #f1f3f8;
+    color: #17223a;
+    font: 14px/1.5 sans-serif;
+    min-height: 1800px;
+  }
+  header {
+    height: 70px;
+    background: #152242;
+    color: white;
+    padding: 22px 28px;
+  }
+  aside {
+    position: absolute;
+    top: 90px;
+    left: 24px;
+    width: 200px;
+    background: white;
+    padding: 16px;
+    border: 1px solid #d5dae5;
+  }
+  main {
+    margin: 24px 250px;
+  }
+  h1 {
+    font-size: 24px;
+  }
+  .card {
+    background: white;
+    border: 1px solid #cbd2df;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 18px 0;
+  }
+  button,
+  input {
+    font: inherit;
+    padding: 8px 12px;
+    border: 1px solid #aeb7ca;
+    background: white;
+    border-radius: 4px;
+  }
+  button {
+    color: #4230c0;
+  }
+  .table {
+    height: 260px;
+    overflow: auto;
+    padding: 0;
+  }
+  table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: 1300px;
+  }
+  th,
+  td {
+    border-bottom: 1px solid #dce1eb;
+    padding: 12px;
+    min-width: 160px;
+    background: white;
+  }
+  th {
+    position: sticky;
+    top: 0;
+    background: #e9edf8;
+    z-index: 2;
+  }
+  td:first-child,
+  th:first-child {
+    position: sticky;
+    left: 0;
+    background: #e4f3f0;
+    z-index: 1;
+  }
+  th:first-child {
+    z-index: 3;
+  }
+  .popover {
+    position: absolute;
+    top: 190px;
+    left: 490px;
+    width: 220px;
+    background: white;
+    box-shadow: 0 6px 20px #15224230;
+    border: 1px solid #adb6ca;
+    padding: 14px;
+    z-index: 5;
+  }
+  .popover label {
+    display: block;
+    padding: 6px;
+  }
+  .virtual {
+    height: 180px;
+    overflow: auto;
+    position: relative;
+  }
+  .virtual-list {
+    height: 26000px;
+    position: relative;
+  }
+  .virtual-row {
+    height: 26px;
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-bottom: 1px solid #dce1eb;
+    padding-left: 10px;
+  }
+  .dialog {
+    position: fixed;
+    right: 26px;
+    top: 350px;
+    width: 300px;
+    background: white;
+    border: 1px solid #adb6ca;
+    box-shadow: 0 6px 20px #15224230;
+    padding: 20px;
+    z-index: 6;
+  }
+  .tooltip {
+    position: absolute;
+    top: 305px;
+    right: 40px;
+    background: #1c2845;
+    color: white;
+    padding: 10px 14px;
+    border-radius: 6px;
+    z-index: 8;
+  }
+  footer {
+    margin-top: 280px;
+    background: #dfe9f8;
+    padding: 40px;
+  }
+</style>
+<header>North Console · 상태 보존 검증</header>
+<aside>고객 관리<br />주문 목록<br />설정</aside>
+<main>
+  <h1>고객 관리 <img src="intentionally-missing.png" alt="누락 로고" width="40" height="24" /></h1>
+  <section class="card" id="filters">
+    <input placeholder="이름 또는 이메일 검색" /><button>상태: 전체 ▾</button><button>검색</button>
+  </section>
+  <div class="popover" id="popover">
+    <strong>상태 필터</strong><label><input type="checkbox" checked />활성 고객</label
+    ><label><input type="checkbox" />비활성 고객</label>
+  </div>
+  <section class="card table" id="table">
+    <table>
+      <thead>
+        <tr>
+          <th>고객</th>
+          <th>이메일</th>
+          <th>등급</th>
+          <th>상태</th>
+          <th>등록일</th>
+          <th>메모</th>
+          <th>담당자</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </section>
+  <section class="card virtual" id="virtual">
+    <div class="virtual-list" id="virtual-list"></div>
+  </section>
+  <p>가상 목록: 전체 1,000개 중 화면 인근 20개만 렌더링됩니다.</p>
+  <footer>하단의 문서 범위 확인</footer>
+</main>
+<div class="tooltip" id="tooltip">선택한 고객에게만 적용합니다.</div>
+<section class="dialog" role="dialog" id="dialog">
+  <h2>고객 편집</h2>
+  <label>이름 <input value="김고객" /></label>
+  <p>열려 있는 편집 창도 현재 상태대로 가져옵니다.</p>
+  <button>저장</button>
+</section>
+<script>
+  window.actions = 0;
+  document.addEventListener('click', () => window.actions++);
+  document.querySelector('#rows').innerHTML = Array.from(
+    { length: 50 },
+    (_, i) =>
+      `<tr><td>고객 ${i + 1}</td><td>customer${i + 1}@example.test</td><td>VIP</td><td>활성</td><td>2026.10.29</td><td>확인 요청 ${i + 1}</td><td>담당자 ${i % 5}</td></tr>`,
+  ).join('');
+  document.querySelector('#table').scrollTop = 140;
+  document.querySelector('#table').scrollLeft = 110;
+  document.querySelector('#virtual-list').innerHTML = Array.from(
+    { length: 20 },
+    (_, i) =>
+      `<div class="virtual-row" style="top:${(i + 20) * 26}px">가상 고객 ${i + 21} · 보이는 행만 수집</div>`,
+  ).join('');
+  document.querySelector('#virtual').scrollTop = 520;
+</script>

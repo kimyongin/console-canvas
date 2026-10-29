@@ -751,6 +751,7 @@
         const sx = node.rect.width / (source.offsetWidth || node.rect.width || 1),
           sy = node.rect.height / (source.offsetHeight || node.rect.height || 1);
         node.image = {
+          broken: source.complete && !source.naturalWidth,
           mode: data ? 'embedded' : 'screenshot',
           url,
           contentRect: {
@@ -942,6 +943,11 @@
         (!/^data:image\/webp;/.test(candidate) || staticWebp)
           ? candidate
           : null;
+      if (job.node.image.broken) {
+        job.clone.src = 'data:image/png;base64,';
+        job.clone.dataset.uicImageFallback = 'source-error';
+        continue;
+      }
       if (data) {
         job.clone.src = data;
         job.node.image.mode = 'embedded';

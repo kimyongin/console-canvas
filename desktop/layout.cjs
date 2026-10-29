@@ -4,5 +4,6 @@ const HEADER_HEIGHT = Object.freeze({
   settings: 54,
   agent: 54,
   update: 54,
+  capture: 54,
 });
 module.exports = { HEADER_HEIGHT };

@@ -112,7 +112,11 @@ try {
   ]);
   await active.done;
   active = null;
+  active = start(electron, ['tests/scoped-capture.cjs']);
+  const nativeScopes = JSON.parse((await active.done).trim());
+  active = null;
   const report = {
+    nativeScopes,
     captureMode: offscreen
       ? 'real DOM / fixture screenshot / offscreen'
       : 'real DOM / display screenshot',

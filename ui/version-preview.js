@@ -23,7 +23,7 @@ export async function withVersionScene(snapshot, point, run) {
 }
 export function versionOptions(state) {
   return [
-    { id: '@original', name: '가져온 원본', state: { edits: {}, annotations: {}, note: '' } },
+    { id: '@original', name: '편집 전 복제본', state: { edits: {}, annotations: {}, note: '' } },
     {
       id: '@current',
       name: '현재 작업',
@@ -157,8 +157,7 @@ export function createVersionPreview({ $, state, commitCommentDraft, adapter }) 
     differences();
     try {
       const result = await withVersionScene(state.snapshot, option.state, (scene) => ({
-        html: scene.serialize(),
-        size: scene.contentSize(),
+        ...scene.preview(),
         changes: scene.changes().length,
         comments: scene.comments().length,
         targets: Object.fromEntries(
@@ -210,11 +209,13 @@ export function createVersionPreview({ $, state, commitCommentDraft, adapter }) 
       if (rect) {
         host(side).scrollLeft = Math.max(
           0,
-          (rect.x + rect.width / 2) * scale - host(side).clientWidth / 2,
+          (rect.x - (scenes.get(side)?.result?.origin?.x || 0) + rect.width / 2) * scale -
+            host(side).clientWidth / 2,
         );
         host(side).scrollTop = Math.max(
           0,
-          (rect.y + rect.height / 2) * scale - host(side).clientHeight / 2,
+          (rect.y - (scenes.get(side)?.result?.origin?.y || 0) + rect.height / 2) * scale -
+            host(side).clientHeight / 2,
         );
       }
     }

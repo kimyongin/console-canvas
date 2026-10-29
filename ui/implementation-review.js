@@ -167,8 +167,7 @@ export function createImplementationReview({
         point = side === 'target' ? review.target.point : review.result?.point;
       if (!snapshot || !point) return null;
       return withVersionScene(snapshot, point, (scene) => ({
-        html: scene.serialize(),
-        size: scene.contentSize(),
+        ...scene.preview(),
         targets: Object.fromEntries(
           [...scene.nodes]
             .filter(([, n]) => !scene.hidden(n.id))

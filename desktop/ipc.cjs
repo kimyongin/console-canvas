@@ -58,6 +58,14 @@ function registerShellIpc({
       source.webContents.navigationHistory.goForward();
   });
   handle('reload', () => source.webContents.reload());
+  handle('capture-preview', async () => {
+    const view = await source.webContents.executeJavaScriptInIsolatedWorld(1002, [
+      { code: '({url:location.href,x:scrollX,y:scrollY,width:innerWidth,height:innerHeight})' },
+    ]);
+    const data = (await source.webContents.capturePage()).toDataURL();
+    show('capture');
+    return { data, view };
+  });
   handle('capture', capture);
 }
 module.exports = { registerShellIpc };

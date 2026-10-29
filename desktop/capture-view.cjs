@@ -1,6 +1,10 @@
 // Bring lazy-loaded public view content into the renderer before freezing the
 // DOM/resources. Only the viewport moves; no service controls are activated.
-async function prepareCaptureView(contents, collectorCode = '', { timeoutMs = 10000 } = {}) {
+async function prepareCaptureView(
+  contents,
+  collectorCode = '',
+  { timeoutMs = 10000, scope = null } = {},
+) {
   const read = async (expression) => {
     let timer;
     try {
@@ -21,6 +25,10 @@ async function prepareCaptureView(contents, collectorCode = '', { timeoutMs = 10
   const original = await read(
     '({url:location.href,x:scrollX,y:scrollY,width:innerWidth,height:innerHeight})',
   );
+  if (scope && scope.mode !== 'document') {
+    await read('globalThis.UICloneCapture?.settleVisibleMedia(document)');
+    return { steps: 0, restored: true };
+  }
   let steps = 0;
   try {
     for (

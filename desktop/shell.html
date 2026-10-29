@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self'"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src data:"
     />
     <title>Console Canvas</title>
     <link rel="stylesheet" href="shell.css" />
@@ -17,7 +17,14 @@
           <button id="show-source" class="active">웹사이트</button
           ><button id="show-editor">편집기</button>
         </nav>
-        <small id="status" role="status">원하는 화면을 열어 주세요.</small
+        <label id="capture-scope-label"
+          >범위
+          <select id="capture-scope" aria-label="가져오기 범위">
+            <option value="viewport">현재 보이는 화면</option>
+            <option value="document">전체 페이지</option>
+            <option value="region">영역 선택</option>
+          </select></label
+        ><small id="status" role="status">원하는 화면을 열어 주세요.</small
         ><button id="capture" class="primary">이 화면 가져오기 →</button>
         <button id="show-settings" title="에이전트 연결·스킬 설치·앱 업데이트" aria-label="앱 설정">
           앱 설정
@@ -35,6 +42,20 @@
         /><button type="submit">열기</button><button id="demo" type="button">샘플 콘솔</button>
       </form>
     </header>
+    <section id="capture-picker" hidden aria-label="가져올 영역 선택">
+      <h1>가져올 영역을 드래그하세요</h1>
+      <p>
+        사진 위에서 선택한 영역이 편집 범위가 됩니다. 배치를 유지하기 위한 주변 HTML은 함께
+        보존됩니다.
+      </p>
+      <div id="capture-photo-wrap">
+        <img id="capture-photo" alt="현재 원본 화면 촬영 사진" draggable="false" />
+        <div id="capture-selection" hidden></div>
+      </div>
+      <p id="capture-region-size" role="status">아직 선택하지 않았습니다.</p>
+      <button id="capture-region-cancel">취소</button
+      ><button id="capture-region-confirm" class="primary" disabled>선택 영역 가져오기</button>
+    </section>
     <main id="fallback">
       <h1>원본 사이트와 편집을 한 곳에서</h1>
       <p>위 주소창에 사이트를 열고, 원하는 화면에서 가져오기를 누르세요.</p>

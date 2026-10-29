@@ -120,6 +120,11 @@ export async function applyCaptureMedia(scene) {
         element.style.webkitMaskImage = 'none';
       }
     }
+    if (node.image?.broken) {
+      element.dataset.uicImageCoverage = 'source-error';
+      element.dataset.uicImageRendering = 'original-error';
+      continue;
+    }
     let incompletePng = false;
     if (node.image && /^data:image\/png;base64,/i.test(element.getAttribute('src') || ''))
       try {

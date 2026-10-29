@@ -1,3 +1,4 @@
+import { renderScope } from './capture-scope.js';
 import { cleanHandoffSettings } from './workflow-state.js';
 import { cleanAiDraft } from './ai-draft.js';
 const encoder = new TextEncoder();
@@ -138,12 +139,23 @@ function reportRuntime() {
     frame.srcdoc = current === 'before' ? data.before : data.after;
     const width = data.width,
       height = data.height;
-    scale = Math.min(1, (document.getElementById('viewport').clientWidth - 64) / width);
+    const view = data.views[current];
+    scale = Math.min(1, (document.getElementById('viewport').clientWidth - 64) / view.width);
     frame.width = width;
     frame.height = height;
-    frame.style.transform = 'scale(' + scale + ')';
-    host.style.width = width * scale + 'px';
-    host.style.height = height * scale + 'px';
+    frame.style.transform =
+      'translate(' + -view.x * scale + 'px,' + -view.y * scale + 'px) scale(' + scale + ')';
+    host.style.overflow = 'hidden';
+    host.style.width = view.width * scale + 'px';
+    host.style.height = view.height * scale + 'px';
+    frame.onload = () => {
+      for (const el of frame.contentDocument.querySelectorAll(
+        '[data-uic-scroll-x],[data-uic-scroll-y]',
+      )) {
+        el.scrollLeft = Number(el.dataset.uicScrollX) || 0;
+        el.scrollTop = Number(el.dataset.uicScrollY) || 0;
+      }
+    };
   }
   document.querySelectorAll('[data-view]').forEach((button) =>
     button.addEventListener('click', () => {
@@ -159,6 +171,10 @@ export function makeReport(snapshot, before, after, instructions, size) {
   const payload = JSON.stringify({
     before,
     after,
+    views: {
+      before: renderScope(before, size.width, size.height),
+      after: renderScope(after, size.width, size.height),
+    },
     instructions,
     width: size.width,
     height: size.height,
@@ -177,6 +193,7 @@ export function makeReport(snapshot, before, after, instructions, size) {
   );
 }
 export async function renderPng(html, width, height) {
+  const view = renderScope(html, width, height);
   const parsed = new DOMParser().parseFromString(html, 'text/html');
   parsed
     .querySelectorAll('[data-uic-editor]:not([data-uic-editor="portal"])')
@@ -199,17 +216,30 @@ export async function renderPng(html, width, height) {
   // SVG images cannot load external resources. Keep the HTML report as the authoritative view.
   for (const image of root.querySelectorAll('img'))
     if (!image.getAttribute('src')?.startsWith('data:')) image.removeAttribute('src');
-  const scale = Math.min(1, Math.sqrt(16_000_000 / (width * height)), 8192 / width, 16384 / height);
+  const scale = Math.min(
+    1,
+    Math.sqrt(16_000_000 / (view.width * view.height)),
+    8192 / view.width,
+    16384 / view.height,
+  );
   const svg =
     '<svg xmlns="http://www.w3.org/2000/svg" width="' +
-    Math.ceil(width * scale) +
+    Math.ceil(view.width * scale) +
     '" height="' +
-    Math.ceil(height * scale) +
-    '" viewBox="0 0 ' +
-    width +
+    Math.ceil(view.height * scale) +
+    '" viewBox="' +
+    view.x +
     ' ' +
+    view.y +
+    ' ' +
+    view.width +
+    ' ' +
+    view.height +
+    '"><foreignObject width="' +
+    width +
+    '" height="' +
     height +
-    '"><foreignObject width="100%" height="100%">' +
+    '">' +
     new XMLSerializer().serializeToString(root) +
     '</foreignObject></svg>';
   const image = new Image();
@@ -221,8 +251,8 @@ export async function renderPng(html, width, height) {
     ),
   ]);
   const canvas = document.createElement('canvas');
-  canvas.width = Math.ceil(width * scale);
-  canvas.height = Math.ceil(height * scale);
+  canvas.width = Math.ceil(view.width * scale);
+  canvas.height = Math.ceil(view.height * scale);
   canvas.getContext('2d').drawImage(image, 0, 0);
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
   if (!blob) throw new Error('비교 이미지를 생성하지 못했습니다.');

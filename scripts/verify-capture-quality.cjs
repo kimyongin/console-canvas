@@ -284,6 +284,7 @@ async function checkCase(item, base) {
   report.push(result);
   console.log('START ' + name + ' ' + url);
   try {
+    let originalState;
     if (process.env.CAPTURE_QA_REPLAY) {
       current = JSON.parse(
         await fs.readFile(
@@ -315,9 +316,23 @@ async function checkCase(item, base) {
         'Promise.race([Promise.all([document.fonts.ready,...[...document.images].map(i=>i.decode().catch(()=>{}))]),new Promise(r=>setTimeout(r,10000))])',
       );
 
+      originalState = await evaluate(
+        source.webContents,
+        'JSON.stringify({html:document.documentElement.outerHTML,actions:globalThis.actions||0,scroll:[scrollX,scrollY]})',
+      );
       current = await captureWebsite(source.webContents, root, {
         onProgress: (p) => console.log('PROGRESS ' + name + ' ' + JSON.stringify(p)),
       });
+    }
+    if (originalState) {
+      result.sourceUnchanged =
+        originalState ===
+        (await evaluate(
+          source.webContents,
+          'JSON.stringify({html:document.documentElement.outerHTML,actions:globalThis.actions||0,scroll:[scrollX,scrollY]})',
+        ));
+      if (item.verifySourceUnchanged && !result.sourceUnchanged)
+        throw Error('Source markup, actions or scroll changed');
     }
     if (!current.screenshotTiles?.length)
       throw Error('Source screenshots unavailable: ' + JSON.stringify(current.warnings?.at(-1)));
@@ -382,6 +397,7 @@ async function checkCase(item, base) {
     const regions = [
       { name: 'viewport', x: 0, y: 0, width, height: current.source.viewport.height },
       { name: 'page', x: 0, y: 0, width, height },
+      ...(item.regions || []),
     ];
     result.comparisons = [];
     const viewportMode =

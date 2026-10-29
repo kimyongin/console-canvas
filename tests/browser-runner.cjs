@@ -56,6 +56,7 @@ async function main() {
     'capture-quality',
     'layout',
     'capture-status',
+    'capture-enhancements',
     'collection',
     'scrollbar-layout',
     'integration',

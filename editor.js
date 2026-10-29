@@ -1,3 +1,8 @@
+import { createResourceRepair } from './ui/resource-repair.js';
+import { resourceCandidates } from './resource-repair.js';
+import { prepareCaptureScope } from './capture-scope.js';
+import { hasCapturedPhoto } from './capture-reference.js';
+import { createSourceComparison } from './ui/source-comparison.js';
 import { captureAssessment } from './capture-status.js';
 import { createImplementationReview } from './ui/implementation-review.js';
 import { cleanHandoffSettings, cleanImplementationReviews } from './workflow-state.js';
@@ -242,9 +247,15 @@ configureModelessInspector({ $ });
 function renderCaptureStatus() {
   const assessment = captureAssessment(state.snapshot, state.scene?.elements);
   $('#capture-status-button').textContent = assessment.label;
-  $('#capture-status-button').classList.toggle('needs-review', assessment.items.length > 0);
+  $('#capture-status-button').classList.toggle('needs-review', assessment.counts.loss > 0);
   $('#capture-status-summary').textContent = assessment.items.length
-    ? '확인이 필요한 수집 정보 ' + assessment.items.length + '건'
+    ? '수집 확인 ' +
+      assessment.counts.loss +
+      '건 · 편집 제약 ' +
+      assessment.counts.constraint +
+      '건 · 참고 ' +
+      assessment.counts.info +
+      '건'
     : '기록된 수집 제한 없음 · 시각 비교 전';
   const source = state.snapshot?.source;
   $('#capture-status-scope').textContent = source
@@ -256,7 +267,14 @@ function renderCaptureStatus() {
       source.viewport.width +
       ' × ' +
       source.viewport.height +
-      'px. 화면 밖 미렌더링 내용은 포함되지 않습니다.'
+      'px. ' +
+      (state.snapshot.captureScope?.mode && state.snapshot.captureScope.mode !== 'document'
+        ? '선택 범위 ' +
+          state.snapshot.captureScope.rect.width +
+          ' × ' +
+          state.snapshot.captureScope.rect.height +
+          'px · 범위 밖은 편집 대상이 아닙니다. 레이아웃 유지를 위한 주변 DOM은 포함될 수 있습니다.'
+        : '화면 밖 미렌더링 내용은 포함되지 않습니다.')
     : '';
   $('#capture-status-empty').hidden = assessment.items.length > 0;
   renderCaptureIssues($('#capture-status-list'), assessment.items, (id) => {
@@ -265,6 +283,18 @@ function renderCaptureStatus() {
     fitSelection();
     $('#capture-status-button').focus();
   });
+  const candidates = resourceCandidates(state.snapshot, state.scene.codePatches);
+  $('#repair-assets-button').disabled =
+    !window.ConsoleCanvasDesktop?.retryAssets || !candidates.length;
+  $('#repair-assets-note').textContent = !window.ConsoleCanvasDesktop?.retryAssets
+    ? '이미지·폰트 다시 읽기는 내장 앱에서 사용할 수 있습니다.'
+    : candidates.length
+      ? '다시 읽을 수 있는 이미지·폰트 주소 ' +
+        candidates.length +
+        '개 · 실제 사진과 비교한 뒤 필요할 때 사용하세요.'
+      : '다시 읽을 수 있는 미복구 자산 선언이 없습니다.';
+  $('#source-compare-button').disabled = !hasCapturedPhoto(state.snapshot);
+  $('#source-compare-unavailable').hidden = hasCapturedPhoto(state.snapshot);
   const desktop = !!window.ConsoleCanvasDesktop;
   $('#capture-source-button').hidden = !desktop;
   $('#capture-source-note').hidden = !desktop;
@@ -293,8 +323,8 @@ function selectNode(id, { reveal = false, additive = false } = {}) {
     const r = state.scene.rect(id);
     if (r) {
       $('#viewport').scrollTo({
-        left: Math.max(0, r.x * state.zoom - 100),
-        top: Math.max(0, r.y * state.zoom - 100),
+        left: Math.max(0, (r.x - state.scene.viewRect().x) * state.zoom - 100),
+        top: Math.max(0, (r.y - state.scene.viewRect().y) * state.zoom - 100),
         behavior: 'smooth',
       });
     }
@@ -323,6 +353,16 @@ function focusComment(options = {}) {
   commentEditor.open(options);
 }
 const preview = createVersionPreview({ $, state, commitCommentDraft, adapter });
+createSourceComparison({ $, state, adapter, commitCommentDraft });
+createResourceRepair({
+  $,
+  state,
+  adapter,
+  commitCommentDraft,
+  historyBefore,
+  changeCommitted,
+  toast,
+});
 const snapshotHistory = createSnapshotHistory({
   state,
   checkpoint,
@@ -421,6 +461,7 @@ function openSnapshot(...args) {
   return next;
 }
 async function openDocument(snapshot, edits = {}, note = '', annotations = {}, timeline = null) {
+  snapshot = prepareCaptureScope(snapshot);
   timeline = timeline || snapshot.timeline;
   validateDocumentInput(snapshot, edits, annotations, timeline);
   if (typeof note !== 'string') throw new Error('추가 설명 형식이 올바르지 않습니다.');
@@ -434,6 +475,8 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
   clipboard.reset();
   commentEditor.reset();
   for (const id of [
+    '#source-compare-dialog',
+    '#repair-assets-dialog',
     '#capture-status-dialog',
     '#compare-dialog',
     '#export-dialog',

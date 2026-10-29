@@ -12,6 +12,8 @@ function showState(value) {
   if (value.url && document.activeElement !== $('#address')) $('#address').value = value.url;
   $('#status').textContent = value.message || '';
   $('#capture').hidden = value.view !== 'source';
+  $('#capture-scope-label').hidden = value.view !== 'source';
+  $('#capture-picker').hidden = value.view !== 'capture';
   $('#capture').disabled = !!value.busy;
   for (const view of ['source', 'editor', 'settings', 'agent', 'update'])
     $('#show-' + view).classList.toggle('active', value.view === view);
@@ -24,7 +26,7 @@ function showState(value) {
   );
   $('#agent-setup').hidden = value.view !== 'agent';
   $('#update-setup').hidden = value.view !== 'update';
-  $('#fallback').hidden = ['settings', 'agent', 'update'].includes(value.view);
+  $('#fallback').hidden = ['settings', 'agent', 'update', 'capture'].includes(value.view);
 }
 api.onState(showState);
 api.info().then((value) => {
@@ -41,7 +43,15 @@ $('#navigation').addEventListener('submit', async (event) => {
 });
 $('#capture').addEventListener('click', async () => {
   try {
-    await api.capture();
+    localStorage.setItem('capture-scope', $('#capture-scope').value);
+    if ($('#capture-scope').value === 'region') {
+      regionPreview = await api.previewCapture();
+      regionRect = null;
+      $('#capture-photo').src = regionPreview.data;
+      $('#capture-selection').hidden = true;
+      $('#capture-region-confirm').disabled = true;
+      $('#capture-region-size').textContent = '아직 선택하지 않았습니다.';
+    } else await api.capture({ mode: $('#capture-scope').value });
   } catch (error) {
     $('#status').textContent = error.message;
     $('#capture').hidden = currentState.view !== 'source';
@@ -163,3 +173,73 @@ for (const [id, method] of [
       $('#update-message').textContent = error.message;
     }
   });
+
+let regionPreview = null,
+  regionRect = null,
+  regionStart = null;
+$('#capture-scope').value = ['viewport', 'document', 'region'].includes(
+  localStorage.getItem('capture-scope'),
+)
+  ? localStorage.getItem('capture-scope')
+  : 'viewport';
+const photoPoint = (e) => {
+  const b = $('#capture-photo').getBoundingClientRect();
+  return {
+    x: Math.max(
+      0,
+      Math.min(
+        regionPreview.view.width,
+        ((e.clientX - b.left) / b.width) * regionPreview.view.width,
+      ),
+    ),
+    y: Math.max(
+      0,
+      Math.min(
+        regionPreview.view.height,
+        ((e.clientY - b.top) / b.height) * regionPreview.view.height,
+      ),
+    ),
+  };
+};
+$('#capture-photo-wrap').addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 || !regionPreview) return;
+  e.preventDefault();
+  regionStart = photoPoint(e);
+  e.currentTarget.setPointerCapture(e.pointerId);
+});
+$('#capture-photo-wrap').addEventListener('pointermove', (e) => {
+  if (!regionStart) return;
+  const p = photoPoint(e),
+    b = $('#capture-photo').getBoundingClientRect(),
+    sx = b.width / regionPreview.view.width,
+    sy = b.height / regionPreview.view.height;
+  regionRect = {
+    x: Math.floor(Math.min(p.x, regionStart.x)),
+    y: Math.floor(Math.min(p.y, regionStart.y)),
+    width: Math.max(1, Math.floor(Math.abs(p.x - regionStart.x))),
+    height: Math.max(1, Math.floor(Math.abs(p.y - regionStart.y))),
+  };
+  const el = $('#capture-selection');
+  el.hidden = false;
+  Object.assign(el.style, {
+    left: regionRect.x * sx + 'px',
+    top: regionRect.y * sy + 'px',
+    width: regionRect.width * sx + 'px',
+    height: regionRect.height * sy + 'px',
+  });
+  $('#capture-region-size').textContent = regionRect.width + ' × ' + regionRect.height + ' px';
+  $('#capture-region-confirm').disabled = regionRect.width < 4 || regionRect.height < 4;
+});
+$('#capture-photo-wrap').addEventListener('pointerup', () => (regionStart = null));
+$('#capture-photo-wrap').addEventListener('pointercancel', () => (regionStart = null));
+$('#capture-region-cancel').addEventListener('click', () => api.show('source'));
+$('#capture-region-confirm').addEventListener('click', async () => {
+  if (!regionRect) return;
+  $('#capture-region-confirm').disabled = true;
+  try {
+    await api.capture({ mode: 'region', rect: regionRect, expectedView: regionPreview.view });
+  } catch (error) {
+    await api.show('source');
+    $('#status').textContent = error.message;
+  }
+});

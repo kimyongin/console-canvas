@@ -31,6 +31,7 @@ export function createDocumentLists({ $, state, selectNode, renameLayer }) {
         }
     }
     function add(node, depth) {
+      if (node.scopeHidden) return;
       if (matches && !matches.has(node.id)) return;
       const children = scene.children.get(node.id) || [];
       if (

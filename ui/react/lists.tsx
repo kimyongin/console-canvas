@@ -239,24 +239,48 @@ export function renderRecent(
 }
 export function renderCaptureIssues(
   host: Element,
-  items: { id?: string; kind: string; message: string; name?: string; actionable: boolean }[],
+  items: {
+    id?: string;
+    kind: string;
+    message: string;
+    name?: string;
+    actionable: boolean;
+    severity: string;
+  }[],
   reveal: (id: string) => void,
 ) {
+  const groups = [
+    { id: 'loss', name: '누락·부분 수집 확인' },
+    { id: 'constraint', name: '개별 편집 제약' },
+    { id: 'info', name: '참고 사항' },
+  ];
   renderReact(
     host,
     <>
-      {items.map((item, index) => (
-        <li key={index}>
-          <strong>{item.name || item.kind}</strong>
-          {item.name && <span className="capture-issue-kind">{item.kind}</span>}
-          <p>{item.message}</p>
-          {item.id && item.actionable && (
-            <Button type="button" variant="outline" onClick={() => reveal(item.id!)}>
-              화면에서 확인
-            </Button>
-          )}
-        </li>
-      ))}
+      {groups.map((group) => {
+        const values = items.filter((item) => item.severity === group.id);
+        return values.length ? (
+          <li className={'capture-issue-group ' + group.id} key={group.id}>
+            <h3>
+              {group.name} · {values.length}
+            </h3>
+            <ul>
+              {values.map((item, index) => (
+                <li key={index}>
+                  <strong>{item.name || item.kind}</strong>
+                  {item.name && <span className="capture-issue-kind">{item.kind}</span>}
+                  <p>{item.message}</p>
+                  {item.id && item.actionable && (
+                    <Button type="button" variant="outline" onClick={() => reveal(item.id!)}>
+                      화면에서 확인
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </li>
+        ) : null;
+      })}
     </>,
   );
 }

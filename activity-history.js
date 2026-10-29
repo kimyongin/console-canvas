@@ -31,9 +31,10 @@ export function activityBranch(state, all = false) {
 }
 export function recordActivity(state, before, after, detail = {}) {
   const changes = codeDifferenceIds(before?.codePatches, after.codePatches).map((id) => ({
-    id: id === '@stylesheet' ? undefined : id,
+    id: id.startsWith('@') ? undefined : id,
     type: 'code',
-    name: state.scene.nodes.get(id)?.name || '공통 스타일',
+    name:
+      id === '@resource' ? '이미지·폰트 복구' : state.scene.nodes.get(id)?.name || '공통 스타일',
     before: 'HTML·CSS 이전 버전',
     after: 'HTML·CSS 수정',
   }));

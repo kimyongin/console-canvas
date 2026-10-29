@@ -8,6 +8,7 @@ async function captureWithProtocol({
   getTargets = () => [],
   beforeScreenshot = async () => {},
   readResource,
+  scope = null,
 }) {
   const screenshot = async (params) => {
     await beforeScreenshot();
@@ -323,6 +324,27 @@ async function captureWithProtocol({
           root,
           'globalThis.UICloneCapture.matchesView(document,' + JSON.stringify(snapshot.source) + ')',
         );
+      if (scope && scope.mode !== 'document') {
+        if (!(await matches())) throw Error('가져오는 동안 원본 화면이 변경되었습니다.');
+        const view = await screenshot({
+          format: 'png',
+          fromSurface: true,
+          captureBeyondViewport: false,
+          clip: { ...current, scale: 1 / ratio },
+        });
+        snapshot.screenshot = 'data:image/png;base64,' + view.data;
+        snapshot.screenshotTiles = [{ rect: current, clip: scope.rect, data: snapshot.screenshot }];
+        snapshot.captureReport = {
+          contentSize: { width, height },
+          frameCount: frames.length,
+          domFrames: frames.filter((f) => f.snapshot && !f.error).length,
+          failedFrames: frames.filter((f) => f.error).map((f) => ({ url: f.url, error: f.error })),
+          embeddedResourceCount: Object.keys(assetData).length,
+          screenshotMode: 'viewport-only',
+          scope,
+        };
+        return snapshot;
+      }
       let viewportCapture = false;
       const scrollbarGutter = await evaluate(
         root,

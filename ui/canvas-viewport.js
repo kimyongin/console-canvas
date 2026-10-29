@@ -6,13 +6,15 @@ export function createCanvasViewport({ $, state }) {
   function updateZoom() {
     if (!state.scene) return;
     const { width, height } = state.size,
-      zoom = state.zoom;
+      zoom = state.zoom,
+      view = state.scene.viewRect();
     state.scene.setDisplayScale(zoom);
     $('#scene-frame').width = width;
     $('#scene-frame').height = height;
-    $('#scene-frame').style.transform = 'scale(' + zoom + ')';
-    $('#artboard').style.width = width * zoom + 'px';
-    $('#artboard').style.height = height * zoom + 'px';
+    $('#scene-frame').style.transform =
+      `translate(${-view.x * zoom}px,${-view.y * zoom}px) scale(${zoom})`;
+    $('#artboard').style.width = view.width * zoom + 'px';
+    $('#artboard').style.height = view.height * zoom + 'px';
     const select = $('#zoom');
     let option = [...select.options].find((option) => Number(option.value) === zoom);
     if (!option) {
@@ -25,7 +27,7 @@ export function createCanvasViewport({ $, state }) {
     select.value = String(zoom);
     $('#viewport').dispatchEvent(new Event('canvas:viewportchange'));
     $('#canvas-dimensions').textContent =
-      width + ' × ' + height + ' · ' + Math.round(zoom * 100) + '%';
+      view.width + ' × ' + view.height + ' · ' + Math.round(zoom * 100) + '%';
   }
   function zoomTo(value, anchor = null) {
     const rect = $('#scene-frame').getBoundingClientRect(),
@@ -40,11 +42,13 @@ export function createCanvasViewport({ $, state }) {
       previous = state.zoom;
     state.zoom = Math.max(0.1, Math.min(2.5, value));
     updateZoom();
-    viewport.scrollLeft += (state.zoom - previous) * x;
-    viewport.scrollTop += (state.zoom - previous) * y;
+    viewport.scrollLeft += (state.zoom - previous) * (x - state.scene.viewRect().x);
+    viewport.scrollTop += (state.zoom - previous) * (y - state.scene.viewRect().y);
   }
   function fit() {
-    zoomTo(Math.min(1, Math.max(0.1, ($('#viewport').clientWidth - 96) / state.size.width)));
+    zoomTo(
+      Math.min(1, Math.max(0.1, ($('#viewport').clientWidth - 96) / state.scene.viewRect().width)),
+    );
   }
 
   function fitSelection() {
@@ -67,10 +71,13 @@ export function createCanvasViewport({ $, state }) {
         (viewport.clientHeight - 96) / Math.max(1, height),
       ),
     );
-    viewport.scrollLeft = Math.max(0, (x + width / 2) * state.zoom - viewport.clientWidth / 2 + 48);
+    viewport.scrollLeft = Math.max(
+      0,
+      (x - state.scene.viewRect().x + width / 2) * state.zoom - viewport.clientWidth / 2 + 48,
+    );
     viewport.scrollTop = Math.max(
       0,
-      (y + height / 2) * state.zoom - viewport.clientHeight / 2 + 48,
+      (y - state.scene.viewRect().y + height / 2) * state.zoom - viewport.clientHeight / 2 + 48,
     );
   }
   return { sizeChanged, zoomTo, fit, fitSelection };

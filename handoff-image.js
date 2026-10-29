@@ -97,23 +97,29 @@ export async function buildHandoffImage(
 ) {
   progress('변경 후 화면과 요청 카드를 만들고 있습니다.');
   const mode = cleanHandoffSettings(options).mode;
+  const view = scene.viewRect();
   const requests = handoffRequests(scene)
       .filter((r) => !Array.isArray(options.requestIds) || options.requestIds.includes(r.id))
       .map((r) => ({
         ...r,
+        rect: r.rect ? { ...r.rect, x: r.rect.x - view.x, y: r.rect.y - view.y } : r.rect,
+        before: r.before
+          ? { ...r.before, x: r.before.x - view.x, y: r.before.y - view.y }
+          : r.before,
         text:
           r.text +
           (options.requestNotes?.[r.id] ? '\n추가 수정: ' + options.requestNotes[r.id] : ''),
       })),
     currentSize = scene.contentSize(),
     reference = requests.some((r) => r.deleted) ? scene.referenceFrame() : null,
-    size = {
+    renderSize = {
       width: Math.max(currentSize.width, reference?.size.width || 0),
       height: Math.max(currentSize.height, reference?.size.height || 0),
     };
-  const after = await createImageBitmap(await screenshot(scene.serialize(), size));
+  const size = { width: view.width, height: view.height };
+  const after = await createImageBitmap(await screenshot(scene.serialize(), renderSize));
   let before;
-  if (reference) before = await createImageBitmap(await screenshot(reference.html, size));
+  if (reference) before = await createImageBitmap(await screenshot(reference.html, renderSize));
   try {
     const width = Math.max(1440, Math.min(2200, size.width + 80)),
       margin = 40,

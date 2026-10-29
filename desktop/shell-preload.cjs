@@ -1,7 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('ConsoleCanvasShell', {
   navigate: (url) => ipcRenderer.invoke('canvas:navigate', url),
-  capture: () => ipcRenderer.invoke('canvas:capture'),
+  capture: (options) => ipcRenderer.invoke('canvas:capture', options),
+  previewCapture: () => ipcRenderer.invoke('canvas:capture-preview'),
   show: (view) => ipcRenderer.invoke('canvas:show', view),
   back: () => ipcRenderer.invoke('canvas:back'),
   forward: () => ipcRenderer.invoke('canvas:forward'),

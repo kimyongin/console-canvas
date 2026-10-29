@@ -1,3 +1,4 @@
+import { prepareCaptureScope, viewRect as capturedViewRect } from './capture-scope.js';
 import { restoreCapturedLayout } from './capture-layout.js';
 import { applyCaptureMedia } from './capture-media.js';
 import { buildCodeDocument } from './code-patches.js';
@@ -42,6 +43,7 @@ export function validateSnapshot(value) {
     !Number.isFinite(value.source.viewport.height)
   )
     throw new Error('원본 화면의 표시 크기가 올바르지 않습니다.');
+  prepareCaptureScope(value);
   if (!Array.isArray(value.warnings)) value.warnings = [];
   if (value.screenshotTiles !== undefined) {
     if (!Array.isArray(value.screenshotTiles) || value.screenshotTiles.length > 32)
@@ -121,6 +123,7 @@ export function sanitizeHtml(html) {
 }
 export class CanvasScene {
   constructor(frame, snapshot, callbacks = {}) {
+    snapshot = prepareCaptureScope(snapshot);
     validateSnapshot(snapshot);
     this.frame = frame;
     this.snapshot = snapshot;
@@ -258,7 +261,12 @@ export class CanvasScene {
     this.addCommentButton.setAttribute('aria-label', '선택한 위치에 주석 작성');
     this.doc.documentElement.append(this.addCommentButton);
     for (const node of this.nodes.values())
-      if (node.position === 'fixed' && node.visible && this.elements.has(node.id))
+      if (
+        node.position === 'fixed' &&
+        node.visible &&
+        !node.scopeHidden &&
+        this.elements.has(node.id)
+      )
         this.lift(node.id, node.rect);
     this.doc.addEventListener('pointerdown', (event) => this.begin(event), true);
     this.doc.addEventListener('pointermove', (event) => this.move(event), true);
@@ -361,6 +369,7 @@ export class CanvasScene {
   }
   hidden(id) {
     return (
+      !!this.nodes.get(id)?.scopeHidden ||
       !!this.nodes.get(id)?.codeDeleted ||
       !!this.nodes.get(id)?.copyHidden ||
       !!this.edits[id]?.deleted ||
@@ -701,7 +710,12 @@ export class CanvasScene {
     // Establish the rebuilt source layout before applying saved moves/copies.
     this.edits = {};
     for (const node of this.nodes.values())
-      if (node.position === 'fixed' && node.visible && this.elements.has(node.id))
+      if (
+        node.position === 'fixed' &&
+        node.visible &&
+        !node.scopeHidden &&
+        this.elements.has(node.id)
+      )
         this.lift(node.id, node.rect);
     this.apply({ refreshUi: false });
     this.restoreCapturedScroll();
@@ -1122,6 +1136,47 @@ export class CanvasScene {
       this.callbacks.onSize?.(this.contentSize());
     }
   }
+  viewRect() {
+    if (!this.snapshot.captureScope || this.snapshot.captureScope.mode === 'document')
+      return { x: 0, y: 0, ...this.contentSize() };
+    const scope = capturedViewRect(this.snapshot),
+      rect = { ...scope };
+    for (const [id, edit] of Object.entries(this.edits)) {
+      const node = this.nodes.get(id);
+      if (!node || node.scopeHidden || edit.deleted || (!edit.dx && !edit.dy)) continue;
+      const offset = this.offset(id),
+        box = {
+          x: Math.max(scope.x, node.rect.x),
+          y: Math.max(scope.y, node.rect.y),
+          width: 0,
+          height: 0,
+        };
+      box.width = Math.max(
+        0,
+        Math.min(scope.x + scope.width, node.rect.x + node.rect.width) - box.x,
+      );
+      box.height = Math.max(
+        0,
+        Math.min(scope.y + scope.height, node.rect.y + node.rect.height) - box.y,
+      );
+      const right = Math.max(rect.x + rect.width, box.x + offset.x + box.width),
+        bottom = Math.max(rect.y + rect.height, box.y + offset.y + box.height);
+      rect.x = Math.max(0, Math.min(rect.x, box.x + offset.x));
+      rect.y = Math.max(0, Math.min(rect.y, box.y + offset.y));
+      rect.width = right - rect.x;
+      rect.height = bottom - rect.y;
+    }
+    return rect;
+  }
+  preview() {
+    const rect = this.viewRect();
+    return {
+      html: this.serialize(),
+      size: { width: rect.width, height: rect.height },
+      documentSize: this.contentSize(),
+      origin: { x: rect.x, y: rect.y },
+    };
+  }
   contentSize() {
     let width = this.snapshot.source.width,
       height = this.snapshot.source.height;
@@ -1333,7 +1388,7 @@ export class CanvasScene {
         continue;
       result.push({
         id,
-        name: node.name,
+        name: op.type === 'resource' ? '이미지·폰트 복구' : node.name,
         kind: node.kind,
         tag: node.tag,
         parentId: node.parentId,
@@ -1354,6 +1409,19 @@ export class CanvasScene {
     clone
       .querySelectorAll('[data-uic-editor]:not([data-uic-editor="portal"])')
       .forEach((el) => el.remove());
+    for (const el of clone.querySelectorAll('[data-uic-id]')) {
+      const live = this.elements.get(el.dataset.uicId);
+      if (live?.scrollLeft || live?.scrollTop) {
+        el.dataset.uicScrollX = String(live.scrollLeft);
+        el.dataset.uicScrollY = String(live.scrollTop);
+      }
+    }
+    clone.querySelectorAll('meta[name="console-canvas-view"]').forEach((el) => el.remove());
+    const view = this.viewRect(),
+      meta = this.doc.createElement('meta');
+    meta.name = 'console-canvas-view';
+    meta.content = [view.x, view.y, view.width, view.height].join(',');
+    clone.querySelector('head').append(meta);
     return '<!doctype html>' + clone.outerHTML;
   }
   async beforeHtml() {

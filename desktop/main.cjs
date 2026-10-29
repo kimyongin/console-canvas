@@ -77,7 +77,7 @@ function layout() {
     view?.setBounds({ x: 0, y: top, width, height: Math.max(1, height - top) });
 }
 function show(which) {
-  if (!['source', 'editor', 'settings', 'agent', 'update'].includes(which))
+  if (!['source', 'editor', 'settings', 'agent', 'update', 'capture'].includes(which))
     throw new Error('알 수 없는 화면');
   current = which;
   source.setVisible(which === 'source');
@@ -197,6 +197,10 @@ async function start() {
     getWindow: () => win,
     downloads: app.getPath('downloads'),
   });
+  ipcMain.handle('canvas:retry-assets', async (event, urls) => {
+    trusted(event, 'editor');
+    return require('./repair-resources.cjs')(urls, require('electron').net.fetch);
+  });
   ipcMain.handle('canvas:render-image', async (event, value) => {
     trusted(event, 'editor');
     return require('./render-image.cjs')(value);
@@ -250,12 +254,13 @@ async function start() {
     flush: lifecycle.flush,
     quit: () => lifecycle.quitSaved(app),
   });
-  async function capture() {
+  async function capture(options) {
     if (busy) throw new Error('화면을 가져오는 중입니다.');
     busy = true;
     notify('원본 화면을 복제하고 있어요…');
     try {
-      const snapshot = await captureWebsite(source.webContents, ROOT);
+      show('source');
+      const snapshot = await captureWebsite(source.webContents, ROOT, { scope: options });
       if (editorReady) editor.webContents.send('canvas:snapshot', snapshot);
       else pendingCapture = snapshot;
       show('editor');

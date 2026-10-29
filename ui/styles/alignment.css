@@ -343,3 +343,121 @@
     right: 20px;
   }
 }
+
+.capture-status-list .capture-issue-group {
+  padding: 0;
+  border: 0;
+}
+.capture-issue-group h3 {
+  font-size: 14px;
+  margin: 16px 0 10px;
+}
+.capture-issue-group ul {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.capture-issue-group.loss > ul > li {
+  border-color: #e5cb94;
+  background: #fffaf1;
+}
+.capture-issue-group.constraint > ul > li {
+  background: #f7f6fb;
+}
+#source-compare-dialog {
+  width: min(1320px, calc(100vw - 48px));
+  max-width: none;
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+}
+.reference-tools {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.reference-tools label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.source-comparison-labels,
+.source-comparison-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.source-comparison-labels {
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.source-comparison-grid {
+  height: min(58vh, 640px);
+}
+.source-comparison-grid .reference-view {
+  height: 100%;
+  min-width: 0;
+  overflow: auto;
+}
+.source-comparison-grid.overlay {
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+.source-comparison-grid.overlay > .reference-view {
+  grid-area: 1/1;
+  background: transparent;
+}
+.source-comparison-grid.overlay > #source-compare-clone {
+  opacity: var(--reference-blend, 0.5);
+}
+#repair-assets-dialog {
+  width: min(900px, 94vw);
+}
+#repair-assets-results {
+  max-height: 190px;
+  overflow: auto;
+  list-style: none;
+  padding: 0;
+}
+#repair-assets-results label {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  overflow-wrap: anywhere;
+  padding: 5px;
+}
+#repair-assets-preview {
+  height: 320px;
+  overflow: auto;
+  background: #f4f5f9;
+  margin: 14px 0;
+}
+#repair-assets-note {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.reference-view,
+.repair-view {
+  position: relative;
+  min-height: 0;
+  background: #f5f6fa;
+  border: 1px solid var(--line);
+  overflow: auto;
+  border-radius: 7px;
+}
+.reference-view iframe,
+.repair-view iframe {
+  border: 0;
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  background: white;
+}
+.reference-view .snapshot-preview-space,
+.repair-view .snapshot-preview-space {
+  margin: 0;
+}

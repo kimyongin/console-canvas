@@ -1,3 +1,4 @@
+import { applyResourcePatch } from './resource-repair.js';
 // Declarative code changes only. Never evaluate generated JavaScript.
 export function validateCodePatches(value = []) {
   if (!Array.isArray(value) || value.length > 500 || JSON.stringify(value).length > 2_000_000)
@@ -43,6 +44,10 @@ export function buildCodeDocument(baseHtml, baseNodes, patches = []) {
   for (const [index, op] of patches.entries()) {
     if (!op || typeof op !== 'object' || Array.isArray(op))
       throw new Error('코드 패치 형식이 올바르지 않습니다.');
+    if (op.type === 'resource') {
+      applyResourcePatch(doc, nodes, elements, op);
+      continue;
+    }
     if (op.type === 'stylesheet') {
       const style = doc.createElement('style');
       style.textContent = safeStyle(op.css);
@@ -146,5 +151,11 @@ export function buildCodeDocument(baseHtml, baseNodes, patches = []) {
 }
 export function codeDifferenceIds(left = [], right = []) {
   if (JSON.stringify(left) === JSON.stringify(right)) return [];
-  return [...new Set([...left, ...right].map((op) => op.element_id || '@stylesheet'))];
+  return [
+    ...new Set(
+      [...left, ...right].map(
+        (op) => op.element_id || (op.type === 'resource' ? '@resource' : '@stylesheet'),
+      ),
+    ),
+  ];
 }

@@ -1,5 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('ConsoleCanvasDesktop', {
+  retryAssets: (urls) => ipcRenderer.invoke('canvas:retry-assets', urls),
   openSource: (url) => ipcRenderer.invoke('canvas:open-source', url),
   showSource: () => ipcRenderer.invoke('canvas:show-source'),
   renderImage: (value) => ipcRenderer.invoke('canvas:render-image', value),

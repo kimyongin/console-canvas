@@ -162,8 +162,7 @@ export function createSnapshotPanel({
     try {
       const capture = state.snapshot;
       const result = await withVersionScene(capture, entry.state, (scene) => ({
-        html: scene.serialize(),
-        size: scene.contentSize(),
+        ...scene.preview(),
       }));
       if (token !== generation || state.snapshot?.id !== capture.id || selected()?.id !== entry.id)
         return;

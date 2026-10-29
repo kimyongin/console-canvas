@@ -7,7 +7,8 @@ const { readPublicResource } = require('./capture-resources.cjs');
 async function captureWebsite(contents, root, options = {}) {
   webUrl(contents.getURL());
   const code = await fs.readFile(path.join(root, 'capture.js'), 'utf8');
-  const prepared = await prepareCaptureView(contents, code);
+  const scope = await resolveScope(contents, options.scope);
+  const prepared = await prepareCaptureView(contents, code, { scope });
   const protocol = contents.debugger;
   if (protocol.isAttached())
     throw Error('원본 화면 개발자 도구가 연결되어 있습니다. 연결을 마친 뒤 다시 가져와 주세요.');
@@ -44,6 +45,7 @@ async function captureWebsite(contents, root, options = {}) {
         }
       },
       code,
+      scope,
       readResource: (url) => readPublicResource(url, require('electron').net.fetch),
       onProgress: options.onProgress,
       getTargets: () => targets,
@@ -63,6 +65,7 @@ async function captureWebsite(contents, root, options = {}) {
         });
       },
     });
+    if (scope) snapshot.captureScope = scope;
     snapshot.captureReport.preparedView = prepared;
     return snapshot;
   } finally {
@@ -70,4 +73,34 @@ async function captureWebsite(contents, root, options = {}) {
     if (protocol.isAttached()) protocol.detach();
   }
 }
-module.exports = { captureWebsite };
+async function resolveScope(contents, request) {
+  if (!request || request.mode === 'document') return { mode: 'document' };
+  if (!['viewport', 'region'].includes(request.mode))
+    throw Error('알 수 없는 가져오기 범위입니다.');
+  const view = await contents.executeJavaScriptInIsolatedWorld(1002, [
+    { code: '({url:location.href,x:scrollX,y:scrollY,width:innerWidth,height:innerHeight})' },
+  ]);
+  if (request.expectedView && JSON.stringify(request.expectedView) !== JSON.stringify(view))
+    throw Error('원본 화면이 바뀌었습니다. 영역을 다시 선택해 주세요.');
+  const r =
+    request.mode === 'viewport'
+      ? { x: 0, y: 0, width: view.width, height: view.height }
+      : request.rect;
+  if (
+    !r ||
+    !['x', 'y', 'width', 'height'].every((k) => Number.isFinite(r[k])) ||
+    r.x < 0 ||
+    r.y < 0 ||
+    r.width < 1 ||
+    r.height < 1 ||
+    r.x + r.width > view.width + 1 ||
+    r.y + r.height > view.height + 1
+  )
+    throw Error('화면 안에서 가져올 영역을 선택해 주세요.');
+  return {
+    mode: request.mode,
+    rect: { x: view.x + r.x, y: view.y + r.y, width: r.width, height: r.height },
+    viewport: view,
+  };
+}
+module.exports = { captureWebsite, resolveScope };

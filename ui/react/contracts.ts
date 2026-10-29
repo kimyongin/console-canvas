@@ -43,6 +43,7 @@ export type MutationResult<T> =
   | { ok: true; screen: T; persisted?: FlushResult | false; save_error?: string }
   | { ok: false; revision: number; error: { code: string; message: string } };
 export interface EditorDesktopAPI {
+  retryAssets(urls: string[]): Promise<{ url: string; data?: string; error?: string }[]>;
   openSource(url: string): Promise<unknown>;
   showSource(): Promise<unknown>;
   renderImage(value: { html: string; width: number; height: number }): Promise<Uint8Array>;

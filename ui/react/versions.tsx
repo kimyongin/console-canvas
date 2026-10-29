@@ -1,3 +1,4 @@
+import { restoreSerializedScroll } from '../../capture-scroll.js';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { renderReact } from './mount';
 import { Button } from './components/button';
@@ -161,6 +162,8 @@ export function VersionFrame({
   zoom,
   highlight,
   fitHeight = false,
+  documentSize,
+  origin = { x: 0, y: 0 },
 }: {
   html: string;
   size: { width: number; height: number };
@@ -168,6 +171,8 @@ export function VersionFrame({
   zoom?: number;
   highlight?: PreviewHighlight;
   fitHeight?: boolean;
+  documentSize?: { width: number; height: number };
+  origin?: { x: number; y: number };
 }) {
   const space = useRef<HTMLDivElement>(null),
     [scale, setScale] = useState(0.5);
@@ -194,17 +199,32 @@ export function VersionFrame({
     <div
       ref={space}
       className="snapshot-preview-space"
-      style={{ width: size.width * scale, height: size.height * scale, position: 'relative' }}
+      style={{
+        width: size.width * scale,
+        height: size.height * scale,
+        position: 'relative',
+        overflow: 'hidden',
+      }}
     >
       <iframe
         title={title}
         sandbox="allow-same-origin"
         referrerPolicy="no-referrer"
         tabIndex={-1}
-        width={size.width}
-        height={size.height}
+        width={(documentSize || size).width}
+        height={(documentSize || size).height}
         srcDoc={html}
-        style={{ pointerEvents: 'none', transform: `scale(${scale})` }}
+        onLoad={(e) => {
+          const doc = e.currentTarget.contentDocument;
+          if (doc) restoreSerializedScroll(doc);
+        }}
+        style={{
+          pointerEvents: 'none',
+          transform:
+            origin.x || origin.y
+              ? `translate(${-origin.x * scale}px,${-origin.y * scale}px) scale(${scale})`
+              : `scale(${scale})`,
+        }}
       />
       {highlight && (
         <div
@@ -216,13 +236,15 @@ export function VersionFrame({
           role="img"
           aria-label={highlight.label}
           style={{
-            left: highlight.rect.x * scale,
-            top: highlight.rect.y * scale,
+            left: (highlight.rect.x - origin.x) * scale,
+            top: (highlight.rect.y - origin.y) * scale,
             width: Math.max(14, highlight.rect.width * scale),
             height: Math.max(14, highlight.rect.height * scale),
           }}
         >
-          <span style={{ top: highlight.rect.y * scale < 26 ? 0 : -25 }}>{highlight.label}</span>
+          <span style={{ top: (highlight.rect.y - origin.y) * scale < 26 ? 0 : -25 }}>
+            {highlight.label}
+          </span>
         </div>
       )}
     </div>
@@ -230,7 +252,12 @@ export function VersionFrame({
 }
 export function renderVersionFrame(
   host: Element,
-  result: { html: string; size: { width: number; height: number } },
+  result: {
+    html: string;
+    size: { width: number; height: number };
+    documentSize?: { width: number; height: number };
+    origin?: { x: number; y: number };
+  },
   title: string,
   zoom?: number,
   highlight?: PreviewHighlight,
@@ -352,6 +379,10 @@ export function renderTargetPreview(
         referrerPolicy="no-referrer"
         tabIndex={-1}
         srcDoc={html}
+        onLoad={(e) => {
+          const doc = e.currentTarget.contentDocument;
+          if (doc) restoreSerializedScroll(doc);
+        }}
         width={size.width}
         height={size.height}
         style={{ transform: `scale(${scale})`, left: -x * scale, top: -y * scale }}

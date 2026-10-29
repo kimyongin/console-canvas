@@ -813,7 +813,7 @@
     },
     {
       "name": "apply_code_patches",
-      "description": "Directly apply validated HTML/CSS patches to the COPY as one undo step. Use register_ai_candidate instead when asked for alternatives. Does not edit the original site.",
+      "description": "Directly apply validated HTML/CSS patches to the COPY as one undo step. Use register_ai_candidate instead when asked for alternatives. Does not edit the original site. Resource patches embed observed HTTP(S) image/font references as bounded inert data; no network request is made by MCP.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -846,7 +846,8 @@
                     "insert",
                     "remove",
                     "reparent",
-                    "stylesheet"
+                    "stylesheet",
+                    "resource"
                   ]
                 },
                 "element_id": {
@@ -881,6 +882,14 @@
                 "css": {
                   "type": "string",
                   "maxLength": 50000
+                },
+                "resource_url": {
+                  "type": "string",
+                  "maxLength": 8192
+                },
+                "data": {
+                  "type": "string",
+                  "maxLength": 1500000
                 }
               },
               "required": [
