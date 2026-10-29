@@ -237,12 +237,25 @@ export function renderRecent(
     </>,
   );
 }
-export function renderWarnings(host: Element, warnings: { message: string }[]) {
+export function renderCaptureIssues(
+  host: Element,
+  items: { id?: string; kind: string; message: string; name?: string; actionable: boolean }[],
+  reveal: (id: string) => void,
+) {
   renderReact(
     host,
     <>
-      {warnings.map((item, index) => (
-        <li key={index}>{item.message}</li>
+      {items.map((item, index) => (
+        <li key={index}>
+          <strong>{item.name || item.kind}</strong>
+          {item.name && <span className="capture-issue-kind">{item.kind}</span>}
+          <p>{item.message}</p>
+          {item.id && item.actionable && (
+            <Button type="button" variant="outline" onClick={() => reveal(item.id!)}>
+              화면에서 확인
+            </Button>
+          )}
+        </li>
       ))}
     </>,
   );

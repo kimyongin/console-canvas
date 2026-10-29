@@ -280,3 +280,66 @@
     column-gap: 6px;
   }
 }
+
+.artboard-caption {
+  position: absolute;
+  top: 16px;
+  left: 48px;
+  right: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.artboard-caption .artboard-label {
+  position: static;
+  min-width: 0;
+}
+#capture-status-button {
+  flex: none;
+  font-size: 11px;
+  min-height: 28px;
+  padding: 4px 10px;
+}
+#capture-status-button.needs-review {
+  color: #80530d;
+  background: #fff9eb;
+  border-color: #e5cb94;
+}
+#capture-status-dialog {
+  width: min(640px, calc(100vw - 48px));
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+}
+.capture-status-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.capture-status-list li {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  overflow-wrap: anywhere;
+}
+.capture-status-list li p {
+  margin: 8px 0;
+}
+.capture-issue-kind {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.capture-verification-note {
+  padding: 12px;
+  border-radius: 8px;
+  background: #f4f2fc;
+}
+@media (max-width: 900px) {
+  .artboard-caption {
+    left: 20px;
+    right: 20px;
+  }
+}

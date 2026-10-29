@@ -1,5 +1,8 @@
 # Chrome 확장 WebMCP 제품화 계획
 
+> 2026-10-29: 0.25.0부터 Chrome 확장/WebMCP 지원·신규 배포를 종료했습니다. 아래는 과거 설계/검증 기록입니다. 현재 사용은 내장 앱이며 [지원 전환과 자료 이동](desktop-only-0.25.md)을 따릅니다.
+
+
 계획 정리일 2026-10-26 · 제품 기준 [PRD](PRD.md) · 상위 [#28](https://github.com/kimyongin/console-canvas/issues/28). **0.20.0에서 #29/#30/#31/#32/#34를 구현·검증했다.** #33의 일반 Chrome 통합과 #35의 업데이트/배포 검증은 진행 중이다. [구현 증빙](webmcp-0.20.md)과 [설정](chrome-webmcp.md)을 따른다.
 
 ## 목표와 출발점

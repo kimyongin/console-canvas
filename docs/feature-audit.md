@@ -4,7 +4,7 @@
 
 0.16.0 후속: 아래는 결함 발견 당시의 전수 조사 기록이다. #8~#11의 코드 수정·회귀 검사를 추가했고 UI 마크업은 `ui/react/editor-shell.tsx`, 목록은 `lists.tsx`/`versions.tsx`로 이동했다. 제품 현재 상태는 PRD 9절과 [검증 기록](verification.md)을 따른다. 아래의 “미수정”은 최초 조사 당시 상태다.
 
-2026-10-26 계획 추가: FR-18~20·AC-27~33과 #28~#35는 [Chrome 확장 WebMCP 제품화](webmcp-productization.md)의 미구현 요구사항이다. 아래 최초 전수 조사 대상 17개 기능을 새 20개 기능 전체의 구현 증빙으로 확대하지 않는다. [실험 37개](../experiments/webmcp/README.md)와 계획/정식 지원을 구별한다.
+2026-10-26 계획 추가: FR-18~20·AC-27~33과 #28~#35는 [Chrome 확장 WebMCP 제품화](webmcp-productization.md)의 미구현 요구사항이다. 아래 최초 전수 조사 대상 17개 기능을 새 20개 기능 전체의 구현 증빙으로 확대하지 않는다. [실험 37개](../archive/chrome-extension/experiments/webmcp/README.md)와 계획/정식 지원을 구별한다.
 
 ## 조사 방법과 경계
 
@@ -252,3 +252,7 @@ E는 최초 editor.html(0.16.0에는 ui/react/editor-shell.tsx로 이전), S는 
 ## 0.21 AI 시안 추가 대조
 
 FR-21~27 / AC-34~43: `ai-requests.js`(고정 요청/후보/분기), `code-patches.js`/`engine.js`(HTML/CSS), `ui/react/ai-variants.tsx`/`ui/ai-panel.js`(요청/비교/선택), `ai-provider.js`(Responses API), `mcp/modern.py`(2026 발견/구독), `editor-controller.js`/`tool-contract.json`(19개 계약). `tests/ai-variants.js`, `tests/unit/ai-provider.test.mjs`, `tests/test_modern_mcp.py`, `scripts/verify_modern_mcp.mjs`가 저장/보존·정제·UI/mock API·공식 modern SDK를 대조한다. [구현과 미검증 조건](ai-variants-0.21.md)에서 실제 API/OAuth·자동 보정/대화 실행·설치 배포를 구분한다.
+
+## 0.25 범위 변경
+
+현재 요구사항은 PRD FR-30/AC-69~71과 [내장 앱 단일 경로](desktop-only-0.25.md)를 따른다. Chrome/WebMCP FR-19 및 기존 확장 설치/스토어 요구는 지원 종료다. 공통 편집기·19개 로컬 MCP와 자료 보존은 유지한다. 가져오기 정보 UI/MCP는 같은 capture-status 평가를 읽고 실제 일치율 검증과 구분한다. 기존 표의 Chrome 관련 기능은 과거 구현 기록이며 현재 지원 여부로 읽지 않는다.

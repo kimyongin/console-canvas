@@ -1,0 +1,55 @@
+<!doctype html><meta charset="utf-8" /><title>Viewport width and nested scroll fixture</title>
+<style>
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #888;
+  }
+  body {
+    margin: 0;
+    min-height: 1800px;
+    font: 16px/24px sans-serif;
+    background: white;
+  }
+  main {
+    margin: 100px 40px 0 240px;
+    border: 1px solid #ddd;
+  }
+  p {
+    padding: 16px;
+    background: #eef;
+  }
+  #scroller {
+    position: fixed;
+    left: 20px;
+    top: 30px;
+    width: 180px;
+    height: 100px;
+    overflow: auto;
+    background: #ddd;
+  }
+  #content {
+    height: 500px;
+    padding-top: 220px;
+    box-sizing: border-box;
+  }
+  button {
+    display: block;
+  }
+</style>
+<aside id="scroller">
+  <div id="content"><button id="nested-action">Nested action</button></div>
+</aside>
+<main>
+  <h1>Actual viewport width</h1>
+  <p>
+    A classic scrollbar must not change the layout width during capture. Lines and boxes should keep
+    their source positions.
+  </p>
+  <div style="height: 1200px; background: linear-gradient(#e7f3ff, #cdbdff)">Document content</div>
+</main>
+<script>
+  document.querySelector('#scroller').scrollTop = 130;
+</script>

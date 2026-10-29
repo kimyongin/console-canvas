@@ -55,6 +55,9 @@ async function main() {
     'iframes',
     'capture-quality',
     'layout',
+    'capture-status',
+    'collection',
+    'scrollbar-layout',
     'integration',
     'ai-variants',
     'developer-workflow',
@@ -73,15 +76,20 @@ async function main() {
     'followup',
     'navigation',
   ]) {
+    if (
+      process.env.CONSOLE_CANVAS_TEST_SUITES &&
+      !process.env.CONSOLE_CANVAS_TEST_SUITES.split(',').includes(suite)
+    )
+      continue;
     let iframeSnapshot,
       iframeNativeSnapshot,
       iframeSourceUnchanged,
       truncatedPngRejected,
       clippedRootHeight;
-    if (['iframes', 'capture-quality'].includes(suite)) {
+    if (['iframes', 'capture-quality', 'scrollbar-layout'].includes(suite)) {
       window.setContentSize(900, 700);
       await window.loadURL(
-        `http://127.0.0.1:${server.address().port}/fixtures/${suite === 'iframes' ? 'iframes' : 'capture-quality'}.html`,
+        `http://127.0.0.1:${server.address().port}/${suite === 'scrollbar-layout' ? 'tests/fixtures' : 'fixtures'}/${suite}.html`,
       );
       const before = await window.webContents.executeJavaScript(
         `JSON.stringify({html:document.documentElement.outerHTML,scroll:document.querySelector('#same')?.contentWindow.scrollY,actions:document.querySelector('#same')?.contentWindow.actions})`,

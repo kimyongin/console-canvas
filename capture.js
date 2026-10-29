@@ -133,7 +133,8 @@
       imageJobs = [],
       contexts = new Map([[doc, { x: scrollX, y: scrollY, sx: 1, sy: 1, frames: [] }]]);
     let counter = 0,
-      traversed = 0;
+      traversed = 0,
+      hiddenSubtreesOmitted = 0;
     const maxElements = options.maxElements || 15000;
     const project = (r, owner) => {
       const c = contexts.get(owner);
@@ -480,9 +481,9 @@
       const raster = ['CANVAS', 'VIDEO', 'IFRAME'].includes(source.tagName),
         closedShadow = source.shadowRoot || registeredShadows.get(source);
       const node = record(source, parentId, raster ? 'raster' : 'element');
-      const tag = raster ? 'div' : source.localName.includes('-') ? 'div' : source.localName;
+      const tag = raster ? 'div' : source.localName.includes('-') ? 'span' : source.localName;
       const clone = doc.createElement(tag),
-        { css } = styles(source);
+        { css, computed } = styles(source);
       clone.style.cssText = css;
       for (const attr of [...source.attributes])
         if (SAFE_ATTR.test(attr.name) && !/^data-uic-/.test(attr.name)) {
@@ -492,6 +493,10 @@
           } catch {}
         }
       clone.dataset.uicId = node.id;
+      if (computed.display === 'none') {
+        hiddenSubtreesOmitted++;
+        return clone;
+      }
       if (source.tagName === 'IFRAME') {
         const frameKey = frameIndex(source);
         const sx = node.rect.width / (source.offsetWidth || node.rect.width || 1),
@@ -1067,6 +1072,7 @@
       html,
       nodes,
       warnings,
+      captureReport: { traversedElements: traversed, hiddenSubtreesOmitted },
       screenshot: null,
     };
   }
@@ -1136,6 +1142,47 @@
       doc.removeEventListener('animationstart', onAnimation, true);
       doc.removeEventListener('transitionrun', onAnimation, true);
     };
+  }
+  function layoutFingerprint(doc = document) {
+    const view = doc.defaultView,
+      stack = [doc.body];
+    let visited = 0,
+      hash = 2166136261;
+    while (stack.length && visited++ < 15000) {
+      const element = stack.pop(),
+        style = view.getComputedStyle(element);
+      if (OMIT.has(element.tagName) || style.display === 'none') continue;
+      const r = element.getBoundingClientRect();
+      if (r.width && r.height) {
+        const text = [...element.childNodes]
+          .filter((n) => n.nodeType === 3)
+          .map((n) => n.textContent)
+          .join('')
+          .slice(0, 200);
+        const signature =
+          [r.x + view.scrollX, r.y + view.scrollY, r.width, r.height]
+            .map((n) => Math.round(n * 100) / 100)
+            .join(',') +
+          '|' +
+          [
+            style.visibility,
+            style.opacity,
+            style.transform,
+            style.backgroundImage,
+            style.color,
+            style.fontFamily,
+            style.fontSize,
+            element.currentSrc || '',
+            text,
+          ].join('|');
+        for (let i = 0; i < signature.length; i++)
+          hash = Math.imul(hash ^ signature.charCodeAt(i), 16777619);
+      }
+      if (element.namespaceURI === 'http://www.w3.org/2000/svg') continue;
+      const shadow = element.shadowRoot || registeredShadows.get(element);
+      stack.push(...(shadow ? shadow.children : element.children));
+    }
+    return { key: visited + ':' + (hash >>> 0), limited: stack.length > 0 };
   }
   function fingerprint(doc = document) {
     const view = doc.defaultView;
@@ -1321,6 +1368,7 @@
     matchesView,
     settleVisibleMedia,
     fingerprint,
+    layoutFingerprint,
     anchors,
     headerInset,
     alignAnchors,

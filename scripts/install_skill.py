@@ -20,11 +20,15 @@ def main():
         parser.error('Destination already exists; review the existing skill before replacing it: ' + str(target))
     if target.exists() and (not (target / 'SKILL.md').is_file() or 'name: console-canvas\n' not in (target / 'SKILL.md').read_text()):
         parser.error('Destination is not an existing Console Canvas skill')
-    if not (source / 'assets' / 'console-canvas-extension.zip').is_file():
+    if not (source / 'assets' / 'console-canvas-runtime.zip').is_file():
         parser.error('Runtime asset is missing; run python3 scripts/build.py first')
     if target == source or source in target.parents:
         parser.error('Destination cannot be inside the source skill')
-    shutil.copytree(source, target, dirs_exist_ok=args.update, ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '.DS_Store'))
+    sys.path.insert(0, str(ROOT / 'mcp'))
+    from skill_install import install
+    result = install(ROOT / 'dist/console-canvas-skill.zip', target)
+    if result['backup']:
+        print('Backup: ' + result['backup'])
     print('Installed: ' + str(target))
     print('Invoke with $console-canvas in a chat where the skill is available.')
     return 0

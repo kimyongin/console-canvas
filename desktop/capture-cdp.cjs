@@ -323,7 +323,11 @@ async function captureWithProtocol({
           root,
           'globalThis.UICloneCapture.matchesView(document,' + JSON.stringify(snapshot.source) + ')',
         );
-      let animatedSurface = false;
+      let viewportCapture = false;
+      const scrollbarGutter = await evaluate(
+        root,
+        'Math.max(0, innerWidth - document.documentElement.clientWidth)',
+      );
       if (await matches()) {
         const view = await screenshot({
           format: 'png',
@@ -340,8 +344,11 @@ async function captureWithProtocol({
             root,
             `document.getAnimations({subtree:true}).some(a=>{const r=a.effect?.target?.getBoundingClientRect();return r && r.width*r.height>innerWidth*innerHeight*.6 && a.effect.getKeyframes().some(k=>k.opacity!==undefined)}) || globalThis.UICloneCapture.surfaceChanged()`,
           );
-        animatedSurface = await hasSurfaceAnimation();
-        if (!animatedSurface) {
+        // Beyond-viewport screenshots can temporarily remove a classic/custom
+        // scrollbar and reflow a wider page. Actual viewport tiles retain the
+        // same layout width as the collected DOM, without changing source CSS.
+        viewportCapture = scrollbarGutter > 0 || (await hasSurfaceAnimation());
+        if (!viewportCapture) {
           const tileHeight = Math.max(1, Math.min(height, Math.floor(40_000_000 / width)));
           for (let y = 0; y < height && snapshot.screenshotTiles.length < 32; y += tileHeight) {
             const rect = { x: 0, y, width, height: Math.min(tileHeight, height - y) };
@@ -358,12 +365,12 @@ async function captureWithProtocol({
             snapshot.screenshotTiles.push({ rect, data: 'data:image/png;base64,' + tile.data });
             pixels += rect.width * rect.height;
             if (await hasSurfaceAnimation()) {
-              animatedSurface = true;
+              viewportCapture = true;
               break;
             }
           }
         }
-        if (animatedSurface) {
+        if (viewportCapture) {
           await evaluate(
             root,
             `Promise.race([Promise.all(document.getAnimations({subtree:true}).map(a=>a.finished.catch(()=>{}))),new Promise(r=>setTimeout(r,1200))])`,
@@ -471,7 +478,7 @@ async function captureWithProtocol({
         // Paint them in the real viewport, and overlay only the frame rectangle.
         let correctedFrames = 0;
         try {
-          const candidates = animatedSurface
+          const candidates = viewportCapture
             ? []
             : snapshot.nodes.filter((n) => n.tag === 'iframe' && n.visible);
           for (const node of candidates.slice(0, 16)) {
@@ -544,7 +551,8 @@ async function captureWithProtocol({
         domFrames: frames.filter((f) => f.snapshot && !f.error).length,
         failedFrames: frames.filter((f) => f.error).map((f) => ({ url: f.url, error: f.error })),
         embeddedResourceCount: Object.keys(assetData).length,
-        screenshotMode: animatedSurface ? 'viewport-scroll' : 'document-surface',
+        screenshotMode: viewportCapture ? 'viewport-scroll' : 'document-surface',
+        scrollbarGutter,
       };
       if (await matches()) {
         const view = await screenshot({
@@ -606,6 +614,10 @@ async function captureWithProtocol({
                 `globalThis.UICloneCapture.frames(document).map(e=>{const r=e.getBoundingClientRect(),sx=r.width/(e.offsetWidth||r.width||1),sy=r.height/(e.offsetHeight||r.height||1);return {tag:'iframe',visible:r.width>0&&r.height>0,rect:{x:r.left+scrollX,y:r.top+scrollY,width:r.width,height:r.height},frame:{contentRect:{x:r.left+scrollX+e.clientLeft*sx,y:r.top+scrollY+e.clientTop*sy,width:e.clientWidth*sx,height:e.clientHeight*sy}}}})`,
               );
               try {
+                root.layoutBeforePictures = await evaluate(
+                  root,
+                  'globalThis.UICloneCapture.layoutFingerprint(document)',
+                );
                 root.pictures = await capturePictures({ source, nodes, warnings: [] });
               } catch (error) {
                 root.pictureError = error.message;
@@ -656,22 +668,53 @@ async function captureWithProtocol({
                 'globalThis.UICloneCapture.fingerprint(document)',
               );
             frame.snapshot = await evaluate(frame, expression);
-            if (frame === root) {
+            if (frame === root && root.pictures?.captureReport) {
+              let after = await evaluate(
+                root,
+                'globalThis.UICloneCapture.layoutFingerprint(document)',
+              );
+              let changed = root.layoutBeforePictures?.key !== after.key;
               for (
                 let retry = 0;
                 retry < 2 &&
-                root.pictures?.captureReport &&
-                frame.snapshot.source.height > root.pictures.captureReport.contentSize.height + 1;
+                (changed ||
+                  frame.snapshot.source.height >
+                    root.pictures.captureReport.contentSize.height + 1);
                 retry++
               ) {
+                root.layoutBeforePictures = await evaluate(
+                  root,
+                  'globalThis.UICloneCapture.layoutFingerprint(document)',
+                );
                 root.pictures = await capturePictures({
                   source: frame.snapshot.source,
                   nodes: frame.snapshot.nodes,
                   warnings: [],
                 });
                 frame.snapshot = await evaluate(frame, expression);
+                after = await evaluate(
+                  root,
+                  'globalThis.UICloneCapture.layoutFingerprint(document)',
+                );
+                changed = root.layoutBeforePictures.key !== after.key;
                 root.pictures.captureReport.layoutRetries = retry + 1;
               }
+              root.pictures.captureReport.sourceChangedDuringCapture = changed;
+              root.pictures.captureReport.layoutSamplingLimited = !!(
+                root.layoutBeforePictures?.limited || after.limited
+              );
+              if (changed)
+                frame.snapshot.warnings.push({
+                  type: 'dynamic',
+                  message:
+                    '촬영과 요소 수집 사이에 화면 배치 또는 내용이 바뀌었습니다. 슬라이더·배너 등은 원본과 다를 수 있으니 확인하거나 다시 가져오세요.',
+                });
+              if (root.pictures.captureReport.layoutSamplingLimited)
+                frame.snapshot.warnings.push({
+                  type: 'capture_limit',
+                  message:
+                    '화면 변경 감지의 요소 한도에 도달했습니다. 모든 영역의 상태 일관성을 확인하지 못했습니다.',
+                });
             }
           } catch (error) {
             frame.error = { code: 'frame_capture_failed', message: error.message };
@@ -688,6 +731,7 @@ async function captureWithProtocol({
   const snapshot = root.snapshot;
   if (!snapshot?.html) throw Error(root.error?.message || '화면을 가져오지 못했습니다.');
   snapshot.captureReport = {
+    ...snapshot.captureReport,
     frameCount: frames.length,
     domFrames: frames.filter((f) => f.snapshot && !f.error).length,
     failedFrames: frames.filter((f) => f.error).map((f) => ({ url: f.url, error: f.error })),
@@ -720,7 +764,7 @@ async function captureWithProtocol({
     snapshot.screenshot = pictures.screenshot;
     snapshot.screenshotTiles = pictures.screenshotTiles;
     snapshot.captureCorrections = pictures.captureCorrections;
-    snapshot.captureReport = pictures.captureReport;
+    snapshot.captureReport = { ...snapshot.captureReport, ...pictures.captureReport };
     snapshot.captureReport.layoutAlignedTiles = pictures.screenshotTiles.filter(
       (t) => t.layoutShift,
     ).length;

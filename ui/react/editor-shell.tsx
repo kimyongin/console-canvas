@@ -289,28 +289,25 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                   {'실제 웹사이트 가져오는 방법'}
                 </Button>
               </div>
-              <div className="import-guide" id="import-guide" hidden={true}>
-                <strong>{'Chrome 확장 프로그램 설치'}</strong>
-                <ol>
-                  <li>
-                    <code>{'chrome://extensions'}</code>
-                    {'에서 개발자 모드를 켭니다.'}
-                  </li>
-                  <li>
-                    {
-                      '\n                  ‘압축해제된 확장 프로그램을 로드합니다’를 누르고\n                  '
-                    }
-                    <code>{'console-canvas'}</code>
-                    {' 폴더를 선택합니다.\n                '}
-                  </li>
-                  <li>{'원하는 웹사이트에서 확장 프로그램 버튼을 누르면 이 편집기가 열립니다.'}</li>
-                </ol>
-                <p>{'현재 화면에 보이는 데이터가 복제본에 포함됩니다.'}</p>
+              <div id="import-guide" className="capture-start-help" hidden={true}>
+                <strong>내장 앱에서 화면 가져오기</strong>
+                <p>상단 웹사이트에서 주소를 열고, 원하는 상태에서 ‘이 화면 가져오기’를 누르세요.</p>
+                <p>기존 Chrome 확장 문서는 편집 파일로 저장한 뒤 이 앱에서 열 수 있습니다.</p>
               </div>
               <div id="recent-documents" className="recent-documents"></div>
             </div>
             <div id="artboard-space" className="artboard-space" hidden={true}>
-              <div id="artboard-label" className="artboard-label"></div>
+              <div className="artboard-caption">
+                <div id="artboard-label" className="artboard-label"></div>
+                <Button
+                  id="capture-status-button"
+                  variant="outline"
+                  onClick={() => dispatchEditorCommand('capture-status')}
+                  disabled={!view?.ready}
+                >
+                  가져오기 정보
+                </Button>
+              </div>
               <div id="artboard" className="artboard">
                 <iframe
                   id="scene-frame"
@@ -698,11 +695,30 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
               </div>
             </details>
           </section>
-          <details id="capture-notes" className="capture-notes" hidden={true}>
-            <summary id="capture-notes-title">{'가져오기 참고사항'}</summary>
-            <ul id="capture-notes-list"></ul>
-          </details>
         </div>
+      </DialogSurface>
+      <DialogSurface id="capture-status-dialog" aria-labelledby="capture-status-title">
+        <form method="dialog">
+          <Button className="dialog-close" aria-label="가져오기 정보 닫기" variant="outline">
+            ×
+          </Button>
+        </form>
+        <h2 id="capture-status-title">가져오기 정보</h2>
+        <p id="capture-status-summary" role="status"></p>
+        <p className="capture-verification-note">
+          아래는 수집 과정에서 확인한 정보입니다. 원본과의 시각적 일치율은 측정하지 않았습니다.
+        </p>
+        <p id="capture-status-scope"></p>
+        <ul id="capture-status-list" className="capture-status-list"></ul>
+        <p id="capture-status-empty" hidden>
+          기록된 제한은 없습니다. 이미지·글자·배치가 원본과 같은지 확인한 뒤 편집하세요.
+        </p>
+        <Button id="capture-source-button" hidden={true} variant="outline">
+          원본 사이트 확인
+        </Button>
+        <p id="capture-source-note" hidden>
+          현재 사이트 상태는 가져온 시점과 다를 수 있습니다.
+        </p>
       </DialogSurface>
       <DialogSurface id="snapshot-save-dialog" aria-labelledby="snapshot-save-title">
         <h2 id="snapshot-save-title">{'스냅샷 저장'}</h2>
@@ -953,31 +969,6 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
         </form>
         <div className="eyebrow">{'CONNECT YOUR AGENT'}</div>
         <h2>{'에이전트와 함께 편집'}</h2>
-        <section id="webmcp-controls" hidden>
-          <h3>Chrome WebMCP</h3>
-          <p>
-            Chrome MCP에서 이 문서의 도구를 사용할 수 있도록 공개합니다. 공식 MCP의 Chrome 연결
-            설정은 별도로 필요합니다. 문서를 바꾸거나 새로고침하면 다시 공개해야 합니다.
-          </p>
-          <p>
-            <a
-              href="https://github.com/kimyongin/console-canvas/blob/main/docs/chrome-webmcp.md"
-              target="_blank"
-              rel="noreferrer"
-            >
-              공식 MCP 설정·이미지 전달 안내
-            </a>
-          </p>
-          <Button id="webmcp-enable" type="button">
-            도구 공개
-          </Button>
-          <Button id="webmcp-disable" type="button" variant="outline">
-            공개 해제
-          </Button>
-          <p id="webmcp-status" role="status">
-            WebMCP 도구 미공개
-          </p>
-        </section>
         <h3>로컬 MCP 서버 연결</h3>
         <p>
           {'\n        연결한 이 화면의 복제본만 에이전트가 읽고 편집합니다.'}

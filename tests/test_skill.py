@@ -193,8 +193,9 @@ class HandoffTests(unittest.TestCase):
                                      'prepare', '--output', str(root / 'runtime')],
                                     check=True, capture_output=True, text=True)
             prepared = json.loads(result.stdout)
-            extension = Path(prepared['extension_directory'])
-            self.assertEqual(json.loads((extension / 'manifest.json').read_text())['manifest_version'], 3)
+            extension = Path(prepared['runtime_directory'])
+            self.assertFalse((extension / 'manifest.json').exists())
+            self.assertFalse((extension / 'background.js').exists())
             self.assertIn('embedded-sample', Path(prepared['preview']).read_text())
             self.assertGreater(prepared['files'], 31)
             self.assertTrue((extension / 'ui/workspace-layout.js').is_file())

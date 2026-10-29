@@ -1,6 +1,9 @@
 # 개발 구조
 
-제품 요구사항과 사용자 동작의 기준은 [PRD](PRD.md), 실제 확인 결과는 [검증 기록](verification.md)에서 관리한다. 아래는 0.16.1의 구현 구조다. 최신 실행 결과는 [0.16 검증](release-0.16-verification.md), 전환 범위와 설치/직접 사용 잔여는 [개선 티켓](https://github.com/kimyongin/console-canvas/issues/1)과 검증 기록에서 구분한다.
+0.25.0부터 내장 Chromium 앱만 공식 지원한다. Chrome 전용 소스는 archive/chrome-extension과 태그 v0.24.3에 보존하고 새 빌드 의존성에서 제외한다. 공통 배포물은 console-canvas-runtime.zip이다. [전환·검증 범위](desktop-only-0.25.md).
+
+
+제품 요구사항과 사용자 동작의 기준은 [PRD](PRD.md), 실제 확인 결과는 [검증 기록](verification.md)에서 관리한다. 아래에는 버전별 구현 기록도 포함한다. 현재 실행 결과는 [검증 기록](verification.md), 전환 범위와 설치/직접 사용 잔여는 [개선 티켓](https://github.com/kimyongin/console-canvas/issues/1)과 검증 기록에서 구분한다.
 
 ## 편집과 명령
 
@@ -46,7 +49,7 @@ IndexedDB `console-canvas-workspace`의 세 저장소를 사용한다.
 
 `package.json`이 버전의 기준이다. `scripts/build.py`가 esbuild로 실제 모듈 의존성과 CSS import를 번들링한다. 독립 HTML은 외부 스크립트·CSS 없이 실행된다. `runtime-manifest.json`에는 공개 파일과 런타임 SHA-256을 기록하며, MCP HTTP 서버는 공개 파일만 제공하고 스킬 prepare는 패키지 파일·체크섬을 검사한다. 스킬 ZIP은 앱 Resources에서 런타임 밖에 둔다.
 
-`npm run check`는 TypeScript·포맷·빌드·Python·Node·Chromium·실제 데스크톱/공식 MCP SDK 순서로 실행한다. 데스크톱 검증은 임시 홈·프로필·포트에서 가상 NORTH만 가져오고, 정상 종료 뒤 같은 프로필을 다시 실행해 편집·초안·스냅샷·패널 너비를 확인한다. 설치된 사용자 앱의 데이터나 스킬에는 쓰지 않는다.
+`npm run check`는 TypeScript·포맷·빌드·Python·Node·Chromium 웹/공통 검사다. 내장 앱 경계와 로컬 MCP는 별도 `test:desktop:offscreen`/공식 SDK로 검사한다. 데스크톱 검증은 임시 홈·프로필·포트에서 가상 NORTH만 가져오고, 정상 종료 뒤 같은 프로필을 다시 실행해 편집·초안·스냅샷·패널 너비를 확인한다. 설치된 사용자 앱의 데이터나 스킬에는 쓰지 않는다.
 
 
 문서의 사용자 지정 이름과 `deletedAt`은 `documents` 메타데이터에 저장한다. 세션 저장은 해당 레코드를 병합하며 휴지통에 있는 문서에는 쓰지 않는다. 문서 휴지통은 캡처·세션을 지우지 않고 기본 조회·최근 목록에서 제외한다. 활성 문서를 휴지통으로 옮기기 전 저장 큐를 flush하고 편집기를 닫아 MCP 화면 등록도 해제한다. 복구는 메타데이터만 바꾸며 다시 열 때 모든 편집과 버전을 읽는다.
@@ -85,9 +88,9 @@ IndexedDB `console-canvas-workspace`의 세 저장소를 사용한다.
 
 개발용 `ui/react/contracts.ts`는 snapshot·이력·MCP 결과·editor preload의 타입 진입점이다. 전역 Window 선언은 TypeScript UI에서 사용하며 배포 런타임에 추가 코드를 만들지 않는다. JS/IPC/MCP의 런타임 검증을 대체하지 않는다.
 
-## Chrome WebMCP · 0.20
+## Chrome WebMCP · 0.20 과거 기록 (0.25 지원 종료)
 
-`tool-contract.json`은 19개 도구 스키마·읽기/쓰기 annotations·계약 버전의 공통 원본이다. `tool-contract.js`와 `mcp/server.py`가 `edit-policy.json`의 한도를 해석한다. `webmcp-client.js`는 명시적으로 공개한 문서의 native `document.modelContext` 등록/철회·직렬 실행·최근 200개 성공 operation_id 결과만 담당한다. 편집·저장·실행 취소·분기는 기존 `editor-controller.js`와 세션/엔진에 위임한다. Electron IPC와 Python 브리지는 Chrome 실행 경로의 의존성이 아니다.
+`tool-contract.json`은 19개 도구 스키마·읽기/쓰기 annotations·계약 버전의 공통 원본이다. `tool-contract.js`와 `mcp/server.py`가 `edit-policy.json`의 한도를 해석한다. `archive/chrome-extension/webmcp-client.js`는 명시적으로 공개한 문서의 native `document.modelContext` 등록/철회·직렬 실행·최근 200개 성공 operation_id 결과만 담당한다. 편집·저장·실행 취소·분기는 기존 `editor-controller.js`와 세션/엔진에 위임한다. Electron IPC와 Python 브리지는 Chrome 실행 경로의 의존성이 아니다.
 
 가이드는 빌드된 동일 SKILL.md를 반환한다. 이미지 생성은 native 실행 반환 뒤 별도 작업으로 시작하고 같은 인수의 재조회로 결과를 전달한다. 로컬 blob 미리보기는 `review-image.html`에서만 로드하고 5분 또는 도구 철회 시 해제한다. 공식 Chrome MCP의 `new_page`→`take_screenshot(fullPage:true)`가 실제 MCP 이미지 콘텐츠를 반환한다. 상세 계약·실패 정책은 [Chrome 안내](chrome-webmcp.md), 실행 증빙은 [0.20](webmcp-0.20.md)에 있다.
 
@@ -114,3 +117,7 @@ Python `mcp/modern.py`는 2026-07-28 발견·요청별 메타데이터·결과/�
 `chrome-capture.js`는 허용된 프레임의 DOM 수집·병합과 활성 탭 촬영을 조정한다. 스크롤 이후 지연 DOM을 다시 수집하므로 원본 하단과 편집 트리의 시점 차이를 줄인다. `capture-assets.js`는 기존 권한 안에서 쿠키 없는 공개 CORS fetch만 수행한다. 보안 격리와 host permissions를 넓히지 않는다. 프레임 신원이 모호하면 추정 병합하지 않는다.
 
 `capture-media.js`는 문서에 내장된 원본 타일만으로 실패한 IMG/래스터 영역을 자른다. 픽셀 합집합으로 full/partial/unavailable을 판단하고 부분을 전체로 늘리지 않는다. immutable capture v1의 추가 선택 필드이며 세션 저장 구조·타임라인 부모 관계는 바꾸지 않았다. MCP 요소 조회는 선택적인 image/coverage/raster_reason을 제공하고 기존 19개 도구와 revision/operation_id 계약을 유지한다. [범위·수치](capture-quality-0.24.md).
+
+## 가져오기 상태 · 0.25
+
+capture-status.js가 저장된 경고·프레임 정보와 scene의 이미지/배경/raster coverage를 읽어 불변 평가한다. UI의 가져오기 정보와 get_screen.capture_status는 같은 평가를 사용한다. 시각 일치율을 계산하거나 상태 변경/저장을 수행하지 않는다. 대상 선택은 기존 선택/확대 명령을 사용한다.

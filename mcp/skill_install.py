@@ -10,7 +10,8 @@ import shutil
 import tempfile
 import zipfile
 
-MANAGED = ('SKILL.md', 'agents/openai.yaml', 'scripts/console_canvas.py', 'assets/console-canvas-extension.zip')
+RETIRED = ('assets/console-canvas-extension.zip',)
+MANAGED = ('SKILL.md', 'agents/openai.yaml', 'scripts/console_canvas.py', 'assets/console-canvas-runtime.zip')
 
 
 def default_target():
@@ -53,7 +54,7 @@ def status(archive, target):
     values = packaged_files(archive)
     target = target.expanduser().resolve()
     installed = (target / 'SKILL.md').is_file()
-    matches = installed and all((target / name).is_file() and (target / name).read_bytes() == raw for name, raw in values.items())
+    matches = installed and not any((target / name).exists() for name in RETIRED) and all((target / name).is_file() and (target / name).read_bytes() == raw for name, raw in values.items())
     return {'path': str(target), 'installed': installed, 'current': matches}
 
 
@@ -71,8 +72,16 @@ def install(archive, target):
             raise ValueError('설치 경로의 파일 또는 링크를 확인해 주세요: ' + name)
         if not path.is_file() or path.read_bytes() != raw:
             changed.append(name)
+    retired = []
+    for name in RETIRED:
+        path = target / name
+        if not path.exists() and not path.is_symlink():
+            continue
+        if target not in path.resolve().parents or path.is_symlink() or not path.is_file():
+            raise ValueError('이전 런타임 경로를 확인해 주세요: ' + name)
+        retired.append(name)
     backup = None
-    old = [name for name in changed if (target / name).is_file()]
+    old = [name for name in changed if (target / name).is_file()] + retired
     if old:
         directory = target.parent.parent / 'console-canvas-skill-backups'
         directory.mkdir(parents=True, exist_ok=True)
@@ -95,6 +104,9 @@ def install(archive, target):
         for name, temporary in prepared.items():
             os.replace(temporary, target / name)
             applied.append(name)
+        for name in retired:
+            (target / name).unlink()
+            applied.append(name)
     except OSError:
         for name in reversed(applied):
             path = target / name
@@ -113,7 +125,7 @@ def install(archive, target):
     finally:
         for temporary in prepared.values():
             temporary.unlink(missing_ok=True)
-    return {**status(archive, target), 'changed_files': changed, 'backup': str(backup) if backup else None}
+    return {**status(archive, target), 'changed_files': changed + retired, 'removed_files': retired, 'backup': str(backup) if backup else None}
 
 
 def sync_installed(archive):

@@ -22,49 +22,6 @@ function near(a, b) {
   return Math.abs(a - b) < 0.75;
 }
 async function run() {
-  let workerRegistration,
-    workerReady = false,
-    workerError = '';
-  try {
-    workerRegistration = await navigator.serviceWorker.register('./background-worker.js', {
-      type: 'module',
-      scope: './background-startup/',
-    });
-    const worker =
-      workerRegistration.installing || workerRegistration.waiting || workerRegistration.active;
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(Error('Background startup timed out')), 10000);
-      const changed = () => {
-        if (worker.state === 'activated' || worker.state === 'redundant') {
-          clearTimeout(timeout);
-          worker.removeEventListener('statechange', changed);
-          if (worker.state === 'redundant') reject(Error('Background startup failed'));
-          else resolve();
-        }
-      };
-      worker.addEventListener('statechange', changed);
-      changed();
-    });
-    workerReady = await new Promise((resolve, reject) => {
-      const channel = new MessageChannel();
-      const timeout = setTimeout(() => reject(Error('Background response timed out')), 5000);
-      channel.port1.onmessage = ({ data }) => {
-        clearTimeout(timeout);
-        channel.port1.close();
-        resolve(data.ready === true);
-      };
-      worker.postMessage('status', [channel.port2]);
-    });
-  } catch (error) {
-    workerError = error.message;
-  } finally {
-    await workerRegistration?.unregister();
-  }
-  check(
-    'Production background imports start in a real module service worker' +
-      (workerError ? ': ' + workerError : ''),
-    () => workerReady,
-  );
   const sourceFrame = document.getElementById('source');
   if (
     sourceFrame.contentDocument?.readyState !== 'complete' ||

@@ -15,6 +15,22 @@ from server import VERSION
 
 
 class AppSkillTests(unittest.TestCase):
+    def test_retired_runtime_is_backed_up_without_losing_personal_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / 'console-canvas'
+            archive = ROOT / 'dist/console-canvas-skill.zip'
+            install(archive, target)
+            old = target / 'assets/console-canvas-extension.zip'
+            old.write_bytes(b'old managed runtime')
+            (target / 'personal.txt').write_text('keep')
+            self.assertFalse(status(archive, target)['current'])
+            result = install(archive, target)
+            self.assertFalse(old.exists())
+            self.assertEqual((Path(result['backup']) / 'assets/console-canvas-extension.zip').read_bytes(), b'old managed runtime')
+            self.assertEqual((target / 'personal.txt').read_text(), 'keep')
+            self.assertTrue(status(archive, target)['current'])
+
+
     def test_auto_sync_does_not_create_an_uninstalled_skill(self):
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {}, clear=True), patch('skill_install.Path.home', return_value=Path(directory)):
             result = sync_installed(ROOT / 'dist/console-canvas-skill.zip')

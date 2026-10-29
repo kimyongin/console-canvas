@@ -318,7 +318,35 @@ export class CanvasScene {
       this.hover.style.display = 'none';
     });
     this.apply();
+    this.restoreCapturedScroll();
     return this;
+  }
+  restoreCapturedScroll() {
+    // Lifting/reconstructing a fixed container or decoding its contents can
+    // clamp an earlier scroll assignment. Restore only its captured viewport
+    // after the layout is in place and keep working baseline geometry aligned.
+    for (const [id, node] of this.nodes) {
+      const el = this.elements.get(id);
+      if (!el || (!node.scroll?.x && !node.scroll?.y)) continue;
+      const x = node.scroll.x || 0,
+        y = node.scroll.y || 0;
+      if (el.scrollLeft === x && el.scrollTop === y) continue;
+      const children = [...this.elements].filter(
+        ([child, element]) => child !== id && !this.lifts.has(child) && el.contains(element),
+      );
+      el.scrollLeft = x;
+      el.scrollTop = y;
+      for (const [child] of children) {
+        const current = this.rect(child),
+          shift = this.offset(child);
+        if (current)
+          this.baseRects.set(child, {
+            ...current,
+            x: current.x - shift.x,
+            y: current.y - shift.y,
+          });
+      }
+    }
   }
   async rasterFallbacks() {
     await applyCaptureMedia(this);
@@ -670,9 +698,13 @@ export class CanvasScene {
       [...prepared.elements].map(([id, el]) => [id, el.cloneNode(true)]),
     );
     this.copySignature = null;
+    // Establish the rebuilt source layout before applying saved moves/copies.
+    this.edits = {};
     for (const node of this.nodes.values())
       if (node.position === 'fixed' && node.visible && this.elements.has(node.id))
         this.lift(node.id, node.rect);
+    this.apply({ refreshUi: false });
+    this.restoreCapturedScroll();
     this.setEdits(edits);
     this.setComments(annotations);
   }
@@ -1031,7 +1063,7 @@ export class CanvasScene {
       };
     });
   }
-  apply() {
+  apply({ refreshUi = true } = {}) {
     for (const [id] of [...this.lifts])
       if (!this.edits[id]?.dx && !this.edits[id]?.dy) this.restoreLift(id);
     for (const [id, edit] of Object.entries(this.edits))
@@ -1085,8 +1117,10 @@ export class CanvasScene {
         } else lift.wrapper.style.clipPath = '';
       }
     }
-    this.drawSelection();
-    this.callbacks.onSize?.(this.contentSize());
+    if (refreshUi) {
+      this.drawSelection();
+      this.callbacks.onSize?.(this.contentSize());
+    }
   }
   contentSize() {
     let width = this.snapshot.source.width,

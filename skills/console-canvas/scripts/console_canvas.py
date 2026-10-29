@@ -63,7 +63,7 @@ def new_output(path):
 
 
 def prepare(output):
-    bundle = SKILL_ROOT / 'assets' / 'console-canvas-extension.zip'
+    bundle = SKILL_ROOT / 'assets' / 'console-canvas-runtime.zip'
     with zipfile.ZipFile(bundle) as archive:
         members = archive_members(archive)
         manifest_name = 'console-canvas/runtime-manifest.json'
@@ -84,7 +84,7 @@ def prepare(output):
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(raw)
     runtime = output / 'console-canvas'
-    return {'extension_directory': str(runtime), 'preview': str(runtime / 'preview.html'),
+    return {'runtime_directory': str(runtime), 'preview': str(runtime / 'preview.html'),
             'readme': str(runtime / 'README.md'), 'files': len(files)}
 
 
@@ -365,7 +365,7 @@ def main():
     args = parser.parse_args()
     try:
         if args.command == 'mcp':
-            asset = SKILL_ROOT / 'assets' / 'console-canvas-extension.zip'
+            asset = SKILL_ROOT / 'assets' / 'console-canvas-runtime.zip'
             key = hashlib.sha256(asset.read_bytes()).hexdigest()[:16]
             runtime = args.state_dir.expanduser().resolve() / 'runtimes' / key
             if not runtime.exists():

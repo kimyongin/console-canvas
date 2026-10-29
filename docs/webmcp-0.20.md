@@ -1,5 +1,8 @@
 # WebMCP 0.20 구현과 검증
 
+> 2026-10-29: 0.25.0부터 Chrome 확장/WebMCP 지원·신규 배포를 종료했습니다. 아래는 과거 설계/검증 기록입니다. 현재 사용은 내장 앱이며 [지원 전환과 자료 이동](desktop-only-0.25.md)을 따릅니다.
+
+
 2026-10-26 · 소스 0.20.0 · [설정/사용](chrome-webmcp.md) · [상위 #28](https://github.com/kimyongin/console-canvas/issues/28)
 
 ## 구현 결과

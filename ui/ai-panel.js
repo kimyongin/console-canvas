@@ -52,11 +52,6 @@ export function createAiPanel({ $, state, manager, adapter, toast, save, checkpo
       $('#mcp-button').click();
     },
     async configureApi(value) {
-      if (
-        globalThis.chrome?.permissions &&
-        !(await chrome.permissions.request({ origins: ['https://api.openai.com/*'] }))
-      )
-        throw new Error('OpenAI API 연결 권한이 필요합니다.');
       provider.configure(value);
     },
     forgetApi: () => {

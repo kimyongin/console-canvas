@@ -1,3 +1,4 @@
+import { captureAssessment } from './capture-status.js';
 import { buildCodeDocument } from './code-patches.js';
 import { activityBranch } from './activity-history.js';
 import { prepareEdits } from './edit-commands.js';
@@ -26,7 +27,14 @@ export function createEditorController(options) {
     };
   }
   function screen() {
+    const assessment = captureAssessment(state.snapshot, state.scene.elements);
     return {
+      capture_status: {
+        visual_comparison: 'not_measured',
+        issue_count: assessment.items.length,
+        issues: assessment.items.slice(0, 200).map(({ actionable, ...item }) => item),
+        issues_truncated: assessment.items.length > 200,
+      },
       ...metadata(),
       undo_count: state.undo.length,
       redo_count: state.redo.length,

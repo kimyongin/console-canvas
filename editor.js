@@ -1,3 +1,4 @@
+import { captureAssessment } from './capture-status.js';
 import { createImplementationReview } from './ui/implementation-review.js';
 import { cleanHandoffSettings, cleanImplementationReviews } from './workflow-state.js';
 import { cleanAiDraft } from './ai-draft.js';
@@ -5,11 +6,10 @@ import { buildAiContext } from './ai-context.js';
 import { createAiPanel } from './ui/ai-panel.js';
 import { createAiRequests, validateAiRequests } from './ai-requests.js';
 import { snapshotChangeLabel } from './ui/snapshot-delta.js';
-import { createWebMcpClient } from './webmcp-client.js';
 import { configureModelessInspector } from './ui/modeless-inspector.js';
 import { cleanLayerNames } from './layer-names.js';
 import { createSelectionToolbar } from './ui/selection-toolbar.js';
-import { renderRecent, renderWarnings } from './ui/react/lists.tsx';
+import { renderRecent, renderCaptureIssues } from './ui/react/lists.tsx';
 import { buildHandoffImage } from './handoff-image.js';
 import { withVersionScene } from './ui/version-preview.js';
 import { cleanActivity } from './activity-history.js';
@@ -53,8 +53,6 @@ import { connectEditorCommands } from './ui/react/commands.ts';
 
 mountEditorShell();
 const $ = (selector) => document.querySelector(selector);
-const isExtension = typeof chrome !== 'undefined' && !!chrome.runtime?.id;
-let webMcpStatus = null;
 const state = {
   snapshot: null,
   scene: null,
@@ -191,7 +189,6 @@ function renderDocumentName() {
     : '';
 }
 function closeDocument(id) {
-  if (state.snapshot?.id === id) webMcp?.invalidate();
   const next = opening
     .catch(() => {})
     .then(async () => {
@@ -242,6 +239,45 @@ const clipboard = createClipboard({ $, state, toast, commitCommentDraft, adapter
 const { renderInspector: renderInspectorView } = createInspector({ $, state, kinds, selectNode });
 const selectionToolbar = createSelectionToolbar({ $, state });
 configureModelessInspector({ $ });
+function renderCaptureStatus() {
+  const assessment = captureAssessment(state.snapshot, state.scene?.elements);
+  $('#capture-status-button').textContent = assessment.label;
+  $('#capture-status-button').classList.toggle('needs-review', assessment.items.length > 0);
+  $('#capture-status-summary').textContent = assessment.items.length
+    ? '확인이 필요한 수집 정보 ' + assessment.items.length + '건'
+    : '기록된 수집 제한 없음 · 시각 비교 전';
+  const source = state.snapshot?.source;
+  $('#capture-status-scope').textContent = source
+    ? '가져온 문서 ' +
+      source.width +
+      ' × ' +
+      source.height +
+      'px · 원본 화면 ' +
+      source.viewport.width +
+      ' × ' +
+      source.viewport.height +
+      'px. 화면 밖 미렌더링 내용은 포함되지 않습니다.'
+    : '';
+  $('#capture-status-empty').hidden = assessment.items.length > 0;
+  renderCaptureIssues($('#capture-status-list'), assessment.items, (id) => {
+    $('#capture-status-dialog').close();
+    selectNode(id, { reveal: true });
+    fitSelection();
+    $('#capture-status-button').focus();
+  });
+  const desktop = !!window.ConsoleCanvasDesktop;
+  $('#capture-source-button').hidden = !desktop;
+  $('#capture-source-note').hidden = !desktop;
+}
+adapter.register('capture-status', () => {
+  if (!state.ready) return;
+  renderCaptureStatus();
+  $('#capture-status-dialog').showModal();
+});
+$('#capture-source-button').addEventListener('click', () => {
+  $('#capture-status-dialog').close();
+  window.ConsoleCanvasDesktop?.showSource();
+});
 function renderInspector() {
   renderInspectorView();
   selectionToolbar.position();
@@ -391,13 +427,14 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
   const existingMeta = await getDocumentMetadata(snapshot.id);
   if (existingMeta?.deletedAt)
     throw new Error('휴지통에 있는 문서입니다. 문서 목록의 휴지통에서 먼저 복구해 주세요.');
-  webMcp?.invalidate();
+
   await aiPanel.cancelJobs();
   await flushEditor();
   areaSelection.reset();
   clipboard.reset();
   commentEditor.reset();
   for (const id of [
+    '#capture-status-dialog',
     '#compare-dialog',
     '#export-dialog',
     '#properties-dialog',
@@ -520,9 +557,7 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
     renderSnapshots();
     $('#export-button').disabled = false;
     $('#snapshots-button').disabled = false;
-    $('#capture-notes').hidden = !snapshot.warnings.length;
-    $('#capture-notes-title').textContent = '가져오기 참고 ' + snapshot.warnings.length + '건';
-    renderWarnings($('#capture-notes-list'), snapshot.warnings);
+    renderCaptureStatus();
     state.lastCheckpoint = checkpoint();
     activityPanel.render();
     state.ready = true;
@@ -768,12 +803,6 @@ window.addEventListener('drop', (event) => {
   }
 });
 function renderMcpStatus() {
-  if (webMcpStatus?.enabled) {
-    $('#mcp-button').textContent = '● WebMCP 공개 중';
-    $('#mcp-button').classList.add('connected');
-    $('#mcp-state').textContent = webMcpStatus.message;
-    return;
-  }
   const status = state.mcpStatus;
   $('#mcp-button').textContent = status.connected ? '● 에이전트 연결됨' : '○ 에이전트 연결';
   $('#mcp-button').classList.toggle('connected', !!status.connected);
@@ -846,30 +875,6 @@ const mcpBridge = createMcpBridge({
   },
 });
 $('#mcp-button').addEventListener('click', () => $('#mcp-dialog').showModal());
-const webMcp = isExtension
-  ? createWebMcpClient({
-      controller,
-      onStatus(status) {
-        webMcpStatus = status;
-        renderMcpStatus();
-        $('#webmcp-status').textContent = status.message;
-        $('#webmcp-disable').disabled = !status.enabled;
-      },
-    })
-  : null;
-if (webMcp) {
-  $('#webmcp-controls').hidden = false;
-  $('#webmcp-disable').disabled = true;
-  $('#webmcp-enable').addEventListener('click', async () => {
-    try {
-      await webMcp.enable();
-      $('#mcp-dialog').close();
-    } catch (error) {
-      $('#webmcp-status').textContent = 'WebMCP 오류 · ' + error.message;
-    }
-  });
-  $('#webmcp-disable').addEventListener('click', () => webMcp.disable());
-}
 $('#mcp-connect').addEventListener('click', async () => {
   const button = $('#mcp-connect');
   button.disabled = true;

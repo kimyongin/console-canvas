@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bundle browser modules and package a standalone demo, extension and agent skill."""
+"""Bundle browser modules and package a standalone demo, desktop runtime and agent skill."""
 import argparse
 import hashlib
 import json
@@ -47,8 +47,10 @@ def build_standalone(output):
 def runtime_files():
     public = json.loads((ROOT / 'runtime-manifest.json').read_text())['public']
     files = set(public) | {
-        'runtime-manifest.json', 'manifest.json', 'background.js',
+        'runtime-manifest.json',
         'README.md', 'agent-guide.md', 'package.json',
+        # Native/Python dependencies must not depend on a browser import graph.
+        'tool-contract.json', 'edit-policy.json',
     }
     for directory, extensions in [('desktop', {'.cjs', '.html', '.css'}), ('mcp', {'.py'})]:
         files.update(path.relative_to(ROOT).as_posix() for path in (ROOT / directory).iterdir()
@@ -71,36 +73,26 @@ def main():
     subprocess.run([node, str(ROOT / 'scripts/bundle.mjs')], cwd=ROOT, check=True)
 
     version = json.loads((ROOT / 'package.json').read_text())['version']
-    manifest = json.loads((ROOT / 'manifest.json').read_text())
-    manifest['version'] = version
-    (ROOT / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n')
     skill = ROOT / 'skills/console-canvas'
     (ROOT / 'agent-guide.md').write_text((skill / 'SKILL.md').read_text())
     build_standalone(output)
 
     files = runtime_files()
-    archive = output / 'console-canvas-extension.zip'
+    archive = output / 'console-canvas-runtime.zip'
     write_archive(archive, ((name, (ROOT / name).read_bytes()) for name in files))
     (skill / 'assets').mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(archive, skill / 'assets/console-canvas-extension.zip')
-    chrome_archive = output / 'console-canvas-chrome.zip'
-    chrome_files = sorted((set(json.loads((ROOT / 'runtime-manifest.json').read_text())['public'])
-                           - {'preview.html'}) | {'manifest.json', 'background.js'})
-    write_archive(chrome_archive, ((name, (ROOT / name).read_bytes()) for name in chrome_files))
-    (output / 'chrome-package.json').write_text(json.dumps({
-        'version': version,
-        'archive': chrome_archive.name,
-        'sha256': hashlib.sha256(chrome_archive.read_bytes()).hexdigest(),
-        'files': {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
-                  for name in chrome_files},
-    }, indent=2) + '\n')
+    shutil.copyfile(archive, skill / 'assets/console-canvas-runtime.zip')
+    # Retired artifacts must not accidentally be included in a new release.
+    for retired in ('console-canvas-extension.zip', 'console-canvas-chrome.zip', 'chrome-package.json'):
+        (output / retired).unlink(missing_ok=True)
+    (skill / 'assets/console-canvas-extension.zip').unlink(missing_ok=True)
     skill_archive = output / 'console-canvas-skill.zip'
     write_archive(skill_archive, ((path.relative_to(skill).as_posix(), path.read_bytes())
                                  for path in sorted(skill.rglob('*'))
                                  if path.is_file() and '__pycache__' not in path.parts))
     print(json.dumps({
         'standalone': str(output / 'Console Canvas.html'),
-        'extension': str(archive), 'chrome': str(chrome_archive), 'skill': str(skill_archive),
+        'runtime': str(archive), 'skill': str(skill_archive),
         'files': len(files), 'bytes': archive.stat().st_size,
     }, ensure_ascii=False))
 

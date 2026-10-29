@@ -20,6 +20,7 @@ export type EditorCommand =
   | 'delete'
   | 'copy'
   | 'paste'
+  | 'capture-status'
   | 'properties'
   | 'comment'
   | 'snapshots'

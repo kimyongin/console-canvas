@@ -2,10 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { toolContract, validateToolArguments } from '../../tool-contract.js';
-import { createWebMcpClient } from '../../webmcp-client.js';
 import { createEditorController } from '../../editor-controller.js';
 
-test('Python MCP and native WebMCP consume identical resolved contracts', () => {
+test('Python MCP and editor consume identical resolved contracts', () => {
   const python = JSON.parse(
     execFileSync(
       'python3',
@@ -76,62 +75,4 @@ test('Image reads report render failure, size limit and concurrent revision chan
   };
   assert.equal((await execute()).error.code, 'revision_conflict');
   assert.deepEqual(state.undo, []);
-});
-
-test('Publication revokes queued commands and retries survive disable/enable', async () => {
-  const oldDocument = globalThis.document;
-  let metadata = { document_id: 'document-1', revision: 1 };
-  const registered = new Map();
-  const statuses = [];
-  let writes = 0;
-  globalThis.document = {
-    modelContext: {
-      registerTool(tool, { signal }) {
-        registered.set(tool.name, tool);
-        signal.addEventListener('abort', () => registered.delete(tool.name));
-      },
-    },
-  };
-  const client = createWebMcpClient({
-    controller: {
-      metadata: () => metadata,
-      execute: async () => {
-        writes++;
-        return { ok: true, persisted: true, screen: { revision: ++metadata.revision } };
-      },
-    },
-    onStatus: (status) => statuses.push(status),
-  });
-  try {
-    assert.equal(registered.size, 0);
-    await client.enable();
-    const tool = registered.get('console_canvas_apply_edits');
-    const args = {
-      editor_id: 'editor',
-      expected_revision: 1,
-      operation_id: 'one',
-      operations: [{ type: 'delete', element_id: 'n1' }],
-    };
-    const [a, b] = await Promise.all([tool.execute(args), tool.execute(args)]);
-    assert.deepEqual(a, b);
-    assert.equal(writes, 1);
-    client.disable();
-    assert.equal(registered.size, 0);
-    assert.equal((await tool.execute(args)).error.code, 'disconnected');
-    await client.enable();
-    assert.deepEqual(await registered.get(tool.name).execute(args), a);
-    assert.equal(writes, 1);
-    assert.equal(
-      (await registered.get(tool.name).execute({ ...args, expected_revision: 2 })).error.code,
-      'operation_id_reused',
-    );
-    metadata = { document_id: 'document-2', revision: 1 };
-    assert.equal((await registered.get(tool.name).execute(args)).error.code, 'wrong_document');
-    assert.equal(registered.size, 0);
-    assert.equal(writes, 1);
-    assert.equal(statuses.at(-1).enabled, false);
-  } finally {
-    client.disable();
-    globalThis.document = oldDocument;
-  }
 });

@@ -66,7 +66,7 @@ def main():
     runtime = resources / 'app'
     # Reuse the exact runtime already verified and packaged by build.py.
     import zipfile
-    with zipfile.ZipFile(ROOT / 'dist' / 'console-canvas-extension.zip') as package:
+    with zipfile.ZipFile(ROOT / 'dist' / 'console-canvas-runtime.zip') as package:
         for name in package.namelist():
             relative = name.removeprefix('console-canvas/')
             target = runtime / relative
