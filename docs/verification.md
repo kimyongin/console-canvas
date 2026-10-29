@@ -274,3 +274,7 @@ Chrome 확장/WebMCP 지원·신규 배포를 종료하고 소스를 archive와v
 최종 공통 Python45·Node41·Chromium508+standalone/실제 포인터, 정확한 배포 앱 SDK22+17개를 통과했다. native 스크롤바9개 회귀에서 자식 이동/코드 재구성의 기준 좌표 오류를 발견·수정했고 패키지 SDK의 계약 JSON 누락도 설치 전 발견·수정했다. 저장소 밖으로 추출한 MCP 시작을 별도 검사한다.
 
 실제0.25.0 설치/재실행·기존 편집 파일 전체 보존(생성/갱신 시각 제외,364요소/스냅샷3), 스킬4개 자동 갱신·이전 관리 runtime 백업·정리, runtime115개/스킬 ZIP 바이트 일치, 실제 설치 스킬의 읽기 전용 SDK0.25.0과 새 상태 응답 및 설치 앱 UI를 확인했다. 기존 Chrome93개 파일은 그대로다. 직접 교체 설치를 자기 업데이트 시험으로 표시하지 않으며 사용자 문서에 시험 편집을 적용하지 않았다. 증빙은 ignored local/desktop-only-025와 local/deployment-025-backup이다.
+
+배포 커밋 `f931ccf`, [v0.25.0 공개 프리릴리스](https://github.com/kimyongin/console-canvas/releases/tag/v0.25.0)의 앱 DMG/ZIP·runtime·skill4개 자산 원격 digest가 로컬 SHA-256과 모두 일치한다. #71/#72 완료, #73/#68 열림 유지.
+
+실제 설치 앱의 공개 릴리스 조회에서 “최신 버전입니다”를 확인하고 기존 편집 화면으로 돌아왔다.
