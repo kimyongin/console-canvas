@@ -870,6 +870,43 @@
   max-height: 240px;
   overflow: auto;
 }
+.ai-followup-settings {
+  min-width: 0;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.ai-followup-details > summary {
+  display: list-item;
+  cursor: pointer;
+  margin: 8px 0;
+}
+.ai-followup-summary {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.ai-followup-details[open] + .ai-followup-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding: 8px 0;
+  background: #fff;
+  border-top: 1px solid var(--line);
+}
+.ai-followup-settings legend {
+  padding: 0 4px;
+  font-weight: 600;
+}
+.ai-followup-settings textarea {
+  min-height: 72px;
+  max-height: 200px;
+  resize: vertical;
+}
 
 #editor-root .canvas-footer #fit {
   display: inline-flex;

@@ -505,6 +505,24 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
 
   await aiPanel.cancelJobs();
   await flushEditor();
+  const outgoingRevision = state.revision,
+    outgoingNote = $('#review-note').value,
+    outgoingComment = $('#component-comment').value;
+  const documentName = snapshot.documentName
+    ? cleanDocumentName(snapshot.documentName)
+    : existingMeta?.title && existingMeta.title !== snapshot.source.title
+      ? existingMeta.title
+      : undefined;
+  await saveCapture({ ...snapshot, ...(documentName ? { documentName } : {}) });
+  if (
+    state.revision !== outgoingRevision ||
+    $('#review-note').value !== outgoingNote ||
+    $('#component-comment').value !== outgoingComment
+  )
+    await flushEditor();
+  // Close callbacks must already belong to an obsolete document generation.
+  // Keep the current task open if saving the incoming capture fails.
+  const generation = ++state.generation;
   areaSelection.reset();
   clipboard.reset();
   commentEditor.reset();
@@ -515,15 +533,10 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
     '#properties-dialog',
     '#ai-dialog',
     '#implementation-dialog',
+    '#rename-dialog',
+    '#snapshot-save-dialog',
   ])
     if ($(id).open) $(id).close();
-  const documentName = snapshot.documentName
-    ? cleanDocumentName(snapshot.documentName)
-    : existingMeta?.title && existingMeta.title !== snapshot.source.title
-      ? existingMeta.title
-      : undefined;
-  await saveCapture({ ...snapshot, ...(documentName ? { documentName } : {}) });
-  const generation = ++state.generation;
   commitCommentDraft();
   state.commentTarget = null;
   state.ready = false;

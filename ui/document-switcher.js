@@ -197,12 +197,12 @@ export function createDocumentSwitcher({
       '개 화면' +
       (matches.length > (query ? 20 : 5) ? ' · 더 보려면 전체 목록을 여세요.' : '');
   }
-  async function show(trashView = false) {
+  async function show(trashView = false, query = '') {
     if (state.scene?.drag || state.scene?.areaSelecting || loading) return;
     commitCommentDraft();
     menu.hidePopover();
     deleted = trashView;
-    $('#document-search').value = '';
+    $('#document-search').value = query;
     renderDocumentRows(list, [], true);
     status.textContent = '저장된 화면을 불러오는 중…';
     dialog.showModal();
@@ -221,7 +221,9 @@ export function createDocumentSwitcher({
       status.textContent = error.message;
     }
   }
-  $('#documents-button').addEventListener('click', () => show());
+  $('#documents-button').addEventListener('click', () =>
+    show(false, menu.matches(':popover-open') ? $('#quick-document-search').value : ''),
+  );
   $('#documents-trash-button').addEventListener('click', () => show(true));
   $('#rename-current').addEventListener('click', () => {
     menu.hidePopover();

@@ -262,6 +262,9 @@ export function createVersionPreview({ $, state, commitCommentDraft, adapter }) 
           x: graph.scrollLeft,
           y: graph.scrollTop,
           scroll: panel.scrollTop,
+          query: $('#snapshot-search').value,
+          zoom: $('#snapshot-preview-zoom').value,
+          focus: document.activeElement,
         }
       : null;
     for (const side of ['left', 'right']) {
@@ -313,17 +316,32 @@ export function createVersionPreview({ $, state, commitCommentDraft, adapter }) 
       target &&
       target.doc === state.snapshot?.id &&
       target.generation === state.generation &&
-      target.selected === state.snapshotPreviewId
+      target.selected === state.snapshotPreviewId &&
+      state.timeline?.entries.some((e) => e.id === target.selected && !e.deletedAt) &&
+      !document.querySelector('dialog:modal')
     ) {
+      $('#snapshot-search').value = target.query;
+      $('#snapshot-preview-zoom').value = target.zoom;
       $('#snapshot-panel').showPopover();
+      $('#snapshot-search').dispatchEvent(new Event('input', { bubbles: true }));
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          if (state.snapshot?.id !== target.doc) return;
+          if (
+            state.snapshot?.id !== target.doc ||
+            state.generation !== target.generation ||
+            state.snapshotPreviewId !== target.selected ||
+            !$('#snapshot-panel').matches(':popover-open') ||
+            document.querySelector('dialog:modal')
+          )
+            return;
           const g = $('#snapshot-graph-scroll');
           g.scrollLeft = target.x;
           g.scrollTop = target.y;
           $('#snapshot-panel').scrollTop = target.scroll;
-          $('#snapshot-list [data-snapshot-id="' + target.selected + '"]')?.focus({
+          const focus = target.focus?.isConnected
+            ? target.focus
+            : $('#snapshot-list [data-snapshot-id="' + target.selected + '"]');
+          focus?.focus({
             preventScroll: true,
           });
         });

@@ -85,6 +85,7 @@ async function main() {
     'ux-followup-032',
     'ux-followup-033',
     'ux-followup-034',
+    'ux-followup-035',
   ]) {
     if (
       process.env.CONSOLE_CANVAS_TEST_SUITES &&

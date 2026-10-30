@@ -11,7 +11,8 @@ export function createAiPanel({ $, state, manager, adapter, toast, save, checkpo
   const jobs = new Set();
   let epoch = 0,
     newRequest = false;
-  const selections = new Map();
+  const selections = new Map(),
+    followups = new Map();
   const connectionContent = $('#mcp-content'),
     connectionHome = connectionContent.parentElement;
   let connectionReturn = null;
@@ -80,6 +81,14 @@ export function createAiPanel({ $, state, manager, adapter, toast, save, checkpo
     remembered: () => selections.get(state.snapshot.id) || {},
     remember(value) {
       selections.set(state.snapshot.id, value);
+    },
+    followup(id) {
+      return followups.get(state.snapshot.id)?.get(id) || null;
+    },
+    rememberFollowup(id, value) {
+      const drafts = followups.get(state.snapshot.id) || new Map();
+      drafts.set(id, { ...cleanAiDraft(value), count: value.count });
+      followups.set(state.snapshot.id, drafts);
     },
     connection: () => $('#mcp-button').classList.contains('connected'),
     connect() {

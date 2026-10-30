@@ -435,6 +435,16 @@ export function createSnapshotPanel({
           const panel = $('#snapshot-panel'),
             graph = $('#snapshot-graph-scroll');
           const position = { left: graph.scrollLeft, top: graph.scrollTop, panel: panel.scrollTop };
+          const query = $('#snapshot-search').value,
+            zoom = $('#snapshot-preview-zoom').value,
+            sceneGeneration = state.generation,
+            selectedId = state.snapshotPreviewId;
+          const valid = () =>
+            state.ready &&
+            state.snapshot?.id === doc &&
+            state.generation === sceneGeneration &&
+            state.snapshotPreviewId === selectedId &&
+            state.timeline?.entries.some((e) => e.id === entry.id && !e.deletedAt);
           renameDialog.open(
             '스냅샷 이름 변경',
             entry.name,
@@ -444,18 +454,29 @@ export function createSnapshotPanel({
               toast('스냅샷 이름을 변경했습니다.');
             },
             () => {
-              if (state.snapshot?.id !== doc) return;
+              if (!valid() || document.querySelector('dialog:modal')) return;
+              $('#snapshot-search').value = query;
+              $('#snapshot-preview-zoom').value = zoom;
               showSnapshots();
-              requestAnimationFrame(() => {
-                graph.scrollLeft = position.left;
-                graph.scrollTop = position.top;
-                panel.scrollTop = position.panel;
-                panel
-                  .querySelector('[data-snapshot-id="' + entry.id + '"]')
-                  ?.closest('.snapshot-card')
-                  ?.querySelector('.more-actions')
-                  ?.focus({ preventScroll: true });
-              });
+              search();
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() => {
+                  if (
+                    !valid() ||
+                    !panel.matches(':popover-open') ||
+                    document.querySelector('dialog:modal')
+                  )
+                    return;
+                  graph.scrollLeft = position.left;
+                  graph.scrollTop = position.top;
+                  panel.scrollTop = position.panel;
+                  panel
+                    .querySelector('[data-snapshot-id="' + entry.id + '"]')
+                    ?.closest('.snapshot-card')
+                    ?.querySelector('.more-actions')
+                    ?.focus({ preventScroll: true });
+                }),
+              );
             },
           );
         },

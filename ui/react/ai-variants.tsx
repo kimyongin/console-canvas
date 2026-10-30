@@ -38,6 +38,8 @@ interface Actions {
   currentCandidate(request: string): string;
   remembered(): { requestId?: string; candidateId?: string };
   remember(value: { requestId: string; candidateId: string }): void;
+  followup(id: string): Draft | null;
+  rememberFollowup(id: string, value: Draft): void;
   connection(): boolean;
   connect(): void;
   create(value: {
@@ -182,15 +184,64 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
     [previewZoom, setPreviewZoom] = useState('fit'),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState(''),
+    [expandedFollowups, setExpandedFollowups] = useState<Record<string, boolean>>({}),
     promptField = useRef<HTMLTextAreaElement>(null),
     creating = useRef(false),
-    previousDraft = useRef<Draft | null>(null);
+    regenerating = useRef(false),
+    previousDraft = useRef<Draft | null>(null),
+    [, setFollowupRevision] = useState(0);
   const request = requests.find((r) => r.id === requestId),
     candidate = request?.candidates.find((c) => c.id === candidateId) || request?.candidates[0];
   const currentCandidateId = request ? actions.currentCandidate(request.id) : '';
   const context = actions.context();
+  const followup = request
+    ? actions.followup(request.id) || {
+        prompt: request.prompt,
+        count: request.count,
+        route: request.route || 'mcp',
+      }
+    : null;
+  const followupBlocked = followup?.route === 'api' && !configured;
+  const followupInvalid =
+    !!followup && (!Number.isInteger(followup.count) || followup.count < 1 || followup.count > 12);
+  function updateFollowup(value: Partial<Draft>) {
+    if (!request || !followup) return;
+    actions.rememberFollowup(request.id, { ...followup, ...value });
+    setFollowupRevision((n) => n + 1);
+  }
+  function openApiSettings() {
+    setFormOpen(true);
+    setAuthOpen(true);
+    requestAnimationFrame(() => document.getElementById('ai-api-key')?.focus());
+  }
+  async function regenerate(fromCandidate: boolean) {
+    if (
+      regenerating.current ||
+      !request ||
+      !followup ||
+      followupBlocked ||
+      followupInvalid ||
+      (fromCandidate && !candidate)
+    )
+      return;
+    regenerating.current = true;
+    try {
+      await run(async () => {
+        const next = await actions.create({
+          ...followup,
+          basis_request_id: request.id,
+          ...(fromCandidate ? { basis_candidate_id: candidate?.id } : {}),
+        });
+        setRequestId(next.id);
+        setCandidateId('');
+        actions.remember({ requestId: next.id, candidateId: '' });
+      });
+    } finally {
+      regenerating.current = false;
+    }
+  }
   useEffect(() => {
-    if (formOpen) promptField.current?.focus();
+    if (formOpen && !authOpen) promptField.current?.focus();
   }, [formOpen]);
   async function createRequest(copyText: boolean) {
     if (creating.current) return;
@@ -329,13 +380,7 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
                 : 'MCP 연결 안 됨 · 요청은 보관할 수 있으며 연결 후 에이전트 대화에 전달하세요.'}
           </p>
           {route === 'api' && !configured && (
-            <Button
-              id="ai-open-auth"
-              onClick={() => {
-                setAuthOpen(true);
-                requestAnimationFrame(() => document.getElementById('ai-api-key')?.focus());
-              }}
-            >
+            <Button id="ai-open-auth" onClick={openApiSettings}>
               API 키·모델 설정
             </Button>
           )}
@@ -507,48 +552,98 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
                       : ''}
                   </p>
                 )}
-                <div className="ai-request-actions">
+                {followup && (
+                  <details
+                    className="ai-followup-details"
+                    key={request.id}
+                    open={!!expandedFollowups[request.id]}
+                    onToggle={(e) => {
+                      const element = e.currentTarget;
+                      setExpandedFollowups((previous) => ({
+                        ...previous,
+                        [request.id]: element.open,
+                      }));
+                      if (element.open)
+                        requestAnimationFrame(() => {
+                          if (element.isConnected && element.open)
+                            element.querySelector('textarea')?.focus();
+                        });
+                    }}
+                  >
+                    <summary>
+                      <strong>추가 생성 설정</strong>
+                      <span className="ai-followup-summary" title={followup.prompt}>
+                        {followup.route === 'api' ? 'AI API · 별도 과금' : '외부 에이전트 · MCP'} ·{' '}
+                        {followup.count || '개수 확인'}개 ·{' '}
+                        {followup.prompt || '현재 기준의 주석 사용'}
+                      </span>
+                    </summary>
+                    <fieldset className="ai-followup-settings" disabled={busy}>
+                      <legend>이 요청에서 추가 생성</legend>
+                      <p className="ai-help">
+                        새 시안 요청의 초안과 별개입니다. 아래 문장·개수·실행 방식으로 생성합니다.
+                      </p>
+                      <label htmlFor="ai-followup-prompt">추가 생성 요청</label>
+                      <Textarea
+                        id="ai-followup-prompt"
+                        value={followup.prompt}
+                        maxLength={8000}
+                        onChange={(e) => updateFollowup({ prompt: e.target.value })}
+                      />
+                      <div className="ai-request-actions">
+                        <label>
+                          실행 방식
+                          <NativeSelect
+                            id="ai-followup-route"
+                            value={followup.route}
+                            onChange={(e) => updateFollowup({ route: e.target.value })}
+                          >
+                            <option value="mcp">외부 에이전트 · MCP</option>
+                            <option value="api">AI API 직접 호출 · 별도 과금</option>
+                          </NativeSelect>
+                        </label>
+                        <label>
+                          시안 수
+                          <Input
+                            id="ai-followup-count"
+                            type="number"
+                            min={1}
+                            max={12}
+                            value={followup.count || ''}
+                            onChange={(e) => updateFollowup({ count: Number(e.target.value) })}
+                          />
+                        </label>
+                      </div>
+                      {followupInvalid && (
+                        <p role="status" className="ai-help">
+                          시안 수는 1~12개로 입력해 주세요.
+                        </p>
+                      )}
+                    </fieldset>
+                  </details>
+                )}
+                <div className="ai-request-actions ai-followup-actions">
                   <Button
                     id="ai-regenerate-baseline"
-                    disabled={busy || apiBlocked}
-                    onClick={() =>
-                      run(async () => {
-                        const next = await actions.create({
-                          prompt: prompt || request.prompt,
-                          count,
-                          route,
-                          basis_request_id: request.id,
-                        });
-                        setRequestId(next.id);
-                        setCandidateId('');
-                      })
-                    }
+                    disabled={busy || followupBlocked || followupInvalid}
+                    onClick={() => regenerate(false)}
                   >
                     같은 기준으로 추가 생성
                   </Button>
                   <Button
                     id="ai-regenerate-candidate"
-                    disabled={busy || !candidate || apiBlocked}
-                    onClick={() =>
-                      run(async () => {
-                        const next = await actions.create({
-                          prompt: prompt || request.prompt,
-                          count,
-                          route,
-                          basis_request_id: request.id,
-                          basis_candidate_id: candidate?.id,
-                        });
-                        setRequestId(next.id);
-                        setCandidateId('');
-                      })
-                    }
+                    disabled={busy || !candidate || followupBlocked || followupInvalid}
+                    onClick={() => regenerate(true)}
                   >
                     선택 시안에서 추가 생성
                   </Button>
                 </div>
-                {apiBlocked && (
+                {followupBlocked && (
                   <p className="ai-help">
-                    API로 추가 생성하려면 새 시안 요청에서 키와 모델을 등록하세요.
+                    API로 추가 생성하려면 키와 모델을 먼저 등록하세요. 별도 API 사용량이 청구됩니다.
+                    <Button id="ai-followup-open-auth" disabled={busy} onClick={openApiSettings}>
+                      API 키·모델 설정
+                    </Button>
                   </p>
                 )}
               </details>
