@@ -57,7 +57,8 @@ try {
   await until(() => doc.querySelector('#source-compare-clone iframe'));
   check(
     'Actual photo and before-copy are named separately',
-    doc.querySelector('#source-compare-dialog').open &&
+    doc.querySelector('#capture-status-dialog').open &&
+      !doc.querySelector('#source-compare-dialog').hidden &&
       doc.querySelector('#source-compare-clone-label').textContent === '편집 전 복제본',
   );
   check(
@@ -72,7 +73,7 @@ try {
     doc.querySelector('#source-compare-grid').classList.contains('overlay') &&
       !doc.querySelector('#source-compare-blend-label').hidden,
   );
-  doc.querySelector('#source-compare-dialog').close();
+  doc.querySelector('#capture-task-close').click();
   check('Comparing never mutates saved capture', JSON.stringify(snapshot) === original);
   const target = snapshot.nodes.find((n) => n.locator.id === 'new-customer'),
     rect = {

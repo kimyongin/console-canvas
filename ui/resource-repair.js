@@ -11,21 +11,21 @@ export function createResourceRepair({
   historyBefore,
   changeCommitted,
   toast,
+  workspace,
 }) {
   let generation = 0,
     identity = null,
     patches = [],
     items = [],
     busy = false;
-  const list = $('#repair-assets-results'),
-    dialog = $('#repair-assets-dialog');
+  const list = $('#repair-assets-results');
   const valid = () =>
-    dialog.open &&
+    workspace.active('repair') &&
     state.ready &&
     identity?.document === state.snapshot.id &&
     identity?.revision === state.revision;
   const current = (token) => {
-    if (token !== generation || !dialog.open) return false;
+    if (token !== generation || !workspace.active('repair')) return false;
     if (!valid()) {
       $('#repair-assets-status').textContent =
         '편집 상태가 바뀌었습니다. 복구 창을 다시 열어 주세요.';
@@ -177,8 +177,7 @@ export function createResourceRepair({
       '최대 16개까지 선택해 읽습니다. 준비된 결과는 재시도해도 유지됩니다.';
     $('#repair-assets-apply').disabled = true;
     clearReact($('#repair-assets-preview'));
-    $('#capture-status-dialog').close();
-    dialog.showModal();
+    workspace.show('repair');
   }
   $('#repair-assets-fetch').addEventListener('click', () =>
     read(items.filter((i) => i.selected && !i.data).map((i) => i.url)),
@@ -201,13 +200,13 @@ export function createResourceRepair({
       historyBefore();
       state.scene.setCodePatches(next, state.scene.edits, state.scene.annotations);
       changeCommitted({ label: '이미지·폰트 복구' });
-      dialog.close();
+      workspace.back();
       toast('자산 복구를 적용했습니다. 실행 취소하거나 스냅샷으로 보관할 수 있습니다.');
     } catch (error) {
       $('#repair-assets-status').textContent = error.message;
     }
   });
-  dialog.addEventListener('close', () => {
+  workspace.onLeave('repair', () => {
     generation++;
     patches = [];
     items = [];

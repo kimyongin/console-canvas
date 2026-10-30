@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { getDocument, documentSummary } from '../../db.js';
 import { withVersionScene } from '../version-preview.js';
 import { renderReact } from './mount';
 import { Button } from './components/button';
+import { Input } from './components/input';
 import { ActionMenu, type MenuAction } from './components/action-menu';
 export interface LayerRow {
   id: string;
@@ -160,6 +161,7 @@ export interface DocumentRow {
   disabled: boolean;
   open: () => void;
   actions: MenuAction[];
+  rename?: (name: string) => Promise<void>;
   recovery?: { label: string; kind: string; run: () => unknown }[];
 }
 export function renderDocumentRows(host: Element, rows: DocumentRow[], loading: boolean) {
@@ -167,42 +169,130 @@ export function renderDocumentRows(host: Element, rows: DocumentRow[], loading: 
     host,
     <>
       {rows.map((row) => (
-        <div className="document-card" key={row.id} data-document-card={row.id}>
-          <Button
-            variant="ghost"
-            className="document-item"
-            size="content"
-            disabled={row.disabled}
-            data-document-id={row.id}
-            aria-current={row.current ? 'true' : undefined}
-            title={row.captured}
-            onClick={row.open}
-          >
-            <DocumentVisual id={row.id} summary={row.summary} />
-            <strong>{row.title + (row.current ? ' · 현재 작업' : '')}</strong>
-            <span>{row.url}</span>
-            <small>{row.date}</small>
-          </Button>
-          <ActionMenu label={row.title} actions={row.actions} disabled={loading} />
-          {row.recovery && (
-            <div className="recovery-actions">
-              {row.recovery.map((item) => (
-                <Button
-                  variant="outline"
-                  key={item.kind}
-                  data-document-action={item.kind}
-                  disabled={loading}
-                  aria-label={row.title + ' · ' + item.label}
-                  onClick={item.run}
-                >
-                  {item.label}
-                </Button>
-              ))}
-            </div>
-          )}
-        </div>
+        <DocumentCard key={row.id} row={row} loading={loading} />
       ))}
     </>,
+  );
+}
+function DocumentCard({ row, loading }: { row: DocumentRow; loading: boolean }) {
+  const [editing, setEditing] = useState(false),
+    [name, setName] = useState(row.title),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(''),
+    field = useRef<HTMLInputElement>(null),
+    card = useRef<HTMLDivElement>(null),
+    wasEditing = useRef(false);
+  useLayoutEffect(() => {
+    if (editing) {
+      field.current?.focus();
+      field.current?.select();
+    } else if (wasEditing.current)
+      card.current?.querySelector<HTMLButtonElement>('.more-actions')?.focus();
+    wasEditing.current = editing;
+  }, [editing]);
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (busy || !row.rename) return;
+    if (!name.trim() || name.trim().length > 120) {
+      setError('이름은 1~120자로 입력해 주세요.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      await row.rename(name.trim());
+      setEditing(false);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="document-card" ref={card} data-document-card={row.id}>
+      <Button
+        variant="ghost"
+        className="document-item"
+        size="content"
+        disabled={row.disabled}
+        data-document-id={row.id}
+        aria-current={row.current ? 'true' : undefined}
+        title={row.captured}
+        onClick={row.open}
+        hidden={editing}
+      >
+        <DocumentVisual id={row.id} summary={row.summary} />
+        <strong>{row.title + (row.current ? ' · 현재 작업' : '')}</strong>
+        <span>{row.url}</span>
+        <small>{row.date}</small>
+      </Button>
+      {editing && (
+        <form
+          className="document-inline-rename"
+          noValidate
+          onSubmit={submit}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              e.stopPropagation();
+              if (!busy) setEditing(false);
+            }
+          }}
+        >
+          <label htmlFor={'document-name-' + row.id}>화면 이름</label>
+          <Input
+            id={'document-name-' + row.id}
+            ref={field}
+            value={name}
+            maxLength={120}
+            disabled={busy}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <small>{row.url}</small>
+          {error && <p role="alert">{error}</p>}
+          <div>
+            <Button type="button" disabled={busy} onClick={() => setEditing(false)}>
+              취소
+            </Button>
+            <Button type="submit" disabled={busy}>
+              {busy ? '저장 중…' : '저장'}
+            </Button>
+          </div>
+        </form>
+      )}
+      <ActionMenu
+        label={row.title}
+        actions={row.actions.map((a) =>
+          a.kind === 'rename' && row.rename
+            ? {
+                ...a,
+                run: () => {
+                  setName(row.title);
+                  setError('');
+                  setEditing(true);
+                },
+              }
+            : a,
+        )}
+        disabled={loading || editing}
+      />
+      {row.recovery && (
+        <div className="recovery-actions">
+          {row.recovery.map((item) => (
+            <Button
+              variant="outline"
+              key={item.kind}
+              data-document-action={item.kind}
+              disabled={loading}
+              aria-label={row.title + ' · ' + item.label}
+              onClick={item.run}
+            >
+              {item.label}
+            </Button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 export function renderPath(

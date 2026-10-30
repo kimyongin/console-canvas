@@ -32,6 +32,7 @@ export function createExportDialog({
       document: state.snapshot.id,
       generation: state.generation,
       scroll: $('.export-scroll').scrollTop,
+      id,
     };
     $('#export-dialog').close();
     focusComment({ id });
@@ -48,7 +49,17 @@ export function createExportDialog({
       $('#handoff-version').value = '@current';
       $('#export-dialog').showModal();
       await refresh();
+      if (
+        !$('#export-dialog').open ||
+        target.document !== state.snapshot?.id ||
+        target.generation !== state.generation
+      )
+        return;
       $('.export-scroll').scrollTop = target.scroll;
+      const trigger = [...$('#handoff-items').querySelectorAll('[data-request-id]')].find(
+        (e) => e.dataset.requestId === target.id,
+      );
+      (trigger || $('#handoff-version')).focus({ preventScroll: true });
     } catch (error) {
       toast(error.message);
     }

@@ -44,10 +44,8 @@ try {
   );
   check(
     'No fabricated visual score is displayed',
-    doc
-      .querySelector('#capture-status-dialog')
-      .textContent.includes('일치율은 측정하지 않았습니다') &&
-      !/95%|100%/.test(doc.querySelector('#capture-status-dialog').textContent),
+    doc.querySelector('#capture-info-view').textContent.includes('일치율은 측정하지 않았습니다') &&
+      !/95%|100%/.test(doc.querySelector('#capture-info-view').textContent),
   );
   const controller = await app.controller.execute({
     name: 'get_screen',

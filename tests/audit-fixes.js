@@ -234,7 +234,7 @@ try {
     $('#implementation-results-visual .document-thumbnail iframe').getAttribute('sandbox') ===
       'allow-same-origin',
   );
-  $('#implementation-results-visual').hidePopover();
+  click('#implementation-results-back');
   $('#implementation-result').value = resultDocument.id;
   $('#implementation-result').dispatchEvent(new w.Event('change', { bubbles: true }));
   await until(

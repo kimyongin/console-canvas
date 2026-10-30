@@ -171,11 +171,12 @@ try {
     'Opening visual picker puts keyboard focus in search',
     d.activeElement === $('#implementation-result-search'),
   );
-  click('[aria-label="구현 결과 목록 닫기"]');
+  click('#implementation-results-back');
+  await tick();
   check(
     'Explicit close returns focus to its trigger',
     d.activeElement === $('#implementation-visual-picker') &&
-      !$('#implementation-results-visual').matches(':popover-open'),
+      $('#implementation-results-visual').hidden,
   );
   $('#implementation-dialog').close();
   await a.state.saving;
@@ -225,15 +226,15 @@ try {
   await until(() => d.activeElement === $('#implementation-visual-picker'));
   check(
     'Selecting a visual result uses the chosen capture and closes the list',
-    !$('#implementation-results-visual').matches(':popover-open') &&
+    $('#implementation-results-visual').hidden &&
       a.state.implementationReviews.at(-1).result.snapshot.source.url.endsWith('/release-final'),
   );
   click('#implementation-visual-picker');
   await tick();
   check(
-    'Reopening picker clears the previous filter',
-    !$('#implementation-result-search').value &&
-      d.querySelectorAll('.result-visual-row').length === 2,
+    'Reopening inline picker preserves the previous filter',
+    $('#implementation-result-search').value === 'release-final' &&
+      d.querySelectorAll('.result-visual-row').length === 1,
   );
   $('#implementation-dialog').close();
 

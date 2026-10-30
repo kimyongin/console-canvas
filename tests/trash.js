@@ -36,7 +36,16 @@ try {
   click('#documents-button');
   await until(() => doc.querySelector('[data-document-card="' + id + '"]'));
   click('[data-document-card="' + id + '"] [data-document-action="rename"]');
-  await named('고객 화면 · 첫 시안');
+  await until(() => doc.querySelector('.document-inline-rename input'));
+  const inlineName = doc.querySelector('.document-inline-rename input');
+  Object.getOwnPropertyDescriptor(frame.contentWindow.HTMLInputElement.prototype, 'value').set.call(
+    inlineName,
+    '고객 화면 · 첫 시안',
+  );
+  inlineName.dispatchEvent(new frame.contentWindow.Event('input', { bubbles: true }));
+  doc.querySelector('.document-inline-rename').requestSubmit();
+  await until(() => !doc.querySelector('.document-inline-rename'));
+
   check(
     'Document rename updates metadata and editor labels without changing original capture',
     (await getDocumentMetadata(id)).title === '고객 화면 · 첫 시안' &&

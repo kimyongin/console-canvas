@@ -2,7 +2,7 @@ import { buildCapturedPhoto, hasCapturedPhoto } from '../capture-reference.js';
 import { withVersionScene } from './version-preview.js';
 import { renderVersionFrame } from './react/versions.tsx';
 import { clearReact } from './react/mount.tsx';
-export function createSourceComparison({ $, state, adapter, commitCommentDraft }) {
+export function createSourceComparison({ $, state, adapter, commitCommentDraft, workspace }) {
   let generation = 0,
     photo = null,
     clone = null,
@@ -34,11 +34,12 @@ export function createSourceComparison({ $, state, adapter, commitCommentDraft }
   async function renderClone(token) {
     const point = $('#source-compare-version').value === 'baseline' ? {} : frozen;
     const result = await withVersionScene(state.snapshot, point, (scene) => scene.preview());
+    if (token !== generation || !workspace.active('source')) return;
     const reference = await buildCapturedPhoto(state.snapshot, {
       ...result.origin,
       ...result.size,
     });
-    if (token !== generation || !$('#source-compare-dialog').open) return;
+    if (token !== generation || !workspace.active('source')) return;
     clone = result;
     photo = reference;
     $('#source-compare-clone-label').textContent =
@@ -72,7 +73,7 @@ export function createSourceComparison({ $, state, adapter, commitCommentDraft }
     $('#source-compare-mode').value = 'side';
     mode();
     $('#source-compare-status').textContent = '가져오기 당시 사진을 준비하고 있습니다…';
-    $('#source-compare-dialog').showModal();
+    workspace.show('source');
     try {
       await renderClone(token);
     } catch (error) {
@@ -97,15 +98,17 @@ export function createSourceComparison({ $, state, adapter, commitCommentDraft }
       if (Math.abs(other.scrollTop - host(side).scrollTop) > 1)
         other.scrollTop = host(side).scrollTop;
     });
-  $('#source-compare-version').addEventListener('change', () =>
-    renderClone(++generation).catch(
-      (error) => ($('#source-compare-status').textContent = error.message),
-    ),
-  );
+  $('#source-compare-version').addEventListener('change', () => {
+    const token = ++generation;
+    renderClone(token).catch((error) => {
+      if (token === generation && workspace.active('source'))
+        $('#source-compare-status').textContent = error.message;
+    });
+  });
   $('#source-compare-zoom').addEventListener('change', draw);
   $('#source-compare-mode').addEventListener('change', mode);
   $('#source-compare-blend').addEventListener('input', mode);
-  $('#source-compare-dialog').addEventListener('close', () => {
+  workspace.onLeave('source', () => {
     generation++;
     photo = null;
     clone = null;
@@ -113,7 +116,6 @@ export function createSourceComparison({ $, state, adapter, commitCommentDraft }
     clearReact(host('clone'));
   });
   adapter.register('source-compare', () => {
-    if ($('#capture-status-dialog').open) $('#capture-status-dialog').close();
     return open();
   });
   return { open };

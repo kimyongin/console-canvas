@@ -53,6 +53,7 @@ async function main() {
   const reports = [];
   for (const suite of [
     'ux-followup-029',
+    'modal-navigation',
     'iframes',
     'capture-quality',
     'layout',

@@ -917,3 +917,108 @@
     grid-row: 1 / span 2;
   }
 }
+
+/* Subtasks share the existing modal surface instead of adding floating work windows. */
+.implementation-workspace {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 10px;
+}
+#editor-root #implementation-results-visual {
+  position: static;
+  inset: auto;
+  width: auto;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  gap: 8px;
+}
+.result-picker-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.result-picker-heading {
+  margin: 0;
+}
+.document-inline-rename {
+  padding: 16px;
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+.document-inline-rename small {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+.document-inline-rename > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.document-inline-rename [role='alert'] {
+  color: #a7374d;
+  margin: 0;
+}
+#editor-root #capture-status-dialog {
+  width: min(1320px, 96vw);
+  height: 90dvh;
+  max-height: 94dvh;
+  padding: 20px;
+  box-sizing: border-box;
+}
+.capture-task-navigation,
+.task-page-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.capture-task-navigation form {
+  margin-left: auto;
+}
+#editor-root #capture-status-dialog .capture-task-page {
+  width: auto;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  margin: 0;
+  padding: 0;
+}
+#ai-connection-page {
+  padding: 20px;
+  min-height: 300px;
+}
+#ai-connection-host {
+  max-width: 680px;
+  margin: auto;
+}
+#editor-root #ai-dialog[data-page='connection'] {
+  width: min(1320px, 96vw);
+  height: 90dvh;
+}
+.result-picker-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+@media (max-width: 760px) {
+  .result-picker-heading {
+    align-items: flex-start;
+  }
+  .result-picker-actions {
+    justify-content: flex-end;
+  }
+}

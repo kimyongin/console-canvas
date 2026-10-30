@@ -155,6 +155,20 @@ export function createDocumentSwitcher({
         captured: '가져옴 ' + new Date(value.capturedAt).toLocaleString('ko-KR'),
         current,
         disabled: loading || deleted,
+        rename: (name) =>
+          action(async () => {
+            const scroll = list.scrollTop;
+            await flushEditor();
+            await renameDocument(value.id, name);
+            if (value.id === state.snapshot?.id) renameCurrent(name);
+            if (dialog.open) {
+              await reload();
+              list.scrollTop = scroll;
+              if (!list.querySelector('[data-document-card="' + value.id + '"]'))
+                $('#document-search').focus();
+            }
+            toast('문서 이름을 변경했습니다.');
+          }, true),
         open: () => {
           if (menu.matches(':popover-open')) menu.hidePopover();
           if (current) dialog.close();

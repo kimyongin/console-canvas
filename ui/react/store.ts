@@ -12,6 +12,9 @@ export interface EditorView {
   save: { pending: boolean; error: string | null; message: string };
 }
 export type EditorCommand =
+  | 'capture-back'
+  | 'ai-connection-back'
+  | 'ai-connection-close'
   | 'layer-search-clear'
   | 'handoff-retry'
   | 'implementation-review'

@@ -94,7 +94,9 @@ function Preview({
   const [bounds, setBounds] = useState({ width: 460, height: 350 });
   useLayoutEffect(() => {
     const host = viewport.current!;
-    const measure = () => setBounds({ width: host.clientWidth, height: host.clientHeight });
+    const measure = () => {
+      if (host.clientWidth) setBounds({ width: host.clientWidth, height: host.clientHeight });
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(host);

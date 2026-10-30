@@ -12,6 +12,39 @@ export function createAiPanel({ $, state, manager, adapter, toast, save, checkpo
   let epoch = 0,
     newRequest = false;
   const selections = new Map();
+  const connectionContent = $('#mcp-content'),
+    connectionHome = connectionContent.parentElement;
+  let connectionReturn = null;
+  function returnFromConnection(focus = true) {
+    if (!connectionReturn) return;
+    const target = connectionReturn;
+    connectionReturn = null;
+    connectionHome.append(connectionContent);
+    $('#ai-connection-page').hidden = true;
+    $('#ai-dialog-content').hidden = false;
+    $('#ai-dialog').removeAttribute('data-page');
+    if (
+      !focus ||
+      !$('#ai-dialog').open ||
+      target.document !== state.snapshot?.id ||
+      target.generation !== state.generation
+    )
+      return;
+    for (const [element, top, left] of target.scroll)
+      if (element.isConnected) {
+        element.scrollTop = top;
+        element.scrollLeft = left;
+      }
+    ($('#ai-connect-agent') || $('#ai-close'))?.focus({ preventScroll: true });
+  }
+  adapter.register('ai-connection-back', () => returnFromConnection());
+  adapter.register('ai-connection-close', () => $('#ai-dialog').close());
+  $('#ai-dialog').addEventListener('cancel', (event) => {
+    if (connectionReturn) {
+      event.preventDefault();
+      returnFromConnection();
+    }
+  });
   const actions = {
     apiStatus: provider.status,
     draft: () => cleanAiDraft(state.aiDraft),
@@ -48,8 +81,18 @@ export function createAiPanel({ $, state, manager, adapter, toast, save, checkpo
     },
     connection: () => $('#mcp-button').classList.contains('connected'),
     connect() {
-      $('#ai-dialog').close();
-      $('#mcp-button').click();
+      connectionReturn = {
+        document: state.snapshot.id,
+        generation: state.generation,
+        scroll: [$('#ai-dialog'), ...$('#ai-dialog-content').querySelectorAll('*')]
+          .filter((e) => e.scrollTop || e.scrollLeft)
+          .map((e) => [e, e.scrollTop, e.scrollLeft]),
+      };
+      $('#ai-dialog-content').hidden = true;
+      $('#ai-connection-host').append(connectionContent);
+      $('#ai-connection-page').hidden = false;
+      $('#ai-dialog').dataset.page = 'connection';
+      (state.mcpStatus?.connected ? $('#ai-connection-back') : $('#mcp-code')).focus();
     },
     async configureApi(value) {
       provider.configure(value);
@@ -137,7 +180,10 @@ export function createAiPanel({ $, state, manager, adapter, toast, save, checkpo
   adapter.register('ai', () => open(false));
   adapter.register('ai-new', () => open(true));
   $('#ai-dialog').addEventListener('close', () => {
-    if (!$('#ai-dialog').open) clearReact($('#ai-dialog-content'));
+    if (!$('#ai-dialog').open) {
+      returnFromConnection(false);
+      clearReact($('#ai-dialog-content'));
+    }
   });
   return {
     render,

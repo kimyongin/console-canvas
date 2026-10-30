@@ -4,6 +4,7 @@ import { resourceCandidates } from './resource-repair.js';
 import { prepareCaptureScope } from './capture-scope.js';
 import { hasCapturedPhoto } from './capture-reference.js';
 import { createSourceComparison } from './ui/source-comparison.js';
+import { createCaptureWorkspace } from './ui/capture-workspace.js';
 import { captureAssessment } from './capture-status.js';
 import { createImplementationReview } from './ui/implementation-review.js';
 import { cleanHandoffSettings, cleanImplementationReviews } from './workflow-state.js';
@@ -322,10 +323,16 @@ function renderCaptureStatus() {
   $('#capture-source-button').hidden = !desktop;
   $('#capture-source-note').hidden = !desktop;
 }
+const captureWorkspace = createCaptureWorkspace({
+  $,
+  state,
+  adapter,
+  renderStatus: renderCaptureStatus,
+});
 adapter.register('capture-status', () => {
   if (!state.ready) return;
   renderCaptureStatus();
-  $('#capture-status-dialog').showModal();
+  captureWorkspace.show('info');
 });
 $('#capture-source-button').addEventListener('click', () => {
   $('#capture-status-dialog').close();
@@ -377,11 +384,12 @@ function focusComment(options = {}) {
   commentEditor.open(options);
 }
 const preview = createVersionPreview({ $, state, commitCommentDraft, adapter });
-createSourceComparison({ $, state, adapter, commitCommentDraft });
+createSourceComparison({ $, state, adapter, commitCommentDraft, workspace: captureWorkspace });
 createResourceRepair({
   $,
   state,
   adapter,
+  workspace: captureWorkspace,
   commitCommentDraft,
   historyBefore,
   changeCommitted,
@@ -500,8 +508,6 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
   clipboard.reset();
   commentEditor.reset();
   for (const id of [
-    '#source-compare-dialog',
-    '#repair-assets-dialog',
     '#capture-status-dialog',
     '#compare-dialog',
     '#export-dialog',

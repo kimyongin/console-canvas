@@ -78,6 +78,25 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
       </DialogSurface>
       <DialogSurface id="ai-dialog">
         <div id="ai-dialog-content" />
+        <section id="ai-connection-page" hidden>
+          <div className="task-page-navigation">
+            <Button
+              id="ai-connection-back"
+              variant="ghost"
+              onClick={() => dispatchEditorCommand('ai-connection-back')}
+            >
+              ← AI 시안으로 돌아가기
+            </Button>
+            <Button
+              aria-label="AI 연결 설정 닫기"
+              variant="ghost"
+              onClick={() => dispatchEditorCommand('ai-connection-close')}
+            >
+              ×
+            </Button>
+          </div>
+          <div id="ai-connection-host" />
+        </section>
       </DialogSurface>
       <div id="notice" className="notice" role="status" hidden={true}></div>
       <Button id="emergency-backup" hidden variant="outline">
@@ -799,118 +818,122 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
         </div>
       </DialogSurface>
       <DialogSurface id="capture-status-dialog" aria-labelledby="capture-status-title">
-        <form method="dialog">
-          <Button className="dialog-close" aria-label="가져오기 정보 닫기" variant="outline">
-            ×
+        <div className="capture-task-navigation">
+          <Button
+            id="capture-task-back"
+            hidden
+            variant="ghost"
+            onClick={() => dispatchEditorCommand('capture-back')}
+          >
+            ← 가져오기 정보
           </Button>
-        </form>
-        <h2 id="capture-status-title">가져오기 정보</h2>
-        <p id="capture-status-summary" role="status"></p>
-        <p id="capture-repair-summary" role="status"></p>
-        <p className="capture-verification-note">
-          아래는 수집 과정에서 확인한 정보입니다. 원본과의 시각적 일치율은 측정하지 않았습니다.
-        </p>
-        <p id="capture-status-scope"></p>
-        <ul id="capture-status-list" className="capture-status-list"></ul>
-        <p id="capture-status-empty" hidden>
-          기록된 제한은 없습니다. 이미지·글자·배치가 원본과 같은지 확인한 뒤 편집하세요.
-        </p>
-        <Button
-          id="repair-assets-button"
-          onClick={() => dispatchEditorCommand('repair-assets')}
-          variant="outline"
-        >
-          이미지·폰트 다시 읽기
-        </Button>
-        <p id="repair-assets-note"></p>
-        <Button
-          id="source-compare-button"
-          onClick={() => dispatchEditorCommand('source-compare')}
-          variant="outline"
-        >
-          원본 사진과 비교
-        </Button>
-        <p id="source-compare-unavailable" hidden>
-          원본 촬영 사진이 없는 문서입니다. 편집 전 복제본과 실제 원본 사진은 다릅니다.
-        </p>
-        <Button id="capture-source-button" hidden={true} variant="outline">
-          원본 사이트 확인
-        </Button>
-        <p id="capture-source-note" hidden>
-          현재 사이트 상태는 가져온 시점과 다를 수 있습니다.
-        </p>
-      </DialogSurface>
-      <DialogSurface id="repair-assets-dialog" aria-labelledby="repair-assets-title">
-        <form method="dialog">
-          <Button className="dialog-close" aria-label="자산 복구 닫기" variant="outline">
-            ×
+          <form method="dialog">
+            <Button id="capture-task-close" aria-label="가져오기 정보 닫기" variant="ghost">
+              ×
+            </Button>
+          </form>
+        </div>
+        <section id="capture-info-view" hidden={false} className="capture-task-page">
+          <h2 id="capture-status-title">가져오기 정보</h2>
+          <p id="capture-status-summary" role="status"></p>
+          <p id="capture-repair-summary" role="status"></p>
+          <p className="capture-verification-note">
+            아래는 수집 과정에서 확인한 정보입니다. 원본과의 시각적 일치율은 측정하지 않았습니다.
+          </p>
+          <p id="capture-status-scope"></p>
+          <ul id="capture-status-list" className="capture-status-list"></ul>
+          <p id="capture-status-empty" hidden>
+            기록된 제한은 없습니다. 이미지·글자·배치가 원본과 같은지 확인한 뒤 편집하세요.
+          </p>
+          <Button
+            id="repair-assets-button"
+            onClick={() => dispatchEditorCommand('repair-assets')}
+            variant="outline"
+          >
+            이미지·폰트 다시 읽기
           </Button>
-        </form>
-        <h2 id="repair-assets-title">이미지·폰트 다시 읽기</h2>
-        <p>
-          저장된 주소에서 공개 자산을 다시 읽어 별도 미리보기를 만듭니다. 현재 편집과 촬영 원본은
-          유지되며, 적용한 복구는 실행 취소할 수 있습니다.
-        </p>
-        <p>최대 16개·각 900KB·합계 1.25MB. 로그인 자산·SVG·캡처에 없는 선언은 복구하지 않습니다.</p>
-        <ul id="repair-assets-results"></ul>
-        <Button id="repair-assets-fetch" variant="outline">
-          선택한 자산 다시 읽기
-        </Button>
-        <Button id="repair-assets-retry" hidden variant="outline">
-          실패한 항목 다시 읽기
-        </Button>
-        <p id="repair-assets-status" role="status"></p>
-        <div id="repair-assets-preview" className="repair-view"></div>
-        <Button id="repair-assets-apply" variant="default" disabled>
-          미리보기 적용
-        </Button>
-      </DialogSurface>
-      <DialogSurface id="source-compare-dialog" aria-labelledby="source-compare-title">
-        <form method="dialog">
-          <Button className="dialog-close" aria-label="원본 사진 비교 닫기" variant="outline">
-            ×
+          <p id="repair-assets-note"></p>
+          <Button
+            id="source-compare-button"
+            onClick={() => dispatchEditorCommand('source-compare')}
+            variant="outline"
+          >
+            원본 사진과 비교
           </Button>
-        </form>
-        <h2 id="source-compare-title">원본 사진과 비교</h2>
-        <p>저장된 실제 사진과 복제본을 비교합니다. 현재 웹사이트를 다시 촬영하지 않습니다.</p>
-        <div className="reference-tools">
-          <label>
-            보기{' '}
-            <NativeSelect id="source-compare-mode">
-              <option value="side">좌우 비교</option>
-              <option value="overlay">겹쳐 보기</option>
-            </NativeSelect>
-          </label>
-          <label>
-            복제본{' '}
-            <NativeSelect id="source-compare-version">
-              <option value="baseline">편집 전 복제본</option>
-              <option value="current">현재 작업</option>
-            </NativeSelect>
-          </label>
-          <label>
-            배율{' '}
-            <NativeSelect id="source-compare-zoom">
-              <option value="fit">화면에 맞춤</option>
-              <option value=".5">50%</option>
-              <option value="1">100%</option>
-              <option value="1.5">150%</option>
-            </NativeSelect>
-          </label>
-          <label id="source-compare-blend-label" hidden>
-            복제본 농도{' '}
-            <Input id="source-compare-blend" type="range" min="0" max="100" defaultValue="50" />
-          </label>
-        </div>
-        <div className="source-comparison-labels">
-          <strong>가져오기 당시 실제 원본 사진</strong>
-          <strong id="source-compare-clone-label">편집 전 복제본</strong>
-        </div>
-        <div id="source-compare-grid" className="source-comparison-grid">
-          <div id="source-compare-photo" className="reference-view"></div>
-          <div id="source-compare-clone" className="reference-view"></div>
-        </div>
-        <p id="source-compare-status" role="status"></p>
+          <p id="source-compare-unavailable" hidden>
+            원본 촬영 사진이 없는 문서입니다. 편집 전 복제본과 실제 원본 사진은 다릅니다.
+          </p>
+          <Button id="capture-source-button" hidden={true} variant="outline">
+            원본 사이트 확인
+          </Button>
+          <p id="capture-source-note" hidden>
+            현재 사이트 상태는 가져온 시점과 다를 수 있습니다.
+          </p>
+        </section>
+        <section id="repair-assets-dialog" hidden={true} className="capture-task-page">
+          <h2 id="repair-assets-title">이미지·폰트 다시 읽기</h2>
+          <p>
+            저장된 주소에서 공개 자산을 다시 읽어 별도 미리보기를 만듭니다. 현재 편집과 촬영 원본은
+            유지되며, 적용한 복구는 실행 취소할 수 있습니다.
+          </p>
+          <p>
+            최대 16개·각 900KB·합계 1.25MB. 로그인 자산·SVG·캡처에 없는 선언은 복구하지 않습니다.
+          </p>
+          <ul id="repair-assets-results"></ul>
+          <Button id="repair-assets-fetch" variant="outline">
+            선택한 자산 다시 읽기
+          </Button>
+          <Button id="repair-assets-retry" hidden variant="outline">
+            실패한 항목 다시 읽기
+          </Button>
+          <p id="repair-assets-status" role="status"></p>
+          <div id="repair-assets-preview" className="repair-view"></div>
+          <Button id="repair-assets-apply" variant="default" disabled>
+            미리보기 적용
+          </Button>
+        </section>
+        <section id="source-compare-dialog" hidden={true} className="capture-task-page">
+          <h2 id="source-compare-title">원본 사진과 비교</h2>
+          <p>저장된 실제 사진과 복제본을 비교합니다. 현재 웹사이트를 다시 촬영하지 않습니다.</p>
+          <div className="reference-tools">
+            <label>
+              보기{' '}
+              <NativeSelect id="source-compare-mode">
+                <option value="side">좌우 비교</option>
+                <option value="overlay">겹쳐 보기</option>
+              </NativeSelect>
+            </label>
+            <label>
+              복제본{' '}
+              <NativeSelect id="source-compare-version">
+                <option value="baseline">편집 전 복제본</option>
+                <option value="current">현재 작업</option>
+              </NativeSelect>
+            </label>
+            <label>
+              배율{' '}
+              <NativeSelect id="source-compare-zoom">
+                <option value="fit">화면에 맞춤</option>
+                <option value=".5">50%</option>
+                <option value="1">100%</option>
+                <option value="1.5">150%</option>
+              </NativeSelect>
+            </label>
+            <label id="source-compare-blend-label" hidden>
+              복제본 농도{' '}
+              <Input id="source-compare-blend" type="range" min="0" max="100" defaultValue="50" />
+            </label>
+          </div>
+          <div className="source-comparison-labels">
+            <strong>가져오기 당시 실제 원본 사진</strong>
+            <strong id="source-compare-clone-label">편집 전 복제본</strong>
+          </div>
+          <div id="source-compare-grid" className="source-comparison-grid">
+            <div id="source-compare-photo" className="reference-view"></div>
+            <div id="source-compare-clone" className="reference-view"></div>
+          </div>
+          <p id="source-compare-status" role="status"></p>
+        </section>
       </DialogSurface>
       <DialogSurface id="snapshot-save-dialog" aria-labelledby="snapshot-save-title">
         <h2 id="snapshot-save-title">{'스냅샷 저장'}</h2>
@@ -1168,36 +1191,38 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             {'×'}
           </Button>
         </form>
-        <div className="eyebrow">{'CONNECT YOUR AGENT'}</div>
-        <h2>{'에이전트와 함께 편집'}</h2>
-        <h3>로컬 MCP 서버 연결</h3>
-        <p>
-          {'\n        연결한 이 화면의 복제본만 에이전트가 읽고 편집합니다.'}
-          <br />
-          {'독립 앱에서는 자동으로\n        연결됩니다.\n      '}
-        </p>
-        <label className="review-note-label">
-          {'로컬 서버 주소'}
-          <Input id="mcp-address" defaultValue="http://127.0.0.1:8849" type="url" />
-        </label>
-        <label className="review-note-label">
-          {'연결 코드'}
-          <Input
-            id="mcp-code"
-            type="password"
-            autoComplete="off"
-            placeholder="에이전트가 준비한 연결 코드"
-          />
-        </label>
-        <div className="export-actions">
-          <Button id="mcp-disconnect" variant="outline">
-            {'연결 끊기'}
-          </Button>
-          <Button id="mcp-connect" className="primary" variant="outline">
-            {'연결'}
-          </Button>
+        <div id="mcp-content">
+          <div className="eyebrow">{'CONNECT YOUR AGENT'}</div>
+          <h2>{'에이전트와 함께 편집'}</h2>
+          <h3>로컬 MCP 서버 연결</h3>
+          <p>
+            {'\n        연결한 이 화면의 복제본만 에이전트가 읽고 편집합니다.'}
+            <br />
+            {'독립 앱에서는 자동으로\n        연결됩니다.\n      '}
+          </p>
+          <label className="review-note-label">
+            {'로컬 서버 주소'}
+            <Input id="mcp-address" defaultValue="http://127.0.0.1:8849" type="url" />
+          </label>
+          <label className="review-note-label">
+            {'연결 코드'}
+            <Input
+              id="mcp-code"
+              type="password"
+              autoComplete="off"
+              placeholder="에이전트가 준비한 연결 코드"
+            />
+          </label>
+          <div className="export-actions">
+            <Button id="mcp-disconnect" variant="outline">
+              {'연결 끊기'}
+            </Button>
+            <Button id="mcp-connect" className="primary" variant="outline">
+              {'연결'}
+            </Button>
+          </div>
+          <div id="mcp-message" className="export-status" role="status"></div>
         </div>
-        <div id="mcp-message" className="export-status" role="status"></div>
       </DialogSurface>
       <Input id="file-input" type="file" accept=".json,.uiclone" hidden={true} />
       <div id="toast" className="toast" role="status" hidden={true}></div>
