@@ -26,10 +26,12 @@ export function renderLayerRows(
   toggle: (id: string) => void,
   pick: (id: string, additive: boolean) => void,
   rename?: (id: string) => void,
+  emptyMessage = '표시할 요소가 없습니다.',
 ) {
   renderReact(
     host,
     <>
+      {!rows.length && <p className="empty-small">{emptyMessage}</p>}
       {rows.map((row) => (
         <div
           key={row.id}

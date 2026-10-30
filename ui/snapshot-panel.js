@@ -170,7 +170,14 @@ export function createSnapshotPanel({
     const entry = selected(),
       panel = $('#snapshot-preview');
     panel.hidden = trashView;
-    $('#apply-snapshot').disabled = !entry;
+    const current = entry?.id === state.timeline?.activeId && !snapshotHistory.dirty();
+    $('#apply-snapshot').disabled = !entry || current;
+    $('#apply-snapshot').textContent = current ? '현재 버전' : '이 버전으로 이동';
+    $('#apply-snapshot').title = current
+      ? '이 버전에서 편집 중이며 저장 이후 변경이 없습니다.'
+      : '';
+    const targetOption = $('#snapshot-preview-zoom option[value="target"]');
+    targetOption.disabled = true;
     $('#compare-button').disabled = !entry;
     updateLabel();
     if (trashView) return;
@@ -188,7 +195,10 @@ export function createSnapshotPanel({
     }
     const mode = $('#snapshot-preview-zoom').value;
     const key = state.snapshot.id + '/' + state.generation + '/' + entry.id + '/' + mode;
-    if (key === previewKey && $('#snapshot-preview-view iframe')) return;
+    if (key === previewKey && $('#snapshot-preview-view iframe')) {
+      targetOption.disabled = $('#snapshot-preview-view').dataset.hasTarget !== 'true';
+      return;
+    }
     previewKey = key;
     const token = ++generation;
     clearReact($('#snapshot-preview-view'));
@@ -197,21 +207,26 @@ export function createSnapshotPanel({
       const capture = state.snapshot;
       const result = await withVersionScene(capture, entry.state, (scene) => ({
         ...scene.preview(),
-        target: Object.keys(entry.state.edits || {})
-          .map((id) => scene.rect(id))
+        changeCount: scene.changes().length,
+        target: [...scene.changes(), ...scene.comments()]
+          .map((c) => c.after || c.before)
           .find(Boolean),
       }));
       if (token !== generation || state.snapshot?.id !== capture.id || selected()?.id !== entry.id)
         return;
+      targetOption.disabled = !result.target;
+      targetOption.textContent = result.target ? '변경 위치 확대' : '변경 위치 없음';
+      $('#snapshot-preview-view').dataset.hasTarget = String(!!result.target);
+      if (mode === 'target' && !result.target) $('#snapshot-preview-zoom').value = 'fit';
       renderVersionFrame(
         $('#snapshot-preview-view'),
         result,
         entry.name + ' 미리보기 화면',
-        mode === '1' || mode === 'target' ? 1 : undefined,
+        mode === '1' || (mode === 'target' && result.target) ? 1 : undefined,
         mode === 'target' && result.target
           ? { rect: result.target, label: '저장된 변경 위치' }
           : undefined,
-        mode === 'fit',
+        mode === 'fit' || (mode === 'target' && !result.target),
       );
       if (mode === 'target' && result.target)
         requestAnimationFrame(() => {
@@ -224,7 +239,7 @@ export function createSnapshotPanel({
           ? '현재 작업의 기준 버전'
           : '선택만으로 현재 편집은 바뀌지 않습니다.') +
         ' · 변경 ' +
-        Object.keys(entry.state.edits).length +
+        result.changeCount +
         ' · 주석 ' +
         Object.keys(entry.state.annotations).length;
     } catch (error) {
@@ -607,6 +622,7 @@ export function createSnapshotPanel({
     if (!entry) return;
     try {
       commitCommentDraft();
+      if (entry.id === state.timeline.activeId && !snapshotHistory.dirty()) return;
       const result = await snapshotHistory.restorePersisted(entry.id);
       await flushEditor();
       renderSnapshots();

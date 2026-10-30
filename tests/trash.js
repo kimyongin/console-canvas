@@ -95,6 +95,8 @@ try {
       doc.querySelector('#review-note').value === '삭제 직전 메모' &&
       app.state.timeline.entries.some((e) => e.id === b.id && e.deletedAt),
   );
+  if (!doc.querySelector('#snapshot-panel').matches(':popover-open')) click('#snapshot-dropdown');
+  await until(() => doc.querySelector('#snapshot-panel').matches(':popover-open'));
   click('#snapshots-trash');
   check(
     'Snapshot trash exposes every recoverable version',
@@ -109,6 +111,7 @@ try {
   );
   click('#snapshots-live');
   card(a.id).querySelector('.snapshot-entry').click();
+  await until(() => !doc.querySelector('#apply-snapshot').disabled);
   click('#apply-snapshot');
   await app.state.saving;
   while (app.state.transactionBusy) await new Promise((r) => setTimeout(r, 10));

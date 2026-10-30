@@ -93,12 +93,25 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             </div>
           </div>
           <div className="layer-search">
-            <Input
-              id="layer-search"
-              type="search"
-              placeholder="텍스트·버튼·요소 찾기"
-              aria-label="레이어 검색"
-            />
+            <div className="layer-search-field">
+              <Input
+                id="layer-search"
+                type="search"
+                placeholder="텍스트·버튼·요소 찾기"
+                aria-label="레이어 검색"
+                aria-describedby="layer-search-status"
+              />
+              <Button
+                id="layer-search-clear"
+                hidden
+                variant="ghost"
+                aria-label="레이어 검색 지우기"
+                onClick={() => dispatchEditorCommand('layer-search-clear')}
+              >
+                ×
+              </Button>
+            </div>
+            <small id="layer-search-status" role="status" hidden />
             <label className="layer-filter">
               <Input type="checkbox" id="major-layers" />
               {' 주요 요소만'}
@@ -1050,11 +1063,19 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
               placeholder="예: 검색 조건을 위로 모으고 작업 버튼을 오른쪽에 정렬하고 싶어요."
             ></Textarea>
           </label>
-          <div id="handoff-preview" className="handoff-preview"></div>
+          <div id="handoff-preview" className="handoff-preview" aria-busy="false"></div>
         </div>
         <div className="export-footer">
           <div className="export-actions">
-            <Button id="handoff-verify" variant="outline">
+            <Button
+              id="handoff-retry"
+              hidden
+              variant="outline"
+              onClick={() => dispatchEditorCommand('handoff-retry')}
+            >
+              이미지 다시 만들기
+            </Button>
+            <Button id="handoff-verify" disabled variant="outline">
               구현 결과 확인
             </Button>
             <Button id="copy-summary" variant="outline">

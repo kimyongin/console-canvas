@@ -1,6 +1,6 @@
 import { elementLabel, isMajorElement } from './element-labels.js';
 import { renderLayerRows } from './react/lists.tsx';
-export function createDocumentLists({ $, state, selectNode, renameLayer }) {
+export function createDocumentLists({ $, state, adapter, selectNode, renameLayer }) {
   const key = 'console-canvas-layer-navigation-v1';
   let cache = new Map(),
     pendingScroll = null,
@@ -65,7 +65,11 @@ export function createDocumentLists({ $, state, selectNode, renameLayer }) {
             ' ' +
             node.tag +
             ' ' +
-            node.id
+            node.id +
+            ' ' +
+            Object.values(node.locator || {})
+              .filter((v) => typeof v === 'string')
+              .join(' ')
           )
             .toLowerCase()
             .includes(query)
@@ -119,8 +123,16 @@ export function createDocumentLists({ $, state, selectNode, renameLayer }) {
       },
       (id, additive) => selectNode(id, { reveal: true, additive }),
       renameLayer,
+      query
+        ? '일치하는 요소가 없습니다. 검색어를 바꾸거나 검색을 지워 주세요.'
+        : '표시할 요소가 없습니다.',
     );
     $('#layer-count').textContent = scene.elements.size.toLocaleString();
+    $('#layer-search-clear').hidden = !$('#layer-search').value;
+    $('#layer-search-status').hidden = !query;
+    $('#layer-search-status').textContent = query
+      ? '일치 ' + directMatches.length.toLocaleString() + '개 · 상위 경로 함께 표시'
+      : '';
     if (pendingScroll !== null) {
       $('#layers').scrollTop = pendingScroll;
       pendingScroll = null;
@@ -129,5 +141,17 @@ export function createDocumentLists({ $, state, selectNode, renameLayer }) {
   }
   $('#layer-search').title =
     '문구·태그·원본 식별자로 검색합니다. 일치 표시는 실제 검색 결과이며 상위 경로는 탐색을 위해 함께 표시됩니다.';
+  function clearSearch() {
+    $('#layer-search').value = '';
+    renderLayers();
+    $('#layer-search').focus();
+  }
+  adapter.register('layer-search-clear', clearSearch);
+  $('#layer-search').addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !e.currentTarget.value) return;
+    e.preventDefault();
+    e.stopPropagation();
+    clearSearch();
+  });
   return { renderLayers, restoreNavigation };
 }

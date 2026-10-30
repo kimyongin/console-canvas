@@ -3,6 +3,7 @@ import { renderReact } from './mount';
 import { Button } from './components/button';
 import { NativeSelect } from './components/surfaces';
 import { Textarea } from './components/textarea';
+import { Input } from './components/input';
 import { DocumentVisual } from './lists';
 import { VersionFrame } from './versions';
 type Rect = { x: number; y: number; width: number; height: number };
@@ -72,7 +73,31 @@ function ImplementationReview({
     [zoom, setZoom] = useState('fit'),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState(''),
+    [resultQuery, setResultQuery] = useState(''),
     [frames, setFrames] = useState<(Preview | null)[]>([null, null]);
+  const resultPicker = useRef<HTMLDivElement>(null),
+    resultSearch = useRef<HTMLInputElement>(null),
+    resultFocusPending = useRef(false);
+  function closeResults() {
+    resultPicker.current?.hidePopover();
+    document.getElementById('implementation-visual-picker')?.focus();
+  }
+  useEffect(() => {
+    const panel = resultPicker.current!;
+    const toggle = (event: Event) => {
+      if ((event as ToggleEvent).newState === 'open') {
+        setResultQuery('');
+        resultSearch.current?.focus();
+      } else if (
+        panel.contains(document.activeElement) ||
+        document.activeElement === document.body
+      ) {
+        document.getElementById('implementation-visual-picker')?.focus();
+      }
+    };
+    panel.addEventListener('toggle', toggle);
+    return () => panel.removeEventListener('toggle', toggle);
+  }, []);
   const comparison = useRef<HTMLDivElement>(null),
     [bounds, setBounds] = useState({ width: 800, height: 350 });
   useLayoutEffect(() => {
@@ -98,6 +123,16 @@ function ImplementationReview({
       current = false;
     };
   }, [review?.id, review?.result, actions]);
+  useEffect(() => {
+    if (!resultFocusPending.current || busy || !frames[0] || (review?.result && !frames[1])) return;
+    resultFocusPending.current = false;
+    const trigger = document.getElementById('implementation-visual-picker');
+    if (
+      document.querySelector<HTMLDialogElement>('#implementation-dialog')?.open &&
+      (document.activeElement === document.body || document.activeElement === trigger)
+    )
+      trigger?.focus();
+  }, [busy, frames, review?.result]);
   const active = review?.requests.find((r) => r.id === focused) || review?.requests[0];
   context.current = { review: selectedId, request: active?.id || '' };
   useEffect(() => {
@@ -175,6 +210,17 @@ function ImplementationReview({
     }
   }
   const remaining = review?.requests.filter((r) => r.status !== 'done').length || 0;
+  const visibleDocuments = documents.filter((d) =>
+    [
+      d.title,
+      d.url,
+      d.capturedAt,
+      d.capturedAt ? new Date(d.capturedAt).toLocaleString('ko-KR') : '',
+    ]
+      .join(' ')
+      .toLocaleLowerCase()
+      .includes(resultQuery.trim().toLocaleLowerCase()),
+  );
   return (
     <div className="implementation-review">
       <header>
@@ -242,18 +288,57 @@ function ImplementationReview({
           </Button>
           <div
             id="implementation-results-visual"
+            ref={resultPicker}
             popover="auto"
             aria-label="구현 결과 미리보기 목록"
           >
-            <h3>구현 결과 선택</h3>
-            {documents.map((d) => (
+            <div className="result-picker-heading">
+              <h3>구현 결과 선택</h3>
+              <Button aria-label="구현 결과 목록 닫기" onClick={closeResults}>
+                ×
+              </Button>
+            </div>
+            <Input
+              ref={resultSearch}
+              id="implementation-result-search"
+              type="search"
+              aria-label="구현 결과 검색"
+              placeholder="화면 이름·주소·가져온 시간 검색"
+              value={resultQuery}
+              onChange={(e) => setResultQuery(e.target.value)}
+            />
+            <p role="status" className="result-picker-status">
+              {visibleDocuments.length} / {documents.length}개 화면
+            </p>
+            {!documents.length ? (
+              <p className="empty-small">
+                선택할 구현 화면이 없습니다. 수정한 웹 화면을 가져온 뒤 ‘목록 새로고침’을 눌러
+                주세요.
+              </p>
+            ) : (
+              !visibleDocuments.length && (
+                <div className="empty-small">
+                  일치하는 화면이 없습니다.{' '}
+                  <Button
+                    onClick={() => {
+                      setResultQuery('');
+                      resultSearch.current?.focus();
+                    }}
+                  >
+                    검색 지우기
+                  </Button>
+                </div>
+              )
+            )}
+            {visibleDocuments.map((d) => (
               <Button
                 key={d.id}
                 className="result-visual-row"
                 disabled={busy}
-                onClick={() => {
-                  document.getElementById('implementation-results-visual')?.hidePopover();
-                  run(() => actions.result(d.id));
+                onClick={async () => {
+                  resultFocusPending.current = true;
+                  closeResults();
+                  await run(() => actions.result(d.id));
                 }}
               >
                 <DocumentVisual id={d.id} />

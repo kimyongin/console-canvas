@@ -18,6 +18,7 @@ export function createExportDialog({
   focusComment,
   save,
   implementationReview,
+  adapter,
 }) {
   let excludedComments = new Map(),
     reviewDocument = null;
@@ -55,22 +56,52 @@ export function createExportDialog({
   function chosen() {
     return versionOptions(state).find((v) => v.id === $('#handoff-version').value);
   }
-  async function useVersion(run) {
-    commitCommentDraft();
-    const option = chosen();
-    if (!option) throw new Error('전달할 버전을 선택해 주세요.');
-    return withVersionScene(state.snapshot, option.state, (scene) => run(scene, option));
+  function available(status) {
+    $('#handoff-preview').dataset.state = status;
+    $('#handoff-preview').setAttribute('aria-busy', String(status === 'preparing'));
+    for (const id of ['copy-summary', 'download-review', 'handoff-verify'])
+      $('#' + id).disabled = status !== 'ready';
+    $('#handoff-retry').hidden = status !== 'failed';
+  }
+  function currentImage(image = latest) {
+    return (
+      !!image &&
+      $('#export-dialog').open &&
+      image.documentId === state.snapshot?.id &&
+      image.sceneGeneration === state.generation &&
+      image.signature === JSON.stringify(chosen()) &&
+      image.mode === (state.handoffSettings?.mode || 'reference')
+    );
+  }
+  function readyImage() {
+    if (currentImage()) return latest;
+    if ($('#export-dialog').open) refresh();
+    return null;
   }
   async function refresh() {
+    if (!$('#export-dialog').open) return;
     const token = ++generation;
     latest = null;
-    $('#copy-summary').disabled = true;
-    $('#download-review').disabled = true;
+    available('preparing');
+    $('#export-status').textContent = '전달 이미지를 준비하고 있습니다…';
     clearReact($('#handoff-preview'));
     $('#handoff-preview').textContent = '전달 이미지 준비 중…';
     clearReact($('#handoff-items'));
     try {
-      const result = await useVersion(async (scene, version) => {
+      commitCommentDraft();
+      const option = chosen();
+      if (!option) throw new Error('전달할 버전을 선택해 주세요.');
+      const signature = JSON.stringify(option),
+        version = structuredClone(option),
+        capture = state.snapshot,
+        sceneGeneration = state.generation,
+        mode = state.handoffSettings?.mode || 'reference';
+      const valid = () =>
+        token === generation &&
+        $('#export-dialog').open &&
+        state.snapshot?.id === capture.id &&
+        state.generation === sceneGeneration;
+      const result = await withVersionScene(capture, version.state, async (scene) => {
         if (token !== generation) throw Error('전달 기준이 바뀌었습니다.');
         const conflicts = scene.comments().filter((c) => c.targetDeleted);
         if (reviewDocument !== state.snapshot.id) {
@@ -98,6 +129,7 @@ export function createExportDialog({
         for (const c of conflicts)
           if (excludedComments.get(version.id + ':' + c.id) === c.text) delete annotations[c.id];
         scene.setComments(annotations);
+        version.state.annotations = annotations;
         const requests = handoffRequests(scene);
         $('#export-summary').textContent = version.name + ' · 변경 요청 ' + requests.length + '개';
         $('#review-note').closest('label').hidden = version.id !== '@current';
@@ -110,15 +142,31 @@ export function createExportDialog({
           );
         // The image is the review surface; avoid duplicating all cards as text.
         return buildHandoffImage(
-          state.snapshot,
+          capture,
           scene,
           version.state.note,
-          (m) => ($('#export-status').textContent = m),
-          { mode: state.handoffSettings?.mode, versionName: version.name },
+          (m) => {
+            if (valid()) $('#export-status').textContent = m;
+          },
+          { mode, versionName: version.name },
         );
       });
-      if (token !== generation || !$('#export-dialog').open) return;
-      latest = result;
+      if (!valid()) return;
+      if (
+        signature !== JSON.stringify(chosen()) ||
+        mode !== (state.handoffSettings?.mode || 'reference')
+      ) {
+        refresh();
+        return;
+      }
+      latest = {
+        ...result,
+        option: version,
+        signature,
+        documentId: capture.id,
+        sceneGeneration,
+        mode,
+      };
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       previewUrl = URL.createObjectURL(result.blob);
       renderHandoffPreview(
@@ -131,15 +179,18 @@ export function createExportDialog({
       if (token !== generation || !$('#export-dialog').open) return;
       $('#export-status').textContent =
         '이 이미지 한 장을 에이전트 대화에 첨부하세요. 번호별 주석에 반응형 배치 의도를 적으면 더 명확해집니다.';
-      $('#copy-summary').disabled = false;
-      $('#download-review').disabled = false;
+      available('ready');
     } catch (error) {
       if (token === generation) {
         $('#handoff-preview').textContent = '';
         $('#export-status').textContent = '이미지를 만들지 못했습니다: ' + error.message;
+        available('failed');
       }
     }
   }
+  adapter.register('handoff-retry', () => {
+    if ($('#handoff-preview').dataset.state === 'failed') refresh();
+  });
   $('#export-button').addEventListener('click', () => {
     excludedComments = new Map();
     reviewDocument = state.snapshot?.id;
@@ -156,17 +207,12 @@ export function createExportDialog({
     refresh();
   });
   $('#handoff-verify').addEventListener('click', async () => {
-    const option = chosen();
-    if (!option) return;
+    const image = readyImage();
+    if (!image) return;
+    const option = image.option;
     $('#export-dialog').close();
     try {
-      const annotations = { ...option.state.annotations };
-      for (const [key, text] of excludedComments)
-        if (key.startsWith(option.id + ':')) {
-          const id = key.slice(option.id.length + 1);
-          if (annotations[id] === text) delete annotations[id];
-        }
-      await implementationReview.open({ ...option, state: { ...option.state, annotations } });
+      await implementationReview.open(option);
     } catch (error) {
       toast(error.message);
     }
@@ -179,38 +225,50 @@ export function createExportDialog({
     if ($('#export-dialog').open) return;
     generation++;
     latest = null;
+    available('idle');
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = null;
     clearReact($('#handoff-preview'));
   });
   $('#copy-summary').addEventListener('click', async () => {
+    const image = readyImage(),
+      token = generation;
+    if (!image) return;
+    $('#copy-summary').disabled = true;
     try {
-      if (!latest) return;
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': latest.blob })]);
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': image.blob })]);
+      if (token !== generation || !currentImage(image)) return;
       $('#export-status').textContent = '이미지를 복사했습니다. 에이전트 대화에 붙여넣으세요.';
     } catch (error) {
+      if (token !== generation || !currentImage(image)) return;
       $('#export-status').textContent =
         '이미지 복사를 지원하지 않는 환경입니다. 전달 이미지 저장을 사용해 주세요. ' +
         error.message;
+    } finally {
+      if (token === generation && currentImage(image)) $('#copy-summary').disabled = false;
     }
   });
   $('#download-review').addEventListener('click', async () => {
-    if (!latest) return;
+    const image = readyImage(),
+      token = generation;
+    if (!image) return;
     const button = $('#download-review');
     button.disabled = true;
     try {
       const result = await download(
-        'console-canvas-' + state.snapshot.id.slice(0, 8) + '.png',
-        latest.blob,
+        'console-canvas-' + image.documentId.slice(0, 8) + '.png',
+        image.blob,
         'image/png',
       );
+      if (token !== generation || !currentImage(image)) return;
       $('#export-status').textContent = result?.canceled
         ? '저장을 취소했습니다.'
         : '전달 이미지 한 장을 저장했습니다. 에이전트 대화에 첨부하세요.';
     } catch (error) {
+      if (token !== generation || !currentImage(image)) return;
       $('#export-status').textContent = '저장 실패: ' + error.message;
     } finally {
-      button.disabled = false;
+      if (token === generation && currentImage(image)) button.disabled = false;
     }
   });
   $('#save-document').addEventListener('click', async () => {

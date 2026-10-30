@@ -145,6 +145,7 @@ try {
   mode.value = 'exact';
   mode.dispatchEvent(new win.Event('change', { bubbles: true }));
   await until(() => app.state.handoffSettings.mode === 'exact');
+  await until(() => !doc.querySelector('#handoff-verify').disabled);
   click('#handoff-verify');
   await until(
     () =>
@@ -377,6 +378,7 @@ try {
   doc.querySelector('[aria-label="구현 결과 확인 닫기"]').click();
   app.state.handoffSettings = { mode: 'reference' };
   click('#export-button');
+  await until(() => !doc.querySelector('#handoff-verify').disabled);
   click('#handoff-verify');
   await until(() => app.state.implementationReviews.length === 4);
   check(

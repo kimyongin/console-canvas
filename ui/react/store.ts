@@ -12,6 +12,8 @@ export interface EditorView {
   save: { pending: boolean; error: string | null; message: string };
 }
 export type EditorCommand =
+  | 'layer-search-clear'
+  | 'handoff-retry'
   | 'implementation-review'
   | 'ai'
   | 'ai-new'

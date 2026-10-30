@@ -356,6 +356,7 @@ function selectNode(id, { reveal = false, additive = false } = {}) {
 const { renderLayers, restoreNavigation } = createDocumentLists({
   $,
   state,
+  adapter,
   selectNode,
   renameLayer: (id) => {
     selectNode(id, { reveal: true });
@@ -852,6 +853,7 @@ const implementationReview = createImplementationReview({
 const exportDialog = createExportDialog({
   $,
   state,
+  adapter,
   commitCommentDraft,
   editorId,
   implementationReview,
