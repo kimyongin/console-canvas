@@ -204,6 +204,49 @@ try {
     'Storage recovery allows a successful retry',
     app.state.scene.edits[node.id]?.dx === 24 && app.state.timeline.activeId === a.id,
   );
+  // A clipboard permission failure must preserve the already generated handoff.
+  const clipboardDescriptor = Object.getOwnPropertyDescriptor(win.navigator, 'clipboard');
+  Object.defineProperty(win.navigator, 'clipboard', {
+    configurable: true,
+    value: {
+      write: async () => {
+        throw new Error('Injected clipboard permission denial');
+      },
+    },
+  });
+  let fallbackPng;
+  win.ConsoleCanvasDesktop = {
+    saveFile: async (value) => {
+      fallbackPng = value;
+      return { path: 'fallback.png' };
+    },
+  };
+  doc.querySelector('#export-button').click();
+  await until(
+    () => !doc.querySelector('#copy-summary').disabled && doc.querySelector('#handoff-preview img'),
+  );
+  const preview = doc.querySelector('#handoff-preview img').src;
+  doc.querySelector('#copy-summary').click();
+  await until(() => doc.querySelector('#export-status').textContent.includes('Injected clipboard'));
+  check(
+    'Clipboard denial keeps the generated preview and exposes the PNG fallback',
+    doc.querySelector('#handoff-preview img').src === preview &&
+      !doc.querySelector('#download-review').disabled &&
+      doc.querySelector('#export-status').textContent.includes('전달 이미지 저장'),
+  );
+  doc.querySelector('#download-review').click();
+  await until(() => fallbackPng && !doc.querySelector('#download-review').disabled);
+  check(
+    'One fallback save delivers actual PNG bytes without rebuilding the request',
+    JSON.stringify([...new Uint8Array(fallbackPng.bytes).subarray(0, 8)]) ===
+      '[137,80,78,71,13,10,26,10]' &&
+      doc.querySelector('#handoff-preview img').src === preview &&
+      doc.querySelector('#export-status').textContent.includes('저장했습니다'),
+  );
+  doc.querySelector('#export-dialog').close();
+  if (clipboardDescriptor) Object.defineProperty(win.navigator, 'clipboard', clipboardDescriptor);
+  else delete win.navigator.clipboard;
+  delete win.ConsoleCanvasDesktop;
   const timeline = structuredClone(app.state.timeline);
   const parent = timeline.entries[0].id;
   while (app.state.timeline.entries.length < 500) {

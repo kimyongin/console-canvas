@@ -1,5 +1,13 @@
 # 검증 기록
 
+## 2026-10-30 · 0.27.0 전체 시나리오 기능·UI/UX 재검토
+
+121개 시나리오를 관련 기능 검사에 연결하고 106개 제어환경 검증·15개 OS/외부/실제 AI 부분 검증으로 나눴다. 이번 브라우저/CLI에서45개 경로를 사용했으며 일부는2요소 등 변형이고121개 사람 완주를 뜻하지 않는다. [전체 매트릭스·14개 개선점·재현/수용 기준](scenario-ux-audit-0.27.md). 사용자 자료·설치 앱·설치 스킬은 변경하지 않았다.
+
+최초 `npm run check:all`은 웹/공통과 SDK 통과 뒤 native scoped-capture stderr가 JSON 파싱에 섞여 종료 코드1(T-01). 별도 `npm run test:desktop` 재실행은 종료 코드0:실제 표시 사진/DOM·IPC·정상 종료/자료 복원·공식 SDK25+현대 SDK17·nativeScopes5. 결과를 구분해 보존한다.
+
+빠져 있던 클립보드 거절→동일 미리보기 유지/PNG 저장2검사를 resilience에 추가했다. 최종 `npm run check` 종료 코드0:Python45·Node49·Chromium583+smoke2, 타입·포맷·번들/스킬 통과. QA MCP UI 연결→공식 SDK19도구/화면1/주석3/스냅샷5 조회→UI 연결 끊기, helper의 별도 상태/포트 시작·종료도 확인했다. 실제 외부 대화 전송·유료 AI·사용자 OS 업데이트·실제 IME/스크린리더는 미검증이다. 로그/가상 캡처는 Git 제외 `local/scenario-audit-027/`에 있다. 이번 제품 UI 개선 코드를 구현한 것은 아니다.
+
 ## 2026-10-30 · 0.27.0 액션 절감·UX 보호 #80~#91
 
 `npm run check` 종료 코드0: 타입·포맷·빌드/스킬, Python45·Node49·Chromium581 + smoke2 통과. 새 action-ux35·shell-actions14는 고정 주석 대기열/직접 판정/실제 IndexedDB 실패 롤백/자산 누적/관리 메뉴 작은 창/초점·IME 가드/가져오기 메뉴 취소·영역 조절/다운로드 동의를 확인한다.
