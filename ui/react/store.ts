@@ -17,6 +17,8 @@ export type EditorCommand =
   | 'ai-connection-close'
   | 'layer-search-clear'
   | 'handoff-retry'
+  | 'handoff-back'
+  | 'snapshot-handoff'
   | 'implementation-review'
   | 'ai'
   | 'ai-new'

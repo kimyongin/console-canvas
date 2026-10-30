@@ -27,6 +27,8 @@ export function createImplementationReview({
     selectedId = null,
     documents = [];
   let captureDestination = null;
+  let returnOrigin = null,
+    returning = false;
   const documentResults = new Map();
   const items = () => state.implementationReviews || [];
   const live = () => items().filter((r) => !r.deletedAt);
@@ -102,6 +104,24 @@ export function createImplementationReview({
     mutations = new Map();
   let verdicts = [];
   const actions = {
+    canReturn: () => !!returnOrigin?.valid(),
+    async back() {
+      if (returning) return;
+      const target = returnOrigin;
+      if (!target?.valid())
+        throw Error('원래 전달 작업이 바뀌었습니다. 현재 작업에서 다시 열어 주세요.');
+      returning = true;
+      try {
+        await flushEditor();
+        if (returnOrigin !== target || !target.valid())
+          throw Error('원래 전달 작업이 바뀌었습니다.');
+        returnOrigin = null;
+        $('#implementation-dialog').close();
+        await target.run();
+      } finally {
+        returning = false;
+      }
+    },
     usage: () => implementationReviewUsage(items()),
     async backup() {
       const expectedDocument = state.snapshot.id;
@@ -397,7 +417,7 @@ export function createImplementationReview({
     for (const [id, value] of results) if (value) documentResults.set(id, resultValue(value));
     return values.filter((d) => d.id !== state.snapshot.id);
   }
-  async function open(option = null) {
+  async function open(option = null, origin = null) {
     if (!state.ready) return;
     await flushEditor();
     const epoch = ++generation,
@@ -423,6 +443,7 @@ export function createImplementationReview({
     if (!selectedId && !items().length)
       await create(versionOptions(state).find((v) => v.id === '@current'));
     if (epoch !== generation || documentId !== state.snapshot?.id) return;
+    returnOrigin = origin?.valid() ? origin : null;
     clearReact($('#implementation-content'));
     $('#implementation-dialog').showModal();
     render();
@@ -435,6 +456,7 @@ export function createImplementationReview({
   );
   $('#implementation-dialog').addEventListener('close', () => {
     if (!$('#implementation-dialog').open) {
+      returnOrigin = null;
       generation++;
       clearReact($('#implementation-content'));
     }

@@ -50,6 +50,8 @@ interface Preview {
   >;
 }
 interface Actions extends ReviewRecordActions {
+  canReturn(): boolean;
+  back(): Promise<void>;
   currentResult(id: string): boolean;
   captureAvailable(): boolean;
   capture(): Promise<unknown>;
@@ -165,11 +167,14 @@ function ImplementationReview({
         event.preventDefault();
         if (picking) closeResults();
         else closeRecords();
+      } else if (actions.canReturn()) {
+        event.preventDefault();
+        if (!busy) run(actions.back);
       }
     };
     dialog.addEventListener('cancel', cancel);
     return () => dialog.removeEventListener('cancel', cancel);
-  }, [picking, managing]);
+  }, [picking, managing, busy]);
   const comparison = useRef<HTMLDivElement>(null),
     [bounds, setBounds] = useState({ width: 800, height: 350 });
   useLayoutEffect(() => {
@@ -319,7 +324,9 @@ function ImplementationReview({
             ? '구현 결과 확인 · 이름 변경·휴지통·백업'
             : picking
               ? '구현 결과 확인 · 가져온 화면 선택'
-              : '목표 시안과 구현 화면을 비교하고 요청별로 확인하세요.'
+              : actions.canReturn()
+                ? '변경 내용 전달에서 이어서 검토 중입니다.'
+                : '목표 시안과 구현 화면을 비교하고 요청별로 확인하세요.'
         }
         back={
           picking || managing ? (
@@ -328,6 +335,17 @@ function ImplementationReview({
               variant="ghost"
               aria-label="구현 결과 확인으로 돌아가기"
               onClick={managing ? closeRecords : closeResults}
+            >
+              ←
+            </Button>
+          ) : actions.canReturn() ? (
+            <Button
+              id="implementation-handoff-back"
+              variant="ghost"
+              aria-label="변경 내용 전달로 돌아가기"
+              title="변경 내용 전달로 돌아가기"
+              disabled={busy}
+              onClick={() => run(actions.back)}
             >
               ←
             </Button>

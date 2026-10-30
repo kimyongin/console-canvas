@@ -18,6 +18,7 @@ export function createSnapshotPanel({
   preview,
   renameDialog,
   flushEditor,
+  handoff,
 }) {
   let trashView = false,
     documentId = null,
@@ -144,6 +145,52 @@ export function createSnapshotPanel({
   const selected = () =>
     state.timeline?.entries.find((e) => e.id === state.snapshotPreviewId && !e.deletedAt);
   const versionName = (entry) => (entry ? snapshotVersionName(entry, state.timeline.entries) : '');
+  adapter.register('snapshot-handoff', () => {
+    const entry = selected();
+    if (!entry || !state.ready) return;
+    const doc = state.snapshot.id,
+      epoch = state.generation,
+      x = $('#snapshot-graph-scroll').scrollLeft,
+      y = $('#snapshot-graph-scroll').scrollTop,
+      scroll = $('#snapshot-panel').scrollTop,
+      query = $('#snapshot-search').value,
+      zoom = $('#snapshot-preview-zoom').value;
+    const valid = () =>
+      state.ready &&
+      state.snapshot?.id === doc &&
+      state.generation === epoch &&
+      state.snapshotPreviewId === entry.id &&
+      state.timeline.entries.some((e) => e.id === entry.id && !e.deletedAt);
+    const origin = {
+      valid,
+      run() {
+        if (!valid()) return;
+        showSnapshots();
+        $('#snapshot-search').value = query;
+        search();
+        $('#snapshot-preview-zoom').value = zoom;
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            if (
+              !valid() ||
+              !$('#snapshot-panel').matches(':popover-open') ||
+              document.querySelector('dialog:modal')
+            )
+              return;
+            $('#snapshot-graph-scroll').scrollLeft = x;
+            $('#snapshot-graph-scroll').scrollTop = y;
+            $('#snapshot-panel').scrollTop = scroll;
+            $('#snapshot-handoff').focus({ preventScroll: true });
+          }),
+        );
+      },
+    };
+    try {
+      if (handoff(entry.id, origin)) $('#snapshot-panel').hidePopover();
+    } catch (error) {
+      toast(error.message);
+    }
+  });
   function updateLabel() {
     adapter.publish();
     const entry = selected(),

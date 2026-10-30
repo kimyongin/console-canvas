@@ -8,6 +8,7 @@ import { clearReact } from './react/mount.tsx';
 import { download, reviewPayload } from '../export.js';
 import { buildHandoffImage, handoffRequests } from '../handoff-image.js';
 import { withVersionScene, versionOptions } from './version-preview.js';
+import { snapshotSignature } from '../snapshot-history.js';
 export function createExportDialog({
   $,
   state,
@@ -24,6 +25,97 @@ export function createExportDialog({
   const previewView = { zoom: 'width', wide: false, left: 0, top: 0 };
   let excludedComments = new Map(),
     reviewDocument = null;
+  let origin = null,
+    navigationEpoch = 0,
+    goingBack = false;
+  function setOrigin(value) {
+    origin = value;
+    $('#export-back').hidden = !origin?.valid();
+    $('#export-context').textContent = origin?.valid()
+      ? '스냅샷 목록에서 선택한 시안 · 변경 후 화면과 요청 카드를 이미지 한 장으로 전달합니다.'
+      : '변경 후 화면과 번호별 요청 카드를 이미지 한 장으로 전달합니다.';
+  }
+  function show(versionId, from = null) {
+    commitCommentDraft();
+    renderVersionOptions($('#handoff-version'), versionOptions(state));
+    $('#handoff-version').value = versionId;
+    $('#handoff-mode').value = state.handoffSettings?.mode || 'reference';
+    setOrigin(from);
+    $('#export-dialog').showModal();
+    return refresh();
+  }
+  function open({ versionId = '@current', origin: from = null } = {}) {
+    if (!state.ready) return false;
+    if (!versionOptions(state).some((v) => v.id === versionId))
+      throw Error('전달할 버전을 찾을 수 없습니다.');
+    navigationEpoch++;
+    returnToExport = null;
+    hasReady = false;
+    excludedComments = new Map();
+    reviewDocument = state.snapshot.id;
+    show(versionId, from);
+    return true;
+  }
+  function captureReturn() {
+    const option = chosen(),
+      doc = state.snapshot.id,
+      sceneGeneration = state.generation,
+      epoch = navigationEpoch,
+      signature = snapshotSignature(option.state),
+      mode = state.handoffSettings?.mode || 'reference',
+      from = origin,
+      exclusions = new Map(excludedComments),
+      view = { ...previewView },
+      optionsScroll = $('.export-options').scrollTop;
+    const valid = () =>
+      state.ready &&
+      state.snapshot?.id === doc &&
+      state.generation === sceneGeneration &&
+      navigationEpoch === epoch &&
+      (state.handoffSettings?.mode || 'reference') === mode &&
+      versionOptions(state).some(
+        (v) => v.id === option.id && snapshotSignature(v.state) === signature,
+      );
+    return {
+      valid,
+      async run() {
+        if (!valid()) throw Error('원래 전달 기준이 바뀌었습니다.');
+        excludedComments = new Map(exclusions);
+        Object.assign(previewView, view);
+        await show(option.id, from?.valid() ? from : null);
+        if (!valid() || !$('#export-dialog').open) return;
+        $('.export-options').scrollTop = optionsScroll;
+        $('#handoff-verify').focus({ preventScroll: true });
+      },
+    };
+  }
+  async function back() {
+    if (goingBack) return;
+    const target = origin;
+    if (!target?.valid()) {
+      setOrigin(null);
+      toast('원래 스냅샷 목록이 바뀌었습니다. 현재 화면에서 다시 열어 주세요.');
+      return;
+    }
+    goingBack = true;
+    try {
+      await flushEditor();
+      if (origin !== target || !target.valid()) throw Error('원래 스냅샷 목록이 바뀌었습니다.');
+      $('#export-dialog').close();
+      target.run();
+    } catch (error) {
+      toast(error.message);
+    } finally {
+      goingBack = false;
+    }
+  }
+  adapter.register('handoff-back', back);
+  $('#export-dialog').addEventListener('cancel', (event) => {
+    if (origin) {
+      event.preventDefault();
+      back();
+    }
+  });
   let generation = 0,
     latest = null,
     previewUrl = null,
@@ -90,6 +182,8 @@ export function createExportDialog({
       scroll: $('.export-scroll').scrollTop,
       optionsScroll: $('.export-options').scrollTop,
       imageTrigger: document.activeElement?.classList.contains('handoff-hotspot'),
+      origin,
+      navigationEpoch,
       id,
     };
     $('#export-dialog').close();
@@ -98,13 +192,19 @@ export function createExportDialog({
   $('#comment-dialog').addEventListener('close', async () => {
     const target = returnToExport;
     returnToExport = null;
-    if (!target || target.document !== state.snapshot?.id || target.generation !== state.generation)
+    if (
+      !target ||
+      target.document !== state.snapshot?.id ||
+      target.generation !== state.generation ||
+      target.navigationEpoch !== navigationEpoch
+    )
       return;
     try {
       await flushEditor();
       if (target.generation !== state.generation) return;
       renderVersionOptions($('#handoff-version'), versionOptions(state));
       $('#handoff-version').value = '@current';
+      setOrigin(target.origin?.valid() ? target.origin : null);
       $('#export-dialog').showModal();
       await refresh();
       if (
@@ -274,17 +374,7 @@ export function createExportDialog({
   adapter.register('handoff-retry', () => {
     if ($('#handoff-preview').dataset.state === 'failed') refresh();
   });
-  $('#export-button').addEventListener('click', () => {
-    hasReady = false;
-    excludedComments = new Map();
-    reviewDocument = state.snapshot?.id;
-    commitCommentDraft();
-    renderVersionOptions($('#handoff-version'), versionOptions(state));
-    $('#handoff-version').value = '@current';
-    $('#handoff-mode').value = state.handoffSettings?.mode || 'reference';
-    $('#export-dialog').showModal();
-    refresh();
-  });
+  $('#export-button').addEventListener('click', () => open());
   $('#handoff-mode').addEventListener('change', () => {
     intentEpoch++;
     hasReady = false;
@@ -338,8 +428,16 @@ export function createExportDialog({
       } else {
         const image = await imagePromise;
         if (kind === 'verify') {
+          const returning = captureReturn();
           $('#export-dialog').close();
-          await implementationReview.open(image.option);
+          try {
+            await implementationReview.open(image.option, returning);
+          } catch (error) {
+            if (returning.valid()) {
+              await returning.run();
+              $('#export-status').textContent = '검토를 열지 못했습니다: ' + error.message;
+            } else throw error;
+          }
         } else {
           const result = await download(
             'console-canvas-' + image.documentId.slice(0, 8) + '.png',
@@ -395,6 +493,7 @@ export function createExportDialog({
   });
   $('#export-dialog').addEventListener('close', () => {
     if ($('#export-dialog').open) return;
+    setOrigin(null);
     generation++;
     intentEpoch++;
     clearTimeout(noteTimer);
@@ -493,5 +592,5 @@ export function createExportDialog({
       directCopying = false;
     }
   }
-  return { copyCurrentImage };
+  return { open, copyCurrentImage };
 }

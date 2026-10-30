@@ -10,7 +10,9 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
   useSyncExternalStore(adapter?.subscribe || emptySubscribe, () => {
     const v = adapter?.getSnapshot();
     return v
-      ? [v.ready, v.selected, v.selectedHidden, v.undoCount, v.redoCount].join('/')
+      ? [v.ready, v.selected, v.selectedHidden, v.undoCount, v.redoCount, v.previewSnapshotId].join(
+          '/',
+        )
       : 'initial';
   });
   const view = adapter?.getSnapshot();
@@ -706,6 +708,14 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             <Button id="compare-button" variant="outline">
               {'현재 작업과 비교'}
             </Button>
+            <Button
+              id="snapshot-handoff"
+              variant="outline"
+              disabled={!view?.ready || !view.previewSnapshotId}
+              onClick={() => dispatchEditorCommand('snapshot-handoff')}
+            >
+              이 버전 전달
+            </Button>
             <Button id="apply-snapshot" className="primary" disabled={true} variant="outline">
               {'이 버전으로 이동'}
             </Button>
@@ -1073,7 +1083,23 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
         <TaskHeader
           title="변경 내용 전달"
           titleId="export-title"
-          context="변경 후 화면과 번호별 요청 카드를 이미지 한 장으로 전달합니다."
+          context={
+            <span id="export-context">
+              변경 후 화면과 번호별 요청 카드를 이미지 한 장으로 전달합니다.
+            </span>
+          }
+          back={
+            <Button
+              id="export-back"
+              hidden
+              variant="ghost"
+              aria-label="스냅샷 목록으로 돌아가기"
+              title="스냅샷 목록으로 돌아가기"
+              onClick={() => dispatchEditorCommand('handoff-back')}
+            >
+              ←
+            </Button>
+          }
           close={
             <form method="dialog">
               <Button className="dialog-close" aria-label="닫기" variant="ghost">

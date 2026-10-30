@@ -228,6 +228,20 @@ export function ReviewRecords({
                 >
                   {record.deletedAt ? '복구' : '휴지통으로 이동'}
                 </Button>
+                {record.deletedAt && (
+                  <Button
+                    disabled={busy || usage.live >= 20}
+                    title={usage.live >= 20 ? '사용 중인 기록을 먼저 정리해 주세요.' : undefined}
+                    onClick={() =>
+                      run(async () => {
+                        await actions.manage(record.id, 'recover');
+                        choose(record.id);
+                      })
+                    }
+                  >
+                    복구하고 열기
+                  </Button>
+                )}
               </div>
             )}
             <details className="review-record-danger">

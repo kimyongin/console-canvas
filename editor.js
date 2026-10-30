@@ -425,6 +425,7 @@ const { showSnapshots, renderSnapshots } = createSnapshotPanel({
   preview,
   renameDialog,
   flushEditor,
+  handoff: (id, origin) => exportDialog.open({ versionId: id, origin }),
 });
 const aiRequests = createAiRequests({
   prepare: prepareEditor,
