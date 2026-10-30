@@ -418,6 +418,38 @@ test('Renderer broker preserves completed alternatives on cancellation and uses 
   assert.equal(calls[0].model, 'selected');
 });
 
+test('Local candidate rejection preserves consumed usage and a safe reason without retrying inference', async () => {
+  let calls = 0;
+  const provider = createChatgptProvider({
+    generate: async () => {
+      calls++;
+      return {
+        ok: true,
+        value: {
+          candidates: [{ name: 'One', patches: [] }],
+          usage: [{ name: 'One', input_tokens: 50, output_tokens: 25 }],
+          failures: [],
+          canceled: false,
+        },
+      };
+    },
+  });
+  provider.setModel('selected', 'account');
+  const result = await provider.generate({
+    request: { id: 'reject', prompt: 'Improve', count: 3, baseline: { selection: ['n1'] } },
+    context: {},
+    register: async () => {
+      throw Object.assign(new Error('Do not serialize raw input'), {
+        code: 'invalid_css_property',
+      });
+    },
+  });
+  assert.equal(calls, 1);
+  assert.equal(result.usage[0].input_tokens, 50);
+  assert.equal(result.failures[0].code, 'invalid_css_property');
+  assert.equal(result.model, 'selected');
+  assert.ok(!JSON.stringify(result).includes('Do not serialize'));
+});
 test('Two app instances serialize renewal and observe external logout without mixing accounts', async (t) => {
   const f = await fixture(t);
   const first = await f.login();
@@ -538,4 +570,67 @@ test('OS availability alone cannot enable OAuth when actual encryption fails', a
     decryptStringAsync: async () => ({ result: 'Console Canvas protected-storage probe' }),
   });
   assert.equal(fake.isEncryptionAvailable(), true);
+});
+
+test('App startup does not touch protected storage; concurrent account operations initialize once', async (t) => {
+  const { createChatgptStorage } = require('../../desktop/chatgpt.cjs');
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'cc-lazy-storage-'));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  let probes = 0,
+    release;
+  const permission = new Promise((resolve) => (release = resolve));
+  const storage = await createChatgptStorage(
+    {
+      isAsyncEncryptionAvailable: async () => true,
+      encryptStringAsync: async () => {
+        probes++;
+        await permission;
+        return Buffer.from('opaque');
+      },
+      decryptStringAsync: async () => ({ result: 'Console Canvas protected-storage probe' }),
+    },
+    { lazy: true },
+  );
+  const service = createChatgptService({ directory, safeStorage: storage });
+  t.after(() => service.close());
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(probes, 0, 'Startup and service construction must not open Keychain');
+  const first = service.status(),
+    second = service.status();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(probes, 1);
+  release();
+  assert.equal((await first).available, true);
+  assert.equal((await second).available, true);
+  assert.equal(probes, 1);
+});
+
+test('Denied account access can retry without restarting or replacing the encrypted file', async (t) => {
+  const f = await fixture(t);
+  await f.login();
+  const file = path.join(f.directory, 'chatgpt-accounts.enc');
+  const before = await fs.readFile(file);
+  let allow = false,
+    reads = 0;
+  const service = createChatgptService({
+    directory: f.directory,
+    safeStorage: {
+      ...f.safeStorage,
+      decryptString(value) {
+        reads++;
+        if (!allow) throw Error('Denied');
+        return f.safeStorage.decryptString(value);
+      },
+    },
+  });
+  t.after(() => service.close());
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(reads, 0);
+  await assert.rejects(service.status(), { code: 'storage_unavailable' });
+  assert.deepEqual(await fs.readFile(file), before);
+  allow = true;
+  const status = await service.status();
+  assert.equal(status.accounts.length, 1);
+  assert.equal(status.accounts[0].loggedIn, true);
+  assert.deepEqual(await fs.readFile(file), before);
 });

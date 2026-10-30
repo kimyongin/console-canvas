@@ -132,7 +132,7 @@ async function start() {
   connection = JSON.parse(fs.readFileSync(path.join(stateDir, 'connection.json'), 'utf8'));
   const chatgpt = require('./chatgpt.cjs').createChatgptService({
     directory: path.join(app.getPath('userData'), 'ai-auth'),
-    safeStorage: await require('./chatgpt.cjs').createChatgptStorage(safeStorage),
+    safeStorage: await require('./chatgpt.cjs').createChatgptStorage(safeStorage, { lazy: true }),
     openExternal: (url) => shell.openExternal(url),
   });
   require('./chatgpt-ipc.cjs').registerChatgptIpc({

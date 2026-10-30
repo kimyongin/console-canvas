@@ -22,6 +22,7 @@
 
 - 버전은 `package.json` 한 곳에서 변경한다. 앱과 Python MCP가 같은 버전 값을 읽는다. 이동·주석·작업 묶음 제한은 `edit-policy.json`을 JS와 Python에서 함께 읽는다.
 - `scripts/build.py`는 esbuild 의존성 그래프를 따라 JS/CSS를 번들링하고 `runtime-manifest.json`의 공개 자산·체크섬을 생성한다. 새 모듈의 배포 목록을 별도 하드코딩하지 않는다. 공개 자산 목록에 데스크톱 IPC·MCP 구현·개인 데이터를 노출하지 않는다.
+- macOS 일반 앱 빌드는 `scripts/build_desktop.py`의 고정 개발 서명을 기본으로 사용한다. 준비한 사용자 전용 `Console Canvas Development Signing` 인증서를 유지하고 키를 재생성하지 않는다. 신원이 없거나 서명에 실패하면 중단하며 ad-hoc으로 자동 전환하지 않는다. `--signing adhoc`은 명시한 격리 검사에만 사용한다. 개인 키·P12·키체인 암호는 저장소/배포 자산에 포함하지 않는다. 개발 서명과 Developer ID·공증·공개 배포 적격을 구분한다.
 - `db.js`는 immutable 캡처·mutable 세션·최근 목록 메타데이터를 분리한다. `editor-session.js`의 저장 큐와 flush를 우회하지 않는다. 종료·업데이트는 `desktop/lifecycle.cjs`의 같은 저장 응답을 기다린다.
 
 - 문서의 사용자 지정 이름·휴지통은 `documents` 메타데이터, 스냅샷의 휴지통은 타임라인 엔트리의 `deletedAt`이다. 원본 캡처·하위 버전·부모 ID를 지우지 않는다. 기본 목록과 MCP는 휴지통을 제외하지만 파일·저장 왕복에서는 유지한다. 휴지통 복구만으로 편집 상태를 적용하지 않는다.

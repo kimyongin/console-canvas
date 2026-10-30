@@ -17,7 +17,15 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--download-only', action='store_true')
+    parser.add_argument('--signing', choices=('dev', 'identity', 'adhoc'), default='dev',
+                        help='dev reuses the prepared local certificate; adhoc must be explicit')
+    parser.add_argument('--identity', help='Certificate identity for --signing identity')
+    parser.add_argument('--keychain', type=Path, help='Optional keychain for --signing identity')
     args = parser.parse_args()
+    if args.signing == 'identity' and (not args.identity or args.identity == '-'):
+        parser.error('--signing identity requires a certificate identity')
+    if args.signing != 'identity' and (args.identity or args.keychain):
+        parser.error('--identity/--keychain require --signing identity')
     if sys.platform != 'darwin':
         parser.error('This packaging script targets macOS. Use npm install and npm start for development on other systems.')
     version = json.loads((ROOT / 'package.json').read_text())['devDependencies']['electron']
@@ -83,11 +91,20 @@ def main():
                   'CFBundleShortVersionString': json.loads((ROOT / 'package.json').read_text())['version'],
                   'CFBundleVersion': json.loads((ROOT / 'package.json').read_text())['version']})
     plist.write_bytes(plistlib.dumps(value))
-    subprocess.run(['/usr/bin/codesign', '--force', '--deep', '--sign', '-', str(app)], check=True)
+    if args.signing == 'dev':
+        from dev_signing import sign
+        signing = sign(app)
+    else:
+        command = ['/usr/bin/codesign', '--force', '--deep', '--sign', args.identity if args.signing == 'identity' else '-']
+        if args.keychain:
+            command.extend(['--keychain', str(args.keychain)])
+        subprocess.run([*command, str(app)], check=True)
+        subprocess.run(['/usr/bin/codesign', '--verify', '--deep', '--strict', str(app)], check=True)
+        signing = {'kind': 'certificate' if args.signing == 'identity' else 'explicit-ad-hoc'}
     output = ROOT / 'dist' / ('console-canvas-desktop-macos-' + arch + '.zip')
     subprocess.run(['/usr/bin/ditto', '-c', '-k', '--sequesterRsrc', '--keepParent', str(app), str(output)], check=True)
     subprocess.run([sys.executable, str(ROOT / 'scripts/build_dmg.py'), '--app', str(app)], check=True)
-    print(json.dumps({'app': str(app), 'archive': str(output), 'electron': version, 'arch': arch}, ensure_ascii=False), flush=True)
+    print(json.dumps({'app': str(app), 'archive': str(output), 'electron': version, 'arch': arch, 'signing': signing}, ensure_ascii=False), flush=True)
 
 
 if __name__ == '__main__':

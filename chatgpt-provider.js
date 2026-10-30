@@ -41,13 +41,24 @@ export function createChatgptProvider(transport = globalThis.ConsoleCanvasDeskto
             variantTotal: request.count,
             previousDirections: usage.map((item) => item.name).filter(Boolean),
           });
-          for (const candidate of result.candidates) {
-            if (job.canceled) break;
-            await register(candidate);
-          }
+          // Inference has already consumed usage even if local patch validation fails.
           usage.push(...result.usage);
           failures.push(...result.failures);
-          if (result.failures.length || result.canceled) break;
+          let rejected = false;
+          for (const candidate of result.candidates) {
+            if (job.canceled) break;
+            try {
+              await register(candidate);
+            } catch (error) {
+              failures.push({
+                index: i + 1,
+                code: error.code === 'invalid_css_property' ? error.code : 'candidate_invalid',
+              });
+              rejected = true;
+              break;
+            }
+          }
+          if (rejected || result.failures.length || result.canceled) break;
         }
         return { auth: 'chatgpt', model, usage, failures, canceled: job.canceled };
       } finally {

@@ -181,6 +181,8 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
     }),
     [chatgptModels, setChatgptModels] = useState<{ id: string; name: string }[]>([]),
     [chatgptModel, setChatgptModel] = useState(''),
+    [storageLoading, setStorageLoading] = useState(false),
+    [storageError, setStorageError] = useState(false),
     chatgptSequence = useRef(0);
   const chatgptAccount = chatgptStatus.accounts.find((a) => a.id === chatgptStatus.activeId);
   const generating = requests.some(
@@ -190,6 +192,8 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
   const directReady =
     authentication === 'chatgpt'
       ? !!(
+          !storageLoading &&
+          !storageError &&
           !chatgptStatus.pending &&
           chatgptAccount?.loggedIn &&
           chatgptAccount.planEnabled &&
@@ -199,10 +203,15 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
       : actions.apiStatus().configured;
   async function refreshChatgpt() {
     const sequence = ++chatgptSequence.current;
+    let storageConfirmed = false;
+    setStorageLoading(true);
+    setStorageError(false);
     try {
       const status: ChatgptStatus = await actions.chatgpt('status');
       if (sequence !== chatgptSequence.current) return;
       setChatgptStatus(status);
+      storageConfirmed = status.available;
+      setStorageError(!status.available);
       const account = status.accounts.find((a) => a.id === status.activeId);
       if (!account?.loggedIn || !account.planEnabled || status.pending) {
         setChatgptModels([]);
@@ -222,11 +231,14 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
       });
     } catch (e) {
       if (sequence === chatgptSequence.current) {
+        setStorageError(!storageConfirmed);
         setChatgptModels([]);
         setChatgptModel('');
         actions.chatgptModel('');
         setMessage(e instanceof Error ? e.message : String(e));
       }
+    } finally {
+      if (sequence === chatgptSequence.current) setStorageLoading(false);
     }
   }
   useEffect(() => {
@@ -529,10 +541,25 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
           </NativeSelect>
           {authentication === 'chatgpt' ? (
             <section className="ai-chatgpt" aria-label="ChatGPT 연결">
-              {actions.chatgptAvailable() && !chatgptStatus.available && (
+              {storageLoading && (
+                <p role="status">
+                  보호된 계정 저장소와 연결을 확인하고 있습니다. macOS에서 ‘Console Canvas Safe
+                  Storage’ 접근 창이 열리면 직접 처리해 주세요. 이 창을 닫아도 편집과 MCP는 계속
+                  사용할 수 있습니다.
+                </p>
+              )}
+              {storageError && !storageLoading && (
+                <div role="status">
+                  <p>보호된 계정을 읽지 못했습니다. 저장된 로그인 정보는 유지됩니다.</p>
+                  <Button id="chatgpt-storage-retry" type="button" onClick={() => refreshChatgpt()}>
+                    계정 저장소 다시 확인
+                  </Button>
+                </div>
+              )}
+              {actions.chatgptAvailable() && !chatgptStatus.available && !storageLoading && (
                 <p role="status">
                   기기의 안전한 계정 저장소를 사용할 수 없어 로그인이 차단되었습니다. 기기
-                  잠금·키체인을 확인한 뒤 앱을 다시 실행하세요.
+                  잠금·키체인을 확인한 뒤 계정 저장소를 다시 확인하세요.
                 </p>
               )}
               <p className="ai-help">
@@ -579,6 +606,8 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
                     busy ||
                     generating ||
                     chatgptStatus.pending ||
+                    storageLoading ||
+                    storageError ||
                     !chatgptStatus.available ||
                     !actions.chatgptAvailable()
                   }

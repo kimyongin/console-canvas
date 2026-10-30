@@ -10,6 +10,7 @@ let qaNumber = 0;
 window.chatgptMock = {
   calls: [],
   mode: 'complete',
+  storageMode: 'complete',
   complete(planEnabled = true) {
     qaStatus.pending = false;
     qaStatus.activeId = 'qa-registration';
@@ -40,6 +41,10 @@ window.ConsoleCanvasDesktop = {
       name,
       async (value) => {
         window.chatgptMock.calls.push({ name, value });
+        if (name === 'status' && window.chatgptMock.storageMode === 'wait')
+          await new Promise((resolve) => (window.chatgptMock.releaseStorage = resolve));
+        if (name === 'status' && window.chatgptMock.storageMode === 'denied')
+          return { ok: false, error: { code: 'storage_unavailable', message: 'QA denied' } };
         if (name === 'login') qaStatus.pending = true;
         if (name === 'cancel-login') qaStatus.pending = false;
         if (name === 'logout') {

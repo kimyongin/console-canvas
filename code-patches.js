@@ -65,8 +65,13 @@ export function buildCodeDocument(baseHtml, baseNodes, patches = []) {
       )
         throw new Error('CSS 속성 형식이 올바르지 않습니다.');
       for (const [key, value] of Object.entries(op.properties)) {
-        if (!/^--[a-zA-Z0-9_-]+$|^[a-z][a-z-]*$/.test(key))
-          throw new Error('CSS 속성 이름이 올바르지 않습니다.');
+        if (
+          !/^(?:--[a-zA-Z0-9_-]+|(?:-(?:webkit|moz|ms|o)-)?[a-z][a-z-]*)$/.test(key) ||
+          ['-moz-binding', 'behavior'].includes(key)
+        )
+          throw Object.assign(new Error('CSS 속성 이름이 올바르지 않습니다.'), {
+            code: 'invalid_css_property',
+          });
         if (value === null) el.style.removeProperty(key);
         else el.style.setProperty(key, safeStyle(value), 'important');
       }

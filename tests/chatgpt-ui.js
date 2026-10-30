@@ -48,6 +48,40 @@ try {
       $('#ai-authentication').value === 'chatgpt',
   );
   check('Generation disabled until consent and account model are ready', $('#ai-create').disabled);
+  w.chatgptMock.storageMode = 'wait';
+  click('#chatgpt-refresh');
+  await until(() => $('.ai-chatgpt').textContent.includes('저장소와 연결을 확인하고'));
+  check(
+    'Pending Keychain permission has an explanation and blocks authentication/generation',
+    $('#chatgpt-login').disabled &&
+      $('#ai-create').disabled &&
+      $('.ai-chatgpt').textContent.includes('Safe Storage'),
+  );
+  click('#ai-close');
+  await until(() => !$('#ai-close'));
+  check(
+    'Pending protected storage does not block returning to normal editing',
+    a.state.ready &&
+      d.querySelectorAll('dialog:modal').length === 0 &&
+      a.state.scene.selection.has(button.id),
+  );
+  w.chatgptMock.storageMode = 'denied';
+  w.chatgptMock.releaseStorage();
+  click('#ai-variants-button');
+  await until(() => $('#chatgpt-storage-retry'));
+  check(
+    'Denied storage preserves the document and offers an in-app retry',
+    $('#ai-create').disabled &&
+      a.state.aiRequests.length === 0 &&
+      $('.ai-chatgpt').textContent.includes('로그인 정보는 유지'),
+  );
+  w.chatgptMock.storageMode = 'complete';
+  click('#chatgpt-storage-retry');
+  await until(() => !$('#chatgpt-login').disabled);
+  check(
+    'Storage retry recovers without restarting or creating requests',
+    !$('#chatgpt-storage-retry') && a.state.aiRequests.length === 0,
+  );
   click('#chatgpt-login');
   await until(() => $('#chatgpt-cancel-login'));
   check(

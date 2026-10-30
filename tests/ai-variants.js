@@ -27,6 +27,24 @@ try {
   const button = [...scene.nodes.values()].find(
     (n) => n.locator?.id === 'new-customer' && n.tag === 'button',
   );
+  const vendor = buildCodeDocument(
+    state.snapshot.html,
+    new Map(state.snapshot.nodes.map((n) => [n.id, n])),
+    [
+      {
+        type: 'style',
+        element_id: button.id,
+        properties: { '-webkit-text-fill-color': '#fff', '-webkit-appearance': 'none' },
+      },
+    ],
+  ).elements.get(button.id);
+  check(
+    'Valid vendor CSS from real AI output retains important style without changing the source scene',
+    !!vendor.style.getPropertyValue('-webkit-text-fill-color') &&
+      vendor.style.getPropertyValue('-webkit-appearance') === 'none' &&
+      vendor.style.getPropertyPriority('-webkit-text-fill-color') === 'important' &&
+      !scene.codePatches.length,
+  );
   app.selectNode(button.id);
   scene.setPosition(24, 16);
   scene.setComment(button.id, 'Keep the customer action prominent');
@@ -59,7 +77,11 @@ try {
           {
             type: 'style',
             element_id: button.id,
-            properties: { 'background-color': color, 'border-radius': '12px' },
+            properties: {
+              'background-color': color,
+              'border-radius': '12px',
+              '-webkit-text-fill-color': '#fff',
+            },
           },
         ],
       }),
@@ -199,6 +221,8 @@ try {
       properties: { background: 'u\\72l(https://bad.test)' },
     },
     { type: 'stylesheet', css: '@import "https://bad.test"' },
+    { type: 'style', element_id: button.id, properties: { '-moz-binding': 'none' } },
+    { type: 'style', element_id: button.id, properties: { behavior: 'none' } },
     { type: 'reparent', element_id: parent, parent_id: button.id },
     { type: 'text', element_id: parent, text: 'Would destroy IDs' },
   ]) {

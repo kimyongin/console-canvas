@@ -57,8 +57,21 @@ function createChatgptService({
         throw fail('storage_unavailable', '저장된 ChatGPT 계정을 안전하게 읽을 수 없습니다.');
     }
   }
-  const ready = load();
-  ready.catch(() => {});
+  // Reading credentials may wait for an OS permission dialog. Do not start it
+  // while constructing the service: ordinary editing and MCP need no account.
+  let readiness;
+  function ready() {
+    if (!readiness)
+      readiness = (async () => {
+        await safeStorage.initialize?.();
+        await load();
+        if (!encrypted()) readiness = null;
+      })().catch((error) => {
+        readiness = null;
+        throw error;
+      });
+    return readiness;
+  }
   async function save() {
     if (!encrypted()) throw fail('storage_unavailable', '안전한 계정 저장소를 사용할 수 없습니다.');
     const tmp = filename + '.' + crypto.randomUUID();
@@ -75,7 +88,7 @@ function createChatgptService({
     const run = queue
       .catch(() => {})
       .then(async () => {
-        await ready;
+        await ready();
         await fs.mkdir(directory, { recursive: true, mode: 0o700 });
         let lock;
         for (let i = 0; i < 100; i++) {
@@ -422,7 +435,7 @@ function createChatgptService({
     });
   }
   async function models() {
-    await ready;
+    await ready();
     const id = data.active,
       record = await credential(id);
     const body = await json(RESOURCE + '/models', {
@@ -499,7 +512,7 @@ function createChatgptService({
     variantTotal = 1,
     previousDirections = [],
   }) {
-    await ready;
+    await ready();
     const id = data.active;
     if (accountId !== id)
       throw fail(
@@ -566,24 +579,34 @@ function createChatgptService({
   }
   return { status, login, cancelLogin, models, select, logout, generate, cancel, close };
 }
-async function createChatgptStorage(safeStorage) {
-  let secure = false;
-  try {
-    const available = await safeStorage.isAsyncEncryptionAvailable();
-    if (
-      available &&
-      !(process.platform === 'linux' && safeStorage.getSelectedStorageBackend() === 'basic_text')
-    ) {
-      const probe = 'Console Canvas protected-storage probe';
-      const encrypted = await safeStorage.encryptStringAsync(probe);
-      secure =
-        !encrypted.includes(Buffer.from(probe)) &&
-        (await safeStorage.decryptStringAsync(encrypted)).result === probe;
+async function createChatgptStorage(safeStorage, { lazy = false } = {}) {
+  let secure = false,
+    initializing;
+  async function probe() {
+    try {
+      const available = await safeStorage.isAsyncEncryptionAvailable();
+      if (
+        available &&
+        !(process.platform === 'linux' && safeStorage.getSelectedStorageBackend() === 'basic_text')
+      ) {
+        const probe = 'Console Canvas protected-storage probe';
+        const encrypted = await safeStorage.encryptStringAsync(probe);
+        secure =
+          !encrypted.includes(Buffer.from(probe)) &&
+          (await safeStorage.decryptStringAsync(encrypted)).result === probe;
+      }
+    } catch {
+      secure = false;
     }
-  } catch {
-    secure = false;
   }
+  async function initialize() {
+    if (secure) return;
+    if (!initializing) initializing = probe().finally(() => (initializing = null));
+    await initializing;
+  }
+  if (!lazy) await initialize();
   return {
+    initialize,
     isEncryptionAvailable: () => secure,
     encryptString: (value) => safeStorage.encryptStringAsync(value),
     decryptString: async (value) => (await safeStorage.decryptStringAsync(value)).result,
