@@ -304,10 +304,11 @@ try {
     .dispatchEvent(new frame.contentWindow.Event('change', { bubbles: true }));
   await new Promise((r) => setTimeout(r, 30));
   check(
-    'API auth clearly distinguishes usage billing, memory storage and future OAuth',
+    'API auth clearly distinguishes billing, memory storage and separate ChatGPT eligibility',
     doc.querySelector('.ai-auth').textContent.includes('별도 과금') &&
       doc.querySelector('.ai-auth').textContent.includes('메모리') &&
-      doc.querySelector('.ai-auth').textContent.includes('검증 후'),
+      doc.querySelector('.ai-auth').textContent.includes('자격 검증') &&
+      doc.querySelector('#ai-authentication option[value="chatgpt"]'),
   );
   const isolated = { ...state, aiRequests: JSON.parse(JSON.stringify(state.aiRequests)) };
   let fail = false;

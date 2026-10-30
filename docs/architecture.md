@@ -5,6 +5,10 @@
 
 제품 요구사항과 사용자 동작의 기준은 [PRD](PRD.md), 실제 확인 결과는 [검증 기록](verification.md)에서 관리한다. 아래에는 버전별 구현 기록도 포함한다. 현재 실행 결과는 [검증 기록](verification.md), 전환 범위와 설치/직접 사용 잔여는 [개선 티켓](https://github.com/kimyongin/console-canvas/issues/1)과 검증 기록에서 구분한다.
 
+## ChatGPT 직접 호출 · 0.36
+
+`desktop/chatgpt.cjs`는 공식 로컬 SIWC OAuth·계정/host·보호 저장·갱신·철회·모델/추론을 소유한다. editor mainFrame의 `chatgpt-ipc.cjs`만 접근하고 `preload.cjs`는 비밀 없는 결과만 노출한다. `chatgpt-provider.js`는 renderer의 직렬 생성/취소와 공통 후보 등록을 연결한다. 실제 토큰과 Responses 호출은 main에 남고 기존 `ai-provider.js`의 스키마/스트림 변환을 재사용한다. API 키 인증·외부 MCP 경로는 별개다. [설계·공식 근거·한계](chatgpt-oauth-0.36.md).
+
 ## 편집과 명령
 
 0.35의 스냅샷 비교/이름 변경 복귀는 검색·미리보기 확대/선택·스크롤·초점을 같은 문서/세대에 한해 복원하며 다른 모달/삭제된 선택의 늦은 콜백을 거절한다. 문서 바로 검색의 전체 목록 진입은 열린 빠른 메뉴의 검색만 넘긴다. AI 추가 생성 설정은 `ui/ai-panel.js`의 문서/요청별 실행 중 Map에 보관하고 `ai-variants.tsx`가 새 요청의 영구 `aiDraft`와 분리해 표시한다. 기본값은 선택한 저장 요청이며 생성 시에만 기존 manager 계약으로 전달한다. UI 초안/복귀 상태는 DB·파일·MCP 계약을 확장하지 않는다. 전체 목표의 현재 기준은 [140개 매트릭스](scenario-matrix-0.35.md)다.

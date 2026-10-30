@@ -1,5 +1,18 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('ConsoleCanvasDesktop', {
+  chatgpt: Object.fromEntries(
+    [
+      'status',
+      'login',
+      'cancel-login',
+      'models',
+      'select',
+      'logout',
+      'generate',
+      'cancel',
+      'usage',
+    ].map((name) => [name, (...args) => ipcRenderer.invoke('canvas:chatgpt-' + name, ...args)]),
+  ),
   focusAddress: () => ipcRenderer.invoke('canvas:focus-address'),
   beginReviewCapture: (value) => ipcRenderer.invoke('canvas:begin-review-capture', value),
   cancelReviewCapture: (id) => ipcRenderer.invoke('canvas:cancel-review-capture', id),

@@ -53,6 +53,18 @@ async function main() {
     assert.equal(prefs.sandbox, true);
   }
   assert.equal(await evaluate(source, 'typeof window.ConsoleCanvasDesktop'), 'undefined');
+  const chatgptBoundary = await evaluate(editor, 'window.ConsoleCanvasDesktop.chatgpt.status()');
+  assert.equal(chatgptBoundary.ok, true);
+  assert.deepEqual(chatgptBoundary.value.accounts, []);
+  assert.ok(!JSON.stringify(chatgptBoundary).includes('access_token'));
+  const protectedStorage = await require(
+    path.join(appRoot, 'desktop/chatgpt.cjs'),
+  ).createChatgptStorage(require('electron').safeStorage);
+  if (protectedStorage.isEncryptionAvailable()) {
+    const encrypted = await protectedStorage.encryptString('qa-only-protected-value');
+    assert.ok(!encrypted.includes('qa-only-protected-value'));
+    assert.equal(await protectedStorage.decryptString(encrypted), 'qa-only-protected-value');
+  }
   if (phase === 'prepare') {
     const before = await evaluate(source, 'document.documentElement.outerHTML');
     await evaluate(shell, 'window.ConsoleCanvasShell.capture()');
@@ -278,6 +290,8 @@ async function main() {
       path.join(directory, 'prepare-ready.json'),
       JSON.stringify({
         sandbox: true,
+        chatgptIpc: true,
+        chatgptProtectedStorage: protectedStorage.isEncryptionAvailable(),
         sourceUnchanged: true,
         reviewCapturePreservesTarget: true,
         reviewCancellation: true,

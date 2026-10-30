@@ -7,6 +7,8 @@ const {
   Menu,
   dialog,
   clipboard,
+  safeStorage,
+  shell,
 } = require('electron');
 const fs = require('node:fs'),
   path = require('node:path'),
@@ -126,6 +128,17 @@ async function start() {
     { timeout: 15000 },
   );
   connection = JSON.parse(fs.readFileSync(path.join(stateDir, 'connection.json'), 'utf8'));
+  const chatgpt = require('./chatgpt.cjs').createChatgptService({
+    directory: path.join(app.getPath('userData'), 'ai-auth'),
+    safeStorage: await require('./chatgpt.cjs').createChatgptStorage(safeStorage),
+    openExternal: (url) => shell.openExternal(url),
+  });
+  require('./chatgpt-ipc.cjs').registerChatgptIpc({
+    ipcMain,
+    service: chatgpt,
+    trust: (event) => trusted(event, 'editor'),
+    openUsage: () => shell.openExternal('https://chatgpt.com/settings/usage'),
+  });
   const browsing = session.fromPartition('persist:console-canvas-websites');
   browsing.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
   browsing.setPermissionCheckHandler(() => false);
@@ -181,6 +194,7 @@ async function start() {
     }
   });
   win.on('closed', () => {
+    chatgpt.close();
     if (!source.webContents.isDestroyed()) source.webContents.close();
     if (!editor.webContents.isDestroyed()) editor.webContents.close();
     win = null;

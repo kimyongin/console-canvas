@@ -86,6 +86,7 @@ async function main() {
     'ux-followup-033',
     'ux-followup-034',
     'ux-followup-035',
+    'chatgpt-ui',
   ]) {
     if (
       process.env.CONSOLE_CANVAS_TEST_SUITES &&

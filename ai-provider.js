@@ -101,7 +101,15 @@ export function createAiProvider({ fetchImpl = globalThis.fetch } = {}) {
     cancel(id) {
       jobs.get(id)?.abort();
     },
-    async generate({ request, context, register, onProgress = () => {} }) {
+    async generate({
+      request,
+      context,
+      register,
+      onProgress = () => {},
+      variantOffset = 0,
+      variantTotal = request.count,
+      previousDirections = [],
+    }) {
       if (!credential) throw new Error('API 키를 먼저 등록해 주세요.');
       if (jobs.has(request.id)) throw new Error('이미 생성 중인 요청입니다.');
       const controller = new AbortController();
@@ -139,9 +147,12 @@ export function createAiProvider({ fetchImpl = globalThis.fetch } = {}) {
                         text: JSON.stringify({
                           prompt: request.prompt,
                           selection: request.baseline.selection,
-                          variant_number: index + 1,
-                          variant_total: request.count,
-                          previous_directions: usage.map((item) => item.name),
+                          variant_number: variantOffset + index + 1,
+                          variant_total: variantTotal,
+                          previous_directions: [
+                            ...previousDirections,
+                            ...usage.map((item) => item.name),
+                          ],
                           context: JSON.parse(serialized),
                         }),
                       },
@@ -159,7 +170,17 @@ export function createAiProvider({ fetchImpl = globalThis.fetch } = {}) {
                 },
               }),
             });
-            if (!response.ok) throw safeError(response.status);
+            if (!response.ok) {
+              const error = safeError(response.status);
+              const body = await response.json().catch(() => ({}));
+              const code = body.error?.code;
+              if (/^(subscription_sharing_[a-z_]+|chatpass_v2_[a-z_]+)$/.test(code || ''))
+                error.code = code;
+              error.status = response.status;
+              error.requestId = response.headers.get('x-request-id')?.slice(0, 200);
+              error.shape = body.error ? 'error' : body.detail ? 'detail' : 'other';
+              throw error;
+            }
             let completed = null,
               buffer = '',
               size = 0;
@@ -191,7 +212,13 @@ export function createAiProvider({ fetchImpl = globalThis.fetch } = {}) {
                   if (['error', 'response.failed', 'response.incomplete'].includes(event.type))
                     throw Object.assign(
                       new Error('AI 생성이 완료되지 않았습니다. 다시 요청해 주세요.'),
-                      { code: 'generation_failed' },
+                      {
+                        code: /^(subscription_sharing_[a-z_]+|chatpass_v2_[a-z_]+)$/.test(
+                          event.response?.error?.code || event.error?.code || '',
+                        )
+                          ? event.response?.error?.code || event.error?.code
+                          : 'generation_failed',
+                      },
                     );
                 }
               }
@@ -238,13 +265,23 @@ export function createAiProvider({ fetchImpl = globalThis.fetch } = {}) {
             });
           } catch (error) {
             if (controller.signal.aborted) break;
-            failures.push({ index: index + 1, code: error.code || 'generation_failed' });
+            failures.push({
+              index: index + 1,
+              code: error.code || 'generation_failed',
+              ...(error.status
+                ? { status: error.status, requestId: error.requestId, shape: error.shape }
+                : {}),
+            });
             onProgress({
               index: index + 1,
               total: request.count,
               error: error.code || 'generation_failed',
             });
-            if (['api_401', 'api_403', 'api_429'].includes(error.code)) break;
+            if (
+              ['api_401', 'api_403', 'api_429'].includes(error.code) ||
+              /^(subscription_sharing_|chatpass_v2_)/.test(error.code || '')
+            )
+              break;
           }
         }
         return { model: chosenModel, usage, failures, canceled: controller.signal.aborted };
