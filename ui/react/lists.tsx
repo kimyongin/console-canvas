@@ -15,6 +15,7 @@ export interface LayerRow {
   title: string;
   icon: string;
   label: string;
+  searchMatch?: boolean;
   comment?: string;
   commentNumber?: number;
   mark?: string;
@@ -37,6 +38,7 @@ export function renderLayerRows(
           }
           style={{ paddingLeft: Math.min(row.depth * 12, 96) }}
           data-layer-id={row.id}
+          data-search-match={row.searchMatch || undefined}
         >
           <Button
             variant="ghost"
@@ -58,6 +60,7 @@ export function renderLayerRows(
             <span className="layer-icon">{row.icon}</span>
             <span className="layer-label">{row.label}</span>
           </Button>
+          {row.searchMatch && <small className="search-match-badge">일치</small>}
           {row.comment && (
             <span className="layer-comment" title={row.comment}>
               주석 {row.commentNumber}
@@ -246,6 +249,7 @@ export function renderCaptureIssues(
     name?: string;
     actionable: boolean;
     severity: string;
+    resolution?: string;
   }[],
   reveal: (id: string) => void,
 ) {
@@ -270,8 +274,16 @@ export function renderCaptureIssues(
                   <strong>{item.name || item.kind}</strong>
                   {item.name && <span className="capture-issue-kind">{item.kind}</span>}
                   <p>{item.message}</p>
+                  {item.resolution === 'resource_applied' && (
+                    <p>현재 작업에 복구 적용됨 · 시각 확인은 필요합니다.</p>
+                  )}
                   {item.id && item.actionable && (
-                    <Button type="button" variant="outline" onClick={() => reveal(item.id!)}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      aria-label={(item.name || item.kind) + ' · 화면에서 확인'}
+                      onClick={() => reveal(item.id!)}
+                    >
                       화면에서 확인
                     </Button>
                   )}
@@ -358,5 +370,39 @@ function DocumentVisual({
         </small>
       </div>
     </div>
+  );
+}
+
+export function renderQuickDocuments(host: Element, rows: DocumentRow[], loading: boolean) {
+  renderReact(
+    host,
+    <>
+      {loading && <p role="status">저장된 화면을 불러오는 중…</p>}
+      {!loading && !rows.length && <p role="status">일치하는 화면이 없습니다.</p>}
+      {rows.map((row) => (
+        <div key={row.id} className="quick-document">
+          <Button
+            className="quick-document-open"
+            variant="ghost"
+            disabled={row.disabled}
+            onClick={row.open}
+            title={row.url + ' · ' + row.captured}
+            aria-current={row.current ? 'true' : undefined}
+          >
+            <strong>
+              {row.title}
+              {row.current ? ' · 현재 작업' : ''}
+            </strong>
+            <small>
+              {row.summary?.snapshotName || row.date} · 주석 {row.summary?.commentCount ?? '—'}개
+            </small>
+            <small>
+              {row.date} · {row.url}
+            </small>
+          </Button>
+          <ActionMenu label={row.title} actions={row.actions} />
+        </div>
+      ))}
+    </>,
   );
 }

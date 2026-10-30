@@ -17,15 +17,11 @@
           <button id="show-source" class="active">웹사이트</button
           ><button id="show-editor">편집기</button>
         </nav>
-        <label id="capture-scope-label"
-          >범위
-          <select id="capture-scope" aria-label="가져오기 범위">
-            <option value="viewport">현재 보이는 화면</option>
-            <option value="document">전체 페이지</option>
-            <option value="region">영역 선택</option>
-          </select></label
-        ><small id="status" role="status">원하는 화면을 열어 주세요.</small
+        <small id="status" role="status">원하는 화면을 열어 주세요.</small
         ><button id="capture" class="primary">이 화면 가져오기 →</button>
+        <button id="capture-menu-button" aria-label="가져오기 실행 메뉴" aria-haspopup="menu">
+          ▾</button
+        ><button id="cancel-review-capture" hidden>검토 가져오기 취소</button>
         <button id="show-settings" title="에이전트 연결·스킬 설치·앱 업데이트" aria-label="앱 설정">
           앱 설정
         </button>
@@ -50,7 +46,17 @@
       </p>
       <div id="capture-photo-wrap">
         <img id="capture-photo" alt="현재 원본 화면 촬영 사진" draggable="false" />
-        <div id="capture-selection" hidden></div>
+        <div
+          id="capture-selection"
+          hidden
+          tabindex="0"
+          role="group"
+          aria-label="선택 영역. 방향키 이동, Shift 방향키 크기 조절"
+        >
+          <span data-handle="nw"></span><span data-handle="n"></span><span data-handle="ne"></span
+          ><span data-handle="e"></span><span data-handle="se"></span><span data-handle="s"></span
+          ><span data-handle="sw"></span><span data-handle="w"></span>
+        </div>
       </div>
       <p id="capture-region-size" role="status">아직 선택하지 않았습니다.</p>
       <button id="capture-region-cancel">취소</button
@@ -70,12 +76,20 @@
         <article>
           <h2>에이전트 연결·스킬</h2>
           <p>Codex 스킬 설치와 MCP 연결 명령을 확인합니다.</p>
+          <p id="quick-skill-info"></p>
+          <button id="quick-install-skill">Codex 스킬 설치·업데이트</button
+          ><button id="quick-copy-mcp">MCP 등록 명령 복사</button>
+          <p id="quick-agent-status" role="status"></p>
           <button id="show-agent">에이전트 연결 열기 →</button>
         </article>
         <article>
           <h2>앱 업데이트</h2>
           <p>현재 버전을 확인하고 새 버전을 설치합니다.</p>
-          <button id="show-update">업데이트 열기 →</button>
+          <label class="update-download-choice"
+            ><input type="checkbox" id="auto-download-updates" /> 업데이트 화면을 열 때 새 버전 자동
+            다운로드</label
+          ><small>기본은 꺼짐입니다. 설치·다시 시작은 직접 확인합니다.</small
+          ><button id="show-update">업데이트 열기 →</button>
         </article>
       </div>
       <div class="setup-actions">

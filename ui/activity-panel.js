@@ -1,6 +1,6 @@
 import { activityGroups } from './activity-groups.js';
 import { renderActivityRows } from './react/lists.tsx';
-import { activityBranch } from '../activity-history.js';
+import { activityBranch, activityChanges } from '../activity-history.js';
 import { pointTarget } from '../edit-commands.js';
 export function changeDescription(change) {
   if (change.type === 'code') return 'HTML·CSS를 수정했습니다. 스냅샷 비교에서 확인할 수 있습니다.';
@@ -40,7 +40,13 @@ export function createActivityPanel({ $, state, selectNode, focusComment }) {
   function render() {
     const list = $('#activity-list');
     const rows = [];
-    const all = $('#activity-scope').value === 'all',
+    if (!state.snapshot || !state.scene) {
+      $('#activity-count').textContent = '0';
+      $('#activity-branch').textContent = '';
+      renderActivityRows(list, [], '화면을 열면 변경 이력이 표시됩니다.');
+      return;
+    }
+    const all = $('#activity-all').checked,
       filter = $('#activity-filter').value,
       query = $('#activity-search').value.trim().toLowerCase(),
       selectedOnly = $('#activity-selected').checked;
@@ -77,7 +83,9 @@ export function createActivityPanel({ $, state, selectNode, focusComment }) {
       rows.push({
         id: event.id || 'baseline-' + changes[0]?.id,
         time: baseline
-          ? '저장된 주석 · 이전 작업에서 유지됨'
+          ? typeof baseline === 'string'
+            ? baseline
+            : '저장된 주석 · 이전 작업에서 유지됨'
           : new Date(event.created_at).toLocaleTimeString('ko-KR', {
               hour: '2-digit',
               minute: '2-digit',
@@ -115,6 +123,35 @@ export function createActivityPanel({ $, state, selectNode, focusComment }) {
           },
           true,
         );
+    // Summarize preserved edits without inventing dates or persisting events.
+    const summaryKey = (c) =>
+      (c.id || c.name) +
+      ':' +
+      (['move', 'property', 'delete', 'copy'].includes(c.type) ? 'layout' : c.type);
+    const recorded = new Set(entries.flatMap((e) => e.changes.map(summaryKey)));
+    const currentChanges = activityChanges(
+      state,
+      {},
+      {
+        codePatches: state.scene?.codePatches || [],
+        edits: state.scene?.edits || {},
+        annotations: {},
+        note: $('#review-note').value,
+      },
+    );
+    for (const change of currentChanges) {
+      if (recorded.has(summaryKey(change)) || (change.type === 'comment' && !change.after))
+        continue;
+      append(
+        {
+          id: 'preserved-' + (change.id || change.name),
+          label: '보존된 현재 변경',
+          changes: [change],
+        },
+        '보존된 현재 변경 · 시간 기록 없음',
+      );
+    }
+    $('#activity-reset').hidden = !all && filter === 'all' && !query && !selectedOnly;
     const byId = new Map(rows.map((row) => [row.id, row])),
       display = [],
       grouped = new Set();
@@ -148,8 +185,15 @@ export function createActivityPanel({ $, state, selectNode, focusComment }) {
         : '아직 변경 이력이 없습니다. 편집과 주석이 시간순으로 모입니다.',
     );
   }
-  for (const id of ['#activity-scope', '#activity-filter', '#activity-selected'])
+  for (const id of ['#activity-all', '#activity-filter', '#activity-selected'])
     $(id).addEventListener('change', render);
   $('#activity-search').addEventListener('input', render);
+  $('#activity-reset').addEventListener('click', () => {
+    $('#activity-all').checked = false;
+    $('#activity-filter').value = 'all';
+    $('#activity-search').value = '';
+    $('#activity-selected').checked = false;
+    render();
+  });
   return { render };
 }

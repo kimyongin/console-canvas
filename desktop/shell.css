@@ -338,3 +338,76 @@ h1 {
   background: #6751ef28;
   pointer-events: none;
 }
+#capture-menu-button {
+  margin-left: -8px;
+  min-width: 30px;
+}
+#capture-selection {
+  pointer-events: auto;
+  cursor: move;
+}
+#capture-selection [data-handle] {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: white;
+  border: 1px solid #6951ef;
+}
+#capture-selection [data-handle='nw'] {
+  left: -6px;
+  top: -6px;
+  cursor: nwse-resize;
+}
+#capture-selection [data-handle='n'] {
+  left: calc(50% - 6px);
+  top: -6px;
+  cursor: ns-resize;
+}
+#capture-selection [data-handle='ne'] {
+  right: -6px;
+  top: -6px;
+  cursor: nesw-resize;
+}
+#capture-selection [data-handle='e'] {
+  right: -6px;
+  top: calc(50% - 6px);
+  cursor: ew-resize;
+}
+#capture-selection [data-handle='se'] {
+  right: -6px;
+  bottom: -6px;
+  cursor: nwse-resize;
+}
+#capture-selection [data-handle='s'] {
+  left: calc(50% - 6px);
+  bottom: -6px;
+  cursor: ns-resize;
+}
+#capture-selection [data-handle='sw'] {
+  left: -6px;
+  bottom: -6px;
+  cursor: nesw-resize;
+}
+#capture-selection [data-handle='w'] {
+  left: -6px;
+  top: calc(50% - 6px);
+  cursor: ew-resize;
+}
+#quick-skill-info {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  color: #657088;
+}
+.update-download-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 12px 0 6px;
+}
+.update-download-choice input {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}

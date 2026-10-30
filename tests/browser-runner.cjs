@@ -57,6 +57,8 @@ async function main() {
     'layout',
     'capture-status',
     'capture-enhancements',
+    'action-ux',
+    'shell-actions',
     'collection',
     'scrollbar-layout',
     'integration',

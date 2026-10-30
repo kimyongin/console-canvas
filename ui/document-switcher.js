@@ -5,7 +5,7 @@ import {
   trashDocument,
   restoreDocument,
 } from '../db.js';
-import { renderDocumentRows } from './react/lists.tsx';
+import { renderDocumentRows, renderQuickDocuments } from './react/lists.tsx';
 export function createDocumentSwitcher({
   $,
   state,
@@ -56,6 +56,7 @@ export function createDocumentSwitcher({
     }
   }
   async function openDocument(id) {
+    if (menu.matches(':popover-open')) menu.hidePopover();
     const doc = await getDocument(id);
     if (!doc) throw new Error('저장된 화면을 찾을 수 없습니다.');
     await openSnapshot(doc, doc.edits, doc.note, doc.annotations);
@@ -108,10 +109,22 @@ export function createDocumentSwitcher({
         : deleted
           ? '휴지통이 비어 있습니다.'
           : '저장된 화면이 없습니다.';
-    const rows = matches.map((value) => {
+    const rows = makeRows(matches);
+    renderDocumentRows(list, rows, loading);
+  }
+  function makeRows(matches) {
+    return matches.map((value) => {
       const current = value.id === state.snapshot?.id;
       const actions = [
-        { label: '이름 변경', scope: 'document', kind: 'rename', run: () => rename(value) },
+        {
+          label: '이름 변경',
+          scope: 'document',
+          kind: 'rename',
+          run: () => {
+            if (menu.matches(':popover-open')) menu.hidePopover();
+            rename(value);
+          },
+        },
       ];
       if (!deleted)
         actions.push({
@@ -119,7 +132,10 @@ export function createDocumentSwitcher({
           scope: 'document',
           kind: 'trash',
           className: 'danger-menu',
-          run: () => trash(value),
+          run: () => {
+            if (menu.matches(':popover-open')) menu.hidePopover();
+            return trash(value);
+          },
         });
       return {
         id: value.id,
@@ -133,6 +149,7 @@ export function createDocumentSwitcher({
         current,
         disabled: loading || deleted,
         open: () => {
+          if (menu.matches(':popover-open')) menu.hidePopover();
           if (current) dialog.close();
           else action(() => openDocument(value.id));
         },
@@ -145,7 +162,19 @@ export function createDocumentSwitcher({
           : undefined,
       };
     });
-    renderDocumentRows(list, rows, loading);
+  }
+  let quickValues = [],
+    quickGeneration = 0;
+  function quickRender() {
+    const query = $('#quick-document-search').value.trim().toLocaleLowerCase();
+    const matches = quickValues.filter((d) =>
+      (d.title + ' ' + d.url).toLocaleLowerCase().includes(query),
+    );
+    renderQuickDocuments($('#quick-documents'), makeRows(matches.slice(0, query ? 20 : 5)), false);
+    $('#quick-document-status').textContent =
+      matches.length +
+      '개 화면' +
+      (matches.length > (query ? 20 : 5) ? ' · 더 보려면 전체 목록을 여세요.' : '');
   }
   async function show(trashView = false) {
     if (state.scene?.drag || state.scene?.areaSelecting || loading) return;
@@ -204,11 +233,31 @@ export function createDocumentSwitcher({
   dialog.addEventListener('cancel', (event) => {
     if (loading) event.preventDefault();
   });
+  $('#quick-document-search').addEventListener('input', quickRender);
+  menu.addEventListener('toggle', async (event) => {
+    const token = ++quickGeneration;
+    if (event.newState !== 'open') {
+      renderQuickDocuments($('#quick-documents'), [], false);
+      return;
+    }
+    deleted = false;
+    $('#quick-document-search').value = '';
+    $('#quick-document-search').focus();
+    renderQuickDocuments($('#quick-documents'), [], true);
+    try {
+      const values = await listDocuments(Number.MAX_SAFE_INTEGER);
+      if (token !== quickGeneration || !menu.matches(':popover-open')) return;
+      quickValues = values;
+      quickRender();
+    } catch (error) {
+      if (token === quickGeneration) $('#quick-document-status').textContent = error.message;
+    }
+  });
   menu.addEventListener('beforetoggle', (event) => {
     if (event.newState !== 'open') return;
     commitCommentDraft();
     const rect = $('#document-menu-button').getBoundingClientRect();
-    menu.style.left = Math.max(8, Math.min(innerWidth - 298, rect.left)) + 'px';
+    menu.style.left = Math.max(8, Math.min(innerWidth - 388, rect.left)) + 'px';
     menu.style.top = rect.bottom + 4 + 'px';
   });
 }

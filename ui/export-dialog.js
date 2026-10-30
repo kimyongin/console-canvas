@@ -224,4 +224,36 @@ export function createExportDialog({
       button.disabled = !state.ready;
     }
   });
+  let directCopying = false;
+  async function copyCurrentImage() {
+    if (directCopying || !state.ready) return;
+    directCopying = true;
+    try {
+      commitCommentDraft();
+      await flushEditor();
+      const id = state.snapshot.id,
+        revision = state.revision,
+        generation = state.generation;
+      const option = versionOptions(state).find((v) => v.id === '@current');
+      const result = await withVersionScene(state.snapshot, option.state, (scene) =>
+        buildHandoffImage(state.snapshot, scene, option.state.note, undefined, {
+          mode: state.handoffSettings?.mode,
+          versionName: option.name,
+        }),
+      );
+      if (
+        state.snapshot?.id !== id ||
+        state.revision !== revision ||
+        state.generation !== generation
+      )
+        throw Error('작업이 바뀌어 이미지를 복사하지 않았습니다. 다시 실행해 주세요.');
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': result.blob })]);
+      toast('현재 작업의 전달 이미지를 복사했습니다.');
+    } catch (error) {
+      toast('이미지를 복사하지 못했습니다. 변경 내용 전달에서 PNG로 저장하세요. ' + error.message);
+    } finally {
+      directCopying = false;
+    }
+  }
+  return { copyCurrentImage };
 }

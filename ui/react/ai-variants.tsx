@@ -181,13 +181,47 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
     ),
     [previewZoom, setPreviewZoom] = useState('fit'),
     [busy, setBusy] = useState(false),
-    [message, setMessage] = useState('');
+    [message, setMessage] = useState(''),
+    promptField = useRef<HTMLTextAreaElement>(null),
+    creating = useRef(false),
+    previousDraft = useRef<Draft | null>(null);
   const request = requests.find((r) => r.id === requestId),
     candidate = request?.candidates.find((c) => c.id === candidateId) || request?.candidates[0];
   const currentCandidateId = request ? actions.currentCandidate(request.id) : '';
   const context = actions.context();
+  useEffect(() => {
+    if (formOpen && !(route === 'api' && !configured) && !authOpen) promptField.current?.focus();
+  }, [formOpen]);
+  async function createRequest(copyText: boolean) {
+    if (creating.current) return;
+    creating.current = true;
+    await run(async () => {
+      const item = await actions.create({ prompt, count, route });
+      updateDraft({ prompt: '' });
+      setRequestId(item.id);
+      actions.remember({ requestId: item.id, candidateId: '' });
+      setCandidateId('');
+      setFormOpen(false);
+      setMessage(
+        route === 'api'
+          ? 'API로 시안을 생성하고 있습니다.'
+          : '요청을 보관했습니다. 에이전트 대화에 전달해야 실행됩니다.',
+      );
+      if (copyText && route === 'mcp')
+        try {
+          await navigator.clipboard.writeText(actions.instruction(item.id));
+          setMessage('요청을 보관하고 복사했습니다. 에이전트 대화에 붙여넣으세요.');
+        } catch {
+          setMessage(
+            '요청은 보관됐지만 복사하지 못했습니다. 아래 요청 문장 복사를 다시 눌러 주세요.',
+          );
+        }
+    });
+    creating.current = false;
+  }
   const apiBlocked = route === 'api' && !configured;
-  function updateDraft(next: Partial<Draft>) {
+  function updateDraft(next: Partial<Draft>, { preserveUndo = false } = {}) {
+    if (!preserveUndo) previousDraft.current = null;
     const value = { prompt, count, route, ...next };
     setPrompt(value.prompt);
     setCount(value.count);
@@ -302,6 +336,7 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
           <label htmlFor="ai-prompt">어떻게 개선할까요?</label>
           <Textarea
             id="ai-prompt"
+            ref={promptField}
             value={prompt}
             onChange={(e) => updateDraft({ prompt: e.target.value })}
             placeholder="예: 검색 조건을 한 줄로 정리하고 중요한 작업 버튼을 강조해 줘"
@@ -323,24 +358,22 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
               id="ai-create"
               disabled={busy || apiBlocked}
               aria-describedby="ai-readiness"
-              onClick={() =>
-                run(async () => {
-                  const item = await actions.create({ prompt, count, route });
-                  updateDraft({ prompt: '' });
-                  setRequestId(item.id);
-                  actions.remember({ requestId: item.id, candidateId: '' });
-                  setCandidateId('');
-                  setFormOpen(false);
-                  setMessage(
-                    route === 'api'
-                      ? '선택 영역의 코드·주석을 OpenAI API로 보내 시안을 생성하고 있습니다.'
-                      : '요청을 보관했습니다. 요청 문장을 에이전트 대화에 전달하세요. 앱이 자동으로 실행하지는 않습니다.',
-                  );
-                })
-              }
+              onClick={(e) => {
+                if (e.detail <= 1) createRequest(route === 'mcp');
+              }}
             >
-              {route === 'api' ? 'API로 시안 생성' : '요청 보관하기'}
+              {route === 'api' ? 'API로 시안 생성' : '요청 보관하고 복사'}
             </Button>
+            {route === 'mcp' && (
+              <Button
+                id="ai-store-only"
+                disabled={busy}
+                variant="outline"
+                onClick={() => createRequest(false)}
+              >
+                보관만 하기
+              </Button>
+            )}
           </div>
           <p id="ai-readiness" className="ai-help" role="status">
             {route === 'api'
@@ -354,10 +387,25 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
           <Button
             id="ai-reset-draft"
             disabled={busy}
-            onClick={() => updateDraft({ prompt: '', count: 3, route: 'mcp' })}
+            onClick={() => {
+              previousDraft.current = { prompt, count, route };
+              updateDraft({ prompt: '', count: 3, route: 'mcp' }, { preserveUndo: true });
+            }}
           >
             초안 초기화
           </Button>
+          {previousDraft.current && (
+            <Button
+              id="ai-undo-reset"
+              onClick={() => {
+                const value = previousDraft.current;
+                previousDraft.current = null;
+                if (value) updateDraft(value);
+              }}
+            >
+              초안 초기화 되돌리기
+            </Button>
+          )}
           <p className="ai-help">
             현재 선택·주석·편집을 기준으로 고정합니다. API 실행 시 해당 코드·주석과 화면 이미지를
             OpenAI에 전송합니다. 에이전트가 시안을 반환해도 선택 전까지 캔버스는 유지됩니다.
@@ -404,7 +452,16 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
                         : request.route === 'api'
                           ? 'API 생성 준비·실행 중'
                           : '요청 보관됨 · 수동 전달 필요 · 자동 실행되지 않음'}
+                <Button
+                  id="ai-cancel-request"
+                  hidden={request.status === 'canceled' || request.status === 'ready'}
+                  disabled={busy || request.status === 'canceled' || request.status === 'ready'}
+                  onClick={() => run(() => actions.cancel(request.id))}
+                >
+                  요청 취소
+                </Button>
               </p>
+
               <details className="ai-request-details" open={!request.candidates.length}>
                 <summary>요청 전달·추가 생성</summary>
                 <div className="ai-request-actions">
@@ -420,13 +477,7 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
                   >
                     요청 문장 복사
                   </Button>
-                  <Button
-                    id="ai-cancel-request"
-                    disabled={busy || request.status === 'canceled' || request.status === 'ready'}
-                    onClick={() => run(() => actions.cancel(request.id))}
-                  >
-                    요청 취소
-                  </Button>
+
                   {request.route === 'mcp' && (
                     <Button id="ai-connect-agent" onClick={actions.connect}>
                       {actions.connection() ? '연결 상태 보기' : '에이전트 연결하기'}

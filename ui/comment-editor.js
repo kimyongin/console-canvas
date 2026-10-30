@@ -9,17 +9,35 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
   const dialog = $('#comment-dialog'),
     field = $('#component-comment');
   let timer,
-    requests = [];
+    requests = [],
+    queueMode = false,
+    documentId = null;
   function close() {
     clearTimeout(timer);
     if (dialog.open) dialog.close();
   }
-  function open({ id = state.scene?.selected, navigating = false } = {}) {
+  function open({ id = state.scene?.selected, navigating = false, ids = null } = {}) {
     if (!state.scene || !id) return;
+    if (navigating && documentId !== state.snapshot?.id) return;
     clearTimeout(timer);
     commit();
     if (!navigating) {
-      requests = handoffRequests(state.scene);
+      documentId = state.snapshot.id;
+      queueMode = !!ids?.length;
+      const all = handoffRequests(state.scene);
+      requests = queueMode
+        ? [...new Set(ids)]
+            .filter((key) => state.scene.nodes.has(key))
+            .map(
+              (key) =>
+                all.find((r) => r.id === key) || {
+                  id: key,
+                  name: elementLabel(state.scene.nodes.get(key), state.snapshot.layerNames),
+                },
+            )
+        : all;
+      if (queueMode) id = requests[0]?.id;
+      if (!id) return;
       if (!requests.some((r) => r.id === id))
         requests.push({
           id,
@@ -30,12 +48,16 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
         });
       renderVersionOptions(
         $('#comment-request'),
-        requests.map((r, i) => ({ id: r.id, name: `${i + 1} / ${requests.length} · ${r.name}` })),
+        requests.map((r, i) => ({
+          id: r.id,
+          name: `${queueMode ? '대상 ' : ''}${i + 1} / ${requests.length} · ${r.name}`,
+        })),
       );
     }
     $('#comment-request').value = id;
     const index = requests.findIndex((r) => r.id === id);
-    $('#comment-progress').textContent = `요청 ${index + 1} / ${requests.length}`;
+    $('#comment-progress').textContent =
+      `${queueMode ? '선택 대상' : '요청'} ${index + 1} / ${requests.length}`;
     $('#comment-previous').disabled = index <= 0;
     $('#comment-next').disabled = index < 0 || index >= requests.length - 1;
     const point = pointTarget(id);
@@ -128,7 +150,7 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
     if (dialog.open) return;
     clearTimeout(timer);
     state.commentTarget = null;
-    requests = [];
+    ((requests = []), (queueMode = false), (documentId = null));
     clearReact($('#comment-target-preview'));
     clearReact($('#comment-intent-suggestions'));
   });

@@ -7,6 +7,12 @@ export function createSelectionToolbar({ $, state }) {
   function position() {
     const scene = state.scene,
       r = scene?.selected && scene.rect(scene.selected);
+    const count = scene?.selection.size || 0;
+    $('#context-comment').setAttribute(
+      'aria-label',
+      count > 1 ? '선택한 ' + count + '개 각각 주석 작성' : '선택 요소 주석 편집',
+    );
+    $('#context-comment').title = count > 1 ? count + '개 대상에 차례로 주석 작성' : '주석 편집';
     host.hidden = !r || scene.hidden(scene.selected) || !state.ready;
     if (host.hidden) return;
     if (documentId !== state.snapshot?.id) {

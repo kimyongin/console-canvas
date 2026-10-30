@@ -20,6 +20,8 @@ export type EditorCommand =
   | 'delete'
   | 'copy'
   | 'paste'
+  | 'duplicate'
+  | 'commands'
   | 'repair-assets'
   | 'source-compare'
   | 'capture-status'

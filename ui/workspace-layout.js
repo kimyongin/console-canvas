@@ -78,12 +78,12 @@ export function createWorkspaceLayout({ $, commitCommentDraft }) {
 
     renderPanelWidths();
   }
-  function setPanelVisibility(key, visible) {
+  function setPanelVisibility(key, visible, { persist = true } = {}) {
     if (panelDrag) finishPanelResize();
     if (key === 'properties' && !visible) commitCommentDraft();
     panels[key] = visible;
     renderPanels();
-    persistPanels();
+    if (persist) persistPanels();
   }
   function resizePanel(key, width, otherWidth) {
     const other = key === 'layers' ? 'properties' : 'layers',
@@ -177,5 +177,15 @@ export function createWorkspaceLayout({ $, commitCommentDraft }) {
     $('#toggle-' + key).addEventListener('click', () => setPanelVisibility(key, !panels[key]));
   renderPanels();
 
-  return { panels, setPanelVisibility };
+  return {
+    panels,
+    setPanelVisibility,
+    snapshotLayout: () => ({ visibility: { ...panels }, widths: { ...panelWidths } }),
+    restoreLayout(value) {
+      Object.assign(panels, value.visibility);
+      Object.assign(panelWidths, value.widths);
+      renderPanels();
+      persistPanels();
+    },
+  };
 }

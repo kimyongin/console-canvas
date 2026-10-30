@@ -44,6 +44,7 @@ export function createMcpBridge({ metadata, execute, onStatus }) {
           ack = { command_id: command.command_id, result };
           onStatus({
             connected: true,
+            agent_command: command.name,
             message: result.ok
               ? '에이전트 · ' + command.name
               : '요청 확인 필요 · ' + (result.error?.message || command.name),

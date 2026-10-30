@@ -89,6 +89,14 @@ export function createClipboard({ $, state, toast, commitCommentDraft, adapter }
       toast('요소를 복사했습니다. 이 창에서 붙여넣기를 사용할 수 있습니다.');
     }
   });
+  adapter.register('duplicate', () =>
+    safely(() => {
+      if (!available() || !state.scene.selection.size) return;
+      commitCommentDraft();
+      const roots = state.scene.pasteSelection(state.scene.copySelection(), 24);
+      toast(roots.length + '개 요소를 복제했습니다.');
+    }),
+  );
   adapter.register('paste', async () => {
     if (!available()) return;
     let text;

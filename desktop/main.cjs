@@ -25,7 +25,9 @@ let win,
   current = 'source',
   busy = false,
   editorReady = false,
-  pendingCapture = null;
+  pendingCapture = null,
+  pendingCaptureTarget = null;
+const reviewCaptureSession = require('./review-capture.cjs').createReviewCapture();
 const { createSkillService } = require('./skills.cjs');
 const { registerShellIpc } = require('./ipc.cjs');
 const { captureWebsite } = require('./capture.cjs');
@@ -54,6 +56,7 @@ function state(message) {
     view: current,
     header_height: HEADER_HEIGHT[current],
     busy,
+    review_target: reviewCaptureSession.current(),
     can_go_back: !!source?.webContents.navigationHistory.canGoBack(),
     can_go_forward: !!source?.webContents.navigationHistory.canGoForward(),
     message:
@@ -219,6 +222,31 @@ async function start() {
     trusted(event, 'editor');
     show('source');
   });
+  ipcMain.handle('canvas:focus-address', (event) => {
+    trusted(event, 'editor');
+    show('source');
+    win.webContents.send('canvas:focus-address');
+  });
+  ipcMain.handle('canvas:begin-review-capture', (event, value) => {
+    trusted(event, 'editor');
+    if (busy) throw Error('화면을 가져오는 중입니다.');
+    const target = reviewCaptureSession.begin(value);
+    show('source');
+    notify('목표: ' + target.label + ' · 결과 상태를 준비한 뒤 이 검토에 가져오기를 누르세요.');
+    return target;
+  });
+  const cancelReviewCapture = (id) => {
+    if (reviewCaptureSession.clear(id)) {
+      editor.webContents.send('canvas:review-cancelled', id);
+      show('editor');
+      return true;
+    }
+    return false;
+  };
+  ipcMain.handle('canvas:cancel-review-capture', (event, id) => {
+    trusted(event, 'editor');
+    return cancelReviewCapture(id);
+  });
   ipcMain.handle('canvas:connection', (event) => {
     trusted(event, 'editor');
     return { url: connection.url, token: connection.token };
@@ -227,7 +255,8 @@ async function start() {
     trusted(event, 'editor');
     editorReady = true;
     if (pendingCapture) {
-      editor.webContents.send('canvas:snapshot', pendingCapture);
+      editor.webContents.send('canvas:snapshot', pendingCapture, pendingCaptureTarget);
+      pendingCaptureTarget = null;
       pendingCapture = null;
     }
   });
@@ -256,13 +285,18 @@ async function start() {
   });
   async function capture(options) {
     if (busy) throw new Error('화면을 가져오는 중입니다.');
+    const destination = reviewCaptureSession.current();
     busy = true;
     notify('원본 화면을 복제하고 있어요…');
     try {
       show('source');
       const snapshot = await captureWebsite(source.webContents, ROOT, { scope: options });
-      if (editorReady) editor.webContents.send('canvas:snapshot', snapshot);
-      else pendingCapture = snapshot;
+      if (editorReady) editor.webContents.send('canvas:snapshot', snapshot, destination);
+      else {
+        pendingCapture = snapshot;
+        pendingCaptureTarget = destination;
+      }
+      if (destination) reviewCaptureSession.clear(destination.request_id);
       show('editor');
       notify('화면을 가져왔어요. 요소를 옮기거나 주석을 남겨 보세요.');
       return { id: snapshot.id, nodes: snapshot.nodes.length };
@@ -285,6 +319,25 @@ async function start() {
     show,
     info: state,
     capture,
+    cancelReviewCapture,
+    captureMenu: (position) =>
+      new Promise((resolve) => {
+        const modes = [
+          ['viewport', '현재 보이는 화면 가져오기'],
+          ['document', '전체 페이지 가져오기'],
+          ['region', '영역 지정하여 가져오기'],
+        ];
+        const menu = Menu.buildFromTemplate(
+          modes.map(([mode, label]) => ({ label, click: () => resolve(mode) })),
+        );
+        const [width, height] = win.getContentSize();
+        menu.popup({
+          window: win,
+          x: Math.max(0, Math.min(width - 1, Math.round(Number(position?.x) || 0))),
+          y: Math.max(0, Math.min(height - 1, Math.round(Number(position?.y) || 0))),
+          callback: () => resolve(null),
+        });
+      }),
   });
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([

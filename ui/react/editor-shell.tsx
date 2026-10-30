@@ -61,6 +61,14 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           </Button>
         </div>
       </header>
+      <DialogSurface id="commands-dialog" aria-label="명령과 단축키">
+        <h2>명령과 단축키</h2>
+        <p>기존 버튼과 메뉴도 그대로 사용할 수 있습니다. 입력 중에는 단축키가 실행되지 않습니다.</p>
+        <div id="command-list"></div>
+        <Button id="commands-close" variant="outline">
+          닫기
+        </Button>
+      </DialogSurface>
       <DialogSurface id="implementation-dialog" aria-label="구현 결과 확인">
         <div id="implementation-content" />
       </DialogSurface>
@@ -68,6 +76,9 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
         <div id="ai-dialog-content" />
       </DialogSurface>
       <div id="notice" className="notice" role="status" hidden={true}></div>
+      <Button id="emergency-backup" hidden variant="outline">
+        편집 파일로 백업
+      </Button>
       <main className="workspace" id="workspace">
         <aside className="left-panel" id="layers-panel" aria-label="레이어 패널">
           <div className="panel-heading panel-topbar">
@@ -160,55 +171,80 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                 <span aria-hidden="true">{'⌄'}</span>
               </Button>
               <div id="document-menu-content" className="document-menu-content" popover="auto">
-                <Button id="documents-button" variant="outline">
-                  {'저장된 화면 전환…'}
-                </Button>
-                <Button
-                  id="rename-current"
-                  data-current-document=""
-                  disabled={true}
-                  variant="outline"
-                >
-                  {'이름 변경…'}
-                </Button>
-                <Button id="import-button" variant="outline">
-                  {'편집 파일 열기…'}
-                </Button>
-                <Button
-                  id="save-document"
-                  data-current-document=""
-                  disabled={true}
-                  variant="outline"
-                >
-                  {'편집 파일 저장…'}
-                </Button>
-                <p className="document-save-help">
-                  {
-                    '\n                작업은 자동 저장됩니다. 스냅샷은 시안 보관, 편집 파일은 기기 밖 백업에 사용하세요.\n              '
-                  }
-                </p>
-                <details id="source-details">
-                  <summary>{'원본 정보'}</summary>
-                  <a id="source-url" target="_blank" rel="noreferrer" hidden={true}></a>
-                  <div id="source-meta" className="source-meta">
-                    {'편집할 화면을 열어 주세요.'}
-                  </div>
-                  <Button id="recapture-button" hidden={true} variant="outline">
-                    {'원본에서 다시 가져오기'}
+                <Input
+                  id="quick-document-search"
+                  type="search"
+                  aria-label="문서 바로 검색"
+                  placeholder="문서 이름·주소로 검색"
+                />
+                <div id="quick-documents" className="quick-documents"></div>
+                <small id="quick-document-status" role="status"></small>
+                <div className="document-management">
+                  <Button
+                    id="show-commands"
+                    variant="outline"
+                    onClick={() => dispatchEditorCommand('commands')}
+                  >
+                    명령과 단축키…
                   </Button>
-                </details>
-                <Button id="documents-trash-button" variant="outline">
-                  {'문서 휴지통…'}
-                </Button>
-                <Button
-                  id="trash-current"
-                  data-current-document=""
-                  className="danger-menu"
-                  disabled={true}
-                  variant="outline"
-                >
-                  {'\n                이 문서를 휴지통으로 이동\n              '}
-                </Button>
+                  <Button id="documents-button" variant="outline">
+                    {'전체 저장 화면 목록…'}
+                  </Button>
+                  <Button
+                    id="rename-current"
+                    data-current-document=""
+                    disabled={true}
+                    variant="outline"
+                  >
+                    {'이름 변경…'}
+                  </Button>
+                  <Button id="import-button" variant="outline">
+                    {'편집 파일 열기…'}
+                  </Button>
+                  <Button
+                    id="save-document"
+                    data-current-document=""
+                    disabled={true}
+                    variant="outline"
+                  >
+                    {'편집 파일 저장…'}
+                  </Button>
+                  <p className="document-save-help">
+                    {
+                      '\n                작업은 자동 저장됩니다. 스냅샷은 시안 보관, 편집 파일은 기기 밖 백업에 사용하세요.\n              '
+                    }
+                  </p>
+                  <Button
+                    id="direct-open-source"
+                    data-current-document=""
+                    disabled={true}
+                    variant="outline"
+                  >
+                    원본 사이트 열기
+                  </Button>
+                  <details id="source-details">
+                    <summary>{'원본 정보'}</summary>
+                    <a id="source-url" target="_blank" rel="noreferrer" hidden={true}></a>
+                    <div id="source-meta" className="source-meta">
+                      {'편집할 화면을 열어 주세요.'}
+                    </div>
+                    <Button id="recapture-button" hidden={true} variant="outline">
+                      {'원본에서 다시 가져오기'}
+                    </Button>
+                  </details>
+                  <Button id="documents-trash-button" variant="outline">
+                    {'문서 휴지통…'}
+                  </Button>
+                  <Button
+                    id="trash-current"
+                    data-current-document=""
+                    className="danger-menu"
+                    disabled={true}
+                    variant="outline"
+                  >
+                    {'\n                이 문서를 휴지통으로 이동\n              '}
+                  </Button>
+                </div>
               </div>
             </div>
             <div className="canvas-toolbar">
@@ -299,6 +335,13 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             <div id="artboard-space" className="artboard-space" hidden={true}>
               <div className="artboard-caption">
                 <div id="artboard-label" className="artboard-label"></div>
+                <Button
+                  id="direct-source-compare"
+                  variant="ghost"
+                  onClick={() => dispatchEditorCommand('source-compare')}
+                >
+                  원본과 비교
+                </Button>
                 <Button
                   id="capture-status-button"
                   variant="outline"
@@ -430,11 +473,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           <section id="history-panel" aria-label="통합 변경 이력">
             <div className="activity-controls">
               <label>
-                {'범위'}
-                <NativeSelect id="activity-scope">
-                  <option value="branch">{'현재 가지'}</option>
-                  <option value="all">{'모든 가지'}</option>
-                </NativeSelect>
+                <Input id="activity-all" type="checkbox" /> 모든 가지 포함
               </label>
               <label>
                 {'종류'}
@@ -456,6 +495,9 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
               <Input id="activity-selected" type="checkbox" />
               {'선택 요소만'}
             </label>
+            <Button id="activity-reset" hidden variant="ghost">
+              필터 초기화
+            </Button>
             <p id="activity-branch" className="activity-branch"></p>
             <div id="activity-list" className="activity-list"></div>
           </section>
@@ -705,6 +747,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
         </form>
         <h2 id="capture-status-title">가져오기 정보</h2>
         <p id="capture-status-summary" role="status"></p>
+        <p id="capture-repair-summary" role="status"></p>
         <p className="capture-verification-note">
           아래는 수집 과정에서 확인한 정보입니다. 원본과의 시각적 일치율은 측정하지 않았습니다.
         </p>
@@ -753,6 +796,9 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
         <ul id="repair-assets-results"></ul>
         <Button id="repair-assets-fetch" variant="outline">
           선택한 자산 다시 읽기
+        </Button>
+        <Button id="repair-assets-retry" hidden variant="outline">
+          실패한 항목 다시 읽기
         </Button>
         <p id="repair-assets-status" role="status"></p>
         <div id="repair-assets-preview" className="repair-view"></div>

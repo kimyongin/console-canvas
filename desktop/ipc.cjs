@@ -16,6 +16,8 @@ function registerShellIpc({
   show,
   info,
   capture,
+  cancelReviewCapture,
+  captureMenu,
 }) {
   const handle = (name, callback) =>
     ipcMain.handle('canvas:' + name, (event, ...args) => {
@@ -67,5 +69,7 @@ function registerShellIpc({
     return { data, view };
   });
   handle('capture', capture);
+  handle('capture-menu', (position) => captureMenu(position));
+  handle('cancel-review', (id) => cancelReviewCapture(id));
 }
 module.exports = { registerShellIpc };

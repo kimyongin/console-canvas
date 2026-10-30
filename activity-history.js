@@ -29,7 +29,7 @@ export function activityBranch(state, all = false) {
   }
   return result;
 }
-export function recordActivity(state, before, after, detail = {}) {
+export function activityChanges(state, before, after, detail = {}) {
   const changes = codeDifferenceIds(before?.codePatches, after.codePatches).map((id) => ({
     id: id.startsWith('@') ? undefined : id,
     type: 'code',
@@ -80,6 +80,10 @@ export function recordActivity(state, before, after, detail = {}) {
       before: before?.note || '',
       after: after.note,
     });
+  return changes;
+}
+export function recordActivity(state, before, after, detail = {}) {
+  const changes = activityChanges(state, before, after, detail);
   const event = {
     id: crypto.randomUUID(),
     parent_id: state.activityHead || null,

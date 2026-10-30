@@ -204,9 +204,11 @@ try {
       scene.hidden(deleted) &&
       app.state.timeline.activeId === a.id,
   );
-  const status = doc.querySelector('[aria-label="요청 1 검토 상태"]');
-  status.value = 'done';
-  status.dispatchEvent(new win.Event('change', { bubbles: true }));
+  await until(
+    () => !doc.querySelector('[aria-label="요청 1 직접 판정"] [data-verdict="done"]').disabled,
+  );
+  const status = doc.querySelector('[aria-label="요청 1 직접 판정"] [data-verdict="done"]');
+  status.click();
   const otherStatus = doc.querySelector('[aria-label="요청 2 검토 상태"]');
   otherStatus.value = 'change';
   otherStatus.dispatchEvent(new win.Event('change', { bubbles: true }));
@@ -288,7 +290,12 @@ try {
   const reviewList = doc.querySelector('#implementation-review-list');
   reviewList.value = review.id;
   reviewList.dispatchEvent(new win.Event('change', { bubbles: true }));
-  await until(() => doc.querySelector('[aria-label="요청 1 검토 상태"]').value === 'done');
+  await until(
+    () =>
+      doc
+        .querySelector('[aria-label="요청 1 직접 판정"] [data-verdict="done"]')
+        ?.getAttribute('aria-pressed') === 'true',
+  );
   doc.querySelector('[aria-label="구현 결과 확인 닫기"]').click();
   const payload = reviewPayload(
     app.state.snapshot,

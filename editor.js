@@ -1,3 +1,4 @@
+import { createEditorCommands } from './ui/editor-commands.js';
 import { createResourceRepair } from './ui/resource-repair.js';
 import { resourceCandidates } from './resource-repair.js';
 import { prepareCaptureScope } from './capture-scope.js';
@@ -129,6 +130,7 @@ const {
   },
   status: (message) => {
     state.saveMessage = message;
+    $('#emergency-backup').hidden = !state.lastSaveError;
     state.savePending = message === '저장 중…';
     adapter.publish();
   },
@@ -143,7 +145,10 @@ const {
     renderMcpStatus();
   },
 });
-const { panels, setPanelVisibility } = createWorkspaceLayout({ $, commitCommentDraft });
+const { panels, setPanelVisibility, snapshotLayout, restoreLayout } = createWorkspaceLayout({
+  $,
+  commitCommentDraft,
+});
 function editSafely(action) {
   try {
     action();
@@ -205,6 +210,7 @@ function closeDocument(id) {
       clipboard.reset();
       commentEditor.reset();
       state.snapshot = null;
+      editorCommands.reset();
       state.scene = null;
       state.timeline = null;
       state.activity = [];
@@ -245,9 +251,16 @@ const { renderInspector: renderInspectorView } = createInspector({ $, state, kin
 const selectionToolbar = createSelectionToolbar({ $, state });
 configureModelessInspector({ $ });
 function renderCaptureStatus() {
-  const assessment = captureAssessment(state.snapshot, state.scene?.elements);
+  const assessment = captureAssessment(
+    state.snapshot,
+    state.scene?.elements,
+    state.scene?.codePatches,
+  );
   $('#capture-status-button').textContent = assessment.label;
-  $('#capture-status-button').classList.toggle('needs-review', assessment.counts.loss > 0);
+  $('#capture-status-button').classList.toggle(
+    'needs-review',
+    assessment.remaining_counts.loss > 0,
+  );
   $('#capture-status-summary').textContent = assessment.items.length
     ? '수집 확인 ' +
       assessment.counts.loss +
@@ -257,6 +270,12 @@ function renderCaptureStatus() {
       assessment.counts.info +
       '건'
     : '기록된 수집 제한 없음 · 시각 비교 전';
+  $('#capture-repair-summary').textContent =
+    '아직 확인할 수집 기록 ' +
+    assessment.remaining_counts.loss +
+    '건 · 자산 복구 ' +
+    assessment.applied_resource_count +
+    '개 적용. 원본 수집 기록은 유지합니다.';
   const source = state.snapshot?.source;
   $('#capture-status-scope').textContent = source
     ? '가져온 문서 ' +
@@ -294,6 +313,10 @@ function renderCaptureStatus() {
         '개 · 실제 사진과 비교한 뒤 필요할 때 사용하세요.'
       : '다시 읽을 수 있는 미복구 자산 선언이 없습니다.';
   $('#source-compare-button').disabled = !hasCapturedPhoto(state.snapshot);
+  $('#direct-source-compare').disabled = !hasCapturedPhoto(state.snapshot);
+  $('#direct-source-compare').title = hasCapturedPhoto(state.snapshot)
+    ? '가져오기 당시 실제 사진과 비교'
+    : '저장된 실제 원본 사진이 없습니다.';
   $('#source-compare-unavailable').hidden = hasCapturedPhoto(state.snapshot);
   const desktop = !!window.ConsoleCanvasDesktop;
   $('#capture-source-button').hidden = !desktop;
@@ -330,7 +353,7 @@ function selectNode(id, { reveal = false, additive = false } = {}) {
     }
   }
 }
-const { renderLayers } = createDocumentLists({
+const { renderLayers, restoreNavigation } = createDocumentLists({
   $,
   state,
   selectNode,
@@ -416,6 +439,7 @@ const aiPanel = createAiPanel({ $, state, manager: aiRequests, adapter, toast, s
 const activityPanel = createActivityPanel({ $, state, selectNode, focusComment });
 function onKey(event) {
   if (event.defaultPrevented) return;
+  if (editorCommands.handle(event)) return;
   if (!state.scene || document.querySelector('dialog:modal')) return;
   if (state.scene.areaSelecting) return;
   const editing = event.target.closest?.('input,textarea,select');
@@ -535,6 +559,7 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
   state.undo = [];
   state.redo = [];
   state.expanded = new Set(snapshot.nodes.filter((node) => !node.parentId).map((node) => node.id));
+  restoreNavigation();
   renderDocumentName();
   $('#source-url').textContent = snapshot.source.url;
   try {
@@ -729,7 +754,11 @@ $('#edit-selected-comment').addEventListener('click', () => {
   $('#properties-dialog').close();
   focusComment();
 });
-adapter.register('comment', () => focusComment());
+adapter.register('comment', () => {
+  const ids = [...(state.scene?.selection || [])];
+  if (ids.length > 1) commentEditor.open({ ids });
+  else focusComment();
+});
 adapter.register('properties', () => {
   if (!state.scene?.selected) return;
   commitCommentDraft();
@@ -820,7 +849,7 @@ const implementationReview = createImplementationReview({
   commitCommentDraft,
   toast,
 });
-createExportDialog({
+const exportDialog = createExportDialog({
   $,
   state,
   commitCommentDraft,
@@ -832,6 +861,33 @@ createExportDialog({
   toast,
   focusComment,
 });
+const editorCommands = createEditorCommands({
+  $,
+  state,
+  adapter,
+  panels,
+  setPanelVisibility,
+  snapshotLayout,
+  restoreLayout,
+  flushEditor,
+  renameDialog,
+  toast,
+  copyImage: () => exportDialog.copyCurrentImage(),
+  setAlias: async (id, name) => {
+    if (!state.scene?.nodes.has(id)) throw Error('요소를 찾을 수 없습니다.');
+    state.scene.select(id);
+    $('#layer-alias').value = name;
+    await setLayerAlias();
+  },
+});
+for (const id of ['#offset-x', '#offset-y'])
+  $(id).addEventListener('keydown', (e) => {
+    if (e.isComposing) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.currentTarget.blur();
+    }
+  });
 window.addEventListener('dragover', (event) => {
   if (event.dataTransfer?.types.includes('Files')) event.preventDefault();
 });
@@ -847,10 +903,17 @@ window.addEventListener('drop', (event) => {
 });
 function renderMcpStatus() {
   const status = state.mcpStatus;
-  $('#mcp-button').textContent = status.connected ? '● 에이전트 연결됨' : '○ 에이전트 연결';
+  $('#mcp-button').textContent = status.connected ? '● 로컬 서버 연결됨' : '○ 에이전트 연결';
+  $('#mcp-button').title =
+    '서버 연결과 에이전트 인증은 다릅니다.' +
+    (state.lastAgentCommand
+      ? ' 최근 에이전트 통신: ' + state.lastAgentCommand
+      : ' 이 실행에서 에이전트 명령 수신 기록 없음');
   $('#mcp-button').classList.toggle('connected', !!status.connected);
   $('#mcp-state').textContent =
-    (status.connected ? 'MCP 연결됨 · r' + state.revision : status.message || 'MCP 연결 안 됨') +
+    (status.connected
+      ? '로컬 서버 연결됨 · r' + state.revision
+      : status.message || 'MCP 연결 안 됨') +
     (state.lastAction
       ? ' · ' +
         (state.lastAction.actor === 'agent' ? '에이전트' : '직접 편집') +
@@ -914,10 +977,26 @@ const mcpBridge = createMcpBridge({
   execute: controller.execute,
   onStatus: (status) => {
     state.mcpStatus = status;
+    if (status.agent_command)
+      state.lastAgentCommand =
+        new Date().toLocaleTimeString('ko-KR') + ' · ' + status.agent_command;
     renderMcpStatus();
   },
 });
-$('#mcp-button').addEventListener('click', () => $('#mcp-dialog').showModal());
+$('#mcp-button').addEventListener('click', () => {
+  $('#mcp-dialog').showModal();
+  if (!state.mcpStatus.connected) $('#mcp-code').focus();
+});
+$('#direct-open-source').addEventListener('click', () => {
+  $('#document-menu-content').hidePopover();
+  if (!state.snapshot) return;
+  if (window.ConsoleCanvasDesktop)
+    window.ConsoleCanvasDesktop.openSource(state.snapshot.source.url).catch((error) =>
+      notice(error.message),
+    );
+  else window.open(state.snapshot.source.url, '_blank', 'noopener,noreferrer');
+});
+$('#emergency-backup').addEventListener('click', () => $('#save-document').click());
 $('#mcp-connect').addEventListener('click', async () => {
   const button = $('#mcp-connect');
   button.disabled = true;
@@ -977,9 +1056,13 @@ if (window.ConsoleCanvasDesktop) {
     await aiPanel.cancelJobs();
     return flushEditor();
   });
-  window.ConsoleCanvasDesktop.onSnapshot((value) =>
-    openSnapshot(value).catch((error) => notice(error.message)),
+  window.ConsoleCanvasDesktop.onSnapshot((value, destination) =>
+    (destination
+      ? implementationReview.acceptCapture(value, destination)
+      : openSnapshot(value)
+    ).catch((error) => notice(error.message)),
   );
+  window.ConsoleCanvasDesktop.onReviewCancelled?.((id) => implementationReview.cancelPending(id));
   window.ConsoleCanvasDesktop.getConnection()
     .then((connection) => {
       if (connection) {
@@ -1026,6 +1109,7 @@ window.ConsoleCanvas = {
   undo,
   selectNode,
   controller,
+  implementationReview,
   snapshotHistory,
   aiRequests,
   buildHandoffImage: () =>

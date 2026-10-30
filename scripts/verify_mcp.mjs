@@ -95,6 +95,7 @@ try {
     (e) => e.kind === 'icon',
   );
   assert.ok(icon);
+  const initialUndoCount = current.undo_count;
   const revision = current.revision,
     operation_id = randomUUID();
   const batch = {
@@ -114,7 +115,7 @@ try {
   current = (await tool('apply_edits', batch)).screen;
   check(
     'Move + delete + comment form one shared undo step',
-    current.undo_count === 1 && current.revision === revision + 1,
+    current.undo_count === initialUndoCount + 1 && current.revision === revision + 1,
   );
   let result = (await tool('list_elements', { ...base, query: 'new-customer' })).elements.find(
     (e) => e.id === button.id,

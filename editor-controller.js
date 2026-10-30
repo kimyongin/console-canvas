@@ -28,7 +28,11 @@ export function createEditorController(options) {
     };
   }
   function screen() {
-    const assessment = captureAssessment(state.snapshot, state.scene.elements);
+    const assessment = captureAssessment(
+      state.snapshot,
+      state.scene.elements,
+      state.scene.codePatches,
+    );
     return {
       capture_reference: {
         available: hasCapturedPhoto(state.snapshot),
@@ -43,6 +47,9 @@ export function createEditorController(options) {
         visual_comparison: 'not_measured',
         issue_count: assessment.items.length,
         counts: assessment.counts,
+        remaining_counts: assessment.remaining_counts,
+        repaired_count: assessment.repaired_count,
+        applied_resource_count: assessment.applied_resource_count,
         issues: assessment.items.slice(0, 200).map(({ actionable, ...item }) => item),
         issues_truncated: assessment.items.length > 200,
       },

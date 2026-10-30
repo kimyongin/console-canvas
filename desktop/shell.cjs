@@ -12,7 +12,13 @@ function showState(value) {
   if (value.url && document.activeElement !== $('#address')) $('#address').value = value.url;
   $('#status').textContent = value.message || '';
   $('#capture').hidden = value.view !== 'source';
-  $('#capture-scope-label').hidden = value.view !== 'source';
+  $('#capture-menu-button').hidden = value.view !== 'source';
+  $('#capture-menu-button').disabled = !!value.busy;
+  $('#cancel-review-capture').hidden = !value.review_target;
+  updateCaptureLabel();
+  if (value.review_target && value.view === 'source')
+    $('#status').textContent =
+      '목표: ' + value.review_target.label + ' · 결과 상태를 확인해 주세요.';
   $('#capture-picker').hidden = value.view !== 'capture';
   $('#capture').disabled = !!value.busy;
   for (const view of ['source', 'editor', 'settings', 'agent', 'update'])
@@ -41,24 +47,53 @@ $('#navigation').addEventListener('submit', async (event) => {
     $('#status').textContent = error.message;
   }
 });
-$('#capture').addEventListener('click', async () => {
+async function captureCurrent() {
   try {
-    localStorage.setItem('capture-scope', $('#capture-scope').value);
-    if ($('#capture-scope').value === 'region') {
+    localStorage.setItem('capture-scope', captureMode);
+    if (captureMode === 'region') {
       regionPreview = await api.previewCapture();
       regionRect = null;
       $('#capture-photo').src = regionPreview.data;
       $('#capture-selection').hidden = true;
       $('#capture-region-confirm').disabled = true;
       $('#capture-region-size').textContent = '아직 선택하지 않았습니다.';
-    } else await api.capture({ mode: $('#capture-scope').value });
+    } else await api.capture({ mode: captureMode });
   } catch (error) {
     $('#status').textContent = error.message;
     $('#capture').hidden = currentState.view !== 'source';
     $('#capture').disabled = false;
   }
+}
+$('#capture').addEventListener('click', captureCurrent);
+$('#capture-menu-button').addEventListener('click', async () => {
+  try {
+    const r = $('#capture-menu-button').getBoundingClientRect();
+    const mode = await api.chooseCaptureMode({ x: r.left, y: r.bottom });
+    if (!mode) return;
+    captureMode = mode;
+    updateCaptureLabel();
+    await captureCurrent();
+  } catch (error) {
+    $('#status').textContent = error.message;
+  }
 });
-$('#show-settings').addEventListener('click', () => api.show('settings'));
+$('#cancel-review-capture').addEventListener('click', () =>
+  api.cancelReview(currentState.review_target?.request_id),
+);
+api.onFocusAddress?.(() => {
+  $('#address').focus();
+  $('#address').select();
+});
+$('#show-settings').addEventListener('click', async () => {
+  await api.show('settings');
+  try {
+    const value = await api.skillInfo();
+    displaySkill(value);
+    $('#quick-skill-info').textContent = '앱 v' + value.version + ' · 설치 대상 ' + value.path;
+  } catch (error) {
+    $('#quick-agent-status').textContent = error.message;
+  }
+});
 $('#settings-return').addEventListener('click', () => api.show(returnView));
 for (const button of document.querySelectorAll('.settings-back'))
   button.addEventListener('click', () => api.show('settings'));
@@ -156,7 +191,14 @@ api.updateInfo().then(displayUpdate);
 $('#show-update').addEventListener('click', async () => {
   try {
     await api.show('update');
-    displayUpdate(await api.updateInfo());
+    const value = await api.updateInfo();
+    displayUpdate(value);
+    if (!['checking', 'downloading', 'ready', 'installing'].includes(value.phase)) {
+      const checked = await api.checkUpdate();
+      displayUpdate(checked);
+      if (checked.phase === 'available' && $('#auto-download-updates').checked)
+        displayUpdate(await api.downloadUpdate());
+    }
   } catch (error) {
     $('#update-message').textContent = error.message;
   }
@@ -177,11 +219,16 @@ for (const [id, method] of [
 let regionPreview = null,
   regionRect = null,
   regionStart = null;
-$('#capture-scope').value = ['viewport', 'document', 'region'].includes(
-  localStorage.getItem('capture-scope'),
-)
+let captureMode = ['viewport', 'document', 'region'].includes(localStorage.getItem('capture-scope'))
   ? localStorage.getItem('capture-scope')
   : 'viewport';
+function updateCaptureLabel() {
+  const name = { viewport: '현재 화면', document: '전체 페이지', region: '영역 지정' }[captureMode];
+  $('#capture').textContent = currentState?.review_target
+    ? '이 검토에 가져오기 · ' + name
+    : name + ' 가져오기 →';
+}
+updateCaptureLabel();
 const photoPoint = (e) => {
   const b = $('#capture-photo').getBoundingClientRect();
   return {
@@ -201,24 +248,11 @@ const photoPoint = (e) => {
     ),
   };
 };
-$('#capture-photo-wrap').addEventListener('pointerdown', (e) => {
-  if (e.button !== 0 || !regionPreview) return;
-  e.preventDefault();
-  regionStart = photoPoint(e);
-  e.currentTarget.setPointerCapture(e.pointerId);
-});
-$('#capture-photo-wrap').addEventListener('pointermove', (e) => {
-  if (!regionStart) return;
-  const p = photoPoint(e),
-    b = $('#capture-photo').getBoundingClientRect(),
+function paintRegion() {
+  if (!regionRect || !regionPreview) return;
+  const b = $('#capture-photo').getBoundingClientRect(),
     sx = b.width / regionPreview.view.width,
     sy = b.height / regionPreview.view.height;
-  regionRect = {
-    x: Math.floor(Math.min(p.x, regionStart.x)),
-    y: Math.floor(Math.min(p.y, regionStart.y)),
-    width: Math.max(1, Math.floor(Math.abs(p.x - regionStart.x))),
-    height: Math.max(1, Math.floor(Math.abs(p.y - regionStart.y))),
-  };
   const el = $('#capture-selection');
   el.hidden = false;
   Object.assign(el.style, {
@@ -227,11 +261,89 @@ $('#capture-photo-wrap').addEventListener('pointermove', (e) => {
     width: regionRect.width * sx + 'px',
     height: regionRect.height * sy + 'px',
   });
-  $('#capture-region-size').textContent = regionRect.width + ' × ' + regionRect.height + ' px';
+  $('#capture-region-size').textContent =
+    regionRect.width + ' × ' + regionRect.height + ' px · 방향키 이동 · Shift+방향키 크기 조절';
   $('#capture-region-confirm').disabled = regionRect.width < 4 || regionRect.height < 4;
+}
+const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+$('#capture-photo-wrap').addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 || !regionPreview) return;
+  e.preventDefault();
+  const p = photoPoint(e),
+    handle = e.target.closest('[data-handle]')?.dataset.handle;
+  regionStart = {
+    point: p,
+    kind: regionRect && e.target.closest('#capture-selection') ? handle || 'move' : 'new',
+    rect: regionRect && { ...regionRect },
+  };
+  e.currentTarget.setPointerCapture(e.pointerId);
 });
-$('#capture-photo-wrap').addEventListener('pointerup', () => (regionStart = null));
-$('#capture-photo-wrap').addEventListener('pointercancel', () => (regionStart = null));
+$('#capture-photo-wrap').addEventListener('pointermove', (e) => {
+  if (!regionStart || !regionPreview) return;
+  const p = photoPoint(e),
+    dx = Math.round(p.x - regionStart.point.x),
+    dy = Math.round(p.y - regionStart.point.y),
+    r = regionStart.rect,
+    v = regionPreview.view;
+  if (regionStart.kind === 'new')
+    regionRect = {
+      x: Math.floor(Math.min(p.x, regionStart.point.x)),
+      y: Math.floor(Math.min(p.y, regionStart.point.y)),
+      width: Math.max(1, Math.floor(Math.abs(p.x - regionStart.point.x))),
+      height: Math.max(1, Math.floor(Math.abs(p.y - regionStart.point.y))),
+    };
+  else if (regionStart.kind === 'move')
+    regionRect = {
+      ...r,
+      x: clamp(r.x + dx, 0, v.width - r.width),
+      y: clamp(r.y + dy, 0, v.height - r.height),
+    };
+  else {
+    const k = regionStart.kind;
+    let left = r.x,
+      top = r.y,
+      right = r.x + r.width,
+      bottom = r.y + r.height;
+    if (k.includes('w')) left = clamp(r.x + dx, 0, right - 4);
+    if (k.includes('e')) right = clamp(right + dx, left + 4, v.width);
+    if (k.includes('n')) top = clamp(r.y + dy, 0, bottom - 4);
+    if (k.includes('s')) bottom = clamp(bottom + dy, top + 4, v.height);
+    regionRect = { x: left, y: top, width: right - left, height: bottom - top };
+  }
+  paintRegion();
+});
+$('#capture-photo-wrap').addEventListener('pointerup', () => {
+  regionStart = null;
+  if (regionRect) $('#capture-selection').focus();
+});
+$('#capture-photo-wrap').addEventListener('pointercancel', () => {
+  regionStart = null;
+});
+$('#capture-selection').addEventListener('keydown', (e) => {
+  if (!regionRect || !regionPreview) return;
+  const delta = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[
+    e.key
+  ];
+  if (!delta) return;
+  e.preventDefault();
+  if (e.shiftKey) {
+    regionRect.width = clamp(
+      regionRect.width + delta[0],
+      4,
+      regionPreview.view.width - regionRect.x,
+    );
+    regionRect.height = clamp(
+      regionRect.height + delta[1],
+      4,
+      regionPreview.view.height - regionRect.y,
+    );
+  } else {
+    regionRect.x = clamp(regionRect.x + delta[0], 0, regionPreview.view.width - regionRect.width);
+    regionRect.y = clamp(regionRect.y + delta[1], 0, regionPreview.view.height - regionRect.height);
+  }
+  paintRegion();
+});
+window.addEventListener('resize', paintRegion);
 $('#capture-region-cancel').addEventListener('click', () => api.show('source'));
 $('#capture-region-confirm').addEventListener('click', async () => {
   if (!regionRect) return;
@@ -243,3 +355,35 @@ $('#capture-region-confirm').addEventListener('click', async () => {
     $('#status').textContent = error.message;
   }
 });
+
+$('#quick-install-skill').addEventListener('click', async () => {
+  const button = $('#quick-install-skill');
+  button.disabled = true;
+  try {
+    const value = await api.installSkill();
+    displaySkill(value);
+    $('#quick-agent-status').textContent = '스킬 설치·업데이트 완료. 이전 관리 파일은 백업됩니다.';
+  } catch (error) {
+    $('#quick-agent-status').textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+$('#quick-copy-mcp').addEventListener('click', async () => {
+  try {
+    await api.copyMcpCommand();
+    $('#quick-agent-status').textContent =
+      '등록 명령을 복사했습니다. 터미널에서 실행하고 실제 도구 연결을 확인해 주세요.';
+  } catch (error) {
+    $('#quick-agent-status').textContent = error.message;
+  }
+});
+
+$('#auto-download-updates').checked =
+  localStorage.getItem('console-canvas-auto-download-updates') === 'true';
+$('#auto-download-updates').addEventListener('change', () =>
+  localStorage.setItem(
+    'console-canvas-auto-download-updates',
+    String($('#auto-download-updates').checked),
+  ),
+);

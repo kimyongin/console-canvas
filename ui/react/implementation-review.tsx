@@ -30,6 +30,10 @@ interface Preview {
   targets: Record<string, { rect: Rect; sourceId: string; selector: string }>;
 }
 interface Actions {
+  captureAvailable(): boolean;
+  capture(): Promise<unknown>;
+  canUndo(): boolean;
+  undoVerdict(): Promise<unknown>;
   close(): void;
   choose(id: string): void;
   fresh(): Promise<unknown>;
@@ -54,6 +58,9 @@ function ImplementationReview({
 }) {
   const review = reviews.find((r) => r.id === selectedId),
     [focused, setFocused] = useState(''),
+    [autoNext, setAutoNext] = useState(false),
+    judging = useRef(false),
+    context = useRef({ review: selectedId, request: '' }),
     [zoom, setZoom] = useState('fit'),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState(''),
@@ -84,6 +91,36 @@ function ImplementationReview({
     };
   }, [review?.id, review?.result, actions]);
   const active = review?.requests.find((r) => r.id === focused) || review?.requests[0];
+  context.current = { review: selectedId, request: active?.id || '' };
+  useEffect(() => {
+    setAutoNext(false);
+    setFocused('');
+  }, [review?.id]);
+  async function judge(status: string, detail: number) {
+    if (!review || !active || judging.current || busy || detail > 1 || !frames[0] || !frames[1])
+      return;
+    const identity = { review: review.id, request: active.id };
+    judging.current = true;
+    setBusy(true);
+    try {
+      await actions.update(active.id, status, active.note);
+      if (
+        context.current.review !== identity.review ||
+        context.current.request !== identity.request
+      )
+        return;
+      if (autoNext && status !== 'pending') {
+        const index = review.requests.findIndex((r) => r.id === identity.request);
+        if (review.requests[index + 1]) setFocused(review.requests[index + 1].id);
+      }
+      setMessage('요청 ' + active.number + ' 판정을 저장했습니다.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      judging.current = false;
+      setBusy(false);
+    }
+  }
   const scale =
     zoom === 'fit'
       ? Math.max(
@@ -176,6 +213,11 @@ function ImplementationReview({
             ))}
           </NativeSelect>
         </div>
+        {actions.captureAvailable() && (
+          <Button id="implementation-capture" disabled={busy} onClick={() => run(actions.capture)}>
+            이 목표의 구현 화면 가져오기
+          </Button>
+        )}
         <Button id="implementation-new" disabled={busy} onClick={() => run(actions.fresh)}>
           현재 작업으로 새 검토
         </Button>
@@ -205,6 +247,20 @@ function ImplementationReview({
           서로 다른 기준 너비입니다. 반응형 차이와 미반영 변경을 구분해 확인하세요.
         </p>
       )}
+      <div className="implementation-judgement-options">
+        <label>
+          <input
+            type="checkbox"
+            checked={autoNext}
+            disabled={busy}
+            onChange={(e) => setAutoNext(e.target.checked)}
+          />{' '}
+          판정 후 다음 요청으로 이동
+        </label>
+        <Button disabled={busy || !actions.canUndo()} onClick={() => run(actions.undoVerdict)}>
+          직전 판정 취소
+        </Button>
+      </div>
       <main className="implementation-body">
         <div className="implementation-comparison" ref={comparison}>
           {['목표 시안', '구현 화면'].map((title, i) => {
@@ -266,16 +322,58 @@ function ImplementationReview({
                 {r.number}. {r.name}
               </Button>
               <p>{r.text}</p>
-              <NativeSelect
-                aria-label={`요청 ${r.number} 검토 상태`}
-                disabled={!review.result}
-                value={r.status}
-                onChange={(e) => update(r.id, e.target.value, r.note)}
-              >
-                <option value="pending">미검토</option>
-                <option value="done">반영 확인</option>
-                <option value="change">추가 수정 필요</option>
-              </NativeSelect>
+              {r.id !== active?.id && (
+                <NativeSelect
+                  aria-label={`요청 ${r.number} 검토 상태`}
+                  disabled={!review.result || busy}
+                  value={r.status}
+                  onChange={(e) => update(r.id, e.target.value, r.note)}
+                >
+                  <option value="pending">미검토</option>
+                  <option value="done">반영 확인</option>
+                  <option value="change">추가 수정 필요</option>
+                </NativeSelect>
+              )}
+              {r.id === active?.id && (
+                <div
+                  className="implementation-verdict-buttons"
+                  aria-label={'요청 ' + r.number + ' 직접 판정'}
+                >
+                  <Button
+                    disabled={!review.result || busy || !frames[0] || !frames[1]}
+                    data-verdict="done"
+                    aria-pressed={r.status === 'done'}
+                    onClick={(e) => judge('done', e.detail)}
+                    onKeyDown={(e) => {
+                      if (e.repeat) e.preventDefault();
+                    }}
+                  >
+                    반영 확인
+                  </Button>
+                  <Button
+                    disabled={!review.result || busy || !frames[0] || !frames[1]}
+                    data-verdict="change"
+                    aria-pressed={r.status === 'change'}
+                    onClick={(e) => judge('change', e.detail)}
+                    onKeyDown={(e) => {
+                      if (e.repeat) e.preventDefault();
+                    }}
+                  >
+                    추가 수정
+                  </Button>
+                  <Button
+                    data-verdict="pending"
+                    disabled={!review.result || busy || !frames[0] || !frames[1]}
+                    aria-pressed={r.status === 'pending'}
+                    onClick={(e) => judge('pending', e.detail)}
+                    onKeyDown={(e) => {
+                      if (e.repeat) e.preventDefault();
+                    }}
+                  >
+                    미검토
+                  </Button>
+                </div>
+              )}
               {r.id === active?.id && (
                 <Textarea
                   aria-label={`요청 ${r.number} 검토 메모`}

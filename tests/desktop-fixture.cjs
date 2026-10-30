@@ -64,6 +64,57 @@ async function main() {
         ),
       'Capture/MCP not ready',
     );
+    // Real IPC capture into a frozen review must leave the target editor intact.
+    const targetDocument = await evaluate(editor, 'window.ConsoleCanvas.state.snapshot.id');
+    await evaluate(
+      editor,
+      `(async()=>{const a=window.ConsoleCanvas,n=[...a.state.scene.nodes.values()].find(n=>n.locator.id==='new-customer');a.state.scene.setComment(n.id,'검증용 구현 요청');await a.implementationReview.open();document.querySelector('#implementation-capture').click();})()`,
+    );
+    await until(
+      () =>
+        evaluate(
+          shell,
+          `!!window.ConsoleCanvasShell && !!document.querySelector('#cancel-review-capture') && !document.querySelector('#cancel-review-capture').hidden`,
+        ),
+      'Review capture target not exposed',
+    );
+    const reviewTicket = await evaluate(
+      shell,
+      'window.ConsoleCanvasShell.info().then(v=>v.review_target)',
+    );
+    assert.equal(reviewTicket.document_id, targetDocument);
+    await evaluate(shell, "window.ConsoleCanvasShell.capture({mode:'viewport'})");
+    await until(
+      () => evaluate(editor, '!!window.ConsoleCanvas.state.implementationReviews.at(-1)?.result'),
+      'Native review result not attached',
+    );
+    const reviewState = await evaluate(
+      editor,
+      `({target:window.ConsoleCanvas.state.snapshot.id,result:window.ConsoleCanvas.state.implementationReviews.at(-1).result.snapshot.id,scope:window.ConsoleCanvas.state.implementationReviews.at(-1).result.snapshot.captureScope})`,
+    );
+    assert.equal(reviewState.target, targetDocument);
+    assert.notEqual(reviewState.result, targetDocument);
+    if (!process.env.CONSOLE_CANVAS_OFFSCREEN) assert.equal(reviewState.scope.mode, 'viewport');
+    await evaluate(editor, `document.querySelector('#implementation-capture').click()`);
+    await until(
+      () => evaluate(shell, "!document.querySelector('#cancel-review-capture').hidden"),
+      'Second review capture not pending',
+    );
+    await evaluate(
+      shell,
+      'window.ConsoleCanvasShell.info().then(v=>window.ConsoleCanvasShell.cancelReview(v.review_target.request_id))',
+    );
+    assert.equal(await evaluate(editor, 'window.ConsoleCanvas.state.snapshot.id'), targetDocument);
+    await evaluate(
+      editor,
+      `(async()=>{document.querySelector('#implementation-dialog').close();const a=window.ConsoleCanvas,n=[...a.state.scene.nodes.values()].find(n=>n.locator.id==='new-customer');a.state.scene.setComment(n.id,'');await a.state.saving;})()`,
+    );
+    await evaluate(editor, 'window.ConsoleCanvasDesktop.focusAddress()');
+    await until(
+      () => evaluate(shell, "document.activeElement===document.querySelector('#address')"),
+      'Address command did not focus shell input',
+    );
+    await evaluate(shell, "window.ConsoleCanvasShell.show('editor')");
     await evaluate(shell, "document.querySelector('#show-settings').click()");
     await until(
       () => evaluate(shell, "document.body.dataset.view==='settings'"),
@@ -225,7 +276,13 @@ async function main() {
     assert.equal(editor.getOwnerBrowserWindow(), window);
     await fs.writeFile(
       path.join(directory, 'prepare-ready.json'),
-      JSON.stringify({ sandbox: true, sourceUnchanged: true }),
+      JSON.stringify({
+        sandbox: true,
+        sourceUnchanged: true,
+        reviewCapturePreservesTarget: true,
+        reviewCancellation: true,
+        addressCommand: true,
+      }),
     );
     await until(
       () =>

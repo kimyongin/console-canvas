@@ -20,6 +20,7 @@ export function reviewCapture(snapshot) {
     html: snapshot.html,
     nodes: snapshot.nodes,
     warnings: snapshot.warnings || [],
+    ...(snapshot.captureScope ? { captureScope: snapshot.captureScope } : {}),
     screenshot: null,
   });
 }

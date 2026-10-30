@@ -1,6 +1,6 @@
 // Evidence about collection limits, not a visual similarity score. Old files
 // receive the same read-only assessment; never rewrite captures or sessions.
-export function captureAssessment(snapshot, elements = new Map()) {
+export function captureAssessment(snapshot, elements = new Map(), repairs = []) {
   const nodes = new Map((snapshot?.nodes || []).map((node) => [node.id, node]));
   const items = [],
     seen = new Set();
@@ -81,17 +81,32 @@ export function captureAssessment(snapshot, elements = new Map()) {
         );
     }
   }
+  const repaired = new Set(repairs.filter((p) => p.type === 'resource').map((p) => p.resource_url));
+  for (const item of items) {
+    const node = nodes.get(item.id);
+    item.resolution =
+      item.kind === '원본 이미지 로딩 실패' && repaired.has(node?.image?.url)
+        ? 'resource_applied'
+        : 'not_verified';
+  }
+  const remaining = { loss: 0, constraint: 0, info: 0 };
+  for (const item of items) if (item.resolution !== 'resource_applied') remaining[item.severity]++;
   const counts = { loss: 0, constraint: 0, info: 0 };
   for (const item of items) counts[item.severity]++;
   return {
     items,
     counts,
-    label: counts.loss
-      ? '가져오기 · 수집 확인 ' + counts.loss + '건'
-      : counts.constraint
-        ? '가져오기 · 편집 제약 ' + counts.constraint + '건'
-        : counts.info
-          ? '가져오기 · 참고 ' + counts.info + '건'
-          : '가져오기 · 화면 비교 전',
+    remaining_counts: remaining,
+    applied_resource_count: repaired.size,
+    repaired_count: items.filter((i) => i.resolution === 'resource_applied').length,
+    label: remaining.loss
+      ? '가져오기 · 수집 확인 ' + remaining.loss + '건'
+      : items.some((i) => i.resolution === 'resource_applied')
+        ? '가져오기 · 복구 적용됨'
+        : counts.constraint
+          ? '가져오기 · 편집 제약 ' + counts.constraint + '건'
+          : counts.info
+            ? '가져오기 · 참고 ' + counts.info + '건'
+            : '가져오기 · 화면 비교 전',
   };
 }
