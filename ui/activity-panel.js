@@ -2,6 +2,7 @@ import { activityGroups } from './activity-groups.js';
 import { renderActivityRows } from './react/lists.tsx';
 import { activityBranch, activityChanges } from '../activity-history.js';
 import { pointTarget } from '../edit-commands.js';
+import { snapshotVersionName } from './version-preview.js';
 export function changeDescription(change) {
   if (change.type === 'code') return 'HTML·CSS를 수정했습니다. 스냅샷 비교에서 확인할 수 있습니다.';
   if (change.type === 'comment') return change.after || '주석이 삭제되었습니다.';
@@ -51,11 +52,17 @@ export function createActivityPanel({ $, state, selectNode, focusComment }) {
       query = $('#activity-search').value.trim().toLowerCase(),
       selectedOnly = $('#activity-selected').checked;
     const currentPath = new Set(activityBranch(state).map((e) => e.id));
+    const versionName = (id) => {
+      const entry = state.timeline?.entries.find((e) => e.id === id);
+      return entry
+        ? snapshotVersionName(entry, state.timeline.entries) + (entry.deletedAt ? ' · 휴지통' : '')
+        : '';
+    };
     const entries = activityBranch(state, all),
       covered = new Set();
     $('#activity-branch').textContent =
       (all ? '모든 가지 · 현재 작업 기준 ' : '현재 작업 기준 · ') +
-      (state.timeline?.entries.find((e) => e.id === state.timeline.activeId)?.name || '현재 작업');
+      (versionName(state.timeline?.activeId) || '현재 작업');
     function append(event, baseline = false) {
       const changes = event.changes.filter((c) => {
         const matches =
@@ -95,8 +102,7 @@ export function createActivityPanel({ $, state, selectNode, focusComment }) {
         context:
           event.id && !baseline
             ? '기준 ' +
-              (state.timeline?.entries.find((e) => e.id === event.snapshot_id)?.name ||
-                '저장 전 작업') +
+              (versionName(event.snapshot_id) || '저장 전 작업') +
               ' · ' +
               (currentPath.has(event.id) ? '현재 작업 경로' : '다른 경로')
             : '',

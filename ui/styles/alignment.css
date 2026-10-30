@@ -1297,34 +1297,16 @@
   display: none;
 }
 @media (max-width: 850px) {
-  .implementation-controls {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-  }
-  .implementation-controls > button {
-    grid-column: auto;
-    font-size: 10px;
-  }
-  .implementation-body {
-    grid-template-columns: minmax(0, 1fr) 220px;
-    grid-template-rows: minmax(0, 1fr);
-  }
-  .implementation-request-list {
-    display: block;
-  }
-  .implementation-request-header {
-    display: block;
-  }
-  .implementation-request-header > strong {
-    font-size: 10px;
-  }
-  .implementation-request-navigation {
-    margin: 6px 0 0;
-  }
   #export-dialog .export-scroll {
     grid-template-columns: 220px minmax(0, 1fr);
     gap: 12px;
     padding: 12px;
   }
+}
+#snapshot-parent-name,
+.activity-context {
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 .implementation-request-navigation label {
   font-size: 12px;

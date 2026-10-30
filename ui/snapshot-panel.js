@@ -297,7 +297,9 @@ export function createSnapshotPanel({
       return;
     }
     const entries = state.timeline?.entries || [],
-      names = new Map(entries.map((e) => [e.id, e.name]));
+      names = new Map(
+        entries.map((e) => [e.id, versionName(e) + (e.deletedAt ? ' · 휴지통' : '')]),
+      );
     const matches = entries
       .filter((e) => !e.deletedAt && e.name.toLocaleLowerCase().includes(query))
       .reverse()
@@ -306,7 +308,7 @@ export function createSnapshotPanel({
       host,
       matches.slice(0, 40).map((e) => ({
         id: e.id,
-        name: e.name,
+        name: versionName(e),
         parent: '부모 · ' + (names.get(e.parentId) || '가져온 시작점'),
       })),
       matches.length,
@@ -540,10 +542,10 @@ export function createSnapshotPanel({
     $('#snapshot-preview').hidden = trashView;
     $('#version-status').textContent = snapshotChangeLabel(state, $('#review-note').value);
     const active = entries.find((e) => e.active);
-    $('#snapshot-parent-name').textContent = '부모 버전 · ' + (active?.name || '현재 작업');
+    $('#snapshot-parent-name').textContent = '부모 버전 · ' + (versionName(active) || '현재 작업');
     $('#snapshot-current').textContent =
       '현재 작업 기준 · ' +
-      (active?.name || '현재 작업') +
+      (versionName(active) || '현재 작업') +
       (snapshotHistory.dirty() ? ' · 저장 전 변경은 버전 이동 전 자동 보관됩니다.' : '');
     updateLabel();
     if (trashView) trash();

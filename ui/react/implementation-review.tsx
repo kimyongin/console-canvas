@@ -36,7 +36,18 @@ interface Review extends ReviewRecord {
 interface Preview {
   html: string;
   size: { width: number; height: number };
-  targets: Record<string, { rect: Rect; sourceId: string; selector: string }>;
+  targets: Record<
+    string,
+    {
+      rect: Rect | null;
+      sourceId: string;
+      selector: string;
+      kind: string;
+      tag: string;
+      textIndex?: number;
+      hidden: boolean;
+    }
+  >;
 }
 interface Actions extends ReviewRecordActions {
   currentResult(id: string): boolean;
@@ -545,10 +556,11 @@ function ImplementationReview({
                 const highlight = frame.querySelector<HTMLElement>('.compare-target-highlight');
                 if (!highlight) continue;
                 const f = frame.getBoundingClientRect(),
-                  h = highlight.getBoundingClientRect();
+                  h = highlight.getBoundingClientRect(),
+                  label = highlight.querySelector('span')?.getBoundingClientRect();
                 frame.scrollTo({
-                  left: frame.scrollLeft + h.left - f.left - 24,
-                  top: frame.scrollTop + h.top - f.top - 32,
+                  left: frame.scrollLeft + Math.min(h.left, label?.left ?? h.left) - f.left - 12,
+                  top: frame.scrollTop + Math.min(h.top, label?.top ?? h.top) - f.top - 12,
                 });
               }
             }}
@@ -580,20 +592,56 @@ function ImplementationReview({
           <div className="implementation-comparison" ref={comparison}>
             {['목표 시안', '구현 화면'].map((title, i) => {
               const frame = frames[i];
+              const identity = active && frames[0]?.targets[active.id];
               const matches =
                 i === 1 && active && frame
-                  ? Object.values(frame.targets).filter((t) =>
-                      active.sourceId
-                        ? t.sourceId === active.sourceId
-                        : active.selector && t.selector === active.selector,
+                  ? Object.values(frame.targets).filter(
+                      (t) =>
+                        !t.hidden &&
+                        t.rect &&
+                        t.rect.width > 0 &&
+                        t.rect.height > 0 &&
+                        (active.sourceId
+                          ? t.sourceId === active.sourceId
+                          : active.selector && t.selector === active.selector) &&
+                        (!identity ||
+                          (t.kind === identity.kind &&
+                            t.tag === identity.tag &&
+                            (identity.textIndex == null || t.textIndex === identity.textIndex))),
                     )
                   : [];
+              const correspondence =
+                !active || !frame
+                  ? ''
+                  : i === 0
+                    ? '요청 ' + active.number + ' · 목표 위치'
+                    : !active.sourceId && !active.selector
+                      ? '위치·화면 요청 · 직접 확인'
+                      : matches.length === 1
+                        ? '식별자로 추정 · 직접 확인 필요'
+                        : matches.length
+                          ? '대응 후보 ' + matches.length + '개 · 직접 확인'
+                          : '대응 요소 없음 · 직접 확인';
               const rect =
                 i === 0 ? active?.rect : matches.length === 1 ? matches[0].rect : undefined;
               return (
                 <section key={title}>
-                  <strong>{title}</strong>
-                  <div className="implementation-frame">
+                  <div className="implementation-pane-heading">
+                    <strong>{title}</strong>
+                    <small
+                      className="implementation-correspondence"
+                      role={i === 1 ? 'status' : undefined}
+                      title={correspondence}
+                    >
+                      {correspondence}
+                    </small>
+                  </div>
+                  <div
+                    className="implementation-frame"
+                    tabIndex={0}
+                    role="region"
+                    aria-label={title + ' 비교 영역'}
+                  >
                     {frame ? (
                       <VersionFrame
                         html={frame.html}

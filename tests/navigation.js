@@ -56,7 +56,9 @@ try {
   check(
     'Search keeps branch graph while showing named results with parent context',
     doc.querySelectorAll('[data-snapshot-match]').length === 3 &&
-      doc.querySelector('#snapshot-search-results').textContent.includes('부모 · A · 공통 기준') &&
+      doc
+        .querySelector('#snapshot-search-results')
+        .textContent.includes('부모 · v2 · A · 공통 기준') &&
       doc.querySelectorAll('[data-snapshot-id]').length === 5,
   );
   field.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));

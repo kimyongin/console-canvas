@@ -315,16 +315,18 @@ export function createImplementationReview({
       return withVersionScene(snapshot, point, (scene) => ({
         ...scene.preview(),
         targets: Object.fromEntries(
-          [...scene.nodes]
-            .filter(([, n]) => !scene.hidden(n.id))
-            .map(([id, n]) => [
-              id,
-              {
-                rect: scene.rect(id),
-                sourceId: n.locator?.id || '',
-                selector: n.locator?.selector || '',
-              },
-            ]),
+          [...scene.nodes].map(([id, n]) => [
+            id,
+            {
+              rect: scene.rect(id),
+              sourceId: n.locator?.id || '',
+              selector: n.locator?.selector || '',
+              kind: n.kind,
+              tag: n.tag,
+              textIndex: n.locator?.textIndex,
+              hidden: scene.hidden(n.id),
+            },
+          ]),
         ),
       }));
     },

@@ -131,3 +131,5 @@ capture-status.js가 저장된 경고·프레임 정보와 scene의 이미지/�
 `desktop/repair-resources.cjs`는 신뢰한 편집기 mainFrame의 명시 요청만 받아 관측 자산을 쿠키 없이 제한적으로 읽고 바이너리 형식을 확인한다. `resource-repair.js`는 관측 참조와 inert data URI만 허용한다. `code-patches.js`의 resource는 기존 checkpoint/session/timeline/JSON에 포함된다. UI는 독립 장면 미리보기·문서/리비전/세대 검증 후 기존 historyBefore/changeCommitted로 한 번만 적용한다. 원본 HTML/사진은 바꾸지 않으며 MCP resource는 네트워크를 호출하지 않는다.
 
 0.32의 검토 기록은 선택적 name/deletedAt을 추가하고 같은 세션 큐로 관리한다. 활성20개/전체40개/문자20,000,000 한도는 workflow-state.js에서 검증한다. ui/react/review-records.tsx는 기존 모달의 하위 화면이며 영구 삭제는 대상 내용 지문과 별도 확인을 거친다. 복구만으로 선택/캔버스를 적용하지 않는다. 전체 편집 파일 백업은 DB 오류 때도 메모리의 보호된 상태를 내보낸다. 전달 확대/넓게 보기/스크롤은 ui/export-dialog.js의 비영구 보기 상태로 PNG 렌더·문서 데이터와 분리한다. [0.32 증빙](ux-0.32.md).
+
+0.33의 구현 비교 반응형 규칙은 ui/react/theme.css의 단일 max850 구간이 소유한다. 공유 VersionFrame은 호스트/원본 표시 너비와 라벨 실측 너비로 텍스트만 안쪽에 배치하고, 선택 요청 이동은 테두리와 라벨의 경계를 함께 사용한다. ui/implementation-review.js의 일시적 targets는 종류/태그/텍스트 인덱스/숨김을 포함하며 고정 목표와 결과를 읽기 대조한다. 실제 중복/부재는 명시하고 임의 위치 대응을 만들지 않는다. 새 검토 저장 필드나 네이티브/MCP 명령은 없다. 저장 부모·통합 이력·검색의 버전 명칭은 기존 snapshotVersionName으로 계산하고 기존 ID/부모를 유지한다. [0.33 증빙](ux-0.33.md).

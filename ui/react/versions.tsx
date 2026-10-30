@@ -178,10 +178,14 @@ export function VersionFrame({
   origin?: { x: number; y: number };
 }) {
   const space = useRef<HTMLDivElement>(null),
-    [scale, setScale] = useState(0.5);
+    label = useRef<HTMLSpanElement>(null),
+    [scale, setScale] = useState(0.5),
+    [hostWidth, setHostWidth] = useState(0),
+    [labelWidth, setLabelWidth] = useState(0);
   useLayoutEffect(() => {
     const host = space.current!.parentElement!;
-    const fit = () =>
+    const fit = () => {
+      setHostWidth(host.clientWidth);
       setScale(
         zoom ??
           Math.max(
@@ -193,11 +197,16 @@ export function VersionFrame({
             ),
           ),
       );
+    };
     fit();
     const observer = new ResizeObserver(fit);
     observer.observe(host);
     return () => observer.disconnect();
   }, [size.width, size.height, zoom, fitHeight]);
+  const labelMaxWidth = Math.max(14, Math.min(280, size.width * scale - 4, hostWidth - 24));
+  useLayoutEffect(() => {
+    setLabelWidth(label.current?.offsetWidth || 0);
+  }, [highlight?.label, labelMaxWidth]);
   return (
     <div
       ref={space}
@@ -245,7 +254,23 @@ export function VersionFrame({
             height: Math.max(14, highlight.rect.height * scale),
           }}
         >
-          <span style={{ top: (highlight.rect.y - origin.y) * scale < 26 ? 0 : -25 }}>
+          <span
+            ref={label}
+            style={{
+              top: (highlight.rect.y - origin.y) * scale < 26 ? 0 : -25,
+              maxWidth: labelMaxWidth,
+              left:
+                Math.max(
+                  2,
+                  Math.min(
+                    (highlight.rect.x - origin.x) * scale + 2,
+                    size.width * scale - labelWidth - 2,
+                  ),
+                ) -
+                (highlight.rect.x - origin.x) * scale -
+                2,
+            }}
+          >
             {highlight.label}
           </span>
         </div>
