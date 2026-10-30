@@ -55,8 +55,8 @@ try {
     .querySelector('#selection-toolbar-handle')
     .dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
   check(
-    'Selection toolbar prefers empty canvas gutter and can move without editing the scene',
-    toolbarRect.bottom <= frameRect.top &&
+    'Selection toolbar avoids capture controls and can move without editing the scene',
+    toolbarRect.top >= doc.querySelector('.artboard-caption').getBoundingClientRect().bottom &&
       toolbar.getBoundingClientRect().left < toolbarRect.left &&
       stableEdits === JSON.stringify(scene.edits) &&
       stableUndo === app.state.undo.length,

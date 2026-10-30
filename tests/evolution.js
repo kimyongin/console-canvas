@@ -148,6 +148,11 @@ try {
       JSON.stringify([scene.edits, scene.annotations, app.state.timeline, app.state.activity]),
   );
   click('#snapshot-dropdown');
+  await new Promise((r) =>
+    frame.contentWindow.requestAnimationFrame(() => frame.contentWindow.requestAnimationFrame(r)),
+  );
+  if (doc.querySelector('#snapshot-fit-graph').textContent === '실제 크기')
+    click('#snapshot-fit-graph');
   const graphScroll = doc.querySelector('#snapshot-graph-scroll');
   graphScroll.scrollLeft = 30;
   const savedScroll = graphScroll.scrollLeft,

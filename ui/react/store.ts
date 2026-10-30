@@ -21,6 +21,7 @@ export type EditorCommand =
   | 'copy'
   | 'paste'
   | 'duplicate'
+  | 'focus-view'
   | 'commands'
   | 'repair-assets'
   | 'source-compare'

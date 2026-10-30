@@ -1,5 +1,6 @@
 import {
   renderHandoffPreview,
+  renderHandoffConflicts,
   renderHandoffRequests,
   renderVersionOptions,
 } from './react/versions.tsx';
@@ -18,6 +19,8 @@ export function createExportDialog({
   save,
   implementationReview,
 }) {
+  let excludedComments = new Map(),
+    reviewDocument = null;
   let generation = 0,
     latest = null,
     previewUrl = null,
@@ -68,6 +71,33 @@ export function createExportDialog({
     clearReact($('#handoff-items'));
     try {
       const result = await useVersion(async (scene, version) => {
+        if (token !== generation) throw Error('전달 기준이 바뀌었습니다.');
+        const conflicts = scene.comments().filter((c) => c.targetDeleted);
+        if (reviewDocument !== state.snapshot.id) {
+          reviewDocument = state.snapshot.id;
+          excludedComments = new Map();
+        }
+        renderHandoffConflicts(
+          $('#handoff-conflicts'),
+          conflicts.map((c) => ({
+            id: c.id,
+            name: c.name || '삭제된 대상',
+            text: c.text,
+            excluded: excludedComments.get(version.id + ':' + c.id) === c.text,
+          })),
+          (id, excluded) => {
+            const item = conflicts.find((c) => c.id === id);
+            if (excluded) excludedComments.set(version.id + ':' + id, item.text);
+            else excludedComments.delete(version.id + ':' + id);
+            refresh();
+          },
+          editRequest,
+          version.id === '@current',
+        );
+        const annotations = { ...scene.annotations };
+        for (const c of conflicts)
+          if (excludedComments.get(version.id + ':' + c.id) === c.text) delete annotations[c.id];
+        scene.setComments(annotations);
         const requests = handoffRequests(scene);
         $('#export-summary').textContent = version.name + ' · 변경 요청 ' + requests.length + '개';
         $('#review-note').closest('label').hidden = version.id !== '@current';
@@ -111,6 +141,8 @@ export function createExportDialog({
     }
   }
   $('#export-button').addEventListener('click', () => {
+    excludedComments = new Map();
+    reviewDocument = state.snapshot?.id;
     commitCommentDraft();
     renderVersionOptions($('#handoff-version'), versionOptions(state));
     $('#handoff-version').value = '@current';
@@ -128,7 +160,13 @@ export function createExportDialog({
     if (!option) return;
     $('#export-dialog').close();
     try {
-      await implementationReview.open(option);
+      const annotations = { ...option.state.annotations };
+      for (const [key, text] of excludedComments)
+        if (key.startsWith(option.id + ':')) {
+          const id = key.slice(option.id.length + 1);
+          if (annotations[id] === text) delete annotations[id];
+        }
+      await implementationReview.open({ ...option, state: { ...option.state, annotations } });
     } catch (error) {
       toast(error.message);
     }
@@ -231,6 +269,11 @@ export function createExportDialog({
     try {
       commitCommentDraft();
       await flushEditor();
+      if (state.scene.comments().some((c) => c.targetDeleted)) {
+        $('#export-button').click();
+        toast('삭제된 대상의 주석을 확인한 뒤 전달해 주세요.');
+        return;
+      }
       const id = state.snapshot.id,
         revision = state.revision,
         generation = state.generation;

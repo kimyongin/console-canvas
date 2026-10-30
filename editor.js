@@ -248,7 +248,7 @@ function closeDocument(id) {
 const areaSelection = createAreaSelection({ $, state, toast });
 const clipboard = createClipboard({ $, state, toast, commitCommentDraft, adapter });
 const { renderInspector: renderInspectorView } = createInspector({ $, state, kinds, selectNode });
-const selectionToolbar = createSelectionToolbar({ $, state });
+const selectionToolbar = createSelectionToolbar({ $, state, selectNode });
 configureModelessInspector({ $ });
 function renderCaptureStatus() {
   const assessment = captureAssessment(
@@ -903,6 +903,10 @@ window.addEventListener('drop', (event) => {
 });
 function renderMcpStatus() {
   const status = state.mcpStatus;
+  $('#mcp-disconnect').disabled = !status.connected;
+  $('#mcp-disconnect').title = status.connected
+    ? '이 복제본의 연결 끊기'
+    : '연결된 로컬 서버가 없습니다.';
   $('#mcp-button').textContent = status.connected ? '● 로컬 서버 연결됨' : '○ 에이전트 연결';
   $('#mcp-button').title =
     '서버 연결과 에이전트 인증은 다릅니다.' +

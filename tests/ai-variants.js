@@ -490,7 +490,8 @@ try {
   );
   check(
     'Unconfigured API blocks generation and exposes setup before submission',
-    apiDoc.querySelector('.ai-auth').open &&
+    !apiDoc.querySelector('.ai-auth').open &&
+      !!apiDoc.querySelector('#ai-open-auth') &&
       apiDoc.querySelector('#ai-create').disabled &&
       apiDoc.querySelector('#ai-readiness').textContent.includes('키와 모델'),
   );

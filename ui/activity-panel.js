@@ -50,10 +50,11 @@ export function createActivityPanel({ $, state, selectNode, focusComment }) {
       filter = $('#activity-filter').value,
       query = $('#activity-search').value.trim().toLowerCase(),
       selectedOnly = $('#activity-selected').checked;
+    const currentPath = new Set(activityBranch(state).map((e) => e.id));
     const entries = activityBranch(state, all),
       covered = new Set();
     $('#activity-branch').textContent =
-      '현재 작업 기준 · ' +
+      (all ? '모든 가지 · 현재 작업 기준 ' : '현재 작업 기준 · ') +
       (state.timeline?.entries.find((e) => e.id === state.timeline.activeId)?.name || '현재 작업');
     function append(event, baseline = false) {
       const changes = event.changes.filter((c) => {
@@ -91,9 +92,19 @@ export function createActivityPanel({ $, state, selectNode, focusComment }) {
               minute: '2-digit',
             }) + (event.actor === 'agent' ? ' · 에이전트' : ''),
         heading: changes.length === 1 ? label(changes[0]) : event.label,
+        context:
+          event.id && !baseline
+            ? '기준 ' +
+              (state.timeline?.entries.find((e) => e.id === event.snapshot_id)?.name ||
+                '저장 전 작업') +
+              ' · ' +
+              (currentPath.has(event.id) ? '현재 작업 경로' : '다른 경로')
+            : '',
         changes: changes.map((change) => ({
           id: change.id || '',
-          name: state.snapshot.layerNames?.[change.id] || change.name,
+          name:
+            state.snapshot.layerNames?.[change.id] ||
+            (/^n\d+$/.test(change.name || '') ? '이전 요소 · 현재 화면에 없음' : change.name),
           type: change.type,
           description: changeDescription(change),
           disabled: !change.id || (!pointTarget(change.id) && !state.scene?.nodes.has(change.id)),

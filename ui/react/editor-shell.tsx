@@ -14,6 +14,10 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
       : 'initial';
   });
   const view = adapter?.getSnapshot();
+  const compact = (command: Parameters<typeof dispatchEditorCommand>[0]) => {
+    document.getElementById('compact-tools')?.hidePopover();
+    dispatchEditorCommand(command);
+  };
   return (
     <>
       <header className="app-header">
@@ -296,7 +300,27 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             >
               <span>{'스냅샷 목록 · '}</span>
               <span id="snapshot-active-name">{'문서 열기'}</span>
-              {' ⌄\n          '}
+              <span className="snapshot-chevron" aria-hidden="true">
+                ⌄
+              </span>
+            </Button>
+            <Button
+              id="compact-tools-button"
+              popoverTarget="compact-tools"
+              aria-label="추가 편집 도구"
+            >
+              ⋯
+            </Button>
+          </div>
+          <div id="compact-tools" popover="auto" aria-label="추가 편집 도구">
+            <Button disabled={!view?.ready} onClick={() => compact('paste')}>
+              붙여넣기
+            </Button>
+            <Button disabled={!view?.ready} onClick={() => compact('ai')}>
+              ✨ AI 시안
+            </Button>
+            <Button disabled={!view?.ready} onClick={() => compact('focus-view')}>
+              캔버스 넓히기 · 이전 패널로 복귀
             </Button>
           </div>
           <div id="viewport" className="canvas-viewport">
@@ -362,6 +386,13 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             </div>
           </div>
           <div id="selection-actions" role="toolbar" aria-label="선택 요소 작업" hidden={true}>
+            <div className="selection-identity">
+              <strong id="selection-name"></strong>
+              <small id="selection-path"></small>
+              <Button id="selection-parent" variant="ghost">
+                상위 요소 선택
+              </Button>
+            </div>
             <Button
               id="selection-toolbar-handle"
               aria-label="선택 도구 모음 이동"
@@ -433,7 +464,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                 {'＋'}
               </Button>
               <Button id="fit" variant="outline">
-                {'맞춤'}
+                {'너비 맞춤'}
               </Button>
               <Button
                 id="zoom-selection"
@@ -572,6 +603,9 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             >
               현재 버전 찾기
             </Button>
+            <Button id="snapshot-fit-graph" variant="outline">
+              그래프 맞춤
+            </Button>
           </div>
         </div>
         <div id="snapshot-tools">
@@ -581,7 +615,9 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             tabIndex={0}
             aria-label="스냅샷 분기 그래프 · 가로 스크롤"
           >
-            <div id="snapshot-list" className="snapshot-graph"></div>
+            <div id="snapshot-graph-space">
+              <div id="snapshot-list" className="snapshot-graph"></div>
+            </div>
           </div>
           <div
             id="snapshot-splitter"
@@ -594,6 +630,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             aria-valuenow={170}
           ></div>
           <div className="snapshot-legend">
+            <span id="snapshot-overflow" role="status"></span> ·
             {
               '\n          ● 현재 버전 · ◉ 선택한 미리보기 · 점선은 저장 전 작업 · 가로로 스크롤하여 탐색\n        '
             }
@@ -617,6 +654,15 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                 {'\n              선택만으로 현재 편집은 바뀌지 않습니다.\n            '}
               </p>
             </div>
+            <label className="snapshot-preview-controls">
+              미리보기 확대{' '}
+              <NativeSelect id="snapshot-preview-zoom" defaultValue="fit">
+                <option value="fit">전체 맞춤</option>
+                <option value="width">너비 맞춤</option>
+                <option value="1">100%</option>
+                <option value="target">변경 위치 확대</option>
+              </NativeSelect>
+            </label>
             <Button id="compare-button" variant="outline">
               {'현재 작업과 비교'}
             </Button>
@@ -993,6 +1039,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             </NativeSelect>
           </label>
           <div id="export-summary" className="export-summary" role="status"></div>
+          <div id="handoff-conflicts"></div>
           <div id="handoff-items" className="handoff-items" aria-label="번호별 요청 검토"></div>
           <label className="review-note-label">
             {'추가 설명 '}

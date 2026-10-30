@@ -86,6 +86,7 @@ export interface ActivityRow {
   id: string;
   time: string;
   heading: string;
+  context?: string;
   children?: ActivityRow[];
   changes: {
     id: string;
@@ -101,6 +102,7 @@ function ActivityContents({ row }: { row: ActivityRow }) {
     <>
       <small>{row.time}</small>
       <strong>{row.heading}</strong>
+      {row.context && <small className="activity-context">{row.context}</small>}
       {row.changes.map((change, index) => (
         <Button
           variant="ghost"
@@ -151,7 +153,7 @@ export interface DocumentRow {
   url: string;
   date: string;
   captured: string;
-  summary?: { snapshotName?: string; commentCount?: number };
+  summary?: { snapshotName?: string; activeSnapshotName?: string; commentCount?: number };
   current: boolean;
   disabled: boolean;
   open: () => void;
@@ -297,12 +299,12 @@ export function renderCaptureIssues(
   );
 }
 
-function DocumentVisual({
+export function DocumentVisual({
   id,
   summary,
 }: {
   id: string;
-  summary?: { snapshotName?: string; commentCount?: number };
+  summary?: { snapshotName?: string; activeSnapshotName?: string; commentCount?: number };
 }) {
   const host = useRef<HTMLDivElement>(null);
   const [details, setDetails] = useState(summary);
@@ -362,7 +364,11 @@ function DocumentVisual({
         )}
       </div>
       <div className="document-summary">
-        <span>{'최근 스냅샷 · ' + (details?.snapshotName || '불러오는 중')}</span>
+        <span>
+          {'작업 기준 · ' + (details?.activeSnapshotName || '기록 없음')}
+          <br />
+          {'최근 저장 버전 · ' + (details?.snapshotName || '불러오는 중')}
+        </span>
         <small>
           {details?.commentCount === undefined
             ? '주석 불러오는 중'
@@ -394,7 +400,9 @@ export function renderQuickDocuments(host: Element, rows: DocumentRow[], loading
               {row.current ? ' · 현재 작업' : ''}
             </strong>
             <small>
-              {row.summary?.snapshotName || row.date} · 주석 {row.summary?.commentCount ?? '—'}개
+              작업 기준 {row.summary?.activeSnapshotName || '기록 없음'} · 주석{' '}
+              {row.summary?.commentCount ?? '—'}개<br />
+              최근 저장 버전 {row.summary?.snapshotName || '기록 없음'}
             </small>
             <small>
               {row.date} · {row.url}

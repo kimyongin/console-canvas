@@ -113,7 +113,7 @@ export function createImplementationReview({
       const index = verdicts.findLastIndex(
         (v) => v.document === state.snapshot?.id && v.review === selectedId,
       );
-      if (index < 0) return;
+      if (index < 0) throw Error('되돌릴 판정이 없습니다.');
       const v = verdicts[index],
         r = find(v.review).requests.find((r) => r.id === v.id);
       if (!r || r.status !== v.after)
@@ -121,6 +121,7 @@ export function createImplementationReview({
       await actions.update(r.id, v.before, r.note, { record: false });
       verdicts.splice(index, 1);
       render();
+      return { number: r.number, status: v.before };
     },
     close: () => $('#implementation-dialog').close(),
     choose(id) {
@@ -132,7 +133,9 @@ export function createImplementationReview({
         epoch = generation;
       const next = await listDocuments(1000);
       if (id !== state.snapshot?.id || epoch !== generation) throw Error('문서가 바뀌었습니다.');
-      documents = next.filter((d) => d.id !== id);
+      const enriched = await enrichDocuments(next);
+      if (id !== state.snapshot?.id || epoch !== generation) throw Error('문서가 바뀌었습니다.');
+      documents = enriched;
       render();
     },
     async fresh() {
@@ -296,16 +299,22 @@ export function createImplementationReview({
         items(),
         selectedId,
         documents,
-        state.snapshot.source,
+        {
+          ...state.snapshot.source,
+          title: state.snapshot.documentName || state.snapshot.source.title,
+        },
         actions,
       );
+  }
+  async function enrichDocuments(values) {
+    return values.filter((d) => d.id !== state.snapshot.id);
   }
   async function open(option = null) {
     if (!state.ready) return;
     await flushEditor();
     const epoch = ++generation,
       documentId = state.snapshot.id;
-    documents = (await listDocuments(1000)).filter((d) => d.id !== documentId);
+    documents = await enrichDocuments(await listDocuments(1000));
     if (epoch !== generation || documentId !== state.snapshot?.id) return;
     if (option) {
       const signature = snapshotSignature(option.state);

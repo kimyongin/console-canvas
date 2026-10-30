@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { startProcess } from './process-output.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
@@ -25,28 +25,7 @@ await fs.mkdir(env.HOME, { recursive: true });
 let active,
   checking = true;
 function start(command, args, extra = {}) {
-  const child = spawn(command, args, {
-    cwd: root,
-    env: { ...env, ...extra },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  let output = '';
-  child.stdout.on('data', (chunk) => (output += chunk));
-  child.stderr.on('data', (chunk) => (output += chunk));
-  const done = new Promise((resolve, reject) => {
-    child.on('error', reject);
-    child.on('exit', (code) =>
-      code === 0 ? resolve(output) : reject(new Error(output || 'Process failed: ' + code)),
-    );
-  });
-  done.catch(() => {});
-  return {
-    child,
-    done,
-    get output() {
-      return output;
-    },
-  };
+  return startProcess(command, args, { cwd: root, env: { ...env, ...extra } });
 }
 async function waitFor(filename) {
   const deadline = Date.now() + 60000;

@@ -3,9 +3,10 @@ import { renderReact } from './mount';
 import { Button } from './components/button';
 import { NativeSelect } from './components/surfaces';
 import { Textarea } from './components/textarea';
+import { DocumentVisual } from './lists';
 import { VersionFrame } from './versions';
 type Rect = { x: number; y: number; width: number; height: number };
-type Source = { url: string; viewport: { width: number; height: number } };
+type Source = { url: string; title?: string; viewport: { width: number; height: number } };
 interface Item {
   id: string;
   number: number;
@@ -33,7 +34,7 @@ interface Actions {
   captureAvailable(): boolean;
   capture(): Promise<unknown>;
   canUndo(): boolean;
-  undoVerdict(): Promise<unknown>;
+  undoVerdict(): Promise<{ number: number; status: string }>;
   close(): void;
   choose(id: string): void;
   fresh(): Promise<unknown>;
@@ -52,7 +53,14 @@ function ImplementationReview({
 }: {
   reviews: Review[];
   selectedId: string | null;
-  documents: { id: string; title: string; url: string }[];
+  documents: {
+    id: string;
+    title: string;
+    url: string;
+    capturedAt?: string;
+    updatedAt?: string;
+    viewport?: { width: number };
+  }[];
   source: Source;
   actions: Actions;
 }) {
@@ -147,6 +155,17 @@ function ImplementationReview({
       setBusy(false);
     }
   }
+  async function undoVerdict() {
+    const result = await actions.undoVerdict();
+    setMessage(
+      '요청 ' +
+        result.number +
+        '을 ' +
+        ({ done: '반영 확인', change: '추가 수정', pending: '미검토' }[result.status] ||
+          result.status) +
+        ' 상태로 되돌렸습니다. 메모는 유지됩니다.',
+    );
+  }
   async function update(id: string, status: string, note: string) {
     try {
       await actions.update(id, status, note);
@@ -208,10 +227,48 @@ function ImplementationReview({
             <option value="">{review?.result ? '다른 결과로 새 검토' : '구현 화면 선택'}</option>
             {documents.map((d) => (
               <option value={d.id} key={d.id}>
-                {d.title} · {d.url}
+                {d.title} · {d.url} · 가져옴{' '}
+                {d.capturedAt ? new Date(d.capturedAt).toLocaleString('ko-KR') : '기록 없음'} ·{' '}
+                {d.viewport?.width || '—'}px
               </option>
             ))}
           </NativeSelect>
+          <Button
+            id="implementation-visual-picker"
+            popoverTarget="implementation-results-visual"
+            disabled={busy}
+          >
+            미리보기로 선택
+          </Button>
+          <div
+            id="implementation-results-visual"
+            popover="auto"
+            aria-label="구현 결과 미리보기 목록"
+          >
+            <h3>구현 결과 선택</h3>
+            {documents.map((d) => (
+              <Button
+                key={d.id}
+                className="result-visual-row"
+                disabled={busy}
+                onClick={() => {
+                  document.getElementById('implementation-results-visual')?.hidePopover();
+                  run(() => actions.result(d.id));
+                }}
+              >
+                <DocumentVisual id={d.id} />
+                <span>
+                  <strong>{d.title}</strong>
+                  <small>{d.url}</small>
+                  <small>
+                    가져옴{' '}
+                    {d.capturedAt ? new Date(d.capturedAt).toLocaleString('ko-KR') : '기록 없음'} ·{' '}
+                    {d.viewport?.width || '—'}px
+                  </small>
+                </span>
+              </Button>
+            ))}
+          </div>
         </div>
         {actions.captureAvailable() && (
           <Button id="implementation-capture" disabled={busy} onClick={() => run(actions.capture)}>
@@ -224,7 +281,7 @@ function ImplementationReview({
       </div>
       <div className="implementation-context">
         <span>
-          목표: {review?.target.label} · {source.viewport.width}px
+          목표: {source.title || '문서'} · {review?.target.label} · {source.viewport.width}px
           {review?.result
             ? ` / 구현: ${review.result.name} · ${review.result.snapshot.source.viewport.width}px`
             : ''}
@@ -257,7 +314,7 @@ function ImplementationReview({
           />{' '}
           판정 후 다음 요청으로 이동
         </label>
-        <Button disabled={busy || !actions.canUndo()} onClick={() => run(actions.undoVerdict)}>
+        <Button disabled={busy || !actions.canUndo()} onClick={() => run(undoVerdict)}>
           직전 판정 취소
         </Button>
       </div>

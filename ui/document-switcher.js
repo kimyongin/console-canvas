@@ -141,7 +141,14 @@ export function createDocumentSwitcher({
         id: value.id,
         title: value.title || '이름 없는 화면',
         url: value.url,
-        summary: value,
+        summary: current
+          ? {
+              ...value,
+              activeSnapshotName:
+                state.timeline?.entries.find((e) => e.id === state.timeline.activeId)?.name ||
+                '기준 버전 없음',
+            }
+          : value,
         date:
           (deleted ? '휴지통 이동 ' : '최근 저장 ') +
           new Date(deleted ? value.deletedAt : value.updatedAt).toLocaleString('ko-KR'),

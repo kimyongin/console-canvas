@@ -116,6 +116,8 @@ try {
       frame.contentWindow.getComputedStyle(row(d)).position === 'absolute',
   );
   const scroll = doc.querySelector('#snapshot-graph-scroll');
+  if (doc.querySelector('#snapshot-fit-graph').textContent === '실제 크기')
+    click('#snapshot-fit-graph');
   scroll.scrollLeft = 80;
   check(
     'Graph has usable horizontal scrolling',

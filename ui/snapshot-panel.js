@@ -24,6 +24,9 @@ export function createSnapshotPanel({
     activeId = null,
     previewKey = null,
     generation = 0;
+  let graphFit = false,
+    graphFitChosen = false,
+    graphData = null;
   let preferredHeight = null;
   try {
     preferredHeight = Number(localStorage.getItem('console-canvas-graph-height')) || null;
@@ -46,7 +49,37 @@ export function createSnapshotPanel({
     $('#snapshot-graph-scroll').style.height = h + 'px';
     $('#snapshot-splitter').setAttribute('aria-valuenow', String(Math.round(h)));
     $('#snapshot-splitter').setAttribute('aria-valuemax', String(Math.round(limit)));
+    layoutGraph();
   }
+  function layoutGraph() {
+    if (!graphData) return;
+    const scroll = $('#snapshot-graph-scroll'),
+      root = $('#snapshot-list'),
+      space = $('#snapshot-graph-space');
+    const scale = graphFit
+      ? Math.min(
+          1,
+          (scroll.clientWidth - 12) / graphData.width,
+          (scroll.clientHeight - 12) / graphData.height,
+        )
+      : 1;
+    root.style.transformOrigin = '0 0';
+    root.style.transform = `scale(${scale})`;
+    space.style.width = graphData.width * scale + 'px';
+    space.style.height = graphData.height * scale + 'px';
+    $('#snapshot-overflow').textContent = graphFit
+      ? '그래프 맞춤 · ' + Math.round(scale * 100) + '%'
+      : '카드와 연결선을 가로·세로로 스크롤하여 탐색할 수 있습니다.';
+    $('#snapshot-fit-graph').textContent = graphFit ? '실제 크기' : '그래프 맞춤';
+  }
+  $('#snapshot-fit-graph').addEventListener('click', () => {
+    graphFitChosen = true;
+    graphFit = !graphFit;
+    layoutGraph();
+    const s = $('#snapshot-graph-scroll');
+    s.scrollLeft = 0;
+    s.scrollTop = 0;
+  });
   function placePanel() {
     const r = $('#snapshot-dropdown').getBoundingClientRect(),
       panel = $('#snapshot-panel');
@@ -153,7 +186,8 @@ export function createSnapshotPanel({
       clearReact($('#snapshot-preview-view'));
       return;
     }
-    const key = state.snapshot.id + '/' + state.generation + '/' + entry.id;
+    const mode = $('#snapshot-preview-zoom').value;
+    const key = state.snapshot.id + '/' + state.generation + '/' + entry.id + '/' + mode;
     if (key === previewKey && $('#snapshot-preview-view iframe')) return;
     previewKey = key;
     const token = ++generation;
@@ -163,6 +197,9 @@ export function createSnapshotPanel({
       const capture = state.snapshot;
       const result = await withVersionScene(capture, entry.state, (scene) => ({
         ...scene.preview(),
+        target: Object.keys(entry.state.edits || {})
+          .map((id) => scene.rect(id))
+          .find(Boolean),
       }));
       if (token !== generation || state.snapshot?.id !== capture.id || selected()?.id !== entry.id)
         return;
@@ -170,10 +207,18 @@ export function createSnapshotPanel({
         $('#snapshot-preview-view'),
         result,
         entry.name + ' 미리보기 화면',
-        undefined,
-        undefined,
-        true,
+        mode === '1' || mode === 'target' ? 1 : undefined,
+        mode === 'target' && result.target
+          ? { rect: result.target, label: '저장된 변경 위치' }
+          : undefined,
+        mode === 'fit',
       );
+      if (mode === 'target' && result.target)
+        requestAnimationFrame(() => {
+          const v = $('#snapshot-preview-view');
+          v.scrollLeft = Math.max(0, result.target.x - 32);
+          v.scrollTop = Math.max(0, result.target.y - 32);
+        });
       $('#snapshot-preview-status').textContent =
         (entry.id === state.timeline.activeId
           ? '현재 작업의 기준 버전'
@@ -189,6 +234,7 @@ export function createSnapshotPanel({
       }
     }
   }
+  $('#snapshot-preview-zoom').addEventListener('change', renderPreview);
   function selectPreview(id, { reveal = false } = {}) {
     const entry = state.timeline.entries.find((e) => e.id === id && !e.deletedAt);
     if (!entry) return;
@@ -202,13 +248,27 @@ export function createSnapshotPanel({
     );
     if (!node) return;
     const scroll = $('#snapshot-graph-scroll');
+    if (graphFit) return;
+    // Keep the whole card visible; do not center its dot and crop the label.
+    if (
+      !graphFitChosen &&
+      graphData &&
+      graphData.height > scroll.clientHeight &&
+      graphData.height <= 260
+    ) {
+      graphFit = true;
+      layoutGraph();
+      scroll.scrollTop = 0;
+      scroll.scrollLeft = 0;
+      return;
+    }
     scroll.scrollLeft = Math.max(
       0,
       node.offsetLeft + node.offsetWidth / 2 - scroll.clientWidth / 2,
     );
     scroll.scrollTop = Math.max(
       0,
-      node.offsetTop + node.offsetHeight / 2 - scroll.clientHeight / 2,
+      Math.min(node.offsetTop, node.offsetTop + node.offsetHeight - scroll.clientHeight),
     );
   }
   function search() {
@@ -374,6 +434,7 @@ export function createSnapshotPanel({
       selectPreview,
       actions,
     );
+    graphData = data;
     graphHeight(data.height);
     scroll.scrollLeft = x;
     scroll.scrollTop = y;
@@ -431,6 +492,9 @@ export function createSnapshotPanel({
       return;
     }
     if (documentId !== state.snapshot.id) {
+      graphFit = false;
+      graphFitChosen = false;
+      graphData = null;
       documentId = state.snapshot.id;
       state.snapshotPreviewId = state.timeline.activeId;
       previewKey = null;

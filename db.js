@@ -71,6 +71,7 @@ export async function saveCapture(value) {
         title: value.documentName || capture.source.title,
         url: capture.source.url,
         capturedAt: capture.capturedAt,
+        viewport: capture.source.viewport,
         updatedAt: new Date().toISOString(),
       });
       done(true);
@@ -160,13 +161,22 @@ export async function getDocument(id, { includeDeleted = false } = {}) {
   });
 }
 export async function listDocuments(limit = 4, { deleted = false } = {}) {
-  return transact(['documents'], 'readonly', (tx, done) => {
+  return transact(['documents', 'sessions'], 'readonly', (tx, done) => {
     const result = [];
     const request = tx.objectStore('documents').index('updatedAt').openCursor(null, 'prev');
     request.onsuccess = () => {
       const cursor = request.result;
       if (!cursor || result.length >= limit) return done(result);
-      if (!!cursor.value.deletedAt === deleted) result.push(cursor.value);
+      if (!!cursor.value.deletedAt === deleted) {
+        const value = cursor.value;
+        result.push(value);
+        if (!value.activeSnapshotName) {
+          const read = tx.objectStore('sessions').get(value.id);
+          read.onsuccess = () => {
+            if (read.result) Object.assign(value, documentSummary(read.result));
+          };
+        }
+      }
       cursor.continue();
     };
   });
@@ -208,6 +218,9 @@ export function documentSummary(value) {
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
   return {
     snapshotName: entry?.name || '스냅샷 없음',
+    activeSnapshotName:
+      value.timeline?.entries.find((e) => e.id === value.timeline.activeId && !e.deletedAt)?.name ||
+      '기준 버전 없음',
     commentCount: Object.values(value.annotations || {}).filter(
       (text) => typeof text === 'string' && text.trim(),
     ).length,

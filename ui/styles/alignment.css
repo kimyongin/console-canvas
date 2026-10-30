@@ -610,3 +610,266 @@
   background: #f0edff;
   flex-shrink: 0;
 }
+/* Narrow workspaces use container width, including when both panels stay open. */
+#editor-root .canvas-tools {
+  container-type: inline-size;
+}
+#editor-root .canvas-toolbar {
+  flex: 0 0 auto;
+  padding-inline: 0;
+  overflow: visible;
+}
+#editor-root .canvas-tools {
+  padding-inline: 10px;
+}
+#editor-root .canvas-tools #document-menu {
+  flex: 1 1 100px;
+  min-width: 44px;
+  max-width: 190px;
+}
+#editor-root #document-menu-button {
+  width: 100%;
+  min-width: 0;
+}
+#editor-root #compact-tools-button {
+  display: none;
+}
+#compact-tools {
+  inset: auto;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+#compact-tools:popover-open {
+  display: grid;
+  gap: 8px;
+  position: fixed;
+  top: 122px;
+  left: max(40px, calc(50vw - 140px));
+}
+@container (max-width: 610px) {
+  #editor-root .canvas-tools {
+    gap: 5px;
+    padding-inline: 6px;
+  }
+  #editor-root .canvas-tools #paste,
+  #editor-root .canvas-tools #ai-variants-button {
+    display: none;
+  }
+  #editor-root #compact-tools-button {
+    display: inline-flex;
+    flex: none;
+    width: 30px;
+    padding: 0;
+  }
+  #editor-root .canvas-tools #document-menu {
+    max-width: 96px;
+  }
+  #editor-root .canvas-tools #snapshot-dropdown {
+    flex: 1 1 90px;
+    min-width: 70px;
+    max-width: 120px;
+    padding-inline: 6px;
+    font-size: 10px;
+  }
+  #editor-root #snapshot-active-name {
+    display: none;
+  }
+  #editor-root .history-controls {
+    gap: 3px;
+  }
+  #editor-root .toolbar-divider {
+    display: none;
+  }
+  #editor-root #undo,
+  #editor-root #redo {
+    width: 28px;
+    padding: 0;
+  }
+  #editor-root .canvas-footer #fit {
+    display: inline-flex;
+    font-size: 10px;
+    padding-inline: 4px;
+  }
+  #editor-root .canvas-footer #canvas-hint,
+  #editor-root .canvas-footer #canvas-dimensions {
+    display: none;
+  }
+}
+#editor-root #selection-actions {
+  flex-wrap: wrap;
+  max-width: calc(100vw - 24px);
+  box-sizing: border-box;
+}
+.selection-identity {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+.selection-identity strong,
+.selection-identity small {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+  font-size: 11px;
+}
+.selection-identity small {
+  color: var(--muted);
+}
+#selection-parent {
+  margin-left: auto;
+}
+#snapshot-graph-space {
+  position: relative;
+}
+#snapshot-list {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+#snapshot-overflow {
+  margin: 4px 0;
+  font-size: 10px;
+  color: var(--muted);
+}
+.snapshot-preview-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  margin-top: 4px;
+}
+.snapshot-preview-controls select {
+  width: auto;
+}
+#implementation-results-visual {
+  position: fixed;
+  inset: 12vh auto auto 10vw;
+  width: min(720px, 80vw);
+  max-height: 65vh;
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.result-visual-row {
+  display: flex;
+  width: 100%;
+  height: auto !important;
+  gap: 12px;
+  text-align: left;
+  white-space: normal;
+  margin: 8px 0;
+  padding: 10px;
+}
+.result-visual-row > span {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+.result-visual-row .document-summary {
+  display: none;
+}
+.result-visual-row small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.implementation-result-control {
+  min-width: 0;
+}
+#implementation-visual-picker {
+  margin-top: 4px;
+  font-size: 11px;
+}
+.handoff-conflicts {
+  padding: 12px;
+  background: #fff8e8;
+  border: 1px solid #ebd8a7;
+  border-radius: 8px;
+  font-size: 12px;
+  margin: 8px 0;
+}
+.handoff-conflicts > div {
+  padding: 10px 0;
+  border-top: 1px solid #ebd8a7;
+}
+.handoff-conflicts label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.handoff-conflicts input {
+  width: 16px;
+  height: 16px;
+}
+.handoff-conflicts p {
+  white-space: pre-wrap;
+}
+.activity-context {
+  border-radius: 4px;
+  background: #f0edf9;
+  padding: 4px;
+}
+#editor-root .ai-request-form {
+  min-width: 0;
+}
+.ai-auth {
+  margin-top: 12px;
+}
+.ai-auth[open] {
+  max-height: 240px;
+  overflow: auto;
+}
+
+#editor-root .canvas-footer #fit {
+  display: inline-flex;
+}
+#editor-root .canvas-footer {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.snapshot-preview-controls {
+  flex: none;
+  margin: 0;
+}
+.snapshot-preview-heading {
+  flex-wrap: wrap;
+}
+#snapshot-overflow {
+  display: inline;
+}
+
+@container (max-width:610px) {
+  #editor-root .canvas-tools #snapshot-dropdown {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 8px;
+    grid-template-rows: 12px 12px;
+    gap: 0 3px;
+    padding-block: 2px;
+  }
+  #editor-root #snapshot-dropdown > span:first-child {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: 9px;
+    line-height: 12px;
+  }
+  #editor-root #snapshot-active-name {
+    display: block;
+    grid-column: 1;
+    grid-row: 2;
+    font-size: 9px;
+    line-height: 12px;
+    max-width: 100%;
+  }
+  #editor-root #snapshot-dropdown > .snapshot-chevron {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}

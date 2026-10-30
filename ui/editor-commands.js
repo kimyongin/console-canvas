@@ -151,6 +151,7 @@ export function createEditorCommands({
     }
     $('#commands-dialog').showModal();
   }
+  adapter.register('focus-view', () => execute(commands.find((c) => c.id === 'focus')));
   adapter.register('commands', open);
   $('#commands-close').addEventListener('click', () => $('#commands-dialog').close());
   function handle(e) {

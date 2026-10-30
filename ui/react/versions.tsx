@@ -430,3 +430,42 @@ export function renderSnapshotMatches(
     </>,
   );
 }
+
+export function renderHandoffConflicts(
+  host: Element,
+  items: { id: string; name: string; text: string; excluded: boolean }[],
+  change: (id: string, excluded: boolean) => void,
+  edit: (id: string) => void,
+  editable: boolean,
+) {
+  renderReact(
+    host,
+    items.length ? (
+      <section className="handoff-conflicts" aria-label="삭제된 대상의 주석 확인">
+        <strong>삭제된 대상에 주석이 있습니다</strong>
+        <p>
+          삭제와 주석의 의도를 확인하세요. 제외해도 원본 주석은 유지되며 이번 전달 이미지에서만
+          빠집니다.
+        </p>
+        {items.map((item) => (
+          <div key={item.id}>
+            <b>{item.name}</b>
+            <p>{item.text}</p>
+            <label>
+              <input
+                type="checkbox"
+                checked={item.excluded}
+                onChange={(e) => change(item.id, e.target.checked)}
+              />{' '}
+              이번 이미지에서 주석 제외 · 삭제 요청 유지
+            </label>
+            <Button disabled={!editable} onClick={() => edit(item.id)}>
+              주석 편집
+            </Button>
+            {!item.excluded && <small>주석을 그대로 전달합니다.</small>}
+          </div>
+        ))}
+      </section>
+    ) : null,
+  );
+}

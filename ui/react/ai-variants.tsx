@@ -176,9 +176,7 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
           ''
         : '',
     ),
-    [authOpen, setAuthOpen] = useState(
-      actions.draft().route === 'api' && !actions.apiStatus().configured,
-    ),
+    [authOpen, setAuthOpen] = useState(false),
     [previewZoom, setPreviewZoom] = useState('fit'),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState(''),
@@ -190,7 +188,7 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
   const currentCandidateId = request ? actions.currentCandidate(request.id) : '';
   const context = actions.context();
   useEffect(() => {
-    if (formOpen && !(route === 'api' && !configured) && !authOpen) promptField.current?.focus();
+    if (formOpen) promptField.current?.focus();
   }, [formOpen]);
   async function createRequest(copyText: boolean) {
     if (creating.current) return;
@@ -263,6 +261,109 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
         <p className="ai-context" id="ai-context-summary">
           대상: {context.target} · 문서 주석 {context.comments}개 · 기준: {context.version}
         </p>
+        <div className="ai-request-form">
+          <label className="ai-request-picker">
+            실행 방식
+            <NativeSelect
+              id="ai-route"
+              value={route}
+              onChange={(e) => {
+                updateDraft({ route: e.target.value });
+              }}
+            >
+              <option value="mcp">외부 에이전트 · MCP</option>
+              <option value="api">AI API 직접 호출 · 별도 과금</option>
+            </NativeSelect>
+          </label>
+          <label htmlFor="ai-prompt">어떻게 개선할까요?</label>
+          <Textarea
+            id="ai-prompt"
+            ref={promptField}
+            value={prompt}
+            onChange={(e) => updateDraft({ prompt: e.target.value })}
+            placeholder="예: 검색 조건을 한 줄로 정리하고 중요한 작업 버튼을 강조해 줘"
+            maxLength={8000}
+          />
+          <div className="ai-request-actions">
+            <label>
+              시안 수{' '}
+              <Input
+                id="ai-count"
+                type="number"
+                min={1}
+                max={12}
+                value={count}
+                onChange={(e) => updateDraft({ count: Number(e.target.value) })}
+              />
+            </label>
+            <Button
+              id="ai-create"
+              disabled={busy || apiBlocked}
+              aria-describedby="ai-readiness"
+              onClick={(e) => {
+                if (e.detail <= 1) createRequest(route === 'mcp');
+              }}
+            >
+              {route === 'api' ? 'API로 시안 생성' : '요청 보관하고 복사'}
+            </Button>
+            {route === 'mcp' && (
+              <Button
+                id="ai-store-only"
+                disabled={busy}
+                variant="outline"
+                onClick={() => createRequest(false)}
+              >
+                보관만 하기
+              </Button>
+            )}
+          </div>
+          <p id="ai-readiness" className="ai-help" role="status">
+            {route === 'api'
+              ? configured
+                ? 'API 키·모델 등록됨 · 실제 연결은 생성 시 확인합니다.'
+                : '생성하려면 AI API 연결에서 키와 모델을 등록하세요.'
+              : actions.connection()
+                ? 'MCP 연결됨 · 요청 문장을 에이전트 대화에 전달해야 실행됩니다.'
+                : 'MCP 연결 안 됨 · 요청은 보관할 수 있으며 연결 후 에이전트 대화에 전달하세요.'}
+          </p>
+          {route === 'api' && !configured && (
+            <Button
+              id="ai-open-auth"
+              onClick={() => {
+                setAuthOpen(true);
+                requestAnimationFrame(() => document.getElementById('ai-api-key')?.focus());
+              }}
+            >
+              API 키·모델 설정
+            </Button>
+          )}
+          <Button
+            id="ai-reset-draft"
+            disabled={busy}
+            onClick={() => {
+              previousDraft.current = { prompt, count, route };
+              updateDraft({ prompt: '', count: 3, route: 'mcp' }, { preserveUndo: true });
+            }}
+          >
+            초안 초기화
+          </Button>
+          {previousDraft.current && (
+            <Button
+              id="ai-undo-reset"
+              onClick={() => {
+                const value = previousDraft.current;
+                previousDraft.current = null;
+                if (value) updateDraft(value);
+              }}
+            >
+              초안 초기화 되돌리기
+            </Button>
+          )}
+          <p className="ai-help">
+            현재 선택·주석·편집을 기준으로 고정합니다. API 실행 시 해당 코드·주석과 화면 이미지를
+            OpenAI에 전송합니다. 에이전트가 시안을 반환해도 선택 전까지 캔버스는 유지됩니다.
+          </p>
+        </div>
         <details
           className="ai-auth"
           open={authOpen}
@@ -318,99 +419,6 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
             </Button>
           </div>
         </details>
-        <div className="ai-request-form">
-          <label className="ai-request-picker">
-            실행 방식
-            <NativeSelect
-              id="ai-route"
-              value={route}
-              onChange={(e) => {
-                updateDraft({ route: e.target.value });
-                if (e.target.value === 'api' && !configured) setAuthOpen(true);
-              }}
-            >
-              <option value="mcp">외부 에이전트 · MCP</option>
-              <option value="api">AI API 직접 호출 · 별도 과금</option>
-            </NativeSelect>
-          </label>
-          <label htmlFor="ai-prompt">어떻게 개선할까요?</label>
-          <Textarea
-            id="ai-prompt"
-            ref={promptField}
-            value={prompt}
-            onChange={(e) => updateDraft({ prompt: e.target.value })}
-            placeholder="예: 검색 조건을 한 줄로 정리하고 중요한 작업 버튼을 강조해 줘"
-            maxLength={8000}
-          />
-          <div className="ai-request-actions">
-            <label>
-              시안 수{' '}
-              <Input
-                id="ai-count"
-                type="number"
-                min={1}
-                max={12}
-                value={count}
-                onChange={(e) => updateDraft({ count: Number(e.target.value) })}
-              />
-            </label>
-            <Button
-              id="ai-create"
-              disabled={busy || apiBlocked}
-              aria-describedby="ai-readiness"
-              onClick={(e) => {
-                if (e.detail <= 1) createRequest(route === 'mcp');
-              }}
-            >
-              {route === 'api' ? 'API로 시안 생성' : '요청 보관하고 복사'}
-            </Button>
-            {route === 'mcp' && (
-              <Button
-                id="ai-store-only"
-                disabled={busy}
-                variant="outline"
-                onClick={() => createRequest(false)}
-              >
-                보관만 하기
-              </Button>
-            )}
-          </div>
-          <p id="ai-readiness" className="ai-help" role="status">
-            {route === 'api'
-              ? configured
-                ? 'API 키·모델 등록됨 · 실제 연결은 생성 시 확인합니다.'
-                : '생성하려면 위의 AI API 연결에서 키와 모델을 등록하세요.'
-              : actions.connection()
-                ? 'MCP 연결됨 · 요청 문장을 에이전트 대화에 전달해야 실행됩니다.'
-                : 'MCP 연결 안 됨 · 요청은 보관할 수 있으며 연결 후 에이전트 대화에 전달하세요.'}
-          </p>
-          <Button
-            id="ai-reset-draft"
-            disabled={busy}
-            onClick={() => {
-              previousDraft.current = { prompt, count, route };
-              updateDraft({ prompt: '', count: 3, route: 'mcp' }, { preserveUndo: true });
-            }}
-          >
-            초안 초기화
-          </Button>
-          {previousDraft.current && (
-            <Button
-              id="ai-undo-reset"
-              onClick={() => {
-                const value = previousDraft.current;
-                previousDraft.current = null;
-                if (value) updateDraft(value);
-              }}
-            >
-              초안 초기화 되돌리기
-            </Button>
-          )}
-          <p className="ai-help">
-            현재 선택·주석·편집을 기준으로 고정합니다. API 실행 시 해당 코드·주석과 화면 이미지를
-            OpenAI에 전송합니다. 에이전트가 시안을 반환해도 선택 전까지 캔버스는 유지됩니다.
-          </p>
-        </div>
       </details>
       {!!requests.length && (
         <>

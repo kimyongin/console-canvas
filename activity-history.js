@@ -1,3 +1,5 @@
+import { elementLabel } from './ui/element-labels.js';
+import { pointTarget } from './edit-commands.js';
 import { codeDifferenceIds } from './code-patches.js';
 // Each event points to its predecessor. Restoring a snapshot changes the head,
 // preserving events in other branches without copying the log into snapshots.
@@ -30,6 +32,24 @@ export function activityBranch(state, all = false) {
   return result;
 }
 export function activityChanges(state, before, after, detail = {}) {
+  const named = (id) => {
+    const copies = [
+      ...Object.values(before?.edits || {}),
+      ...Object.values(after.edits || {}),
+    ].flatMap((e) => e.copy?.nodes || []);
+    const descriptor = copies.find((n) => n.id === id);
+    const original = state.snapshot?.nodes?.find((n) => n.id === (descriptor?.sourceId || id));
+    const node =
+      state.scene.nodes.get(id) ||
+      (descriptor && original
+        ? { ...original, id, copiedFrom: original.id, copyRoot: id }
+        : original);
+    return node
+      ? elementLabel(node, state.snapshot?.layerNames)
+      : pointTarget(id)
+        ? '위치 주석'
+        : '이전 요소 · 현재 화면에 없음';
+  };
   const changes = codeDifferenceIds(before?.codePatches, after.codePatches).map((id) => ({
     id: id.startsWith('@') ? undefined : id,
     type: 'code',
@@ -53,7 +73,7 @@ export function activityChanges(state, before, after, detail = {}) {
           : !!a.deleted !== !!b.deleted
             ? 'delete'
             : detail.category || 'move',
-      name: state.scene.nodes.get(id)?.name || id,
+      name: named(id),
       before: a,
       after: b,
     });
@@ -68,7 +88,7 @@ export function activityChanges(state, before, after, detail = {}) {
       changes.push({
         id,
         type: 'comment',
-        name: state.scene.nodes.get(id)?.name || '위치 주석',
+        name: named(id),
         before: a,
         after: b,
       });

@@ -1,4 +1,5 @@
-export function createSelectionToolbar({ $, state }) {
+import { elementLabel } from './element-labels.js';
+export function createSelectionToolbar({ $, state, selectNode }) {
   const host = $('#selection-actions'),
     viewport = $('#viewport');
   let manual = null,
@@ -15,6 +16,25 @@ export function createSelectionToolbar({ $, state }) {
     $('#context-comment').title = count > 1 ? count + '개 대상에 차례로 주석 작성' : '주석 편집';
     host.hidden = !r || scene.hidden(scene.selected) || !state.ready;
     if (host.hidden) return;
+    host.style.width = Math.min(420, Math.max(100, viewport.clientWidth - 16)) + 'px';
+    host.style.maxWidth = Math.max(100, viewport.clientWidth - 16) + 'px';
+    const node = scene.nodes.get(scene.selected),
+      path = [];
+    let ancestor = scene.nodes.get(node?.parentId);
+    const seen = new Set();
+    while (ancestor && !seen.has(ancestor.id)) {
+      seen.add(ancestor.id);
+      path.unshift(elementLabel(ancestor, state.snapshot.layerNames));
+      ancestor = scene.nodes.get(ancestor.parentId);
+    }
+    $('#selection-name').textContent =
+      count > 1
+        ? count + '개 선택 · ' + elementLabel(node, state.snapshot.layerNames)
+        : elementLabel(node, state.snapshot.layerNames);
+    $('#selection-path').textContent = path.join(' › ');
+    $('#selection-path').title = path.join(' › ');
+    $('#selection-parent').hidden = !node?.parentId;
+    $('#selection-parent').title = '상위 요소 선택 · ' + (path.at(-1) || '');
     if (documentId !== state.snapshot?.id) {
       manual = null;
       documentId = state.snapshot?.id;
@@ -32,23 +52,29 @@ export function createSelectionToolbar({ $, state }) {
       host.hidden = true;
       return;
     }
+    const caption = $('.artboard-caption').getBoundingClientRect();
+    const safeTop = Math.max(v.top + 8, Math.min(v.bottom - 40, caption.bottom + 8));
     const left = manual?.x ?? x;
     host.style.left = Math.max(v.left + 4, Math.min(v.right - host.offsetWidth - 4, left)) + 'px';
     const above = y - host.offsetHeight - 48;
     host.style.top =
       Math.max(
-        v.top + 8,
+        safeTop,
         Math.min(
           v.bottom - host.offsetHeight - 8,
           manual?.y ??
             (f.top - v.top >= host.offsetHeight + 8
-              ? v.top + 4
+              ? safeTop
               : above >= v.top + 8
                 ? above
                 : y + r.height * state.zoom + 12),
         ),
       ) + 'px';
   }
+  $('#selection-parent').addEventListener('click', () => {
+    const parent = state.scene?.nodes.get(state.scene.selected)?.parentId;
+    if (parent) selectNode(parent);
+  });
   const handle = $('#selection-toolbar-handle');
   handle.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;

@@ -234,9 +234,22 @@ export function createVersionPreview({ $, state, commitCommentDraft, adapter }) 
   }
   adapter.register('compare-previous', () => step(-1));
   adapter.register('compare-next', () => step(1));
+  let returnGraph = null;
   function open(left = '@original', right = '@current') {
     if (!state.ready) return;
     commitCommentDraft();
+    const panel = $('#snapshot-panel'),
+      graph = $('#snapshot-graph-scroll');
+    returnGraph = panel.matches(':popover-open')
+      ? {
+          doc: state.snapshot.id,
+          generation: state.generation,
+          selected: state.snapshotPreviewId,
+          x: graph.scrollLeft,
+          y: graph.scrollTop,
+          scroll: panel.scrollTop,
+        }
+      : null;
     for (const side of ['left', 'right']) {
       renderVersionOptions($('#compare-' + side), versionOptions(state));
       $('#compare-' + side).value = side === 'left' ? left : right;
@@ -280,6 +293,28 @@ export function createVersionPreview({ $, state, commitCommentDraft, adapter }) 
     open(state.snapshotPreviewId || '@original', '@current'),
   );
   $('#compare-dialog').addEventListener('close', () => {
+    const target = returnGraph;
+    returnGraph = null;
+    if (
+      target &&
+      target.doc === state.snapshot?.id &&
+      target.generation === state.generation &&
+      target.selected === state.snapshotPreviewId
+    ) {
+      $('#snapshot-panel').showPopover();
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (state.snapshot?.id !== target.doc) return;
+          const g = $('#snapshot-graph-scroll');
+          g.scrollLeft = target.x;
+          g.scrollTop = target.y;
+          $('#snapshot-panel').scrollTop = target.scroll;
+          $('#snapshot-list [data-snapshot-id="' + target.selected + '"]')?.focus({
+            preventScroll: true,
+          });
+        });
+      });
+    }
     for (const side of ['left', 'right']) {
       scenes.set(side, { token: (scenes.get(side)?.token || 0) + 1 });
       clearReact(host(side));
