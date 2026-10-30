@@ -71,7 +71,12 @@ function safeError(status) {
     { code: 'api_' + status },
   );
 }
-export function createAiProvider({ fetchImpl = globalThis.fetch } = {}) {
+export function createAiProvider({
+  fetchImpl = globalThis.fetch,
+  authentication = 'api_key',
+} = {}) {
+  if (!['api_key', 'chatgpt'].includes(authentication))
+    throw new Error('지원하지 않는 AI 인증 방식입니다.');
   let credential = '',
     model = '';
   const jobs = new Map();
@@ -80,16 +85,18 @@ export function createAiProvider({ fetchImpl = globalThis.fetch } = {}) {
       if (
         typeof key !== 'string' ||
         !key.trim() ||
-        key.length > 1000 ||
+        key.length > (authentication === 'chatgpt' ? 64_000 : 1000) ||
         /\s/.test(key.trim()) ||
         typeof chosen !== 'string' ||
         !/^[\w.:-]{1,100}$/.test(chosen)
       )
-        throw new Error('API 키와 사용 가능한 모델 ID를 입력해 주세요.');
+        throw Object.assign(new Error('AI 인증 정보와 사용 가능한 모델 ID를 확인해 주세요.'), {
+          code: 'invalid_credential',
+        });
       credential = key.trim();
       model = chosen;
     },
-    status: () => ({ configured: !!credential, model, auth: 'api_key', storage: 'memory' }),
+    status: () => ({ configured: !!credential, model, auth: authentication, storage: 'memory' }),
     forget() {
       for (const controller of jobs.values()) controller.abort();
       credential = '';
@@ -122,7 +129,9 @@ export function createAiProvider({ fetchImpl = globalThis.fetch } = {}) {
         const { image_url, ...codeContext } = context;
         const serialized = JSON.stringify(codeContext);
         if (serialized.length > 2_000_000)
-          throw new Error('AI 입력이 너무 큽니다. 더 작은 영역을 선택해 주세요.');
+          throw Object.assign(new Error('AI 입력이 너무 큽니다. 더 작은 영역을 선택해 주세요.'), {
+            code: 'input_too_large',
+          });
         for (let index = 0; index < request.count; index++) {
           if (controller.signal.aborted) break;
           onProgress({ index, total: request.count });
@@ -184,6 +193,7 @@ export function createAiProvider({ fetchImpl = globalThis.fetch } = {}) {
             let completed = null,
               buffer = '',
               size = 0;
+            const textParts = new Map();
             if (!response.body)
               throw Object.assign(new Error('API 응답 스트림이 없습니다.'), {
                 code: 'invalid_stream',
@@ -208,6 +218,14 @@ export function createAiProvider({ fetchImpl = globalThis.fetch } = {}) {
                   const raw = line.slice(6);
                   if (raw === '[DONE]') continue;
                   const event = JSON.parse(raw);
+                  const partKey = `${event.output_index ?? 0}:${event.content_index ?? 0}`;
+                  if (
+                    event.type === 'response.output_text.delta' &&
+                    typeof event.delta === 'string'
+                  )
+                    textParts.set(partKey, (textParts.get(partKey) || '') + event.delta);
+                  if (event.type === 'response.output_text.done' && typeof event.text === 'string')
+                    textParts.set(partKey, event.text);
                   if (event.type === 'response.completed') completed = event.response;
                   if (['error', 'response.failed', 'response.incomplete'].includes(event.type))
                     throw Object.assign(
@@ -230,12 +248,31 @@ export function createAiProvider({ fetchImpl = globalThis.fetch } = {}) {
                 new Error('AI 응답이 중간에 끝났습니다. 완료된 시안만 보관합니다.'),
                 { code: 'incomplete' },
               );
-            const text = (completed.output || [])
+            const completedText = (completed.output || [])
               .flatMap((item) => item.content || [])
               .filter((item) => item.type === 'output_text')
               .map((item) => item.text)
               .join('');
-            const candidate = JSON.parse(text);
+            // Some completed streams carry text only in output_text events.
+            // Never register that text until the terminal completion is verified.
+            const text =
+              completedText ||
+              [...textParts.entries()]
+                .sort(([a], [b]) => {
+                  const [ao, ac] = a.split(':').map(Number),
+                    [bo, bc] = b.split(':').map(Number);
+                  return ao - bo || ac - bc;
+                })
+                .map(([, value]) => value)
+                .join('');
+            let candidate;
+            try {
+              candidate = JSON.parse(text);
+            } catch {
+              throw Object.assign(new Error('AI가 반환한 시안 형식이 올바르지 않습니다.'), {
+                code: 'invalid_output',
+              });
+            }
             if (!Array.isArray(candidate.patches))
               throw Object.assign(new Error('AI 코드 패치 형식이 올바르지 않습니다.'), {
                 code: 'invalid_output',

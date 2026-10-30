@@ -540,7 +540,8 @@ function createChatgptService({
       if (id !== data.active) throw fail('account_changed', '계정이 변경되었습니다.');
       if (canceled)
         return { model, auth: 'chatgpt', candidates: [], usage: [], failures: [], canceled: true };
-      provider = createAiProvider({ fetchImpl });
+      // OAuth bearer tokens are opaque and can exceed the API-key length limit.
+      provider = createAiProvider({ fetchImpl, authentication: 'chatgpt' });
       provider.configure({ key: record.access_token, model });
       const candidates = [];
       const result = await provider.generate({

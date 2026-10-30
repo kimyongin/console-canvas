@@ -35,6 +35,81 @@ const candidate = {
     },
   ],
 };
+test('OAuth token bounds are separate from API keys and never expose credential values', () => {
+  const keyProvider = createAiProvider();
+  const oauthProvider = createAiProvider({ authentication: 'chatgpt' });
+  const token = 'fixture-bearer-' + 'x'.repeat(3000);
+  assert.throws(() => keyProvider.configure({ key: token, model: 'test' }), {
+    code: 'invalid_credential',
+  });
+  oauthProvider.configure({ key: token, model: 'test' });
+  assert.deepEqual(oauthProvider.status(), {
+    configured: true,
+    model: 'test',
+    auth: 'chatgpt',
+    storage: 'memory',
+  });
+  for (const key of ['x'.repeat(64_001), 'bearer\ninvalid'])
+    assert.throws(() => oauthProvider.configure({ key, model: 'test' }), {
+      code: 'invalid_credential',
+    });
+  assert.ok(!JSON.stringify(oauthProvider.status()).includes(token));
+});
+test('Completed compact streams use text events without duplicating deltas or applying partial output', async () => {
+  let completed = true;
+  const provider = createAiProvider({
+    fetchImpl: async () => {
+      const text = JSON.stringify(candidate);
+      const events = [
+        {
+          type: 'response.output_text.delta',
+          output_index: 0,
+          content_index: 0,
+          delta: text.slice(0, 30),
+        },
+        {
+          type: 'response.output_text.delta',
+          output_index: 0,
+          content_index: 0,
+          delta: text.slice(30),
+        },
+        { type: 'response.output_text.done', output_index: 0, content_index: 0, text },
+        ...(completed
+          ? [
+              {
+                type: 'response.completed',
+                response: {
+                  status: 'completed',
+                  output: [],
+                  usage: { input_tokens: 12, output_tokens: 34 },
+                },
+              },
+            ]
+          : []),
+      ];
+      return new Response(
+        events.map((event) => 'data: ' + JSON.stringify(event) + '\n\n').join(''),
+      );
+    },
+  });
+  provider.configure({ key: 'fixture-key', model: 'fixture-model' });
+  const registered = [];
+  const generate = () =>
+    provider.generate({
+      request: { ...request, count: 1 },
+      context: {},
+      register: (c) => registered.push(c),
+    });
+  const result = await generate();
+  assert.equal(result.failures.length, 0);
+  assert.equal(registered.length, 1);
+  assert.equal(registered[0].name, candidate.name);
+  assert.equal(result.usage[0].output_tokens, 34);
+  completed = false;
+  const interrupted = await generate();
+  assert.equal(interrupted.failures[0].code, 'incomplete');
+  assert.equal(registered.length, 1);
+});
 test('API sends frozen context to fixed endpoint, independently registers variants and never serializes credentials', async () => {
   const calls = [],
     registered = [];

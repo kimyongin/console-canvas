@@ -102,6 +102,8 @@ function trusted(event, kind) {
   trustFrame(event, kind === 'editor' ? editor?.webContents : win?.webContents);
 }
 async function start() {
+  // Expose WebContentsView controls to native assistive technology on first launch.
+  app.setAccessibilitySupportEnabled(true);
   const skills = createSkillService({
     root: ROOT,
     archive: bundledSkill,

@@ -53,6 +53,7 @@ async function main() {
     assert.equal(prefs.sandbox, true);
   }
   assert.equal(await evaluate(source, 'typeof window.ConsoleCanvasDesktop'), 'undefined');
+  assert.equal(app.isAccessibilitySupportEnabled(), true);
   const chatgptBoundary = await evaluate(editor, 'window.ConsoleCanvasDesktop.chatgpt.status()');
   assert.equal(chatgptBoundary.ok, true);
   assert.deepEqual(chatgptBoundary.value.accounts, []);
@@ -60,6 +61,12 @@ async function main() {
   const protectedStorage = await require(
     path.join(appRoot, 'desktop/chatgpt.cjs'),
   ).createChatgptStorage(require('electron').safeStorage);
+  if (process.platform === 'darwin')
+    assert.equal(
+      protectedStorage.isEncryptionAvailable(),
+      true,
+      'Real macOS protected storage must work with preserved OS identity',
+    );
   if (protectedStorage.isEncryptionAvailable()) {
     const encrypted = await protectedStorage.encryptString('qa-only-protected-value');
     assert.ok(!encrypted.includes('qa-only-protected-value'));

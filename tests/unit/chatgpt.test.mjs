@@ -119,7 +119,7 @@ async function fixture(t) {
         f.url.searchParams.get('code_challenge'),
       );
       return Response.json({
-        access_token: 'fixture-secret',
+        access_token: f.accessToken || 'fixture-secret',
         refresh_token: 'fixture-renewable',
         id_token: f.token(body.get('client_id')),
         token_type: 'Bearer',
@@ -137,7 +137,11 @@ async function fixture(t) {
         ],
       });
     if (url === resource + '/responses') {
-      assert.match(options.headers.Authorization, /^Bearer (fixture-secret|rotated-secret)$/);
+      assert.ok(
+        [f.accessToken || 'fixture-secret', 'rotated-secret'].some(
+          (token) => options.headers.Authorization === 'Bearer ' + token,
+        ),
+      );
       const body = JSON.parse(options.body);
       assert.equal(body.store, false);
       assert.equal(body.stream, true);
@@ -307,6 +311,22 @@ test('Available model catalog and completed SSE produce common patches without t
   assert.equal(limited.candidates.length, 0);
   assert.equal(limited.failures[0].code, 'subscription_sharing_usage_limit_exceeded');
   assert.equal((await f.service.status()).accounts[0].loggedIn, true);
+});
+test('OAuth bearer tokens longer than API keys reach inference without crossing IPC results', async (t) => {
+  const f = await fixture(t);
+  f.accessToken = 'fixture-oauth-' + 'x'.repeat(3000);
+  await f.login();
+  await f.service.models();
+  const result = await f.service.generate({
+    request: { id: 'long-token', prompt: 'Improve', count: 1, baseline: { selection: ['n1'] } },
+    context: { html: '<button data-uic-id="n1">Create</button>' },
+    model: 'allowed',
+    accountId: (await f.service.status()).activeId,
+  });
+  assert.equal(result.candidates.length, 1);
+  assert.equal(result.failures.length, 0);
+  assert.ok(f.calls.some((call) => call.url.endsWith('/responses')));
+  assert.ok(!JSON.stringify(result).includes(f.accessToken));
 });
 test('Cancel before credential loading and during streaming prevents late candidates; logout retains registration', async (t) => {
   const f = await fixture(t);

@@ -15,6 +15,8 @@ MANAGED = ('SKILL.md', 'agents/openai.yaml', 'scripts/console_canvas.py', 'asset
 
 
 def default_target():
+    if os.environ.get('CONSOLE_CANVAS_SKILL_DIR'):
+        return Path(os.environ['CONSOLE_CANVAS_SKILL_DIR'])
     legacy = Path(os.environ.get('CODEX_HOME', str(Path.home() / '.codex'))) / 'skills' / 'console-canvas'
     modern = Path.home() / '.agents' / 'skills' / 'console-canvas'
     if legacy.exists() or os.environ.get('CODEX_HOME'):
@@ -26,8 +28,9 @@ def default_target():
 
 def installed_targets():
     """Find existing user installations only; never turn an app launch into first install."""
-    candidates = [Path.home() / '.codex/skills/console-canvas', Path.home() / '.agents/skills/console-canvas']
-    if os.environ.get('CODEX_HOME'):
+    explicit = os.environ.get('CONSOLE_CANVAS_SKILL_DIR')
+    candidates = [Path(explicit)] if explicit else [Path.home() / '.codex/skills/console-canvas', Path.home() / '.agents/skills/console-canvas']
+    if not explicit and os.environ.get('CODEX_HOME'):
         candidates.insert(0, Path(os.environ['CODEX_HOME']) / 'skills/console-canvas')
     found = []
     for candidate in candidates:

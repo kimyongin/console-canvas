@@ -15,6 +15,23 @@ from server import VERSION
 
 
 class AppSkillTests(unittest.TestCase):
+    def test_explicit_skill_directory_never_scans_or_updates_user_roots(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            archive = ROOT / 'dist/console-canvas-skill.zip'
+            selected = root / 'qa/console-canvas'
+            user = root / 'user/.codex/skills/console-canvas'
+            install(archive, selected)
+            install(archive, user)
+            for target in (selected, user):
+                (target / 'SKILL.md').write_text('---\nname: console-canvas\n---\nolder\n')
+            with patch.dict(os.environ, {'CONSOLE_CANVAS_SKILL_DIR': str(selected)}, clear=True), patch('skill_install.Path.home', side_effect=AssertionError('OS home must not be queried for scoped QA')):
+                self.assertEqual(default_target(), selected)
+                result = sync_installed(archive)
+                self.assertEqual([item['path'] for item in result['updated']], [str(selected.resolve())])
+                self.assertEqual(result['errors'], [])
+                self.assertIn('older', (user / 'SKILL.md').read_text())
+
     def test_retired_runtime_is_backed_up_without_losing_personal_files(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / 'console-canvas'

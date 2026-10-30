@@ -5,9 +5,15 @@
 
 제품 요구사항과 사용자 동작의 기준은 [PRD](PRD.md), 실제 확인 결과는 [검증 기록](verification.md)에서 관리한다. 아래에는 버전별 구현 기록도 포함한다. 현재 실행 결과는 [검증 기록](verification.md), 전환 범위와 설치/직접 사용 잔여는 [개선 티켓](https://github.com/kimyongin/console-canvas/issues/1)과 검증 기록에서 구분한다.
 
+## 실제 OS 인증 검증 환경 · 0.37
+
+Electron 통합 검사는 OS HOME/CODEX_HOME을 다른 경로로 바꾸지 않는다. 사용자 홈 변경은 macOS Keychain 발견/초기화에 영향을 주므로, 프로필·브리지·스킬만 앱 전용 경로로 분리한다. `CONSOLE_CANVAS_SKILL_DIR`가 있으면 설치/자동 갱신은 그 한 경로만 조회하고 실제 사용자 설치를 검색하지 않는다. macOS 통합 검사는 실제 비동기 OS 암호화/복호화 성공을 요구한다. 일반 앱 동작과 평문 거절은 유지한다.
+
 ## ChatGPT 직접 호출 · 0.36
 
 `desktop/chatgpt.cjs`는 공식 로컬 SIWC OAuth·계정/host·보호 저장·갱신·철회·모델/추론을 소유한다. editor mainFrame의 `chatgpt-ipc.cjs`만 접근하고 `preload.cjs`는 비밀 없는 결과만 노출한다. `chatgpt-provider.js`는 renderer의 직렬 생성/취소와 공통 후보 등록을 연결한다. 실제 토큰과 Responses 호출은 main에 남고 기존 `ai-provider.js`의 스키마/스트림 변환을 재사용한다. API 키 인증·외부 MCP 경로는 별개다. [설계·공식 근거·한계](chatgpt-oauth-0.36.md).
+
+0.37.3은 OAuth bearer의 길이 검증을 API 키와 분리한다. Responses의 완료 객체에 output이 없어도 output_text 이벤트로 본문을 재구성하며 done으로 delta 중복을 제거한다. terminal response.completed 확인 전에는 후보를 등록하지 않고 중단된 스트림의 본문은 버린다. 실제 계정 호출에서 확인한 두 결함의 수정/회귀와 설치 검증은 [0.37 기록](deployment-0.37.md)을 따른다.
 
 ## 편집과 명령
 

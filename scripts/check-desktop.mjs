@@ -14,14 +14,15 @@ const port = socket.address().port;
 await new Promise((resolve) => socket.close(resolve));
 const env = {
   ...process.env,
-  HOME: path.join(temporary, 'home'),
-  CODEX_HOME: path.join(temporary, 'home/.codex'),
+  // OS Keychain discovery must retain the actual login user's HOME.
+  // Isolate application state through its own paths, never OS identity variables.
+  CONSOLE_CANVAS_SKILL_DIR: path.join(temporary, 'skills/console-canvas'),
   CONSOLE_CANVAS_TEST_DIR: temporary,
   CONSOLE_CANVAS_STATE_DIR: path.join(temporary, 'bridge'),
   CONSOLE_CANVAS_PORT: String(port),
   ...(offscreen ? { CONSOLE_CANVAS_OFFSCREEN: '1' } : {}),
 };
-await fs.mkdir(env.HOME, { recursive: true });
+await fs.mkdir(path.dirname(env.CONSOLE_CANVAS_SKILL_DIR), { recursive: true });
 let active,
   checking = true;
 function start(command, args, extra = {}) {
