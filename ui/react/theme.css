@@ -105,8 +105,16 @@
 }
 .ai-request-picker {
   display: grid;
+  min-width: 0;
   gap: 8px;
   margin-bottom: 12px;
+}
+.ai-request-picker select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 .ai-candidate-list {
   display: grid;

@@ -207,10 +207,27 @@ export function createAiPanel({ $, state, manager, adapter, toast, save, checkpo
       $('#ai-dialog').close();
     },
     instruction: manager.instruction,
-    preview: (point) =>
-      withVersionScene(state.snapshot, point, (scene) => ({
-        ...scene.preview(),
-      })),
+    preview: (point, focusIds = []) =>
+      withVersionScene(state.snapshot, point, (scene) => {
+        const preview = scene.preview();
+        const rects = focusIds
+          .filter((id) => scene.elements.has(id) && !scene.hidden(id))
+          .map((id) => scene.rect(id))
+          .filter(Boolean);
+        const left = Math.min(...rects.map((r) => r.x)),
+          top = Math.min(...rects.map((r) => r.y));
+        return {
+          ...preview,
+          focus: rects.length
+            ? {
+                x: left - preview.origin.x,
+                y: top - preview.origin.y,
+                width: Math.max(...rects.map((r) => r.x + r.width)) - left,
+                height: Math.max(...rects.map((r) => r.y + r.height)) - top,
+              }
+            : null,
+        };
+      }),
     close: () => $('#ai-dialog').close(),
   };
   function render() {

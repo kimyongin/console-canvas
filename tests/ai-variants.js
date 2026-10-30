@@ -411,7 +411,7 @@ try {
   const route = apiDoc.querySelector('#ai-route');
   route.value = 'api';
   route.dispatchEvent(new apiWindow.Event('change', { bubbles: true }));
-  input('#ai-prompt', 'Make three distinct candidates');
+  input('#ai-prompt', 'Make three distinct candidates. Preserve the selected button. '.repeat(18));
   const apiRevision = apiApp.state.revision;
   apiDoc.querySelector('#ai-create').click();
   await wait(() => apiApp.state.aiRequests[0]?.execution?.usage?.length === 3);
@@ -429,6 +429,11 @@ try {
       apiApp.state.scene.codePatches.length === 0,
   );
   await wait(() => apiDoc.querySelectorAll('[data-candidate-id]').length === 3);
+  check(
+    'Completed generation has one coherent status without a stale generating message',
+    apiDoc.querySelector('#ai-request-state').textContent.includes('후보 3개 완료') &&
+      !apiDoc.querySelector('#ai-status').textContent.includes('생성하고 있습니다'),
+  );
   check(
     'Existing requests collapse the input form to prioritize previews',
     !apiDoc.querySelector('.ai-new-request').open &&
@@ -454,6 +459,51 @@ try {
   check(
     'Candidate comparison keeps the same zoom on both sides',
     [...apiDoc.querySelectorAll('.ai-preview select')].every((el) => el.value === '1'),
+  );
+  for (const width of [1440, 820]) {
+    apiFrame.style.width = width + 'px';
+    await new Promise((resolve) => apiWindow.requestAnimationFrame(resolve));
+    const picker = apiDoc.querySelector('#ai-request-list').getBoundingClientRect(),
+      dialog = apiDoc.querySelector('#ai-dialog').getBoundingClientRect();
+    check(
+      'Long stored request stays inside the AI dialog at ' + width + 'px',
+      picker.left >= dialog.left &&
+        picker.right <= dialog.right &&
+        dialog.right <= width &&
+        apiDoc.querySelector('#ai-request-list').title === apiApp.state.aiRequests[0].prompt,
+    );
+  }
+  apiFrame.style.width = '1440px';
+  previewSelect.value = 'target';
+  previewSelect.dispatchEvent(new apiWindow.Event('change', { bubbles: true }));
+  await wait(() =>
+    [...apiDoc.querySelectorAll('.ai-preview-scroll')].every(
+      (el) =>
+        el.scrollLeft > 0 &&
+        el
+          .querySelector('iframe')
+          ?.contentDocument?.querySelector('[data-uic-id="' + apiNode.id + '"]'),
+    ),
+  );
+  check(
+    'Request-location view shows the selected button at 100% on both sides without applying code',
+    [...apiDoc.querySelectorAll('.ai-preview')].every((el) => {
+      const viewport = el.querySelector('.ai-preview-scroll').getBoundingClientRect(),
+        iframe = el.querySelector('iframe'),
+        frameRect = iframe.getBoundingClientRect(),
+        target = iframe.contentDocument
+          .querySelector('[data-uic-id="' + apiNode.id + '"]')
+          .getBoundingClientRect();
+      return (
+        el.querySelector('select').value === 'target' &&
+        frameRect.left + target.left >= viewport.left - 1 &&
+        frameRect.left + target.right <= viewport.right + 1 &&
+        frameRect.top + target.top >= viewport.top - 1 &&
+        frameRect.top + target.bottom <= viewport.bottom + 1
+      );
+    }) &&
+      apiApp.state.revision === apiRevision &&
+      apiApp.state.scene.codePatches.length === 0,
   );
   apiDoc.querySelector('#ai-apply').click();
   await wait(() => !apiDoc.querySelector('#ai-dialog').open);

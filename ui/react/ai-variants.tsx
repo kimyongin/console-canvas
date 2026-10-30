@@ -16,7 +16,7 @@ interface Request {
   count: number;
   status: string;
   candidates: Candidate[];
-  baseline: unknown;
+  baseline: { selection?: string[] };
   selectedId?: string;
   route?: string;
   execution?: {
@@ -64,11 +64,16 @@ interface Actions {
   cancel(id: string): Promise<unknown>;
   apply(request: string, candidate: string): Promise<unknown>;
   instruction(id: string): string;
-  preview(point: unknown): Promise<{ html: string; size: { width: number; height: number } }>;
+  preview(point: unknown, focusIds: string[]): Promise<PreviewResult>;
   apiStatus(): { configured: boolean; model: string };
   configureApi(value: { key: string; model: string }): Promise<void>;
   forgetApi(): void;
   close(): void;
+}
+interface PreviewResult {
+  html: string;
+  size: { width: number; height: number };
+  focus?: { x: number; y: number; width: number; height: number } | null;
 }
 function Preview({
   point,
@@ -76,24 +81,24 @@ function Preview({
   title,
   zoom,
   onZoom,
+  focusIds,
 }: {
   point: unknown;
   actions: Actions;
   title: string;
   zoom: string;
   onZoom: (value: string) => void;
+  focusIds: string[];
 }) {
-  const [result, setResult] = useState<{
-    html: string;
-    size: { width: number; height: number };
-  } | null>(null);
+  const [result, setResult] = useState<PreviewResult | null>(null);
   const [error, setError] = useState('');
+  const focusKey = focusIds.join(',');
   useEffect(() => {
     let current = true;
     setResult(null);
     setError('');
     actions
-      .preview(point)
+      .preview(point, focusIds)
       .then((value) => {
         if (current) setResult(value);
       })
@@ -103,7 +108,7 @@ function Preview({
     return () => {
       current = false;
     };
-  }, [point, actions]);
+  }, [point, actions, focusKey]);
   const viewport = useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = useState({ width: 460, height: 350 });
   useLayoutEffect(() => {
@@ -122,8 +127,20 @@ function Preview({
           0.05,
           Math.min(1, bounds.width / result.size.width, bounds.height / result.size.height),
         )
-      : Number(zoom)
+      : zoom === 'target'
+        ? 1
+        : Number(zoom)
     : 1;
+  useLayoutEffect(() => {
+    if (!result) return;
+    const host = viewport.current!;
+    if (zoom === 'target' && result.focus) {
+      host.scrollLeft = result.focus.x + result.focus.width / 2 - bounds.width / 2;
+      host.scrollTop = result.focus.y + result.focus.height / 2 - bounds.height / 2;
+    } else if (zoom === 'fit' || zoom === 'target') {
+      host.scrollLeft = host.scrollTop = 0;
+    }
+  }, [result, zoom, bounds.width, bounds.height]);
   return (
     <section className="ai-preview">
       <div className="ai-preview-heading">
@@ -134,6 +151,7 @@ function Preview({
           onChange={(e) => onZoom(e.target.value)}
         >
           <option value="fit">맞춤</option>
+          {!!focusIds.length && <option value="target">요청 위치</option>}
           <option value="0.5">50%</option>
           <option value="1">100%</option>
         </NativeSelect>
@@ -351,9 +369,7 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
       setCandidateId('');
       setFormOpen(false);
       setMessage(
-        route === 'api'
-          ? 'API로 시안을 생성하고 있습니다.'
-          : '요청을 보관했습니다. 에이전트 대화에 전달해야 실행됩니다.',
+        route === 'api' ? '' : '요청을 보관했습니다. 에이전트 대화에 전달해야 실행됩니다.',
       );
       if (copyText && route === 'mcp')
         try {
@@ -777,6 +793,7 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
             <NativeSelect
               id="ai-request-list"
               value={requestId}
+              title={request?.prompt || '선택 영역 개선'}
               onChange={(e) => {
                 setRequestId(e.target.value);
                 const id = actions.currentCandidate(e.target.value);
@@ -984,6 +1001,7 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
                         title="요청 기준"
                         zoom={previewZoom}
                         onZoom={setPreviewZoom}
+                        focusIds={request.baseline.selection || []}
                       />
                       <Preview
                         point={candidate.point}
@@ -991,6 +1009,7 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
                         title={candidate.name}
                         zoom={previewZoom}
                         onZoom={setPreviewZoom}
+                        focusIds={request.baseline.selection || []}
                       />
                     </div>
                   </>
