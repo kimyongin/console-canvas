@@ -40,7 +40,9 @@ async function waitFor(filename) {
 }
 try {
   const electron = process.env.ELECTRON_BINARY || path.join(root, 'node_modules/.bin/electron');
-  active = start(electron, [fixture], { CONSOLE_CANVAS_TEST_PHASE: 'prepare' });
+  active = start(electron, [fixture, '--check-chatgpt-connection'], {
+    CONSOLE_CANVAS_TEST_PHASE: 'prepare',
+  });
   const capture = await Promise.race([
     waitFor('prepare-ready.json'),
     active.done.then(() => {
@@ -75,7 +77,25 @@ try {
     JSON.stringify(modernReport, null, 2),
   );
   await fs.writeFile(path.join(temporary, 'sdk-complete'), 'done');
-  await active.done;
+  const prepareOutput = await active.done;
+  const connectionCheck = prepareOutput.split('\n').flatMap((line) => {
+    try {
+      const value = JSON.parse(line);
+      return value.kind === 'chatgpt-connection-check' ? [value] : [];
+    } catch {
+      return [];
+    }
+  });
+  if (
+    connectionCheck.length !== 1 ||
+    connectionCheck[0].ok !== false ||
+    connectionCheck[0].accountCount !== 0 ||
+    !['signin_required', 'storage_unavailable'].includes(connectionCheck[0].code) ||
+    Object.keys(connectionCheck[0]).some(
+      (key) => !['kind', 'version', 'ok', 'protectedStorage', 'accountCount', 'code'].includes(key),
+    )
+  )
+    throw new Error('Native connection diagnostic must report only the isolated empty account');
   active = null;
   const expected = JSON.parse(await fs.readFile(path.join(temporary, 'expected.json'), 'utf8'));
   const session = JSON.parse(
@@ -101,6 +121,7 @@ try {
       ? 'real DOM / fixture screenshot / offscreen'
       : 'real DOM / display screenshot',
     manualInstalledAppUse: false,
+    nativeConnectionDiagnostic: connectionCheck[0],
     capture,
     reopened,
     officialSdkChecks: sdkReport.passed,

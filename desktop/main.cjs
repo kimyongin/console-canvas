@@ -403,6 +403,15 @@ async function start() {
   await source.webContents.loadURL(connection.url + '/fixtures/console.html');
   if (reopen?.document_id) show('editor');
   notify();
+  // Opt-in operator check in this installed app's signed process. Normal
+  // startup stays lazy; renderer/MCP cannot request this diagnostic.
+  if (process.argv.includes('--check-chatgpt-connection')) {
+    require('./connection-check.cjs')
+      .checkChatgptConnection(chatgpt, appVersion)
+      .then((report) => {
+        process.stdout.write(JSON.stringify(report) + '\n');
+      });
+  }
 }
 if (!app.requestSingleInstanceLock()) app.quit();
 else {

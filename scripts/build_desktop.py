@@ -18,7 +18,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--download-only', action='store_true')
     parser.add_argument('--signing', choices=('dev', 'identity', 'adhoc'), default='dev',
-                        help='dev reuses the prepared local certificate; adhoc must be explicit')
+                        help='dev uses the pinned Apple identity, or the prepared local identity when none is pinned')
     parser.add_argument('--identity', help='Certificate identity for --signing identity')
     parser.add_argument('--keychain', type=Path, help='Optional keychain for --signing identity')
     args = parser.parse_args()
@@ -92,8 +92,13 @@ def main():
                   'CFBundleVersion': json.loads((ROOT / 'package.json').read_text())['version']})
     plist.write_bytes(plistlib.dumps(value))
     if args.signing == 'dev':
-        from dev_signing import sign
-        signing = sign(app)
+        import apple_signing
+        selected = apple_signing.selection_path()
+        if selected.exists() or selected.is_symlink():
+            signing = apple_signing.sign(app)
+        else:
+            from dev_signing import sign
+            signing = sign(app)
     else:
         command = ['/usr/bin/codesign', '--force', '--deep', '--sign', args.identity if args.signing == 'identity' else '-']
         if args.keychain:
