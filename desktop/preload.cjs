@@ -37,7 +37,18 @@ contextBridge.exposeInMainWorld('ConsoleCanvasDesktop', {
       }
     }),
   onSnapshot: (callback) => {
-    ipcRenderer.on('canvas:snapshot', (_event, value, destination) => callback(value, destination));
+    ipcRenderer.on('canvas:snapshot', async (_event, value, destination, receipt) => {
+      try {
+        const result = await callback(value, destination);
+        if (receipt) ipcRenderer.send('canvas:snapshot-result', receipt, result || { ok: true });
+      } catch (error) {
+        if (receipt)
+          ipcRenderer.send('canvas:snapshot-result', receipt, {
+            ok: false,
+            message: error.message,
+          });
+      }
+    });
     ipcRenderer.send('canvas:editor-ready');
   },
 });

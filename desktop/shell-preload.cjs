@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('ConsoleCanvasShell', {
   onFocusAddress: (callback) => ipcRenderer.on('canvas:focus-address', () => callback()),
   navigate: (url) => ipcRenderer.invoke('canvas:navigate', url),
   capture: (options) => ipcRenderer.invoke('canvas:capture', options),
+  captureApp: () => ipcRenderer.invoke('canvas:capture-app'),
   previewCapture: () => ipcRenderer.invoke('canvas:capture-preview'),
   show: (view) => ipcRenderer.invoke('canvas:show', view),
   back: () => ipcRenderer.invoke('canvas:back'),

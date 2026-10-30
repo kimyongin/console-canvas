@@ -6,6 +6,15 @@ const { prepareCaptureView } = require('./capture-view.cjs');
 const { readPublicResource } = require('./capture-resources.cjs');
 async function captureWebsite(contents, root, options = {}) {
   webUrl(contents.getURL());
+  return captureContents(contents, root, options);
+}
+// This file-only exception is private to our own shell, never the website IPC.
+async function captureAppShell(contents, root) {
+  const expected = require('node:url').pathToFileURL(path.join(root, 'desktop/shell.html')).href;
+  if (contents.getURL() !== expected) throw Error('앱 화면 출처가 올바르지 않습니다.');
+  return captureContents(contents, root, { scope: { mode: 'viewport' } });
+}
+async function captureContents(contents, root, options) {
   const code = await fs.readFile(path.join(root, 'capture.js'), 'utf8');
   const scope = await resolveScope(contents, options.scope);
   const prepared = await prepareCaptureView(contents, code, { scope });
@@ -103,4 +112,4 @@ async function resolveScope(contents, request) {
     viewport: view,
   };
 }
-module.exports = { captureWebsite, resolveScope };
+module.exports = { captureWebsite, captureAppShell, resolveScope };

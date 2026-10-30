@@ -230,6 +230,11 @@ async function start() {
   });
   ipcMain.handle('canvas:open-source', async (event, url) => {
     trusted(event, 'editor');
+    const ownView = /^console-canvas:\/\/app\/(editor|source|settings|agent|update)$/.exec(url);
+    if (ownView) {
+      show(ownView[1]);
+      return;
+    }
     const target = require('./security.cjs').webUrl(url);
     show('source');
     await source.webContents.loadURL(target);
@@ -321,6 +326,72 @@ async function start() {
       notify();
     }
   }
+  async function captureApp() {
+    if (busy || current === 'capture') throw Error('화면 가져오기를 마친 뒤 다시 시도해 주세요.');
+    if (!editorReady) throw Error('편집기를 준비 중입니다. 잠시 후 다시 시도해 주세요.');
+    if (reviewCaptureSession.current())
+      throw Error('구현 화면 가져오기를 완료하거나 취소한 뒤 앱 디자인을 편집해 주세요.');
+    const view = current,
+      [width, height] = win.getContentSize();
+    const child = view === 'editor' ? editor : view === 'source' ? source : null;
+    busy = true;
+    let message;
+    try {
+      const snapshot = await require('./app-capture.cjs').captureApplication({
+        shell: win.webContents,
+        content: child?.webContents,
+        bounds: child?.getBounds(),
+        width,
+        height,
+        view,
+        root: ROOT,
+        version: appVersion,
+        onShellCaptured: () => notify('앱 디자인을 가져오고 있어요…'),
+      });
+      if (
+        current !== view ||
+        win.getContentSize().some((value, index) => value !== [width, height][index])
+      )
+        throw Error('앱 화면이 바뀌었습니다. 다시 가져와 주세요.');
+      notify('앱 디자인을 새 문서로 저장하고 있어요…');
+      const receipt = require('node:crypto').randomUUID();
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          cleanup();
+          reject(
+            Error('앱 디자인 저장 응답이 없습니다. 기존 작업을 확인한 뒤 다시 시도해 주세요.'),
+          );
+        }, 30000);
+        const cleanup = () => {
+          clearTimeout(timer);
+          ipcMain.removeListener('canvas:snapshot-result', saved);
+        };
+        function saved(event, id, result) {
+          try {
+            trusted(event, 'editor');
+          } catch {
+            return;
+          }
+          if (id !== receipt) return;
+          cleanup();
+          result?.ok
+            ? resolve()
+            : reject(Error(result?.message || '앱 디자인을 저장하지 못했습니다.'));
+        }
+        ipcMain.on('canvas:snapshot-result', saved);
+        editor.webContents.send('canvas:snapshot', snapshot, null, receipt);
+      });
+      show('editor');
+      message = '앱 디자인 복제본을 열었어요. 헤더·패널·버튼을 편집하거나 AI 시안을 만들어 보세요.';
+      return { id: snapshot.id, nodes: snapshot.nodes.length };
+    } catch (error) {
+      message = error.message;
+      throw error;
+    } finally {
+      busy = false;
+      notify(message);
+    }
+  }
   registerShellIpc({
     ipcMain,
     trusted,
@@ -335,6 +406,7 @@ async function start() {
     show,
     info: state,
     capture,
+    captureApp,
     cancelReviewCapture,
     captureMenu: (position) =>
       new Promise((resolve) => {
@@ -361,6 +433,10 @@ async function start() {
         label: 'Console Canvas',
         submenu: [
           { role: 'about' },
+          {
+            label: '앱 디자인 편집',
+            click: () => captureApp().catch((error) => notify(error.message)),
+          },
           {
             label: '업데이트 확인…',
             click: () => {

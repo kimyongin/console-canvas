@@ -540,6 +540,9 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
   commitCommentDraft();
   state.commentTarget = null;
   state.ready = false;
+  // A long-poll may still advertise the preceding document after a switch.
+  // Withdraw it before replacing the scene, then reconnect with fresh metadata.
+  state.desktopConnection = (await mcpBridge.suspend()) || state.desktopConnection;
   state.revision++;
   $('#welcome').hidden = true;
   $('#artboard-space').hidden = false;
@@ -1052,7 +1055,13 @@ if (window.ConsoleCanvasDesktop) {
   actions.setAttribute('aria-label', '스냅샷과 화면 파일');
   $('.canvas-tools').append(actions);
   $('#recapture-button').hidden = false;
-  $('#recapture-button').addEventListener('click', () => window.ConsoleCanvasDesktop.showSource());
+  $('#recapture-button').addEventListener('click', () =>
+    state.snapshot?.source.application
+      ? window.ConsoleCanvasDesktop.openSource(state.snapshot.source.url).catch((error) =>
+          notice(error.message),
+        )
+      : window.ConsoleCanvasDesktop.showSource(),
+  );
   $('#source-url').addEventListener('click', (event) => {
     event.preventDefault();
     window.ConsoleCanvasDesktop.openSource(state.snapshot.source.url).catch((error) =>
@@ -1083,12 +1092,17 @@ if (window.ConsoleCanvasDesktop) {
     await aiPanel.cancelJobs();
     return flushEditor();
   });
-  window.ConsoleCanvasDesktop.onSnapshot((value, destination) =>
-    (destination
-      ? implementationReview.acceptCapture(value, destination)
-      : openSnapshot(value)
-    ).catch((error) => notice(error.message)),
-  );
+  window.ConsoleCanvasDesktop.onSnapshot(async (value, destination) => {
+    try {
+      await (destination
+        ? implementationReview.acceptCapture(value, destination)
+        : openSnapshot(value));
+      return { ok: true };
+    } catch (error) {
+      notice(error.message);
+      return { ok: false, message: error.message };
+    }
+  });
   window.ConsoleCanvasDesktop.onReviewCancelled?.((id) => implementationReview.cancelPending(id));
   window.ConsoleCanvasDesktop.getConnection()
     .then((connection) => {

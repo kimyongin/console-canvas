@@ -44,9 +44,15 @@ export async function applyCaptureMedia(scene) {
   const sources = [];
   for (const description of descriptions) {
     try {
-      const image = new doc.defaultView.Image();
-      image.src = description.data;
-      await image.decode();
+      // HTMLImageElement.decode can wait for an inactive WebContentsView's
+      // rendering lifecycle during startup. Decode embedded bytes independently
+      // of painting, without registering another page resource.
+      if (!/^data:image\/(png|jpeg|webp);base64,/.test(description.data)) continue;
+      const [header, encoded] = description.data.split(',');
+      const bytes = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
+      const image = await createImageBitmap(
+        new Blob([bytes], { type: header.slice(5, header.indexOf(';')) }),
+      );
       sources.push({ ...description, image });
     } catch {}
   }
@@ -68,7 +74,7 @@ export async function applyCaptureMedia(scene) {
     if (!parts.length) return null;
     const density = Math.min(
       2,
-      Math.max(...parts.map((p) => p.source.image.naturalWidth / p.source.rect.width)),
+      Math.max(...parts.map((p) => p.source.image.width / p.source.rect.width)),
     );
     const scale = Math.min(
       density,
@@ -80,8 +86,8 @@ export async function applyCaptureMedia(scene) {
     canvas.height = Math.max(1, Math.round(rect.height * scale));
     const context = canvas.getContext('2d');
     for (const { source: s, rect: r } of parts) {
-      const sx = s.image.naturalWidth / s.rect.width,
-        sy = s.image.naturalHeight / s.rect.height;
+      const sx = s.image.width / s.rect.width,
+        sy = s.image.height / s.rect.height;
       context.drawImage(
         s.image,
         (r.x - s.rect.x) * sx,
@@ -179,4 +185,5 @@ export async function applyCaptureMedia(scene) {
       element.replaceChildren(holder);
     }
   }
+  for (const source of sources) source.image.close();
 }

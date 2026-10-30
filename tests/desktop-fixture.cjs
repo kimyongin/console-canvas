@@ -293,6 +293,10 @@ async function main() {
     assert.equal(await evaluate(source, 'document.documentElement.outerHTML'), before);
     assert.equal(await evaluate(shell, "document.querySelector('#navigation').hidden"), true);
     assert.equal(editor.getOwnerBrowserWindow(), window);
+    const selfDesign = process.env.CONSOLE_CANVAS_OFFSCREEN
+      ? { skipped: 'actual native capture required' }
+      : await require('./self-design.cjs')({ editor, shell, window, appRoot, until });
+    await fs.writeFile(path.join(directory, 'self-design.json'), JSON.stringify(selfDesign));
     await fs.writeFile(
       path.join(directory, 'prepare-ready.json'),
       JSON.stringify({
@@ -303,6 +307,7 @@ async function main() {
         reviewCapturePreservesTarget: true,
         reviewCancellation: true,
         addressCommand: true,
+        selfDesign,
       }),
     );
     await until(
@@ -344,7 +349,17 @@ async function main() {
           '!!window.ConsoleCanvas?.state.ready && !!window.ConsoleCanvas.state.mcpStatus.connected',
         ),
       'Restored document not ready',
-    );
+    ).catch(async (error) => {
+      console.error(
+        JSON.stringify(
+          await evaluate(
+            editor,
+            `({ready:window.ConsoleCanvas?.state.ready,document:window.ConsoleCanvas?.state.snapshot?.id,mcp:window.ConsoleCanvas?.state.mcpStatus,notice:document.querySelector('#notice')?.textContent,scene:!!window.ConsoleCanvas?.state.scene,sceneDocument:!!window.ConsoleCanvas?.state.scene?.doc,generation:window.ConsoleCanvas?.state.generation,revision:window.ConsoleCanvas?.state.revision,nodes:window.ConsoleCanvas?.state.snapshot?.nodes.length,frameState:document.querySelector('#scene-frame')?.contentDocument?.readyState,dialogs:[...document.querySelectorAll('dialog[open]')].map(d=>d.textContent.slice(0,300))})`,
+          ),
+        ),
+      );
+      throw error;
+    });
     const expected = JSON.parse(await fs.readFile(path.join(directory, 'expected.json')));
     const actual = await evaluate(
       editor,
@@ -377,6 +392,19 @@ async function main() {
     assert.equal(actual.note, 'note saved on normal quit');
     assert.equal(actual.entries.length, expected.snapshots);
     assert.equal(actual.active, expected.snapshotId);
+    const selfDesign = JSON.parse(
+      await fs.readFile(path.join(directory, 'self-design.json'), 'utf8'),
+    );
+    if (!selfDesign.skipped) {
+      const selfStored = await evaluate(
+        editor,
+        `(async()=>{const s=await(await import('/db.js')).getDocument(${JSON.stringify(selfDesign.document_id)});return {application:s.source.application,comment:s.annotations[${JSON.stringify(selfDesign.node)}],dx:s.edits[${JSON.stringify(selfDesign.node)}].dx,snapshot:s.timeline.entries.some(e=>e.id===${JSON.stringify(selfDesign.snapshot)})};})()`,
+      );
+      assert.equal(selfStored.application.view, 'editor');
+      assert.equal(selfStored.comment, 'Give snapshots more room');
+      assert.equal(selfStored.dx, 12);
+      assert.equal(selfStored.snapshot, true);
+    }
     assert.deepEqual(actual.panels.widths, { layers: 260, properties: 320 });
     assert.equal(await evaluate(shell, "document.querySelector('#navigation').hidden"), true);
     assert.equal(
@@ -403,7 +431,7 @@ async function main() {
   if (phase === 'reopen' && !process.env.CONSOLE_CANVAS_OFFSCREEN) {
     await fs.writeFile(
       path.join(__dirname, '../dist/editor-panel-controls.png'),
-      (await editor.capturePage()).toPNG(),
+      (await editor.capturePage(undefined, { stayHidden: true, stayAwake: true })).toPNG(),
     );
   }
   window.close();

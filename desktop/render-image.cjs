@@ -19,6 +19,20 @@ module.exports = async function renderImage(value) {
   if (view.width > 8192 || view.height > 16000 || view.width * view.height > 48_000_000)
     throw Error('화면 이미지가 너무 큽니다. 화면 범위를 줄여 주세요.');
   const isolated = session.fromPartition('image-' + require('node:crypto').randomUUID());
+  // Keep large editable captures out of Chromium's data-URL length limit and
+  // error messages. This per-renderer, in-memory origin serves one inert page.
+  const documentUrl = 'console-canvas-render://document/index.html';
+  isolated.protocol.handle('console-canvas-render', (request) =>
+    request.url === documentUrl
+      ? new Response(value.html, {
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Content-Security-Policy':
+              "default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data: blob: https: http:; font-src data: https: http:; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'",
+          },
+        })
+      : new Response('', { status: 404 }),
+  );
   isolated.setPermissionRequestHandler((_c, _p, done) => done(false));
   const win = new BrowserWindow({
     show: false,
@@ -39,7 +53,7 @@ module.exports = async function renderImage(value) {
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   try {
-    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(value.html));
+    await win.loadURL(documentUrl);
     await win.webContents.executeJavaScriptInIsolatedWorld(1003, [
       {
         code: 'Promise.race([Promise.all([document.fonts.ready,...[...document.images].map(i=>i.decode().catch(()=>{}))]),new Promise(r=>setTimeout(r,2000))]).then(()=>0)',
@@ -82,6 +96,7 @@ module.exports = async function renderImage(value) {
     return Buffer.from(result.data, 'base64');
   } finally {
     win.destroy();
+    isolated.protocol.unhandle('console-canvas-render');
     await isolated.clearStorageData();
   }
 };

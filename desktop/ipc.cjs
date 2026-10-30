@@ -16,6 +16,7 @@ function registerShellIpc({
   show,
   info,
   capture,
+  captureApp,
   cancelReviewCapture,
   captureMenu,
 }) {
@@ -69,6 +70,7 @@ function registerShellIpc({
     return { data, view };
   });
   handle('capture', capture);
+  handle('capture-app', captureApp);
   handle('capture-menu', (position) => captureMenu(position));
   handle('cancel-review', (id) => cancelReviewCapture(id));
 }

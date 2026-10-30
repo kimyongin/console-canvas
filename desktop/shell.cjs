@@ -21,6 +21,7 @@ function showState(value) {
       '목표: ' + value.review_target.label + ' · 결과 상태를 확인해 주세요.';
   $('#capture-picker').hidden = value.view !== 'capture';
   $('#capture').disabled = !!value.busy;
+  $('#capture-app').disabled = !!value.busy || value.view === 'capture';
   for (const view of ['source', 'editor', 'settings', 'agent', 'update'])
     $('#show-' + view).classList.toggle('active', value.view === view);
   $('#back').disabled = !value.can_go_back;
@@ -65,6 +66,18 @@ async function captureCurrent() {
   }
 }
 $('#capture').addEventListener('click', captureCurrent);
+let appCapturePending = false;
+$('#capture-app').addEventListener('click', async () => {
+  if (appCapturePending) return;
+  appCapturePending = true;
+  try {
+    await api.captureApp();
+  } catch (error) {
+    $('#status').textContent = error.message;
+  } finally {
+    appCapturePending = false;
+  }
+});
 $('#capture-menu-button').addEventListener('click', async () => {
   try {
     const r = $('#capture-menu-button').getBoundingClientRect();

@@ -481,6 +481,11 @@
       const raster = ['CANVAS', 'VIDEO', 'IFRAME'].includes(source.tagName),
         closedShadow = source.shadowRoot || registeredShadows.get(source);
       const node = record(source, parentId, raster ? 'raster' : 'element');
+      // Native top-layer state is not retained by serializing an `open`
+      // attribute. Hosts composing app surfaces need its viewport placement
+      // and backdrop, without calling showModal on the captured page.
+      if (source.matches(':modal, :popover-open'))
+        node.topLayer = { style: styles(source).css, backdrop: styles(source, '::backdrop').css };
       const tag = raster ? 'div' : source.localName.includes('-') ? 'span' : source.localName;
       const clone = doc.createElement(tag),
         { css, computed } = styles(source);
@@ -806,6 +811,13 @@
       return clone;
     }
     const clonedBody = cloneElement(doc.body, null);
+    // Portals can be rendered directly under <html> (including our inert
+    // canvas's fixed-element layers). They remain visible outside <body>.
+    for (const extra of doc.documentElement.children)
+      if (extra !== doc.body && extra.tagName !== 'HEAD') {
+        const clone = cloneElement(extra, clonedBody.dataset.uicId);
+        if (clone) clonedBody.append(clone);
+      }
     const rootStyle = styles(doc.documentElement).css;
     let fonts = [...extraFonts, ...(options.fontCss || [])].join('\n');
     function fontRules(sheet, base) {
@@ -963,7 +975,7 @@
     function embedUrls(text) {
       const replacements = new Map();
       for (const [url, data] of available)
-        if (data) {
+        if (data && !url.startsWith('data:')) {
           replacements.set(url, data);
           replacements.set(esc(url), data);
         }
