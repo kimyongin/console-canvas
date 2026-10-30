@@ -21,6 +21,9 @@ export async function withVersionScene(snapshot, point, run) {
     frame.remove();
   }
 }
+export function snapshotVersionName(entry, entries) {
+  return 'v' + (entries.findIndex((value) => value.id === entry.id) + 1) + ' · ' + entry.name;
+}
 export function versionOptions(state) {
   return [
     { id: '@original', name: '편집 전 복제본', state: { edits: {}, annotations: {}, note: '' } },
@@ -38,7 +41,18 @@ export function versionOptions(state) {
       .filter((entry) => !entry.deletedAt)
       .map((entry) => ({
         ...entry,
-        name: '스냅샷 · ' + entry.name,
+        name:
+          '스냅샷 · ' +
+          snapshotVersionName(entry, state.timeline.entries) +
+          ' · ' +
+          new Date(entry.createdAt).toLocaleString('ko-KR', {
+            month: 'numeric',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          }) +
+          (entry.id === state.timeline.activeId ? ' · 작업 기준' : ''),
       })),
   ];
 }

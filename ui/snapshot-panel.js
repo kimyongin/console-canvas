@@ -1,6 +1,6 @@
 import { snapshotChangeLabel } from './snapshot-delta.js';
 import { snapshotGraph } from '../snapshot-graph.js';
-import { withVersionScene } from './version-preview.js';
+import { withVersionScene, snapshotVersionName } from './version-preview.js';
 import {
   renderSnapshotGraph,
   renderSnapshotTrash,
@@ -143,18 +143,20 @@ export function createSnapshotPanel({
   });
   const selected = () =>
     state.timeline?.entries.find((e) => e.id === state.snapshotPreviewId && !e.deletedAt);
+  const versionName = (entry) => (entry ? snapshotVersionName(entry, state.timeline.entries) : '');
   function updateLabel() {
     adapter.publish();
     const entry = selected(),
       active = state.timeline?.entries.find(
         (e) => e.id === state.timeline.activeId && !e.deletedAt,
       );
-    const name = entry?.name || active?.name || (state.timeline ? '현재 작업' : '문서 열기');
+    const name =
+      versionName(entry) || versionName(active) || (state.timeline ? '현재 작업' : '문서 열기');
     $('#snapshot-current').textContent =
       '작업 중: ' +
-      (active?.name || '현재 작업') +
+      (versionName(active) || '현재 작업') +
       '  |  미리보기: ' +
-      (entry?.name || '선택 없음') +
+      (versionName(entry) || '선택 없음') +
       (snapshotHistory.dirty() ? ' · 스냅샷 이후 변경 있음' : '');
     const suffix =
       entry && entry.id !== active?.id
@@ -182,7 +184,7 @@ export function createSnapshotPanel({
     updateLabel();
     if (trashView) return;
     $('#snapshot-preview-title').textContent = entry
-      ? entry.name + ' 미리보기'
+      ? versionName(entry) + ' 미리보기'
       : '버전을 선택하세요';
     $('#snapshot-preview-status').textContent = entry
       ? '선택만으로 현재 편집은 바뀌지 않습니다.'
@@ -440,6 +442,7 @@ export function createSnapshotPanel({
       x = scroll.scrollLeft,
       y = scroll.scrollTop;
     const focus = document.activeElement?.dataset?.snapshotId;
+    for (const entry of data.nodes) entry.versionLabel = versionName(entry);
     renderSnapshotGraph(
       root,
       data,

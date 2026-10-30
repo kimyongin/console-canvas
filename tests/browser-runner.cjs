@@ -81,6 +81,7 @@ async function main() {
     'usability',
     'followup',
     'navigation',
+    'ux-followup-031',
   ]) {
     if (
       process.env.CONSOLE_CANVAS_TEST_SUITES &&

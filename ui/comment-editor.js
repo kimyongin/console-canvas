@@ -94,6 +94,7 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
       reference?.size || scene.contentSize(),
       rect,
       100,
+      id,
     );
     renderIntentSuggestions(
       $('#comment-intent-suggestions'),

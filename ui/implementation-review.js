@@ -2,7 +2,7 @@ import { buildHandoffImage } from '../handoff-image.js';
 import { download } from '../export.js';
 import { copy, validateSnapshot } from '../engine.js';
 import { snapshotPoint, snapshotSignature } from '../snapshot-history.js';
-import { cleanImplementationReviews, reviewCapture } from '../workflow-state.js';
+import { cleanImplementationReviews, reviewCapture, sameReviewResult } from '../workflow-state.js';
 import { listDocuments, getDocument } from '../db.js';
 import { handoffRequests } from '../handoff-image.js';
 import { withVersionScene, versionOptions } from './version-preview.js';
@@ -21,6 +21,7 @@ export function createImplementationReview({
     selectedId = null,
     documents = [];
   let captureDestination = null;
+  const documentResults = new Map();
   const items = () => state.implementationReviews || [];
   function find(id) {
     const review = items().find((r) => r.id === id);
@@ -85,6 +86,8 @@ export function createImplementationReview({
     mutations = new Map();
   let verdicts = [];
   const actions = {
+    currentResult: (id) =>
+      sameReviewResult(items().find((r) => r.id === selectedId)?.result, documentResults.get(id)),
     captureAvailable: () => !!window.ConsoleCanvasDesktop?.beginReviewCapture,
     async capture() {
       await flushEditor();
@@ -147,14 +150,17 @@ export function createImplementationReview({
         review = find(selectedId);
       const value = await getDocument(id);
       if (!value) throw Error('구현 화면을 찾을 수 없습니다. 다시 가져와 주세요.');
-      if (documentId !== state.snapshot?.id || epoch !== generation)
+      if (documentId !== state.snapshot?.id || epoch !== generation || selectedId !== review.id)
         throw Error('문서가 바뀌었습니다.');
+      const result = resultValue(value);
+      documentResults.set(id, result);
+      if (sameReviewResult(review.result, result)) return;
       const next = copy(review);
       if (review.result) {
         next.id = crypto.randomUUID();
         next.createdAt = new Date().toISOString();
       }
-      next.result = resultValue(value);
+      next.result = result;
       next.requests = next.requests.map((r) => ({ ...r, status: 'pending', note: '' }));
       await persist(
         review.result ? [...items(), next] : items().map((r) => (r.id === review.id ? next : r)),
@@ -307,6 +313,14 @@ export function createImplementationReview({
       );
   }
   async function enrichDocuments(values) {
+    const ids = new Set(
+      items()
+        .map((r) => r.result?.snapshot.id)
+        .filter(Boolean),
+    );
+    const results = await Promise.all([...ids].map(async (id) => [id, await getDocument(id)]));
+    documentResults.clear();
+    for (const [id, value] of results) if (value) documentResults.set(id, resultValue(value));
     return values.filter((d) => d.id !== state.snapshot.id);
   }
   async function open(option = null) {

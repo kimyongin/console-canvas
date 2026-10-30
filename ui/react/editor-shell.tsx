@@ -4,7 +4,7 @@ import { dispatchEditorCommand } from './commands';
 import { Button } from './components/button';
 import { Input } from './components/input';
 import { Textarea } from './components/textarea';
-import { DialogSurface, NativeSelect } from './components/surfaces';
+import { DialogSurface, NativeSelect, TaskHeader } from './components/surfaces';
 const emptySubscribe = () => () => {};
 export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
   useSyncExternalStore(adapter?.subscribe || emptySubscribe, () => {
@@ -73,28 +73,36 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           닫기
         </Button>
       </DialogSurface>
-      <DialogSurface id="implementation-dialog" aria-label="구현 결과 확인">
+      <DialogSurface id="implementation-dialog" aria-labelledby="implementation-page-title">
         <div id="implementation-content" />
       </DialogSurface>
       <DialogSurface id="ai-dialog">
         <div id="ai-dialog-content" />
         <section id="ai-connection-page" hidden>
-          <div className="task-page-navigation">
-            <Button
-              id="ai-connection-back"
-              variant="ghost"
-              onClick={() => dispatchEditorCommand('ai-connection-back')}
-            >
-              ← AI 시안으로 돌아가기
-            </Button>
-            <Button
-              aria-label="AI 연결 설정 닫기"
-              variant="ghost"
-              onClick={() => dispatchEditorCommand('ai-connection-close')}
-            >
-              ×
-            </Button>
-          </div>
+          <TaskHeader
+            title="에이전트 연결"
+            titleId="ai-connection-title"
+            context="AI 시안 · 로컬 MCP 서버 연결"
+            back={
+              <Button
+                id="ai-connection-back"
+                variant="ghost"
+                aria-label="AI 시안으로 돌아가기"
+                onClick={() => dispatchEditorCommand('ai-connection-back')}
+              >
+                ←
+              </Button>
+            }
+            close={
+              <Button
+                aria-label="AI 연결 설정 닫기"
+                variant="ghost"
+                onClick={() => dispatchEditorCommand('ai-connection-close')}
+              >
+                ×
+              </Button>
+            }
+          />
           <div id="ai-connection-host" />
         </section>
       </DialogSurface>
@@ -817,24 +825,35 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           </section>
         </div>
       </DialogSurface>
-      <DialogSurface id="capture-status-dialog" aria-labelledby="capture-status-title">
-        <div className="capture-task-navigation">
-          <Button
-            id="capture-task-back"
-            hidden
-            variant="ghost"
-            onClick={() => dispatchEditorCommand('capture-back')}
-          >
-            ← 가져오기 정보
-          </Button>
-          <form method="dialog">
-            <Button id="capture-task-close" aria-label="가져오기 정보 닫기" variant="ghost">
-              ×
+      <DialogSurface id="capture-status-dialog" aria-labelledby="capture-task-title">
+        <TaskHeader
+          title={<span id="capture-task-label">가져오기 정보</span>}
+          titleId="capture-task-title"
+          context={
+            <span id="capture-task-context" hidden>
+              가져오기 정보
+            </span>
+          }
+          back={
+            <Button
+              id="capture-task-back"
+              hidden
+              variant="ghost"
+              aria-label="가져오기 정보로 돌아가기"
+              onClick={() => dispatchEditorCommand('capture-back')}
+            >
+              ←
             </Button>
-          </form>
-        </div>
+          }
+          close={
+            <form method="dialog">
+              <Button id="capture-task-close" aria-label="가져오기 정보 닫기" variant="ghost">
+                ×
+              </Button>
+            </form>
+          }
+        />
         <section id="capture-info-view" hidden={false} className="capture-task-page">
-          <h2 id="capture-status-title">가져오기 정보</h2>
           <p id="capture-status-summary" role="status"></p>
           <p id="capture-repair-summary" role="status"></p>
           <p className="capture-verification-note">
@@ -871,7 +890,6 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           </p>
         </section>
         <section id="repair-assets-dialog" hidden={true} className="capture-task-page">
-          <h2 id="repair-assets-title">이미지·폰트 다시 읽기</h2>
           <p>
             저장된 주소에서 공개 자산을 다시 읽어 별도 미리보기를 만듭니다. 현재 편집과 촬영 원본은
             유지되며, 적용한 복구는 실행 취소할 수 있습니다.
@@ -893,7 +911,6 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           </Button>
         </section>
         <section id="source-compare-dialog" hidden={true} className="capture-task-page">
-          <h2 id="source-compare-title">원본 사진과 비교</h2>
           <p>저장된 실제 사진과 복제본을 비교합니다. 현재 웹사이트를 다시 촬영하지 않습니다.</p>
           <div className="reference-tools">
             <label>
@@ -1031,7 +1048,10 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           </Button>
         </form>
         <h2>{'저장된 화면'}</h2>
-        <p>{'작업은 자동 저장됩니다. 삭제한 화면은 휴지통에서 복구할 수 있습니다.'}</p>
+        <p>
+          캔버스 편집은 자동 저장됩니다. 화면 이름은 ‘저장’으로 확정하세요. 삭제한 화면은 휴지통에서
+          복구할 수 있습니다.
+        </p>
         <div className="list-tabs">
           <Button id="documents-live" aria-pressed="true" variant="outline">
             {'저장된 화면'}
@@ -1075,6 +1095,9 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             </NativeSelect>
           </label>
           <div id="export-summary" className="export-summary" role="status"></div>
+          <Button id="handoff-continue" hidden variant="outline">
+            이 버전에서 이어 편집
+          </Button>
           <div id="handoff-conflicts"></div>
           <div id="handoff-items" className="handoff-items" aria-label="번호별 요청 검토"></div>
           <label className="review-note-label">

@@ -169,8 +169,8 @@ try {
   );
   check(
     'Working and preview names are explicit',
-    doc.querySelector('#snapshot-current').textContent.includes('작업 중: 기준 버전') &&
-      doc.querySelector('#snapshot-current').textContent.includes('미리보기: 기준 버전'),
+    /작업 중: v\d+ · 기준 버전/.test(doc.querySelector('#snapshot-current').textContent) &&
+      /미리보기: v\d+ · 기준 버전/.test(doc.querySelector('#snapshot-current').textContent),
   );
   click('#close-snapshots');
   click('#export-button');
@@ -214,9 +214,12 @@ try {
   doc.querySelector('#handoff-version').dispatchEvent(new win.Event('change'));
   await until(() => !doc.querySelector('#copy-summary').disabled);
   check(
-    'Stored version review cannot edit current comments',
+    'Stored version remains read-only with an explicit continuation route',
     !doc.querySelector('.handoff-hotspot') &&
-      [...doc.querySelectorAll('.handoff-request')].every((e) => e.disabled) &&
+      !doc.querySelector('#handoff-continue').hidden &&
+      [...doc.querySelectorAll('.handoff-request')].every((e) =>
+        e.getAttribute('aria-label').includes('이 버전에서 이어 편집'),
+      ) &&
       app.state.scene.annotations[node.id] === '번호에서 수정한 요청',
   );
   doc.querySelector('#export-dialog').close();

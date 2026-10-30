@@ -7,9 +7,9 @@ export function createCaptureWorkspace({ $, state, adapter, renderStatus }) {
     repair: $('#repair-assets-dialog'),
   };
   const titles = {
-    info: 'capture-status-title',
-    source: 'source-compare-title',
-    repair: 'repair-assets-title',
+    info: '가져오기 정보',
+    source: '원본 사진과 비교',
+    repair: '이미지·폰트 다시 읽기',
   };
   const labels = {
     info: '가져오기 정보 닫기',
@@ -27,7 +27,8 @@ export function createCaptureWorkspace({ $, state, adapter, renderStatus }) {
     page = next;
     for (const [id, host] of Object.entries(pages)) host.hidden = id !== next;
     dialog.dataset.page = next;
-    dialog.setAttribute('aria-labelledby', titles[next]);
+    $('#capture-task-label').textContent = titles[next];
+    $('#capture-task-context').hidden = !origin || next === 'info';
     $('#capture-task-close').setAttribute('aria-label', labels[next]);
     $('#capture-task-back').hidden = !origin || next === 'info';
   }

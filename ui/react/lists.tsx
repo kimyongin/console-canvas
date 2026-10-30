@@ -165,28 +165,66 @@ export interface DocumentRow {
   recovery?: { label: string; kind: string; run: () => unknown }[];
 }
 export function renderDocumentRows(host: Element, rows: DocumentRow[], loading: boolean) {
-  renderReact(
-    host,
+  renderReact(host, <DocumentList rows={rows} loading={loading} />);
+}
+type NameDraft = { name: string; busy: boolean; error: string };
+function DocumentList({ rows, loading }: { rows: DocumentRow[]; loading: boolean }) {
+  // Owned by the list, so filtering/unmounting a card never discards its draft.
+  // Closing the list also retains drafts for this editor session; only Save/Cancel clears them.
+  const [drafts, setDrafts] = useState<Record<string, NameDraft>>({});
+  function change(id: string, value: NameDraft | null) {
+    setDrafts((previous) => {
+      const next = { ...previous };
+      if (value) next[id] = value;
+      else delete next[id];
+      return next;
+    });
+  }
+  return (
     <>
+      {!!Object.keys(drafts).length && (
+        <p className="name-draft-status" role="status">
+          이름 편집 {Object.keys(drafts).length}개 · 저장 버튼으로 확정하세요. 검색·휴지통 전환과 창
+          닫기 후에도 이 실행 중 초안은 유지됩니다.
+        </p>
+      )}
       {rows.map((row) => (
-        <DocumentCard key={row.id} row={row} loading={loading} />
+        <DocumentCard
+          key={row.id}
+          row={row}
+          loading={loading}
+          draft={drafts[row.id]}
+          changeDraft={(value) => change(row.id, value)}
+        />
       ))}
-    </>,
+    </>
   );
 }
-function DocumentCard({ row, loading }: { row: DocumentRow; loading: boolean }) {
-  const [editing, setEditing] = useState(false),
-    [name, setName] = useState(row.title),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState(''),
-    field = useRef<HTMLInputElement>(null),
+function DocumentCard({
+  row,
+  loading,
+  draft,
+  changeDraft,
+}: {
+  row: DocumentRow;
+  loading: boolean;
+  draft?: NameDraft;
+  changeDraft: (value: NameDraft | null) => void;
+}) {
+  const editing = !!draft,
+    name = draft?.name || '',
+    busy = !!draft?.busy,
+    error = draft?.error || '';
+  const field = useRef<HTMLInputElement>(null),
     card = useRef<HTMLDivElement>(null),
-    wasEditing = useRef(false);
+    wasEditing = useRef(editing),
+    focusDraft = useRef(false);
   useLayoutEffect(() => {
-    if (editing) {
+    if (editing && focusDraft.current) {
+      focusDraft.current = false;
       field.current?.focus();
       field.current?.select();
-    } else if (wasEditing.current)
+    } else if (!editing && wasEditing.current)
       card.current?.querySelector<HTMLButtonElement>('.more-actions')?.focus();
     wasEditing.current = editing;
   }, [editing]);
@@ -194,18 +232,19 @@ function DocumentCard({ row, loading }: { row: DocumentRow; loading: boolean }) 
     event.preventDefault();
     if (busy || !row.rename) return;
     if (!name.trim() || name.trim().length > 120) {
-      setError('이름은 1~120자로 입력해 주세요.');
+      changeDraft({ name, busy: false, error: '이름은 1~120자로 입력해 주세요.' });
       return;
     }
-    setBusy(true);
-    setError('');
+    changeDraft({ name, busy: true, error: '' });
     try {
       await row.rename(name.trim());
-      setEditing(false);
+      changeDraft(null);
     } catch (error) {
-      setError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setBusy(false);
+      changeDraft({
+        name,
+        busy: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
   return (
@@ -235,7 +274,7 @@ function DocumentCard({ row, loading }: { row: DocumentRow; loading: boolean }) 
             if (e.key === 'Escape') {
               e.preventDefault();
               e.stopPropagation();
-              if (!busy) setEditing(false);
+              if (!busy) changeDraft(null);
             }
           }}
         >
@@ -246,12 +285,12 @@ function DocumentCard({ row, loading }: { row: DocumentRow; loading: boolean }) 
             value={name}
             maxLength={120}
             disabled={busy}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => changeDraft({ name: e.target.value, busy: false, error: '' })}
           />
           <small>{row.url}</small>
           {error && <p role="alert">{error}</p>}
           <div>
-            <Button type="button" disabled={busy} onClick={() => setEditing(false)}>
+            <Button type="button" disabled={busy} onClick={() => changeDraft(null)}>
               취소
             </Button>
             <Button type="submit" disabled={busy}>
@@ -267,9 +306,8 @@ function DocumentCard({ row, loading }: { row: DocumentRow; loading: boolean }) 
             ? {
                 ...a,
                 run: () => {
-                  setName(row.title);
-                  setError('');
-                  setEditing(true);
+                  focusDraft.current = true;
+                  changeDraft({ name: row.title, busy: false, error: '' });
                 },
               }
             : a,

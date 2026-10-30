@@ -18,6 +18,7 @@ export function createExportDialog({
   focusComment,
   save,
   implementationReview,
+  snapshotHistory,
   adapter,
 }) {
   let excludedComments = new Map(),
@@ -26,8 +27,62 @@ export function createExportDialog({
     latest = null,
     previewUrl = null,
     returnToExport = null;
-  function editRequest(id) {
-    if (chosen()?.id !== '@current') return;
+  let hasReady = false,
+    actionBusy = false,
+    activeAction = null,
+    intentEpoch = 0,
+    preparing = null,
+    noteTimer;
+  let continuing = false;
+  async function continueVersion(requestId = null) {
+    const version = chosen();
+    if (continuing || !version || version.id.startsWith('@')) return false;
+    continuing = true;
+    const documentId = state.snapshot.id,
+      epoch = state.generation;
+    try {
+      commitCommentDraft();
+      await flushEditor();
+      if (
+        !$('#export-dialog').open ||
+        state.snapshot?.id !== documentId ||
+        state.generation !== epoch ||
+        chosen()?.id !== version.id
+      )
+        throw Error('전달 기준이 바뀌었습니다. 선택한 버전에서 다시 시도해 주세요.');
+      if (requestId) {
+        const exists = await withVersionScene(state.snapshot, version.state, (scene) =>
+          handoffRequests(scene).some((request) => request.id === requestId),
+        );
+        if (!exists) throw Error('이 버전에서 해당 요청을 찾을 수 없습니다.');
+        if (
+          !$('#export-dialog').open ||
+          state.snapshot?.id !== documentId ||
+          state.generation !== epoch ||
+          chosen()?.id !== version.id
+        )
+          throw Error('전달 기준이 바뀌었습니다.');
+      }
+      await snapshotHistory.restorePersisted(version.id);
+      if (
+        !$('#export-dialog').open ||
+        state.snapshot?.id !== documentId ||
+        state.generation !== epoch
+      )
+        return false;
+      renderVersionOptions($('#handoff-version'), versionOptions(state));
+      $('#handoff-version').value = '@current';
+      toast('선택한 버전에서 이어 편집합니다. 이동 전 작업과 이후 가지는 보존했습니다.');
+      return true;
+    } catch (error) {
+      toast(error.message);
+      return false;
+    } finally {
+      continuing = false;
+    }
+  }
+  async function editRequest(id) {
+    if (chosen()?.id !== '@current' && !(await continueVersion(id))) return;
     returnToExport = {
       document: state.snapshot.id,
       generation: state.generation,
@@ -71,7 +126,8 @@ export function createExportDialog({
     $('#handoff-preview').dataset.state = status;
     $('#handoff-preview').setAttribute('aria-busy', String(status === 'preparing'));
     for (const id of ['copy-summary', 'download-review', 'handoff-verify'])
-      $('#' + id).disabled = status !== 'ready';
+      $('#' + id).disabled =
+        actionBusy || (status !== 'ready' && !(status === 'preparing' && hasReady));
     $('#handoff-retry').hidden = status !== 'failed';
   }
   function currentImage(image = latest) {
@@ -84,12 +140,12 @@ export function createExportDialog({
       image.mode === (state.handoffSettings?.mode || 'reference')
     );
   }
-  function readyImage() {
-    if (currentImage()) return latest;
-    if ($('#export-dialog').open) refresh();
-    return null;
+  function refresh() {
+    clearTimeout(noteTimer);
+    preparing = renderImage();
+    return preparing;
   }
-  async function refresh() {
+  async function renderImage() {
     if (!$('#export-dialog').open) return;
     const token = ++generation;
     latest = null;
@@ -142,14 +198,16 @@ export function createExportDialog({
         scene.setComments(annotations);
         version.state.annotations = annotations;
         const requests = handoffRequests(scene);
+        $('#handoff-continue').hidden = version.id.startsWith('@');
         $('#export-summary').textContent = version.name + ' · 변경 요청 ' + requests.length + '개';
         $('#review-note').closest('label').hidden = version.id !== '@current';
         if (token === generation)
           renderHandoffRequests(
             $('#handoff-items'),
             requests,
-            version.id === '@current',
+            version.id !== '@original',
             editRequest,
+            version.id !== '@current',
           );
         // The image is the review surface; avoid duplicating all cards as text.
         return buildHandoffImage(
@@ -188,8 +246,10 @@ export function createExportDialog({
         editRequest,
       );
       if (token !== generation || !$('#export-dialog').open) return;
-      $('#export-status').textContent =
-        '이 이미지 한 장을 에이전트 대화에 첨부하세요. 번호별 주석에 반응형 배치 의도를 적으면 더 명확해집니다.';
+      $('#export-status').textContent = actionBusy
+        ? '최신 이미지가 준비되었습니다. 선택한 동작을 진행합니다…'
+        : '이 이미지 한 장을 에이전트 대화에 첨부하세요. 번호별 주석에 반응형 배치 의도를 적으면 더 명확해집니다.';
+      hasReady = true;
       available('ready');
     } catch (error) {
       if (token === generation) {
@@ -203,6 +263,7 @@ export function createExportDialog({
     if ($('#handoff-preview').dataset.state === 'failed') refresh();
   });
   $('#export-button').addEventListener('click', () => {
+    hasReady = false;
     excludedComments = new Map();
     reviewDocument = state.snapshot?.id;
     commitCommentDraft();
@@ -213,74 +274,127 @@ export function createExportDialog({
     refresh();
   });
   $('#handoff-mode').addEventListener('change', () => {
+    intentEpoch++;
+    hasReady = false;
     state.handoffSettings = { mode: $('#handoff-mode').value === 'exact' ? 'exact' : 'reference' };
     save();
     refresh();
   });
-  $('#handoff-verify').addEventListener('click', async () => {
-    const image = readyImage();
-    if (!image) return;
-    const option = image.option;
-    $('#export-dialog').close();
+  // A click is an intent, even when blur commits a new note before click dispatch.
+  // Queue that intent against its exact document/version/note, never a stale PNG.
+  async function imageAction(kind) {
+    if (actionBusy) return;
+    actionBusy = true;
+    const actionId = Symbol();
+    activeAction = actionId;
+    const epoch = intentEpoch,
+      documentId = state.snapshot?.id,
+      sceneGeneration = state.generation,
+      signature = JSON.stringify(chosen()),
+      mode = state.handoffSettings?.mode || 'reference';
+    const valid = () =>
+      epoch === intentEpoch &&
+      $('#export-dialog').open &&
+      documentId === state.snapshot?.id &&
+      sceneGeneration === state.generation &&
+      signature === JSON.stringify(chosen()) &&
+      mode === (state.handoffSettings?.mode || 'reference');
+    const imagePromise = (async () => {
+      await flushEditor();
+      if (!valid()) throw Error('전달 기준이 바뀌어 동작을 취소했습니다.');
+      if (!currentImage()) {
+        if (preparing) await preparing;
+        if (valid() && !currentImage() && $('#handoff-preview').dataset.state !== 'failed')
+          await refresh();
+      }
+      if (!valid()) throw Error('전달 기준이 바뀌어 동작을 취소했습니다.');
+      if (!currentImage())
+        throw Error('이미지를 준비하지 못했습니다. 이미지 다시 만들기를 눌러 주세요.');
+      return latest;
+    })();
+    imagePromise.catch(() => {});
+    available($('#handoff-preview').dataset.state);
+    $('#export-status').textContent = '최신 설명을 확인하고 선택한 동작을 진행합니다…';
     try {
-      await implementationReview.open(option);
+      if (kind === 'copy') {
+        // Start within the user gesture; ClipboardItem waits for the latest PNG.
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': imagePromise.then((image) => image.blob) }),
+        ]);
+        if (valid())
+          $('#export-status').textContent = '이미지를 복사했습니다. 에이전트 대화에 붙여넣으세요.';
+      } else {
+        const image = await imagePromise;
+        if (kind === 'verify') {
+          $('#export-dialog').close();
+          await implementationReview.open(image.option);
+        } else {
+          const result = await download(
+            'console-canvas-' + image.documentId.slice(0, 8) + '.png',
+            image.blob,
+            'image/png',
+          );
+          if (valid())
+            $('#export-status').textContent = result?.canceled
+              ? '저장을 취소했습니다.'
+              : '전달 이미지 한 장을 저장했습니다. 에이전트 대화에 첨부하세요.';
+        }
+      }
     } catch (error) {
-      toast(error.message);
+      if (valid())
+        $('#export-status').textContent =
+          (kind === 'copy'
+            ? '복사 실패 · 전달 이미지 저장을 사용할 수 있습니다: '
+            : '진행하지 못했습니다: ') + error.message;
+      else if (epoch === intentEpoch && kind === 'verify' && !$('#export-dialog').open)
+        toast(error.message);
+    } finally {
+      if (activeAction === actionId) {
+        activeAction = null;
+        actionBusy = false;
+        available($('#handoff-preview').dataset.state);
+      }
     }
+  }
+  $('#handoff-verify').addEventListener('click', () => imageAction('verify'));
+  $('#copy-summary').addEventListener('click', () => imageAction('copy'));
+  $('#download-review').addEventListener('click', () => imageAction('download'));
+  $('#handoff-version').addEventListener('change', () => {
+    intentEpoch++;
+    hasReady = false;
+    refresh();
   });
-  $('#handoff-version').addEventListener('change', refresh);
+  $('#handoff-continue').addEventListener('click', async () => {
+    if (await continueVersion()) await refresh();
+  });
+  $('#review-note').addEventListener('input', () => {
+    intentEpoch++;
+    if (!$('#export-dialog').open) return;
+    $('#export-status').textContent = '추가 설명을 이미지에 반영합니다…';
+    clearTimeout(noteTimer);
+    noteTimer = setTimeout(refresh, 250);
+  });
   $('#review-note').addEventListener('change', () => {
-    if ($('#export-dialog').open) refresh();
+    // No synchronous disabling on blur: the following click must reach its handler.
+    if ($('#export-dialog').open) {
+      clearTimeout(noteTimer);
+      noteTimer = setTimeout(refresh, 0);
+    }
   });
   $('#export-dialog').addEventListener('close', () => {
     if ($('#export-dialog').open) return;
     generation++;
+    intentEpoch++;
+    clearTimeout(noteTimer);
+    activeAction = null;
+    actionBusy = false;
     latest = null;
+    preparing = null;
+    hasReady = false;
     available('idle');
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = null;
     clearReact($('#handoff-preview'));
-  });
-  $('#copy-summary').addEventListener('click', async () => {
-    const image = readyImage(),
-      token = generation;
-    if (!image) return;
-    $('#copy-summary').disabled = true;
-    try {
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': image.blob })]);
-      if (token !== generation || !currentImage(image)) return;
-      $('#export-status').textContent = '이미지를 복사했습니다. 에이전트 대화에 붙여넣으세요.';
-    } catch (error) {
-      if (token !== generation || !currentImage(image)) return;
-      $('#export-status').textContent =
-        '이미지 복사를 지원하지 않는 환경입니다. 전달 이미지 저장을 사용해 주세요. ' +
-        error.message;
-    } finally {
-      if (token === generation && currentImage(image)) $('#copy-summary').disabled = false;
-    }
-  });
-  $('#download-review').addEventListener('click', async () => {
-    const image = readyImage(),
-      token = generation;
-    if (!image) return;
-    const button = $('#download-review');
-    button.disabled = true;
-    try {
-      const result = await download(
-        'console-canvas-' + image.documentId.slice(0, 8) + '.png',
-        image.blob,
-        'image/png',
-      );
-      if (token !== generation || !currentImage(image)) return;
-      $('#export-status').textContent = result?.canceled
-        ? '저장을 취소했습니다.'
-        : '전달 이미지 한 장을 저장했습니다. 에이전트 대화에 첨부하세요.';
-    } catch (error) {
-      if (token !== generation || !currentImage(image)) return;
-      $('#export-status').textContent = '저장 실패: ' + error.message;
-    } finally {
-      if (token === generation && currentImage(image)) button.disabled = false;
-    }
   });
   $('#save-document').addEventListener('click', async () => {
     if (!state.ready) return;

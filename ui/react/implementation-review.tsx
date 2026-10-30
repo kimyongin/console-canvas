@@ -6,6 +6,7 @@ import { Textarea } from './components/textarea';
 import { Input } from './components/input';
 import { DocumentVisual } from './lists';
 import { VersionFrame } from './versions';
+import { TaskHeader } from './components/surfaces';
 type Rect = { x: number; y: number; width: number; height: number };
 type Source = { url: string; title?: string; viewport: { width: number; height: number } };
 interface Item {
@@ -32,6 +33,7 @@ interface Preview {
   targets: Record<string, { rect: Rect; sourceId: string; selector: string }>;
 }
 interface Actions {
+  currentResult(id: string): boolean;
   captureAvailable(): boolean;
   capture(): Promise<unknown>;
   canUndo(): boolean;
@@ -67,6 +69,7 @@ function ImplementationReview({
 }) {
   const review = reviews.find((r) => r.id === selectedId),
     [focused, setFocused] = useState(''),
+    [scope, setScope] = useState('all'),
     [autoNext, setAutoNext] = useState(false),
     judging = useRef(false),
     context = useRef({ review: selectedId, request: '' }),
@@ -156,12 +159,31 @@ function ImplementationReview({
       current = false;
     };
   }, [review?.id, review?.result, actions]);
-  const active = review?.requests.find((r) => r.id === focused) || review?.requests[0];
+  const matchesScope = (r: Item) => scope === 'all' || r.status === scope;
+  const scoped = review?.requests.filter(matchesScope) || [];
+  const active = review?.requests.find((r) => r.id === focused) || scoped[0];
+  // Keep the just-judged request visible rather than silently selecting and judging another.
+  const visibleRequests = active && !scoped.includes(active) ? [active, ...scoped] : scoped;
+  const nextPending =
+    review &&
+    (() => {
+      const index = review.requests.findIndex((r) => r.id === active?.id);
+      return [...review.requests.slice(index + 1), ...review.requests.slice(0, index + 1)].find(
+        (r) => r.status === 'pending' && r.id !== active?.id,
+      );
+    })();
   context.current = { review: selectedId, request: active?.id || '' };
   useEffect(() => {
     setAutoNext(false);
     setFocused('');
+    setScope('all');
   }, [review?.id]);
+  useEffect(() => {
+    if (focused)
+      document
+        .querySelector('.implementation-requests .is-current')
+        ?.scrollIntoView({ block: 'nearest' });
+  }, [focused]);
   async function judge(status: string, detail: number) {
     if (!review || !active || judging.current || busy || detail > 1 || !frames[0] || !frames[1])
       return;
@@ -177,7 +199,10 @@ function ImplementationReview({
         return;
       if (autoNext && status !== 'pending') {
         const index = review.requests.findIndex((r) => r.id === identity.request);
-        if (review.requests[index + 1]) setFocused(review.requests[index + 1].id);
+        const next = [...review.requests.slice(index + 1), ...review.requests.slice(0, index)].find(
+          (r) => matchesScope(r),
+        );
+        if (next) setFocused(next.id);
       }
       setMessage('요청 ' + active.number + ' 판정을 저장했습니다.');
     } catch (error) {
@@ -248,15 +273,32 @@ function ImplementationReview({
   );
   return (
     <div className="implementation-review">
-      <header>
-        <div>
-          <h2>구현 결과 확인</h2>
-          <p>목표 시안과 별도로 가져온 구현 화면을 비교하고 요청별로 확인하세요.</p>
-        </div>
-        <Button aria-label="구현 결과 확인 닫기" onClick={actions.close}>
-          ×
-        </Button>
-      </header>
+      <TaskHeader
+        title={picking ? '구현 결과 선택' : '구현 결과 확인'}
+        titleId="implementation-page-title"
+        context={
+          picking
+            ? '구현 결과 확인 · 가져온 화면 선택'
+            : '목표 시안과 구현 화면을 비교하고 요청별로 확인하세요.'
+        }
+        back={
+          picking ? (
+            <Button
+              id="implementation-results-back"
+              variant="ghost"
+              aria-label="구현 결과 확인으로 돌아가기"
+              onClick={closeResults}
+            >
+              ←
+            </Button>
+          ) : undefined
+        }
+        close={
+          <Button aria-label="구현 결과 확인 닫기" onClick={actions.close}>
+            ×
+          </Button>
+        }
+      />
       <div
         id="implementation-results-visual"
         hidden={!picking}
@@ -271,13 +313,9 @@ function ImplementationReview({
         }}
       >
         <div className="result-picker-heading">
-          <h3>구현 결과 선택</h3>
           <div className="result-picker-actions">
             <Button disabled={busy} onClick={() => run(actions.refresh)}>
               목록 새로고침
-            </Button>
-            <Button id="implementation-results-back" onClick={closeResults}>
-              ← 비교로 돌아가기
             </Button>
           </div>
         </div>
@@ -317,6 +355,7 @@ function ImplementationReview({
             <Button
               key={d.id}
               className="result-visual-row"
+              aria-current={actions.currentResult(d.id) ? 'true' : undefined}
               disabled={busy}
               onClick={async () => {
                 if (await run(() => actions.result(d.id))) closeResults();
@@ -325,6 +364,9 @@ function ImplementationReview({
               <DocumentVisual id={d.id} />
               <span>
                 <strong>{d.title}</strong>
+                {actions.currentResult(d.id) && (
+                  <small className="current-result-badge">현재 검토에 사용 중</small>
+                )}
                 <small>{d.url}</small>
                 <small>
                   가져옴{' '}
@@ -342,6 +384,7 @@ function ImplementationReview({
             검토 기록
             <NativeSelect
               id="implementation-review-list"
+              disabled={busy}
               value={review?.id || ''}
               onChange={(e) => {
                 setFocused('');
@@ -378,6 +421,7 @@ function ImplementationReview({
               <option value="">{review?.result ? '다른 결과로 새 검토' : '구현 화면 선택'}</option>
               {documents.map((d) => (
                 <option value={d.id} key={d.id}>
+                  {actions.currentResult(d.id) ? '현재 검토에 사용 중 · ' : ''}
                   {d.title} · {d.url} · 가져옴{' '}
                   {d.capturedAt ? new Date(d.capturedAt).toLocaleString('ko-KR') : '기록 없음'} ·{' '}
                   {d.viewport?.width || '—'}px
@@ -440,7 +484,7 @@ function ImplementationReview({
               disabled={busy}
               onChange={(e) => setAutoNext(e.target.checked)}
             />{' '}
-            판정 후 다음 요청으로 이동
+            판정 후 현재 범위의 다음 요청으로 이동
           </label>
           <Button disabled={busy || !actions.canUndo()} onClick={() => run(undoVerdict)}>
             직전 판정 취소
@@ -496,7 +540,47 @@ function ImplementationReview({
               요청별 확인 · {review?.requests.filter((r) => r.status === 'done').length || 0}/
               {review?.requests.length || 0} 반영
             </strong>
-            {review?.requests.map((r) => (
+            <div className="implementation-request-navigation">
+              <label htmlFor="implementation-request-filter">표시 범위</label>
+              <NativeSelect
+                id="implementation-request-filter"
+                value={scope}
+                disabled={busy}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setScope(value);
+                  setFocused(
+                    review?.requests.find((r) => value === 'all' || r.status === value)?.id || '',
+                  );
+                }}
+              >
+                <option value="all">전체 {review?.requests.length || 0}</option>
+                {(['pending', 'change', 'done'] as const).map((status) => (
+                  <option key={status} value={status}>
+                    {{ pending: '미검토', change: '추가 수정', done: '반영 확인' }[status]}{' '}
+                    {review?.requests.filter((r) => r.status === status).length || 0}
+                  </option>
+                ))}
+              </NativeSelect>
+              <Button
+                id="implementation-next-pending"
+                disabled={busy || !nextPending}
+                onClick={() => nextPending && setFocused(nextPending.id)}
+              >
+                다음 미검토
+              </Button>
+              {active && !matchesScope(active) && (
+                <small role="status">
+                  현재 요청은 선택한 범위 밖입니다. 판정을 확인한 뒤 다음 요청으로 이동하세요.
+                </small>
+              )}
+              {!scoped.length && (
+                <p role="status">
+                  이 범위에 요청이 없습니다. ‘전체’에서 모든 요청을 볼 수 있습니다.
+                </p>
+              )}
+            </div>
+            {visibleRequests.map((r) => (
               <section key={r.id} className={r.id === active?.id ? 'is-current' : ''}>
                 <Button
                   variant="ghost"
@@ -510,7 +594,7 @@ function ImplementationReview({
                 {r.id !== active?.id && (
                   <NativeSelect
                     aria-label={`요청 ${r.number} 검토 상태`}
-                    disabled={!review.result || busy}
+                    disabled={!review?.result || busy}
                     value={r.status}
                     onChange={(e) => update(r.id, e.target.value, r.note)}
                   >
@@ -525,7 +609,7 @@ function ImplementationReview({
                     aria-label={'요청 ' + r.number + ' 직접 판정'}
                   >
                     <Button
-                      disabled={!review.result || busy || !frames[0] || !frames[1]}
+                      disabled={!review?.result || busy || !frames[0] || !frames[1]}
                       data-verdict="done"
                       aria-pressed={r.status === 'done'}
                       onClick={(e) => judge('done', e.detail)}
@@ -536,7 +620,7 @@ function ImplementationReview({
                       반영 확인
                     </Button>
                     <Button
-                      disabled={!review.result || busy || !frames[0] || !frames[1]}
+                      disabled={!review?.result || busy || !frames[0] || !frames[1]}
                       data-verdict="change"
                       aria-pressed={r.status === 'change'}
                       onClick={(e) => judge('change', e.detail)}
@@ -548,7 +632,7 @@ function ImplementationReview({
                     </Button>
                     <Button
                       data-verdict="pending"
-                      disabled={!review.result || busy || !frames[0] || !frames[1]}
+                      disabled={!review?.result || busy || !frames[0] || !frames[1]}
                       aria-pressed={r.status === 'pending'}
                       onClick={(e) => judge('pending', e.detail)}
                       onKeyDown={(e) => {
@@ -564,7 +648,7 @@ function ImplementationReview({
                     aria-label={`요청 ${r.number} 검토 메모`}
                     placeholder="남은 차이 또는 확인한 내용을 기록하세요."
                     maxLength={4000}
-                    disabled={!review.result}
+                    disabled={!review?.result}
                     value={r.note}
                     onChange={(e) => update(r.id, r.status, e.target.value)}
                   />

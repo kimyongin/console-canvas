@@ -863,6 +863,7 @@ const exportDialog = createExportDialog({
   commitCommentDraft,
   editorId,
   implementationReview,
+  snapshotHistory,
   save,
   flushEditor,
   prepareEditor,

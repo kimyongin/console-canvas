@@ -23,6 +23,8 @@ export function createAiPanel({ $, state, manager, adapter, toast, save, checkpo
     $('#ai-connection-page').hidden = true;
     $('#ai-dialog-content').hidden = false;
     $('#ai-dialog').removeAttribute('data-page');
+    $('#ai-dialog').setAttribute('aria-label', 'AI 시안');
+    $('#ai-dialog').removeAttribute('aria-labelledby');
     if (
       !focus ||
       !$('#ai-dialog').open ||
@@ -92,6 +94,8 @@ export function createAiPanel({ $, state, manager, adapter, toast, save, checkpo
       $('#ai-connection-host').append(connectionContent);
       $('#ai-connection-page').hidden = false;
       $('#ai-dialog').dataset.page = 'connection';
+      $('#ai-dialog').removeAttribute('aria-label');
+      $('#ai-dialog').setAttribute('aria-labelledby', 'ai-connection-title');
       (state.mcpStatus?.connected ? $('#ai-connection-back') : $('#mcp-code')).focus();
     },
     async configureApi(value) {

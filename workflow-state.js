@@ -1,5 +1,5 @@
 import { copy, validateSnapshot } from './engine.js';
-import { snapshotPoint } from './snapshot-history.js';
+import { snapshotPoint, snapshotSignature } from './snapshot-history.js';
 import { cleanHandoffSettings } from './handoff-settings.js';
 export { cleanHandoffSettings } from './handoff-settings.js';
 export function sourcePath(source) {
@@ -23,6 +23,16 @@ export function reviewCapture(snapshot) {
     ...(snapshot.captureScope ? { captureScope: snapshot.captureScope } : {}),
     screenshot: null,
   });
+}
+// Names and navigation are metadata; identity includes the frozen capture and edits.
+export function sameReviewResult(left, right) {
+  return (
+    !!left &&
+    !!right &&
+    JSON.stringify(reviewCapture(left.snapshot)) ===
+      JSON.stringify(reviewCapture(right.snapshot)) &&
+    snapshotSignature(left.point) === snapshotSignature(right.point)
+  );
 }
 const text = (value, max) => (typeof value === 'string' ? value.slice(0, max) : '');
 export function cleanImplementationReviews(value = [], snapshot) {

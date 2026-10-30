@@ -5,6 +5,7 @@ import { Button } from './components/button';
 import { Badge } from './components/badge';
 import { ActionMenu, type MenuAction } from './components/action-menu';
 export interface GraphNode {
+  versionLabel?: string;
   id: string;
   parentId: string | null;
   name: string;
@@ -77,11 +78,12 @@ export function renderSnapshotGraph(
             data-parent-id={entry.parentId || ''}
             disabled={!!entry.deletedAt}
             aria-pressed={entry.id === preview}
-            aria-label={entry.name + ' · 미리보기'}
+            aria-label={(entry.versionLabel || entry.name) + ' · 미리보기'}
             onClick={() => select(entry.id)}
           >
             <strong>{entry.name + (entry.deletedAt ? ' · 휴지통' : '')}</strong>
             <span>
+              {entry.versionLabel ? entry.versionLabel.split(' · ')[0] + ' · ' : ''}
               {new Date(entry.createdAt).toLocaleString('ko-KR', {
                 month: 'short',
                 day: 'numeric',
@@ -295,6 +297,7 @@ export function renderHandoffRequests(
   requests: { id: string; number: number; name: string }[],
   editable: boolean,
   pick: (id: string) => void,
+  savedVersion = false,
 ) {
   renderReact(
     host,
@@ -305,15 +308,24 @@ export function renderHandoffRequests(
           className="handoff-request"
           variant="outline"
           disabled={!editable}
-          aria-label={'요청 ' + r.number + ' · ' + r.name + ' 주석 편집'}
+          aria-label={
+            '요청 ' +
+            r.number +
+            ' · ' +
+            r.name +
+            (savedVersion ? ' 이 버전에서 이어 편집' : ' 주석 편집')
+          }
           data-request-id={r.id}
           onClick={() => pick(r.id)}
         >
           {r.number + ' · ' + r.name}
         </Button>
       ))}
-      {!editable && (
-        <small>{'저장 버전은 보기 전용입니다. 현재 작업을 선택해 주석을 편집하세요.'}</small>
+      {savedVersion && editable && (
+        <small>
+          저장 버전은 보기 전용입니다. 요청을 누르면 이 버전으로 이동한 뒤 주석을 편집합니다. 이동
+          전 작업과 이후 가지는 보존합니다.
+        </small>
       )}
     </>,
   );
@@ -363,40 +375,106 @@ export function renderTargetPreview(
   size: { width: number; height: number },
   rect: { x: number; y: number; width: number; height: number },
   maxHeight = 130,
+  target = '',
 ) {
+  renderReact(
+    host,
+    <TargetPreview key={target} html={html} size={size} rect={rect} maxHeight={maxHeight} />,
+  );
+}
+function TargetPreview({
+  html,
+  size,
+  rect,
+  maxHeight,
+}: {
+  html: string;
+  size: { width: number; height: number };
+  rect: { x: number; y: number; width: number; height: number };
+  maxHeight: number;
+}) {
+  const [expanded, setExpanded] = useState(false),
+    [zoom, setZoom] = useState('fit'),
+    host = useRef<HTMLDivElement>(null),
+    [bounds, setBounds] = useState({ width: 400, height: 100 });
+  useLayoutEffect(() => {
+    const element = host.current!;
+    const measure = () =>
+      setBounds({ width: element.clientWidth || 400, height: element.clientHeight || maxHeight });
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    measure();
+    return () => observer.disconnect();
+  }, [maxHeight, expanded]);
   const width = Math.min(size.width, Math.max(280, rect.width + 64)),
     height = Math.min(size.height, Math.max(110, rect.height + 48));
   const x = Math.max(0, Math.min(size.width - width, rect.x + rect.width / 2 - width / 2)),
     y = Math.max(0, Math.min(size.height - height, rect.y + rect.height / 2 - height / 2));
-  const scale = Math.min(1, (host.clientWidth || 380) / width, maxHeight / height);
-  renderReact(
-    host,
-    <div className="target-crop" style={{ width: width * scale, height: height * scale }}>
-      <iframe
-        title="주석 대상 주변 화면"
-        aria-hidden="true"
-        sandbox="allow-same-origin"
-        referrerPolicy="no-referrer"
-        tabIndex={-1}
-        srcDoc={html}
-        onLoad={(e) => {
-          const doc = e.currentTarget.contentDocument;
-          if (doc) restoreSerializedScroll(doc);
-        }}
-        width={size.width}
-        height={size.height}
-        style={{ transform: `scale(${scale})`, left: -x * scale, top: -y * scale }}
-      />
-      <span
-        className="target-crop-outline"
-        style={{
-          left: (rect.x - x) * scale,
-          top: (rect.y - y) * scale,
-          width: Math.max(8, rect.width * scale),
-          height: Math.max(8, rect.height * scale),
-        }}
-      />
-    </div>,
+  const scale =
+    expanded && zoom !== 'fit'
+      ? Number(zoom)
+      : Math.min(1, bounds.width / width, (expanded ? bounds.height : maxHeight) / height);
+  return (
+    <div className={'target-preview' + (expanded ? ' is-expanded' : '')}>
+      <div className="target-preview-tools">
+        <Button
+          id="comment-preview-expand"
+          variant="ghost"
+          aria-expanded={expanded}
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? '미리보기 접기' : '미리보기 펼치기'}
+        </Button>
+        {expanded && (
+          <label>
+            확대{' '}
+            <select
+              aria-label="주석 대상 확대"
+              value={zoom}
+              onChange={(e) => setZoom(e.target.value)}
+            >
+              <option value="fit">맞춤</option>
+              <option value="0.5">50%</option>
+              <option value="1">100%</option>
+            </select>
+          </label>
+        )}
+      </div>
+      <div
+        className="target-preview-scroll"
+        ref={host}
+        style={{ height: expanded ? 'min(280px, 40dvh)' : maxHeight }}
+        tabIndex={expanded ? 0 : undefined}
+        aria-label="주석 대상 미리보기 스크롤"
+      >
+        <div className="target-crop" style={{ width: width * scale, height: height * scale }}>
+          <iframe
+            title="주석 대상 주변 화면"
+            aria-hidden="true"
+            sandbox="allow-same-origin"
+            referrerPolicy="no-referrer"
+            tabIndex={-1}
+            srcDoc={html}
+            onLoad={(e) => {
+              const doc = e.currentTarget.contentDocument;
+              if (doc) restoreSerializedScroll(doc);
+            }}
+            width={size.width}
+            height={size.height}
+            style={{ transform: `scale(${scale})`, left: -x * scale, top: -y * scale }}
+          />
+          <span
+            className="target-crop-outline"
+            style={{
+              left: (rect.x - x) * scale,
+              top: (rect.y - y) * scale,
+              width: Math.max(8, rect.width * scale),
+              height: Math.max(8, rect.height * scale),
+            }}
+          />
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -169,7 +169,9 @@ try {
   check(
     'No request is marked as implemented before a result is selected',
     review.requests.every((r) => r.status === 'pending') &&
-      [...doc.querySelectorAll('.implementation-requests select')].every((el) => el.disabled),
+      [...doc.querySelectorAll('.implementation-requests select[aria-label$="검토 상태"]')].every(
+        (el) => el.disabled,
+      ),
   );
   doc.querySelector('[aria-label="구현 결과 확인 닫기"]').click();
 
@@ -251,6 +253,11 @@ try {
       followup.context.mode === 'exact',
   );
   // New result revision keeps the older verdicts but starts a fresh manual review.
+  const changedButton = capture.nodes.find((n) => n.locator?.id === 'new-customer');
+  await saveSession(capture.id, {
+    documentName: capture.documentName,
+    edits: { [changedButton.id]: { dx: 4, dy: 0 } },
+  });
   const selectNew = doc.querySelector('#implementation-result');
   selectNew.value = capture.id;
   selectNew.dispatchEvent(new win.Event('change', { bubbles: true }));
