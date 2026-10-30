@@ -178,11 +178,11 @@ try {
     () => doc.querySelector('#handoff-preview img') && !doc.querySelector('#copy-summary').disabled,
   );
   check(
-    'Review summary and note appear before the image',
-    doc.querySelector('#review-note').getBoundingClientRect().top <
-      doc.querySelector('#handoff-preview').getBoundingClientRect().top &&
-      doc.querySelector('#export-summary').getBoundingClientRect().top <
-        doc.querySelector('#handoff-preview').getBoundingClientRect().top,
+    'Review settings stay beside the image without overlapping its reading area',
+    doc.querySelector('.export-options').contains(doc.querySelector('#review-note')) &&
+      doc.querySelector('.export-options').getBoundingClientRect().right <=
+        doc.querySelector('#handoff-preview').getBoundingClientRect().left &&
+      doc.querySelector('.export-options').contains(doc.querySelector('#export-summary')),
   );
   check(
     'Image number has a real editable hotspot',

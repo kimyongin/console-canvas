@@ -2,12 +2,18 @@ import { buildHandoffImage } from '../handoff-image.js';
 import { download } from '../export.js';
 import { copy, validateSnapshot } from '../engine.js';
 import { snapshotPoint, snapshotSignature } from '../snapshot-history.js';
-import { cleanImplementationReviews, reviewCapture, sameReviewResult } from '../workflow-state.js';
+import {
+  cleanImplementationReviews,
+  reviewCapture,
+  sameReviewResult,
+  implementationReviewUsage,
+} from '../workflow-state.js';
 import { listDocuments, getDocument } from '../db.js';
 import { handoffRequests } from '../handoff-image.js';
 import { withVersionScene, versionOptions } from './version-preview.js';
 import { renderImplementationReview } from './react/implementation-review.tsx';
 import { clearReact } from './react/mount.tsx';
+import { reviewPayload } from '../export.js';
 export function createImplementationReview({
   $,
   state,
@@ -23,8 +29,9 @@ export function createImplementationReview({
   let captureDestination = null;
   const documentResults = new Map();
   const items = () => state.implementationReviews || [];
+  const live = () => items().filter((r) => !r.deletedAt);
   function find(id) {
-    const review = items().find((r) => r.id === id);
+    const review = live().find((r) => r.id === id);
     if (!review) throw Error('검토를 찾을 수 없습니다.');
     return review;
   }
@@ -40,6 +47,11 @@ export function createImplementationReview({
       if (state.snapshot?.id === documentId) {
         state.implementationReviews = previous;
         save();
+        try {
+          await flushEditor();
+        } catch {
+          /* Keep the original storage failure visible. */
+        }
       }
       throw error;
     }
@@ -47,6 +59,10 @@ export function createImplementationReview({
     render();
   }
   async function create(option) {
+    if (!implementationReviewUsage(items()).canCreate)
+      throw Error(
+        '새 검토를 보관할 공간이 없습니다. 검토 기록 관리에서 정리하거나 파일로 백업하세요.',
+      );
     commitCommentDraft();
     const documentId = state.snapshot.id,
       sceneGeneration = state.generation;
@@ -86,6 +102,61 @@ export function createImplementationReview({
     mutations = new Map();
   let verdicts = [];
   const actions = {
+    usage: () => implementationReviewUsage(items()),
+    async backup() {
+      const expectedDocument = state.snapshot.id;
+      let storageError = '';
+      try {
+        await flushEditor();
+      } catch (error) {
+        storageError = error.message;
+      }
+      if (!state.ready || state.snapshot?.id !== expectedDocument)
+        throw Error('문서가 바뀌었습니다. 현재 문서에서 다시 백업해 주세요.');
+      const snapshot = state.snapshot,
+        documentId = snapshot.id;
+      const payload = reviewPayload(
+        snapshot,
+        state.scene,
+        $('#review-note').value,
+        state.timeline,
+        state.activity,
+        state.activityHead,
+        state.aiRequests,
+        state.aiDraft,
+        { implementationReviews: items(), handoffSettings: state.handoffSettings },
+      );
+      const result = await download(
+        'console-canvas-review-backup-' + documentId.slice(0, 8) + '.uiclone.json',
+        JSON.stringify(payload),
+        'application/json',
+      );
+      if (result?.canceled) throw Error('백업 저장을 취소했습니다. 기록은 그대로입니다.');
+      if (state.snapshot?.id !== documentId) throw Error('다른 문서로 바뀌었습니다.');
+      return storageError
+        ? '긴급 편집 파일 백업을 요청했습니다. 기기 자동 저장 오류는 계속됩니다: ' + storageError
+        : '편집 파일 백업을 요청했습니다. 저장된 파일을 확인하세요.';
+    },
+    async manage(id, action, value = '') {
+      const target = items().find((r) => r.id === id);
+      if (!target) throw Error('검토 기록을 찾을 수 없습니다.');
+      if (action === 'purge' && JSON.stringify(target) !== value)
+        throw Error('검토 내용이 바뀌었습니다. 다시 확인해 주세요.');
+      const next = copy(items()),
+        entry = next.find((r) => r.id === id);
+      if (action === 'rename') {
+        if (typeof value !== 'string' || !value.trim() || value.trim().length > 120)
+          throw Error('이름은1~120자로 입력해 주세요.');
+        entry.name = value.trim();
+      } else if (action === 'trash') entry.deletedAt = new Date().toISOString();
+      else if (action === 'recover') delete entry.deletedAt;
+      else if (action !== 'purge') throw Error('지원하지 않는 관리 작업입니다.');
+      await persist(action === 'purge' ? next.filter((r) => r.id !== id) : next);
+      if ((action === 'trash' || action === 'purge') && !live().some((r) => r.id === selectedId))
+        selectedId = live().at(-1)?.id || null;
+      if (captureDestination?.review_id === id && action !== 'rename') captureDestination = null;
+      render();
+    },
     currentResult: (id) =>
       sameReviewResult(items().find((r) => r.id === selectedId)?.result, documentResults.get(id)),
     captureAvailable: () => !!window.ConsoleCanvasDesktop?.beginReviewCapture,
@@ -128,6 +199,7 @@ export function createImplementationReview({
     },
     close: () => $('#implementation-dialog').close(),
     choose(id) {
+      find(id);
       selectedId = id;
       render();
     },
@@ -332,7 +404,7 @@ export function createImplementationReview({
     if (epoch !== generation || documentId !== state.snapshot?.id) return;
     if (option) {
       const signature = snapshotSignature(option.state);
-      const matching = [...items()]
+      const matching = [...live()]
         .reverse()
         .find(
           (r) =>
@@ -340,9 +412,14 @@ export function createImplementationReview({
             r.target.mode === (state.handoffSettings?.mode || 'reference'),
         );
       if (matching) selectedId = matching.id;
-      else await create(option);
-    } else selectedId = items().at(-1)?.id || null;
-    if (!selectedId) await create(versionOptions(state).find((v) => v.id === '@current'));
+      else if (implementationReviewUsage(items()).canCreate) await create(option);
+      else {
+        selectedId = live().at(-1)?.id || null;
+        toast('새 검토의 보관 한도에 도달했습니다. 기록 관리에서 정리한 뒤 다시 시작해 주세요.');
+      }
+    } else selectedId = live().at(-1)?.id || null;
+    if (!selectedId && !items().length)
+      await create(versionOptions(state).find((v) => v.id === '@current'));
     if (epoch !== generation || documentId !== state.snapshot?.id) return;
     clearReact($('#implementation-content'));
     $('#implementation-dialog').showModal();

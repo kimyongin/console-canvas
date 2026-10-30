@@ -129,3 +129,5 @@ capture-status.js가 저장된 경고·프레임 정보와 scene의 이미지/�
 `desktop/capture.cjs`는 범위를 읽기 검증하고 현재 화면/영역의 준비 스크롤을 생략한다. 영역 선택은 shell의 원본 PNG 위에서 동작하며 원본 DOM에 오버레이를 삽입하지 않는다. `capture-scope.js`와 엔진은 원본 좌표/레이아웃을 보존하며 범위 밖의 편집 요소를 숨기고 표시/미리보기/전달만 자른다. 주변 HTML은 보존되어 보안 삭제가 아니다. `capture-scroll.js`는 inert 직렬화 복제본의 내부 스크롤 복원을 공통 처리한다.
 
 `desktop/repair-resources.cjs`는 신뢰한 편집기 mainFrame의 명시 요청만 받아 관측 자산을 쿠키 없이 제한적으로 읽고 바이너리 형식을 확인한다. `resource-repair.js`는 관측 참조와 inert data URI만 허용한다. `code-patches.js`의 resource는 기존 checkpoint/session/timeline/JSON에 포함된다. UI는 독립 장면 미리보기·문서/리비전/세대 검증 후 기존 historyBefore/changeCommitted로 한 번만 적용한다. 원본 HTML/사진은 바꾸지 않으며 MCP resource는 네트워크를 호출하지 않는다.
+
+0.32의 검토 기록은 선택적 name/deletedAt을 추가하고 같은 세션 큐로 관리한다. 활성20개/전체40개/문자20,000,000 한도는 workflow-state.js에서 검증한다. ui/react/review-records.tsx는 기존 모달의 하위 화면이며 영구 삭제는 대상 내용 지문과 별도 확인을 거친다. 복구만으로 선택/캔버스를 적용하지 않는다. 전체 편집 파일 백업은 DB 오류 때도 메모리의 보호된 상태를 내보낸다. 전달 확대/넓게 보기/스크롤은 ui/export-dialog.js의 비영구 보기 상태로 PNG 렌더·문서 데이터와 분리한다. [0.32 증빙](ux-0.32.md).

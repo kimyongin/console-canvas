@@ -1070,6 +1070,262 @@
   gap: 8px;
   margin: 12px 0;
 }
+/* Bound scaled content to the allocated grid row; only the frame scrolls. */
+.implementation-body {
+  grid-template-rows: minmax(0, 1fr);
+}
+.implementation-comparison {
+  grid-template-rows: minmax(0, 1fr);
+  min-width: 0;
+}
+.implementation-comparison > section {
+  min-height: 0;
+}
+.implementation-context > span {
+  flex: 1;
+  min-width: 0;
+}
+.implementation-record-control {
+  display: grid;
+  grid-template-rows: 18px 32px;
+  gap: 5px;
+  font-size: 11px;
+  min-width: 0;
+}
+.implementation-record-select,
+.implementation-result-select {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+.implementation-record-select select,
+.implementation-result-select select {
+  min-width: 0;
+  flex: 1;
+}
+.implementation-record-select button,
+.implementation-result-select button {
+  flex: none;
+}
+.review-records-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.review-record-tools,
+.review-record-actions,
+.review-record-rename {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.review-record-rename label {
+  flex: 1;
+  min-width: 160px;
+}
+.review-record-usage {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+#review-record-status {
+  margin: 0;
+  min-height: 18px;
+  font-size: 12px;
+}
+.review-record-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.review-record-list > article {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 10px;
+}
+.review-record-list small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.review-record-list p {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.review-record-danger {
+  margin-top: 10px;
+  font-size: 12px;
+}
+.review-record-danger summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.review-record-confirm {
+  padding: 12px;
+  background: #fff4f5;
+  border-radius: 6px;
+}
+.implementation-requests {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.implementation-request-header {
+  flex: none;
+  background: white;
+  padding-bottom: 8px;
+}
+.implementation-request-header > strong {
+  display: block;
+  font-size: 12px;
+}
+.implementation-request-navigation {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  margin: 6px 0 0;
+}
+.implementation-request-navigation > small,
+.implementation-request-navigation > p {
+  grid-column: 1 / -1;
+}
+.implementation-request-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.implementation-request-list section {
+  scroll-margin-top: 4px;
+}
+#export-dialog {
+  width: min(1200px, 96vw);
+  height: 90dvh;
+}
+#export-dialog > .task-header {
+  flex: none;
+  margin: 0;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  background: white;
+}
+#export-dialog .dialog-close {
+  position: static;
+  inset: auto;
+  background: white;
+  font-size: 20px;
+}
+#export-dialog .export-scroll {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 16px;
+  overflow: hidden;
+  padding: 16px;
+}
+.export-options {
+  min-width: 0;
+  overflow: auto;
+  padding-right: 4px;
+}
+#export-dialog .handoff-label {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+#export-dialog .handoff-preview {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+}
+.handoff-preview-tools {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 8px;
+}
+.handoff-preview-tools strong {
+  flex: 1;
+  font-size: 12px;
+}
+.handoff-preview-tools label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.handoff-preview-tools select {
+  width: 112px;
+}
+.handoff-preview-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+  overscroll-behavior: contain;
+  background: #f5f6fa;
+  border-radius: 8px;
+}
+.handoff-preview-scroll .handoff-interactive {
+  margin: 0 auto;
+  flex: none;
+}
+.handoff-preview-scroll img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+}
+.handoff-preview-size {
+  flex: none;
+  font-size: 10px;
+  color: var(--muted);
+  padding-top: 6px;
+}
+#export-dialog[data-preview-wide='true'] .export-scroll {
+  grid-template-columns: minmax(0, 1fr);
+}
+#export-dialog[data-preview-wide='true'] .export-options {
+  display: none;
+}
+@media (max-width: 850px) {
+  .implementation-controls {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+  .implementation-controls > button {
+    grid-column: auto;
+    font-size: 10px;
+  }
+  .implementation-body {
+    grid-template-columns: minmax(0, 1fr) 220px;
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .implementation-request-list {
+    display: block;
+  }
+  .implementation-request-header {
+    display: block;
+  }
+  .implementation-request-header > strong {
+    font-size: 10px;
+  }
+  .implementation-request-navigation {
+    margin: 6px 0 0;
+  }
+  #export-dialog .export-scroll {
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 12px;
+    padding: 12px;
+  }
+}
 .implementation-request-navigation label {
   font-size: 12px;
   color: var(--muted);

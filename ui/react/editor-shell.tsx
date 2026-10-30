@@ -1069,46 +1069,48 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
         <p id="document-list-status" role="status"></p>
         <div id="document-list" className="document-list"></div>
       </DialogSurface>
-      <DialogSurface id="export-dialog">
-        <form method="dialog">
-          <Button className="dialog-close" aria-label="닫기" variant="outline">
-            {'×'}
-          </Button>
-        </form>
+      <DialogSurface id="export-dialog" aria-labelledby="export-title">
+        <TaskHeader
+          title="변경 내용 전달"
+          titleId="export-title"
+          context="변경 후 화면과 번호별 요청 카드를 이미지 한 장으로 전달합니다."
+          close={
+            <form method="dialog">
+              <Button className="dialog-close" aria-label="닫기" variant="ghost">
+                ×
+              </Button>
+            </form>
+          }
+        />
         <div className="export-scroll">
-          <div className="eyebrow">{'HAND OFF YOUR CHANGES'}</div>
-          <h2>{'편집 방향을 전달하세요.'}</h2>
-          <p>
-            {'\n        변경 후 화면과 번호별 요청 카드를 이미지 한 장으로 전달합니다.'}
-            <br />
-            {'편집 파일 백업은 문서\n        메뉴에서 저장하세요.\n      '}
-          </p>
-          <label className="handoff-label">
-            {'전달 기준'}
-            <NativeSelect id="handoff-version"></NativeSelect>
-          </label>
-          <label className="handoff-label">
-            그림의 용도
-            <NativeSelect id="handoff-mode">
-              <option value="reference">배치 참고 · 주석 요청 우선</option>
-              <option value="exact">확정 시안 · 주석의 예외 우선</option>
-            </NativeSelect>
-          </label>
-          <div id="export-summary" className="export-summary" role="status"></div>
-          <Button id="handoff-continue" hidden variant="outline">
-            이 버전에서 이어 편집
-          </Button>
-          <div id="handoff-conflicts"></div>
-          <div id="handoff-items" className="handoff-items" aria-label="번호별 요청 검토"></div>
-          <label className="review-note-label">
-            {'추가 설명 '}
-            <span>{'선택'}</span>
-            <Textarea
-              id="review-note"
-              rows={3}
-              placeholder="예: 검색 조건을 위로 모으고 작업 버튼을 오른쪽에 정렬하고 싶어요."
-            ></Textarea>
-          </label>
+          <aside className="export-options" aria-label="전달 설정과 요청">
+            <label className="handoff-label">
+              {'전달 기준'}
+              <NativeSelect id="handoff-version"></NativeSelect>
+            </label>
+            <label className="handoff-label">
+              그림의 용도
+              <NativeSelect id="handoff-mode">
+                <option value="reference">배치 참고 · 주석 요청 우선</option>
+                <option value="exact">확정 시안 · 주석의 예외 우선</option>
+              </NativeSelect>
+            </label>
+            <div id="export-summary" className="export-summary" role="status"></div>
+            <Button id="handoff-continue" hidden variant="outline">
+              이 버전에서 이어 편집
+            </Button>
+            <div id="handoff-conflicts"></div>
+            <div id="handoff-items" className="handoff-items" aria-label="번호별 요청 검토"></div>
+            <label className="review-note-label">
+              {'추가 설명 '}
+              <span>{'선택'}</span>
+              <Textarea
+                id="review-note"
+                rows={3}
+                placeholder="예: 검색 조건을 위로 모으고 작업 버튼을 오른쪽에 정렬하고 싶어요."
+              ></Textarea>
+            </label>
+          </aside>
           <div id="handoff-preview" className="handoff-preview" aria-busy="false"></div>
         </div>
         <div className="export-footer">

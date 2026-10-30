@@ -35,10 +35,30 @@ export function sameReviewResult(left, right) {
   );
 }
 const text = (value, max) => (typeof value === 'string' ? value.slice(0, max) : '');
+export const REVIEW_LIMITS = Object.freeze({ live: 20, total: 40, characters: 20_000_000 });
+export function implementationReviewUsage(value = []) {
+  const live = value.filter((r) => !r.deletedAt).length,
+    characters = JSON.stringify(value).length;
+  return {
+    live,
+    trash: value.length - live,
+    total: value.length,
+    characters,
+    canCreate:
+      live < REVIEW_LIMITS.live &&
+      value.length < REVIEW_LIMITS.total &&
+      characters < REVIEW_LIMITS.characters,
+  };
+}
 export function cleanImplementationReviews(value = [], snapshot) {
-  if (!Array.isArray(value) || value.length > 20 || JSON.stringify(value).length > 20_000_000)
+  if (
+    !Array.isArray(value) ||
+    value.length > REVIEW_LIMITS.total ||
+    value.filter((r) => r && !r.deletedAt).length > REVIEW_LIMITS.live ||
+    JSON.stringify(value).length > REVIEW_LIMITS.characters
+  )
     throw new Error(
-      '구현 검토는 문서당 20개·직렬화 2,000만 자까지 보관할 수 있습니다. 편집 파일로 백업한 뒤 검토를 나누어 주세요.',
+      '검토 보관 한도입니다: 사용 중20개·휴지통 포함40개·2,000만 자. 검토 기록 관리에서 휴지통으로 옮기거나 파일 백업 후 필요한 기록을 정리하세요.',
     );
   const seen = new Set();
   return value.map((review) => {
@@ -48,6 +68,12 @@ export function cleanImplementationReviews(value = [], snapshot) {
       !/^[\w-]{1,100}$/.test(review.id) ||
       seen.has(review.id) ||
       !Number.isFinite(Date.parse(review.createdAt)) ||
+      (review.name != null &&
+        (typeof review.name !== 'string' ||
+          !review.name.trim() ||
+          review.name.trim().length > 120)) ||
+      (review.deletedAt != null &&
+        (typeof review.deletedAt !== 'string' || !Number.isFinite(Date.parse(review.deletedAt)))) ||
       !review.target ||
       !Array.isArray(review.requests) ||
       review.requests.length > 1000
@@ -99,6 +125,8 @@ export function cleanImplementationReviews(value = [], snapshot) {
     return {
       id: review.id,
       createdAt: review.createdAt,
+      ...(review.name != null ? { name: review.name.trim() } : {}),
+      ...(review.deletedAt != null ? { deletedAt: review.deletedAt } : {}),
       target: {
         label: text(review.target.label, 120),
         mode: cleanHandoffSettings(review.target).mode,

@@ -21,6 +21,7 @@ export function createExportDialog({
   snapshotHistory,
   adapter,
 }) {
+  const previewView = { zoom: 'width', wide: false, left: 0, top: 0 };
   let excludedComments = new Map(),
     reviewDocument = null;
   let generation = 0,
@@ -87,6 +88,8 @@ export function createExportDialog({
       document: state.snapshot.id,
       generation: state.generation,
       scroll: $('.export-scroll').scrollTop,
+      optionsScroll: $('.export-options').scrollTop,
+      imageTrigger: document.activeElement?.classList.contains('handoff-hotspot'),
       id,
     };
     $('#export-dialog').close();
@@ -111,10 +114,18 @@ export function createExportDialog({
       )
         return;
       $('.export-scroll').scrollTop = target.scroll;
+      $('.export-options').scrollTop = target.optionsScroll;
       const trigger = [...$('#handoff-items').querySelectorAll('[data-request-id]')].find(
         (e) => e.dataset.requestId === target.id,
       );
-      (trigger || $('#handoff-version')).focus({ preventScroll: true });
+      const imageTrigger = [...$('#handoff-preview').querySelectorAll('[data-request-id]')].find(
+        (e) => e.dataset.requestId === target.id,
+      );
+      (
+        (previewView.wide || target.imageTrigger ? imageTrigger : trigger) ||
+        $('#handoff-preview-zoom') ||
+        $('#handoff-version')
+      ).focus({ preventScroll: true });
     } catch (error) {
       toast(error.message);
     }
@@ -244,6 +255,7 @@ export function createExportDialog({
         result,
         chosen()?.id === '@current',
         editRequest,
+        previewView,
       );
       if (token !== generation || !$('#export-dialog').open) return;
       $('#export-status').textContent = actionBusy

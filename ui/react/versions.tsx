@@ -2,6 +2,7 @@ import { restoreSerializedScroll } from '../../capture-scroll.js';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { renderReact } from './mount';
 import { Button } from './components/button';
+import { NativeSelect } from './components/surfaces';
 import { Badge } from './components/badge';
 import { ActionMenu, type MenuAction } from './components/action-menu';
 export interface GraphNode {
@@ -330,42 +331,159 @@ export function renderHandoffRequests(
     </>,
   );
 }
+interface HandoffImage {
+  width: number;
+  height: number;
+  hotspots: { id: string; number: number; x: number; y: number; width: number; height: number }[];
+}
+export interface HandoffView {
+  zoom: string;
+  wide: boolean;
+  left: number;
+  top: number;
+}
 export function renderHandoffPreview(
   host: Element,
   url: string,
-  result: {
-    width: number;
-    height: number;
-    hotspots: { id: string; number: number; x: number; y: number; width: number; height: number }[];
-  },
+  result: HandoffImage,
   editable: boolean,
   pick: (id: string) => void,
+  view: HandoffView = { zoom: 'width', wide: false, left: 0, top: 0 },
 ) {
   renderReact(
     host,
-    <div className="handoff-interactive">
-      <img
-        src={url}
-        width={result.width}
-        height={result.height}
-        alt="변경 후 화면과 번호별 주석 카드가 포함된 전달 이미지"
-      />
-      {editable &&
-        result.hotspots.map((r, i) => (
-          <button
-            key={i}
-            className="handoff-hotspot"
-            aria-label={'이미지 요청 ' + r.number + ' 주석 편집'}
-            style={{
-              left: (r.x / result.width) * 100 + '%',
-              top: (r.y / result.height) * 100 + '%',
-              width: (r.width / result.width) * 100 + '%',
-              height: (r.height / result.height) * 100 + '%',
+    <HandoffPreview url={url} result={result} editable={editable} pick={pick} view={view} />,
+  );
+}
+function HandoffPreview({
+  url,
+  result,
+  editable,
+  pick,
+  view,
+}: {
+  url: string;
+  result: HandoffImage;
+  editable: boolean;
+  pick: (id: string) => void;
+  view: HandoffView;
+}) {
+  const [zoom, setZoom] = useState(view.zoom),
+    [wide, setWide] = useState(view.wide),
+    scroll = useRef<HTMLDivElement>(null),
+    restoring = useRef(true),
+    [bounds, setBounds] = useState({ width: 600, height: 400 });
+  useLayoutEffect(() => {
+    const element = scroll.current!,
+      dialog = element.closest('dialog')!;
+    dialog.dataset.previewWide = String(wide);
+    const measure = () => setBounds({ width: element.clientWidth, height: element.clientHeight });
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    measure();
+    return () => {
+      observer.disconnect();
+      delete dialog.dataset.previewWide;
+    };
+  }, [wide]);
+  const scale =
+    zoom === '1'
+      ? 1
+      : Math.max(
+          0.02,
+          Math.min(
+            1,
+            (bounds.width - 16) / result.width,
+            zoom === 'fit' ? (bounds.height - 16) / result.height : 1,
+          ),
+        );
+  useLayoutEffect(() => {
+    restoring.current = true;
+    const x = view.left,
+      y = view.top;
+    const id = requestAnimationFrame(() => {
+      scroll.current?.scrollTo(x * scale, y * scale);
+      restoring.current = false;
+    });
+    return () => cancelAnimationFrame(id);
+  }, [scale, view]);
+  return (
+    <>
+      <div className="handoff-preview-tools">
+        <strong>전달 이미지</strong>
+        <label>
+          확대{' '}
+          <NativeSelect
+            id="handoff-preview-zoom"
+            aria-label="전달 이미지 확대"
+            value={zoom}
+            onChange={(e) => {
+              view.zoom = e.target.value;
+              setZoom(e.target.value);
             }}
-            onClick={() => pick(r.id)}
+          >
+            <option value="width">너비 맞춤</option>
+            <option value="fit">전체 맞춤</option>
+            <option value="1">100%</option>
+          </NativeSelect>
+        </label>
+        <Button
+          id="handoff-preview-wide"
+          variant="outline"
+          aria-expanded={wide}
+          onClick={() => {
+            view.wide = !wide;
+            setWide(!wide);
+          }}
+        >
+          {wide ? '설정 함께 보기' : '미리보기 넓게'}
+        </Button>
+      </div>
+      <div
+        className="handoff-preview-scroll"
+        ref={scroll}
+        tabIndex={0}
+        aria-label="전달 이미지 스크롤"
+        onScroll={(e) => {
+          if (!restoring.current) {
+            view.left = e.currentTarget.scrollLeft / scale;
+            view.top = e.currentTarget.scrollTop / scale;
+          }
+        }}
+      >
+        <div
+          className="handoff-interactive"
+          style={{ width: result.width * scale, height: result.height * scale }}
+        >
+          <img
+            src={url}
+            width={result.width}
+            height={result.height}
+            alt="변경 후 화면과 번호별 주석 카드가 포함된 전달 이미지"
           />
-        ))}
-    </div>,
+          {editable &&
+            result.hotspots.map((r, i) => (
+              <button
+                key={i}
+                className="handoff-hotspot"
+                data-request-id={r.id}
+                aria-label={'이미지 요청 ' + r.number + ' 주석 편집'}
+                style={{
+                  left: (r.x / result.width) * 100 + '%',
+                  top: (r.y / result.height) * 100 + '%',
+                  width: (r.width / result.width) * 100 + '%',
+                  height: (r.height / result.height) * 100 + '%',
+                }}
+                onClick={() => pick(r.id)}
+              />
+            ))}
+        </div>
+      </div>
+      <small className="handoff-preview-size">
+        {result.width} × {result.height}px · 보기 {Math.round(scale * 100)}% · 이미지의 번호를
+        누르면 해당 주석을 편집합니다.
+      </small>
+    </>
   );
 }
 

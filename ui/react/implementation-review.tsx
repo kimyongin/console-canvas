@@ -7,6 +7,12 @@ import { Input } from './components/input';
 import { DocumentVisual } from './lists';
 import { VersionFrame } from './versions';
 import { TaskHeader } from './components/surfaces';
+import {
+  ReviewRecords,
+  reviewRecordName,
+  type ReviewRecord,
+  type ReviewRecordActions,
+} from './review-records';
 type Rect = { x: number; y: number; width: number; height: number };
 type Source = { url: string; title?: string; viewport: { width: number; height: number } };
 interface Item {
@@ -20,7 +26,7 @@ interface Item {
   status: string;
   note: string;
 }
-interface Review {
+interface Review extends ReviewRecord {
   id: string;
   createdAt: string;
   target: { label: string; point: unknown };
@@ -32,7 +38,7 @@ interface Preview {
   size: { width: number; height: number };
   targets: Record<string, { rect: Rect; sourceId: string; selector: string }>;
 }
-interface Actions {
+interface Actions extends ReviewRecordActions {
   currentResult(id: string): boolean;
   captureAvailable(): boolean;
   capture(): Promise<unknown>;
@@ -67,7 +73,8 @@ function ImplementationReview({
   source: Source;
   actions: Actions;
 }) {
-  const review = reviews.find((r) => r.id === selectedId),
+  const liveReviews = reviews.filter((r) => !r.deletedAt);
+  const review = liveReviews.find((r) => r.id === selectedId),
     [focused, setFocused] = useState(''),
     [scope, setScope] = useState('all'),
     [autoNext, setAutoNext] = useState(false),
@@ -78,9 +85,11 @@ function ImplementationReview({
     [message, setMessage] = useState(''),
     [resultQuery, setResultQuery] = useState(''),
     [picking, setPicking] = useState(false),
+    [managing, setManaging] = useState(false),
     [frames, setFrames] = useState<(Preview | null)[]>([null, null]);
   const resultSearch = useRef<HTMLInputElement>(null),
     resultFocusPending = useRef(false),
+    recordFocusPending = useRef(false),
     comparisonScroll = useRef<[HTMLElement, number, number][]>([]),
     pickerScroll = useRef(0),
     pickerList = useRef<HTMLDivElement>(null);
@@ -91,12 +100,26 @@ function ImplementationReview({
   }
   function openResults() {
     comparisonScroll.current = [
-      ...document.querySelectorAll<HTMLElement>('.implementation-frame, .implementation-requests'),
+      ...document.querySelectorAll<HTMLElement>(
+        '.implementation-frame, .implementation-request-list',
+      ),
     ].map((e) => [e, e.scrollTop, e.scrollLeft]);
     setPicking(true);
   }
+  function openRecords() {
+    comparisonScroll.current = [
+      ...document.querySelectorAll<HTMLElement>(
+        '.implementation-frame, .implementation-request-list',
+      ),
+    ].map((e) => [e, e.scrollTop, e.scrollLeft]);
+    setManaging(true);
+  }
+  function closeRecords() {
+    setManaging(false);
+    recordFocusPending.current = true;
+  }
   useLayoutEffect(() => {
-    if (picking) return;
+    if (picking || managing) return;
     let second = 0;
     const first = requestAnimationFrame(() => {
       second = requestAnimationFrame(() => {
@@ -111,27 +134,31 @@ function ImplementationReview({
       cancelAnimationFrame(first);
       cancelAnimationFrame(second);
     };
-  }, [picking]);
+  }, [picking, managing]);
   useLayoutEffect(() => {
     if (picking) {
       resultSearch.current?.focus();
       if (pickerList.current) pickerList.current.scrollTop = pickerScroll.current;
-    } else if (resultFocusPending.current && !busy) {
+    } else if (!managing && recordFocusPending.current && !busy) {
+      recordFocusPending.current = false;
+      document.getElementById('implementation-records')?.focus();
+    } else if (!managing && resultFocusPending.current && !busy) {
       resultFocusPending.current = false;
       document.getElementById('implementation-visual-picker')?.focus();
     }
-  }, [picking, busy]);
+  }, [picking, managing, busy]);
   useEffect(() => {
     const dialog = document.querySelector<HTMLDialogElement>('#implementation-dialog')!;
     const cancel = (event: Event) => {
-      if (picking) {
+      if (picking || managing) {
         event.preventDefault();
-        closeResults();
+        if (picking) closeResults();
+        else closeRecords();
       }
     };
     dialog.addEventListener('cancel', cancel);
     return () => dialog.removeEventListener('cancel', cancel);
-  }, [picking]);
+  }, [picking, managing]);
   const comparison = useRef<HTMLDivElement>(null),
     [bounds, setBounds] = useState({ width: 800, height: 350 });
   useLayoutEffect(() => {
@@ -274,20 +301,22 @@ function ImplementationReview({
   return (
     <div className="implementation-review">
       <TaskHeader
-        title={picking ? '구현 결과 선택' : '구현 결과 확인'}
+        title={managing ? '검토 기록 관리' : picking ? '구현 결과 선택' : '구현 결과 확인'}
         titleId="implementation-page-title"
         context={
-          picking
-            ? '구현 결과 확인 · 가져온 화면 선택'
-            : '목표 시안과 구현 화면을 비교하고 요청별로 확인하세요.'
+          managing
+            ? '구현 결과 확인 · 이름 변경·휴지통·백업'
+            : picking
+              ? '구현 결과 확인 · 가져온 화면 선택'
+              : '목표 시안과 구현 화면을 비교하고 요청별로 확인하세요.'
         }
         back={
-          picking ? (
+          picking || managing ? (
             <Button
-              id="implementation-results-back"
+              id={managing ? 'implementation-records-back' : 'implementation-results-back'}
               variant="ghost"
               aria-label="구현 결과 확인으로 돌아가기"
-              onClick={closeResults}
+              onClick={managing ? closeRecords : closeResults}
             >
               ←
             </Button>
@@ -378,27 +407,48 @@ function ImplementationReview({
           ))}
         </div>
       </div>
-      <div className="implementation-workspace" hidden={picking}>
+      <ReviewRecords
+        records={reviews}
+        selectedId={selectedId}
+        active={managing}
+        actions={actions}
+        choose={(id) => {
+          actions.choose(id);
+          closeRecords();
+        }}
+      />
+      <div className="implementation-workspace" hidden={picking || managing}>
         <div className="implementation-controls">
-          <label>
-            검토 기록
-            <NativeSelect
-              id="implementation-review-list"
-              disabled={busy}
-              value={review?.id || ''}
-              onChange={(e) => {
-                setFocused('');
-                actions.choose(e.target.value);
-              }}
-            >
-              {reviews.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.target.label} · {new Date(r.createdAt).toLocaleString('ko-KR')} ·{' '}
-                  {r.result?.name || '구현 화면 미선택'}
-                </option>
-              ))}
-            </NativeSelect>
-          </label>
+          <div className="implementation-record-control">
+            <label htmlFor="implementation-review-list">검토 기록</label>
+            <div className="implementation-record-select">
+              <NativeSelect
+                id="implementation-review-list"
+                disabled={busy}
+                value={review?.id || ''}
+                onChange={(e) => {
+                  setFocused('');
+                  actions.choose(e.target.value);
+                }}
+              >
+                {!review && (
+                  <option value="">
+                    {liveReviews.length ? '검토를 선택해 주세요' : '사용 중인 검토 없음'}
+                  </option>
+                )}
+                {liveReviews.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {reviewRecordName(r, reviews)} · {r.target.label} ·{' '}
+                    {new Date(r.createdAt).toLocaleString('ko-KR')} ·{' '}
+                    {r.result?.name || '구현 화면 미선택'}
+                  </option>
+                ))}
+              </NativeSelect>
+              <Button id="implementation-records" onClick={openRecords} disabled={busy}>
+                기록 관리
+              </Button>
+            </div>
+          </div>
           <div className="implementation-result-control">
             <span className="implementation-result-label">
               <label htmlFor="implementation-result">수정 후 가져온 화면</label>
@@ -412,30 +462,34 @@ function ImplementationReview({
                 목록 새로고침
               </Button>
             </span>
-            <NativeSelect
-              id="implementation-result"
-              value=""
-              disabled={busy}
-              onChange={(e) => run(() => actions.result(e.target.value))}
-            >
-              <option value="">{review?.result ? '다른 결과로 새 검토' : '구현 화면 선택'}</option>
-              {documents.map((d) => (
-                <option value={d.id} key={d.id}>
-                  {actions.currentResult(d.id) ? '현재 검토에 사용 중 · ' : ''}
-                  {d.title} · {d.url} · 가져옴{' '}
-                  {d.capturedAt ? new Date(d.capturedAt).toLocaleString('ko-KR') : '기록 없음'} ·{' '}
-                  {d.viewport?.width || '—'}px
+            <div className="implementation-result-select">
+              <NativeSelect
+                id="implementation-result"
+                value=""
+                disabled={busy || !review}
+                onChange={(e) => run(() => actions.result(e.target.value))}
+              >
+                <option value="">
+                  {review?.result ? '다른 결과로 새 검토' : '구현 화면 선택'}
                 </option>
-              ))}
-            </NativeSelect>
-            <Button
-              id="implementation-visual-picker"
-              aria-expanded={picking}
-              onClick={openResults}
-              disabled={busy}
-            >
-              미리보기로 선택
-            </Button>
+                {documents.map((d) => (
+                  <option value={d.id} key={d.id}>
+                    {actions.currentResult(d.id) ? '현재 검토에 사용 중 · ' : ''}
+                    {d.title} · {d.url} · 가져옴{' '}
+                    {d.capturedAt ? new Date(d.capturedAt).toLocaleString('ko-KR') : '기록 없음'} ·{' '}
+                    {d.viewport?.width || '—'}px
+                  </option>
+                ))}
+              </NativeSelect>
+              <Button
+                id="implementation-visual-picker"
+                aria-expanded={picking}
+                onClick={openResults}
+                disabled={busy || !review}
+              >
+                미리보기로 선택
+              </Button>
+            </div>
           </div>
           {actions.captureAvailable() && (
             <Button
@@ -446,10 +500,22 @@ function ImplementationReview({
               이 목표의 구현 화면 가져오기
             </Button>
           )}
-          <Button id="implementation-new" disabled={busy} onClick={() => run(actions.fresh)}>
+          <Button
+            id="implementation-new"
+            disabled={busy || !actions.usage().canCreate}
+            title={
+              !actions.usage().canCreate ? '기록 관리에서 정리하거나 백업해 주세요.' : undefined
+            }
+            onClick={() => run(actions.fresh)}
+          >
             현재 작업으로 새 검토
           </Button>
         </div>
+        {!actions.usage().canCreate && (
+          <p className="implementation-warning">
+            새 검토의 보관 한도에 도달했습니다. ‘기록 관리’에서 정리하거나 파일로 백업하세요.
+          </p>
+        )}
         <div className="implementation-context">
           <span>
             목표: {source.title || '문서'} · {review?.target.label} · {source.viewport.width}px
@@ -469,6 +535,26 @@ function ImplementationReview({
               <option value="1">100%</option>
             </NativeSelect>
           </label>
+          <Button
+            id="implementation-focus-request"
+            disabled={!active || !frames[0]}
+            onClick={() => {
+              for (const frame of comparison.current?.querySelectorAll<HTMLElement>(
+                '.implementation-frame',
+              ) || []) {
+                const highlight = frame.querySelector<HTMLElement>('.compare-target-highlight');
+                if (!highlight) continue;
+                const f = frame.getBoundingClientRect(),
+                  h = highlight.getBoundingClientRect();
+                frame.scrollTo({
+                  left: frame.scrollLeft + h.left - f.left - 24,
+                  top: frame.scrollTop + h.top - f.top - 32,
+                });
+              }
+            }}
+          >
+            선택 요청 위치
+          </Button>
         </div>
         {review?.result &&
           source.viewport.width !== review.result.snapshot.source.viewport.width && (
@@ -525,9 +611,11 @@ function ImplementationReview({
                       />
                     ) : (
                       <p>
-                        {i === 1 && !review?.result
-                          ? '수정된 웹 화면을 기존 가져오기 기능으로 가져온 뒤 위에서 선택하세요. 별도 파일을 에이전트에게 전달할 필요는 없습니다.'
-                          : '미리보기 준비 중…'}
+                        {!review
+                          ? '사용 중인 검토가 없습니다. 새 검토를 만들거나 기록 관리에서 복구하세요.'
+                          : i === 1 && !review?.result
+                            ? '수정된 웹 화면을 기존 가져오기 기능으로 가져온 뒤 위에서 선택하세요. 별도 파일을 에이전트에게 전달할 필요는 없습니다.'
+                            : '미리보기 준비 중…'}
                       </p>
                     )}
                   </div>
@@ -536,128 +624,134 @@ function ImplementationReview({
             })}
           </div>
           <aside className="implementation-requests">
-            <strong>
-              요청별 확인 · {review?.requests.filter((r) => r.status === 'done').length || 0}/
-              {review?.requests.length || 0} 반영
-            </strong>
-            <div className="implementation-request-navigation">
-              <label htmlFor="implementation-request-filter">표시 범위</label>
-              <NativeSelect
-                id="implementation-request-filter"
-                value={scope}
-                disabled={busy}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setScope(value);
-                  setFocused(
-                    review?.requests.find((r) => value === 'all' || r.status === value)?.id || '',
-                  );
-                }}
-              >
-                <option value="all">전체 {review?.requests.length || 0}</option>
-                {(['pending', 'change', 'done'] as const).map((status) => (
-                  <option key={status} value={status}>
-                    {{ pending: '미검토', change: '추가 수정', done: '반영 확인' }[status]}{' '}
-                    {review?.requests.filter((r) => r.status === status).length || 0}
-                  </option>
-                ))}
-              </NativeSelect>
-              <Button
-                id="implementation-next-pending"
-                disabled={busy || !nextPending}
-                onClick={() => nextPending && setFocused(nextPending.id)}
-              >
-                다음 미검토
-              </Button>
-              {active && !matchesScope(active) && (
-                <small role="status">
-                  현재 요청은 선택한 범위 밖입니다. 판정을 확인한 뒤 다음 요청으로 이동하세요.
-                </small>
-              )}
-              {!scoped.length && (
-                <p role="status">
-                  이 범위에 요청이 없습니다. ‘전체’에서 모든 요청을 볼 수 있습니다.
-                </p>
+            <div className="implementation-request-header">
+              <strong>
+                요청별 확인 · {review?.requests.filter((r) => r.status === 'done').length || 0}/
+                {review?.requests.length || 0} 반영
+              </strong>
+              <div className="implementation-request-navigation">
+                <label htmlFor="implementation-request-filter" className="sr-only">
+                  표시 범위
+                </label>
+                <NativeSelect
+                  id="implementation-request-filter"
+                  value={scope}
+                  disabled={busy}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setScope(value);
+                    setFocused(
+                      review?.requests.find((r) => value === 'all' || r.status === value)?.id || '',
+                    );
+                  }}
+                >
+                  <option value="all">전체 {review?.requests.length || 0}</option>
+                  {(['pending', 'change', 'done'] as const).map((status) => (
+                    <option key={status} value={status}>
+                      {{ pending: '미검토', change: '추가 수정', done: '반영 확인' }[status]}{' '}
+                      {review?.requests.filter((r) => r.status === status).length || 0}
+                    </option>
+                  ))}
+                </NativeSelect>
+                <Button
+                  id="implementation-next-pending"
+                  disabled={busy || !nextPending}
+                  onClick={() => nextPending && setFocused(nextPending.id)}
+                >
+                  다음 미검토
+                </Button>
+                {active && !matchesScope(active) && (
+                  <small role="status">
+                    현재 요청은 선택한 범위 밖입니다. 판정을 확인한 뒤 다음 요청으로 이동하세요.
+                  </small>
+                )}
+                {!scoped.length && (
+                  <p role="status">
+                    이 범위에 요청이 없습니다. ‘전체’에서 모든 요청을 볼 수 있습니다.
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="implementation-request-list" tabIndex={0} aria-label="검토 요청 목록">
+              {visibleRequests.map((r) => (
+                <section key={r.id} className={r.id === active?.id ? 'is-current' : ''}>
+                  <Button
+                    variant="ghost"
+                    size="content"
+                    className="implementation-request-pick"
+                    onClick={() => setFocused(r.id)}
+                  >
+                    {r.number}. {r.name}
+                  </Button>
+                  <p>{r.text}</p>
+                  {r.id !== active?.id && (
+                    <NativeSelect
+                      aria-label={`요청 ${r.number} 검토 상태`}
+                      disabled={!review?.result || busy}
+                      value={r.status}
+                      onChange={(e) => update(r.id, e.target.value, r.note)}
+                    >
+                      <option value="pending">미검토</option>
+                      <option value="done">반영 확인</option>
+                      <option value="change">추가 수정 필요</option>
+                    </NativeSelect>
+                  )}
+                  {r.id === active?.id && (
+                    <div
+                      className="implementation-verdict-buttons"
+                      aria-label={'요청 ' + r.number + ' 직접 판정'}
+                    >
+                      <Button
+                        disabled={!review?.result || busy || !frames[0] || !frames[1]}
+                        data-verdict="done"
+                        aria-pressed={r.status === 'done'}
+                        onClick={(e) => judge('done', e.detail)}
+                        onKeyDown={(e) => {
+                          if (e.repeat) e.preventDefault();
+                        }}
+                      >
+                        반영 확인
+                      </Button>
+                      <Button
+                        disabled={!review?.result || busy || !frames[0] || !frames[1]}
+                        data-verdict="change"
+                        aria-pressed={r.status === 'change'}
+                        onClick={(e) => judge('change', e.detail)}
+                        onKeyDown={(e) => {
+                          if (e.repeat) e.preventDefault();
+                        }}
+                      >
+                        추가 수정
+                      </Button>
+                      <Button
+                        data-verdict="pending"
+                        disabled={!review?.result || busy || !frames[0] || !frames[1]}
+                        aria-pressed={r.status === 'pending'}
+                        onClick={(e) => judge('pending', e.detail)}
+                        onKeyDown={(e) => {
+                          if (e.repeat) e.preventDefault();
+                        }}
+                      >
+                        미검토
+                      </Button>
+                    </div>
+                  )}
+                  {r.id === active?.id && (
+                    <Textarea
+                      aria-label={`요청 ${r.number} 검토 메모`}
+                      placeholder="남은 차이 또는 확인한 내용을 기록하세요."
+                      maxLength={4000}
+                      disabled={!review?.result}
+                      value={r.note}
+                      onChange={(e) => update(r.id, r.status, e.target.value)}
+                    />
+                  )}
+                </section>
+              ))}
+              {!review?.requests.length && (
+                <p>이 목표에는 개별 요청이 없습니다. 화면 전체를 비교할 수 있습니다.</p>
               )}
             </div>
-            {visibleRequests.map((r) => (
-              <section key={r.id} className={r.id === active?.id ? 'is-current' : ''}>
-                <Button
-                  variant="ghost"
-                  size="content"
-                  className="implementation-request-pick"
-                  onClick={() => setFocused(r.id)}
-                >
-                  {r.number}. {r.name}
-                </Button>
-                <p>{r.text}</p>
-                {r.id !== active?.id && (
-                  <NativeSelect
-                    aria-label={`요청 ${r.number} 검토 상태`}
-                    disabled={!review?.result || busy}
-                    value={r.status}
-                    onChange={(e) => update(r.id, e.target.value, r.note)}
-                  >
-                    <option value="pending">미검토</option>
-                    <option value="done">반영 확인</option>
-                    <option value="change">추가 수정 필요</option>
-                  </NativeSelect>
-                )}
-                {r.id === active?.id && (
-                  <div
-                    className="implementation-verdict-buttons"
-                    aria-label={'요청 ' + r.number + ' 직접 판정'}
-                  >
-                    <Button
-                      disabled={!review?.result || busy || !frames[0] || !frames[1]}
-                      data-verdict="done"
-                      aria-pressed={r.status === 'done'}
-                      onClick={(e) => judge('done', e.detail)}
-                      onKeyDown={(e) => {
-                        if (e.repeat) e.preventDefault();
-                      }}
-                    >
-                      반영 확인
-                    </Button>
-                    <Button
-                      disabled={!review?.result || busy || !frames[0] || !frames[1]}
-                      data-verdict="change"
-                      aria-pressed={r.status === 'change'}
-                      onClick={(e) => judge('change', e.detail)}
-                      onKeyDown={(e) => {
-                        if (e.repeat) e.preventDefault();
-                      }}
-                    >
-                      추가 수정
-                    </Button>
-                    <Button
-                      data-verdict="pending"
-                      disabled={!review?.result || busy || !frames[0] || !frames[1]}
-                      aria-pressed={r.status === 'pending'}
-                      onClick={(e) => judge('pending', e.detail)}
-                      onKeyDown={(e) => {
-                        if (e.repeat) e.preventDefault();
-                      }}
-                    >
-                      미검토
-                    </Button>
-                  </div>
-                )}
-                {r.id === active?.id && (
-                  <Textarea
-                    aria-label={`요청 ${r.number} 검토 메모`}
-                    placeholder="남은 차이 또는 확인한 내용을 기록하세요."
-                    maxLength={4000}
-                    disabled={!review?.result}
-                    value={r.note}
-                    onChange={(e) => update(r.id, r.status, e.target.value)}
-                  />
-                )}
-              </section>
-            ))}
-            {!review?.requests.length && (
-              <p>이 목표에는 개별 요청이 없습니다. 화면 전체를 비교할 수 있습니다.</p>
-            )}
           </aside>
         </main>
         <footer>
