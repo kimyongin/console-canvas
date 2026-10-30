@@ -2,12 +2,16 @@ import { cleanAiDraft } from '../ai-draft.js';
 import { snapshotSignature } from '../snapshot-history.js';
 import { elementLabel } from './element-labels.js';
 import { createAiProvider } from '../ai-provider.js';
+import { createChatgptProvider } from '../chatgpt-provider.js';
 import { buildAiContext } from '../ai-context.js';
 import { renderAiVariants } from './react/ai-variants.tsx';
 import { clearReact } from './react/mount.tsx';
 import { withVersionScene } from './version-preview.js';
 export function createAiPanel({ $, state, manager, adapter, toast, save, checkpoint }) {
   const provider = createAiProvider();
+  const chatgpt = createChatgptProvider();
+  let authentication = chatgpt.available() ? 'chatgpt' : 'api_key',
+    chatgptReady = false;
   const jobs = new Set();
   let epoch = 0,
     newRequest = false;
@@ -49,6 +53,20 @@ export function createAiPanel({ $, state, manager, adapter, toast, save, checkpo
     }
   });
   const actions = {
+    authentication: () => authentication,
+    setAuthentication(value) {
+      authentication = value === 'chatgpt' ? 'chatgpt' : 'api_key';
+    },
+    chatgptAvailable: chatgpt.available,
+    async chatgpt(name, ...args) {
+      const result = await chatgpt.call(name, ...args);
+      if (['select', 'logout', 'login'].includes(name)) chatgptReady = false;
+      return result;
+    },
+    chatgptModel(model, accountId) {
+      chatgpt.setModel(model, accountId);
+      chatgptReady = !!model;
+    },
     apiStatus: provider.status,
     draft: () => cleanAiDraft(state.aiDraft),
     saveDraft(value) {
@@ -115,10 +133,20 @@ export function createAiPanel({ $, state, manager, adapter, toast, save, checkpo
       render();
     },
     async create(value) {
-      if (value.route === 'api' && !provider.status().configured)
-        throw new Error('API 키와 모델을 먼저 등록해 주세요.');
+      if (
+        value.route === 'api' &&
+        !(authentication === 'chatgpt' ? chatgptReady : provider.status().configured)
+      )
+        throw new Error(
+          authentication === 'chatgpt'
+            ? 'ChatGPT 로그인·사용 동의 후 모델을 선택하세요.'
+            : 'API 키와 모델을 먼저 등록해 주세요.',
+        );
+      const requestedAuth = authentication;
       const item = await manager.create(value);
       if (value.route === 'api') {
+        item.authentication = requestedAuth;
+        const executor = requestedAuth === 'chatgpt' ? chatgpt : provider;
         const generation = state.generation,
           currentEpoch = epoch,
           documentId = state.snapshot.id;
@@ -127,6 +155,7 @@ export function createAiPanel({ $, state, manager, adapter, toast, save, checkpo
           state.generation === generation &&
           state.snapshot?.id === documentId;
         const target = manager.find(item.id);
+        target.authentication = requestedAuth;
         const job = (async () => {
           try {
             const context = await buildAiContext(state.snapshot, item.baseline, { image: true });
@@ -134,7 +163,7 @@ export function createAiPanel({ $, state, manager, adapter, toast, save, checkpo
             target.status = 'running';
             await manager.persist();
             if (!current() || target.status === 'canceled') return;
-            const result = await provider.generate({
+            const result = await executor.generate({
               request: item,
               context,
               register: (args) => {
@@ -147,10 +176,13 @@ export function createAiPanel({ $, state, manager, adapter, toast, save, checkpo
             if (result.canceled) target.status = 'canceled';
             else if (result.failures.length)
               target.status = target.candidates.length ? 'partial' : 'failed';
-          } catch {
+          } catch (error) {
             if (current()) {
-              target.status = 'failed';
-              target.execution = { failures: [{ code: 'generation_failed' }] };
+              target.status = target.candidates.length ? 'partial' : 'failed';
+              target.execution = {
+                auth: requestedAuth,
+                failures: [{ code: error.code || 'generation_failed' }],
+              };
             }
           } finally {
             if (current()) await manager.persist();
@@ -164,6 +196,7 @@ export function createAiPanel({ $, state, manager, adapter, toast, save, checkpo
     },
     cancel: async (id) => {
       provider.cancel(id);
+      chatgpt.cancel(id);
       await manager.cancel(id);
     },
     apply: async (...args) => {
@@ -205,6 +238,7 @@ export function createAiPanel({ $, state, manager, adapter, toast, save, checkpo
       let changed = false;
       epoch++;
       provider.cancelAll();
+      chatgpt.cancelAll();
       for (const item of manager.list())
         if (
           item.route === 'api' &&

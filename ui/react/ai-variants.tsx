@@ -30,7 +30,19 @@ interface Draft {
   count: number;
   route: string;
 }
+interface ChatgptStatus {
+  available: boolean;
+  activeId: string;
+  pending: boolean;
+  message: string;
+  accounts: { id: string; label: string; loggedIn: boolean; planEnabled: boolean }[];
+}
 interface Actions {
+  authentication(): string;
+  setAuthentication(value: string): void;
+  chatgptAvailable(): boolean;
+  chatgpt(name: string, ...args: unknown[]): Promise<any>;
+  chatgptModel(model: string, accountId?: string): void;
   draft(): Draft;
   saveDraft(value: Draft): void;
   initialNew(): boolean;
@@ -159,6 +171,75 @@ function Preview({
   );
 }
 function AiVariants({ requests, actions }: { requests: Request[]; actions: Actions }) {
+  const [authentication, setAuthentication] = useState(actions.authentication()),
+    [chatgptStatus, setChatgptStatus] = useState<ChatgptStatus>({
+      available: actions.chatgptAvailable(),
+      activeId: '',
+      pending: false,
+      message: '',
+      accounts: [],
+    }),
+    [chatgptModels, setChatgptModels] = useState<{ id: string; name: string }[]>([]),
+    [chatgptModel, setChatgptModel] = useState(''),
+    chatgptSequence = useRef(0);
+  const chatgptAccount = chatgptStatus.accounts.find((a) => a.id === chatgptStatus.activeId);
+  const generating = requests.some(
+    (r) =>
+      r.route === 'api' && ['pending', 'running', 'partial'].includes(r.status) && !r.execution,
+  );
+  const directReady =
+    authentication === 'chatgpt'
+      ? !!(
+          !chatgptStatus.pending &&
+          chatgptAccount?.loggedIn &&
+          chatgptAccount.planEnabled &&
+          chatgptModel &&
+          chatgptModels.some((m) => m.id === chatgptModel)
+        )
+      : actions.apiStatus().configured;
+  async function refreshChatgpt() {
+    const sequence = ++chatgptSequence.current;
+    try {
+      const status: ChatgptStatus = await actions.chatgpt('status');
+      if (sequence !== chatgptSequence.current) return;
+      setChatgptStatus(status);
+      const account = status.accounts.find((a) => a.id === status.activeId);
+      if (!account?.loggedIn || !account.planEnabled || status.pending) {
+        setChatgptModels([]);
+        setChatgptModel('');
+        actions.chatgptModel('');
+        return;
+      }
+      const models = await actions.chatgpt('models');
+      if (sequence !== chatgptSequence.current) return;
+      setChatgptModels(models);
+      setChatgptModel((previous) => {
+        const model = models.some((m: { id: string }) => m.id === previous)
+          ? previous
+          : models[0]?.id || '';
+        actions.chatgptModel(model, status.activeId);
+        return model;
+      });
+    } catch (e) {
+      if (sequence === chatgptSequence.current) {
+        setChatgptModels([]);
+        setChatgptModel('');
+        actions.chatgptModel('');
+        setMessage(e instanceof Error ? e.message : String(e));
+      }
+    }
+  }
+  useEffect(() => {
+    if (actions.chatgptAvailable() && authentication === 'chatgpt') refreshChatgpt();
+    return () => {
+      chatgptSequence.current++;
+    };
+  }, [authentication]);
+  useEffect(() => {
+    if (!chatgptStatus.pending) return;
+    const timer = setInterval(() => refreshChatgpt(), 2000);
+    return () => clearInterval(timer);
+  }, [chatgptStatus.pending]);
   const [prompt, setPrompt] = useState(actions.draft().prompt),
     [count, setCount] = useState(actions.draft().count),
     [route, setRoute] = useState(actions.draft().route),
@@ -201,7 +282,7 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
         route: request.route || 'mcp',
       }
     : null;
-  const followupBlocked = followup?.route === 'api' && !configured;
+  const followupBlocked = followup?.route === 'api' && !directReady;
   const followupInvalid =
     !!followup && (!Number.isInteger(followup.count) || followup.count < 1 || followup.count > 12);
   function updateFollowup(value: Partial<Draft>) {
@@ -212,7 +293,11 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
   function openApiSettings() {
     setFormOpen(true);
     setAuthOpen(true);
-    requestAnimationFrame(() => document.getElementById('ai-api-key')?.focus());
+    requestAnimationFrame(() =>
+      document
+        .getElementById(authentication === 'chatgpt' ? 'chatgpt-login' : 'ai-api-key')
+        ?.focus(),
+    );
   }
   async function regenerate(fromCandidate: boolean) {
     if (
@@ -270,7 +355,7 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
     });
     creating.current = false;
   }
-  const apiBlocked = route === 'api' && !configured;
+  const apiBlocked = route === 'api' && !directReady;
   function updateDraft(next: Partial<Draft>, { preserveUndo = false } = {}) {
     if (!preserveUndo) previousDraft.current = null;
     const value = { prompt, count, route, ...next };
@@ -325,7 +410,7 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
               }}
             >
               <option value="mcp">외부 에이전트 · MCP</option>
-              <option value="api">AI API 직접 호출 · 별도 과금</option>
+              <option value="api">AI 직접 호출 · ChatGPT 또는 API 키</option>
             </NativeSelect>
           </label>
           <label htmlFor="ai-prompt">어떻게 개선할까요?</label>
@@ -357,7 +442,11 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
                 if (e.detail <= 1) createRequest(route === 'mcp');
               }}
             >
-              {route === 'api' ? 'API로 시안 생성' : '요청 보관하고 복사'}
+              {route === 'api'
+                ? authentication === 'chatgpt'
+                  ? 'ChatGPT로 시안 생성'
+                  : 'API로 시안 생성'
+                : '요청 보관하고 복사'}
             </Button>
             {route === 'mcp' && (
               <Button
@@ -372,16 +461,20 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
           </div>
           <p id="ai-readiness" className="ai-help" role="status">
             {route === 'api'
-              ? configured
-                ? 'API 키·모델 등록됨 · 실제 연결은 생성 시 확인합니다.'
-                : '생성하려면 AI API 연결에서 키와 모델을 등록하세요.'
+              ? authentication === 'chatgpt'
+                ? directReady
+                  ? 'ChatGPT 계정·모델 준비됨 · 생성 시 요금제 사용 권한과 한도를 확인합니다.'
+                  : 'ChatGPT 로그인·요금제 사용 동의 후 모델을 선택하세요.'
+                : configured
+                  ? 'API 키·모델 등록됨 · 실제 연결은 생성 시 확인합니다.'
+                  : '생성하려면 AI API 연결에서 키와 모델을 등록하세요.'
               : actions.connection()
                 ? 'MCP 연결됨 · 요청 문장을 에이전트 대화에 전달해야 실행됩니다.'
                 : 'MCP 연결 안 됨 · 요청은 보관할 수 있으며 연결 후 에이전트 대화에 전달하세요.'}
           </p>
-          {route === 'api' && !configured && (
+          {route === 'api' && !directReady && (
             <Button id="ai-open-auth" onClick={openApiSettings}>
-              API 키·모델 설정
+              {authentication === 'chatgpt' ? 'ChatGPT 연결 설정' : 'API 키·모델 설정'}
             </Button>
           )}
           <Button
@@ -416,55 +509,236 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
           open={authOpen}
           onToggle={(e) => setAuthOpen(e.currentTarget.open)}
         >
-          <summary>AI API 연결 {configured ? '· 키 등록됨' : ''}</summary>
-          <p className="ai-help">
-            일반 OpenAI API 사용량으로 별도 과금됩니다. 키는 이 창의 메모리에만 보관하며 재실행 시
-            삭제됩니다. ChatGPT 구독 로그인은 인증·제품 자격 검증 후 지원할 예정입니다.
-          </p>
-          <label htmlFor="ai-api-key">API 키</label>
-          <Input
-            id="ai-api-key"
-            type="password"
-            autoComplete="off"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="현재 실행 동안만 사용"
-          />
-          <label htmlFor="ai-model">모델 ID</label>
-          <Input
-            id="ai-model"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            placeholder="계정에서 사용할 수 있는 모델 ID"
-          />
-          <div className="ai-request-actions">
-            <Button
-              id="ai-configure-api"
-              disabled={busy}
-              onClick={() =>
-                run(async () => {
-                  await actions.configureApi({ key: apiKey, model });
-                  setApiKey('');
-                  setConfigured(true);
-                  setMessage('API 키를 등록했습니다. 실제 추론 연결은 시안 생성 시 확인합니다.');
-                })
-              }
-            >
-              키 등록
-            </Button>
-            <Button
-              id="ai-forget-api"
-              disabled={!configured}
-              onClick={() => {
-                actions.forgetApi();
-                setConfigured(false);
-                setApiKey('');
-                setMessage('API 키를 메모리에서 삭제했습니다.');
-              }}
-            >
-              키 삭제
-            </Button>
-          </div>
+          <summary>
+            AI API 연결{' '}
+            {authentication === 'chatgpt' ? '· ChatGPT 요금제' : configured ? '· 키 등록됨' : ''}
+          </summary>
+          <label htmlFor="ai-authentication">직접 호출 인증</label>
+          <NativeSelect
+            id="ai-authentication"
+            value={authentication}
+            disabled={busy || generating}
+            onChange={(e) => {
+              chatgptSequence.current++;
+              actions.setAuthentication(e.target.value);
+              setAuthentication(e.target.value);
+            }}
+          >
+            <option value="api_key">API 키 · 별도 API 과금</option>
+            <option value="chatgpt">ChatGPT 로그인 · 요금제 사용</option>
+          </NativeSelect>
+          {authentication === 'chatgpt' ? (
+            <section className="ai-chatgpt" aria-label="ChatGPT 연결">
+              {actions.chatgptAvailable() && !chatgptStatus.available && (
+                <p role="status">
+                  기기의 안전한 계정 저장소를 사용할 수 없어 로그인이 차단되었습니다. 기기
+                  잠금·키체인을 확인한 뒤 앱을 다시 실행하세요.
+                </p>
+              )}
+              <p className="ai-help">
+                시스템 브라우저에서 로그인하고 Console Canvas의 요금제 사용에 동의합니다.
+                코드·주석·화면 이미지를 OpenAI에 전송합니다. 한도와 사용 가능한 크레딧은 ChatGPT
+                설정을 따르며 API 키로 자동 전환하지 않습니다.
+              </p>
+              {!actions.chatgptAvailable() && (
+                <p role="status">
+                  ChatGPT 로그인은 Chromium 내장 앱에서 사용할 수 있습니다. 웹 미리보기에서는 API 키
+                  또는 외부 에이전트를 선택하세요.
+                </p>
+              )}
+              {!!chatgptStatus.accounts.length && (
+                <label>
+                  ChatGPT 계정
+                  <NativeSelect
+                    id="chatgpt-account"
+                    value={chatgptStatus.activeId}
+                    disabled={busy || chatgptStatus.pending || generating}
+                    onChange={(e) =>
+                      run(async () => {
+                        chatgptSequence.current++;
+                        setChatgptModels([]);
+                        setChatgptModel('');
+                        await actions.chatgpt('select', e.target.value);
+                        await refreshChatgpt();
+                      })
+                    }
+                  >
+                    {chatgptStatus.accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.label}
+                        {a.loggedIn ? '' : ' · 로그아웃'}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </label>
+              )}
+              <div className="ai-request-actions">
+                <Button
+                  id="chatgpt-login"
+                  disabled={
+                    busy ||
+                    generating ||
+                    chatgptStatus.pending ||
+                    !chatgptStatus.available ||
+                    !actions.chatgptAvailable()
+                  }
+                  onClick={() =>
+                    run(async () => {
+                      await actions.chatgpt('login', chatgptStatus.activeId);
+                      await refreshChatgpt();
+                    })
+                  }
+                >
+                  Continue with ChatGPT
+                </Button>
+                {chatgptStatus.accounts.length > 0 && (
+                  <Button
+                    id="chatgpt-add-account"
+                    disabled={busy || generating || chatgptStatus.pending}
+                    onClick={() =>
+                      run(async () => {
+                        await actions.chatgpt('login', '');
+                        await refreshChatgpt();
+                      })
+                    }
+                  >
+                    다른 계정·워크스페이스 추가
+                  </Button>
+                )}
+                {chatgptStatus.pending && (
+                  <Button
+                    id="chatgpt-cancel-login"
+                    onClick={() =>
+                      run(async () => {
+                        await actions.chatgpt('cancel-login');
+                        await refreshChatgpt();
+                      })
+                    }
+                  >
+                    로그인 취소
+                  </Button>
+                )}
+                {!chatgptStatus.pending && chatgptAccount?.loggedIn && (
+                  <Button
+                    id="chatgpt-logout"
+                    disabled={busy || generating}
+                    onClick={() =>
+                      run(async () => {
+                        chatgptSequence.current++;
+                        await actions.chatgpt('logout', chatgptStatus.activeId);
+                        await refreshChatgpt();
+                      })
+                    }
+                  >
+                    로그아웃
+                  </Button>
+                )}
+                <Button
+                  id="chatgpt-refresh"
+                  disabled={
+                    busy ||
+                    generating ||
+                    chatgptStatus.pending ||
+                    !chatgptStatus.available ||
+                    !actions.chatgptAvailable()
+                  }
+                  onClick={() => run(refreshChatgpt)}
+                >
+                  계정·모델 새로고침
+                </Button>
+                <Button
+                  id="chatgpt-usage"
+                  disabled={!actions.chatgptAvailable()}
+                  onClick={() => run(() => actions.chatgpt('usage'))}
+                >
+                  ChatGPT 사용량·연결 관리
+                </Button>
+              </div>
+              <p role="status" className="ai-help" id="chatgpt-status">
+                {chatgptStatus.message || '로그인 후 계정의 사용 가능한 모델을 불러옵니다.'}
+                {!chatgptStatus.pending && chatgptAccount?.loggedIn && !chatgptAccount.planEnabled
+                  ? ' 요금제 사용 권한이 없습니다. Continue with ChatGPT에서 동의하세요.'
+                  : ''}
+              </p>
+              <label>
+                ChatGPT 모델
+                <NativeSelect
+                  id="chatgpt-model"
+                  value={chatgptModel}
+                  disabled={busy || generating || !chatgptModels.length}
+                  onChange={(e) => {
+                    setChatgptModel(e.target.value);
+                    actions.chatgptModel(e.target.value, chatgptStatus.activeId);
+                  }}
+                >
+                  <option value="">사용 가능한 모델 선택</option>
+                  {chatgptModels.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </label>
+              <p className="ai-help">
+                로그인·모델 목록과 실제 시안 생성 성공은 별개입니다. 로컬 도구용 공식 미리보기
+                경로이며 계정·워크스페이스·배포 자격에 따라 제한될 수 있습니다.
+              </p>
+            </section>
+          ) : (
+            <>
+              <p className="ai-help">
+                일반 OpenAI API 사용량으로 별도 과금됩니다. 키는 이 창의 메모리에만 보관하며 재실행
+                시 삭제됩니다. ChatGPT 구독 로그인은 위에서 별도로 선택하며 인증·제품 자격 검증이
+                필요합니다.
+              </p>
+              <label htmlFor="ai-api-key">API 키</label>
+              <Input
+                id="ai-api-key"
+                type="password"
+                autoComplete="off"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="현재 실행 동안만 사용"
+              />
+              <label htmlFor="ai-model">모델 ID</label>
+              <Input
+                id="ai-model"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                placeholder="계정에서 사용할 수 있는 모델 ID"
+              />
+              <div className="ai-request-actions">
+                <Button
+                  id="ai-configure-api"
+                  disabled={busy}
+                  onClick={() =>
+                    run(async () => {
+                      await actions.configureApi({ key: apiKey, model });
+                      setApiKey('');
+                      setConfigured(true);
+                      setMessage(
+                        'API 키를 등록했습니다. 실제 추론 연결은 시안 생성 시 확인합니다.',
+                      );
+                    })
+                  }
+                >
+                  키 등록
+                </Button>
+                <Button
+                  id="ai-forget-api"
+                  disabled={!configured}
+                  onClick={() => {
+                    actions.forgetApi();
+                    setConfigured(false);
+                    setApiKey('');
+                    setMessage('API 키를 메모리에서 삭제했습니다.');
+                  }}
+                >
+                  키 삭제
+                </Button>
+              </div>
+            </>
+          )}
         </details>
       </details>
       {!!requests.length && (
@@ -548,7 +822,7 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
                     {request.execution.usage?.reduce((sum, u) => sum + u.output_tokens, 0) || 0}{' '}
                     토큰
                     {request.execution.failures?.length
-                      ? ` · 실패 ${request.execution.failures.length}개 (${request.execution.failures.map((f) => f.code).join(', ')}) · 키·모델·한도를 확인하고 새 요청으로 다시 시도하세요.`
+                      ? ` · 실패 ${request.execution.failures.length}개 (${request.execution.failures.map((f) => f.code).join(', ')}) · 계정·인증·모델·한도를 확인하고 새 요청으로 다시 시도하세요.`
                       : ''}
                   </p>
                 )}
@@ -573,8 +847,12 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
                     <summary>
                       <strong>추가 생성 설정</strong>
                       <span className="ai-followup-summary" title={followup.prompt}>
-                        {followup.route === 'api' ? 'AI API · 별도 과금' : '외부 에이전트 · MCP'} ·{' '}
-                        {followup.count || '개수 확인'}개 ·{' '}
+                        {followup.route === 'api'
+                          ? authentication === 'chatgpt'
+                            ? 'ChatGPT 요금제'
+                            : 'AI API · 별도 과금'
+                          : '외부 에이전트 · MCP'}{' '}
+                        · {followup.count || '개수 확인'}개 ·{' '}
                         {followup.prompt || '현재 기준의 주석 사용'}
                       </span>
                     </summary>
@@ -599,7 +877,7 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
                             onChange={(e) => updateFollowup({ route: e.target.value })}
                           >
                             <option value="mcp">외부 에이전트 · MCP</option>
-                            <option value="api">AI API 직접 호출 · 별도 과금</option>
+                            <option value="api">AI 직접 호출 · ChatGPT 또는 API 키</option>
                           </NativeSelect>
                         </label>
                         <label>
@@ -640,9 +918,11 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
                 </div>
                 {followupBlocked && (
                   <p className="ai-help">
-                    API로 추가 생성하려면 키와 모델을 먼저 등록하세요. 별도 API 사용량이 청구됩니다.
+                    {authentication === 'chatgpt'
+                      ? 'ChatGPT 로그인·사용 동의 후 모델을 선택하세요.'
+                      : 'API로 추가 생성하려면 키와 모델을 먼저 등록하세요. 별도 API 사용량이 청구됩니다.'}
                     <Button id="ai-followup-open-auth" disabled={busy} onClick={openApiSettings}>
-                      API 키·모델 설정
+                      {authentication === 'chatgpt' ? 'ChatGPT 연결 설정' : 'API 키·모델 설정'}
                     </Button>
                   </p>
                 )}
