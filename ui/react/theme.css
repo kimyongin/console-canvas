@@ -400,30 +400,6 @@
   margin: 0;
   font-size: 11px;
 }
-.intent-suggestions {
-  margin: 10px 0;
-  display: grid;
-  gap: 6px;
-}
-.intent-suggestions > strong {
-  font-size: 11px;
-  color: #655c7c;
-}
-.intent-suggestions > div {
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-}
-.intent-suggestions button {
-  font-size: 11px;
-  min-height: 28px;
-  padding: 5px 8px;
-  white-space: normal;
-}
-.intent-suggestions small {
-  color: #7c748b;
-  font-size: 10px;
-}
 #implementation-dialog {
   width: min(1440px, 96vw);
   max-width: 96vw;

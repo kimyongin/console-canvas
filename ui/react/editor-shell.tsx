@@ -848,15 +848,13 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             aria-label="주석 대상 미리보기"
           ></div>
           <small id="comment-preview-label"></small>
-          <div id="comment-intent-suggestions" />
           <div className="component-comment">
             <label htmlFor="component-comment">{'이 요소에 주석 남기기'}</label>
-            <p>{'어떻게 바꾸고 싶은지 적어 주세요. 입력 내용은 자동 저장됩니다.'}</p>
             <Textarea
               id="component-comment"
               rows={4}
               maxLength={4000}
-              placeholder="예: 버튼을 오른쪽 위로 옮기고, 문구를 ‘고객 추가’로 바꿔 주세요."
+              placeholder="예: 제목 오른쪽에 정렬하고, 좁은 화면에서는 다음 줄에 배치해 주세요."
             ></Textarea>
           </div>
         </div>
