@@ -430,3 +430,12 @@ Chrome 확장/WebMCP 지원·신규 배포를 종료하고 소스를 archive와v
 배포 커밋 `f931ccf`, [v0.25.0 공개 프리릴리스](https://github.com/kimyongin/console-canvas/releases/tag/v0.25.0)의 앱 DMG/ZIP·runtime·skill4개 자산 원격 digest가 로컬 SHA-256과 모두 일치한다. #71/#72 완료, #73/#68 열림 유지.
 
 실제 설치 앱의 공개 릴리스 조회에서 “최신 버전입니다”를 확인하고 기존 편집 화면으로 돌아왔다.
+
+
+## 2026-11-01 · 제품 방향·PRD·실행 티켓 정리
+
+새 [PRD](PRD.md)의 CC-FR-01~08/CC-AC-01~14와 [상위 #160](https://github.com/kimyongin/console-canvas/issues/160)·하위 #161~#168을 작성했다. 이전 PRD/티켓 본문은 같은 디렉터리의 0.44 history 문서에 전문 보존하고 SHA-256으로 확인했다. 이전 AI 계획 #36~#44/#149는 미완료를 성공으로 바꾸지 않고 not_planned로 대체 종료했으며 #7/#68/#73/#152의 실제 잔여는 유지했다.
+
+`npm run check` 최종 종료 0: TypeScript·포맷·빌드/스킬 패키징·Python·Node·Chromium 웹/공통을 통과했다. 최초 제한 실행의 가상 HTTP 서버 bind PermissionError는 임시 로컬 포트를 허용한 재실행으로 해소했다. 문서 로컬 링크·요구사항 ID·티켓 의존성/실제 상태도 확인했다. 원시 로그는 Git 제외 `local/simplification-plan-2026-11-01/`에 있다.
+
+README를 패키징하는 manifest와 스킬 런타임 ZIP은 같은 빌드로 갱신했다. 현재 구현 버전은 0.44.0이다. 기능 제거·자료 이전·새 티켓/MCP/스킬 워크플로는 **아직 구현 전**이다. 이번에는 Electron 통합·설치 앱/개인 스킬 업데이트·사용자 문서 변경을 하지 않았으며, 과거 실계정 시안 성공을 새 티켓 흐름의 증빙으로 쓰지 않는다.

@@ -1,5 +1,7 @@
 # 세 가지 편집 경로와 AI 인증 계획
 
+> 2026-11-01: 이 문서는 이전/0.44 구현·조사의 근거입니다. 새 제품 범위와 제거·이전 계획은 [현재 PRD](PRD.md)·[티켓 추적표](ticket-review.md)를 따릅니다. 아래 FR/AC는 [0.44 PRD 기록](PRD-0.44-history.md)의 식별자이며 신규 범위로 다시 구현하지 않습니다.
+
 2026-10-26 · [PRD](PRD.md) FR-21~27 / AC-34~43 · [상위 #36](https://github.com/kimyongin/console-canvas/issues/36)
 
 **계획과 0.21 MVP를 함께 포함한다.** 직접 편집·공통 HTML/CSS 패치·후보 저장/갤러리·API 키 호출 어댑터·modern/과거 MCP를 구현했다. 실제 API 계정 추론·ChatGPT 로그인·후보 이미지 자동 보정 반복/대화 자동 시작은 미완료다. 최신 증빙과 제한은 [0.21 기록](ai-variants-0.21.md)을 따른다.

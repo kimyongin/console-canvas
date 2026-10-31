@@ -1,5 +1,7 @@
 # 개발 구조
 
+> 2026-11-01: 이 문서는 이전/0.44 구현·조사의 근거입니다. 새 제품 범위와 제거·이전 계획은 [현재 PRD](PRD.md)·[티켓 추적표](ticket-review.md)를 따릅니다. 아래 FR/AC는 [0.44 PRD 기록](PRD-0.44-history.md)의 식별자이며 신규 범위로 다시 구현하지 않습니다.
+
 0.25.0부터 내장 Chromium 앱만 공식 지원한다. Chrome 전용 소스는 archive/chrome-extension과 태그 v0.24.3에 보존하고 새 빌드 의존성에서 제외한다. 공통 배포물은 console-canvas-runtime.zip이다. [전환·검증 범위](desktop-only-0.25.md).
 
 
