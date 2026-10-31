@@ -45,6 +45,19 @@ try {
     doc.querySelector('#requests-list').textContent.includes('반응형') &&
       !doc.querySelector('#activity-filter'),
   );
+  const child = [...scene.nodes.values()].find((n) => n.parentId === node.id && n.kind === 'text');
+  scene.select(child.id);
+  scene.nudge(3, 0);
+  scene.remove(node.id);
+  check(
+    'Deleting a parent folds descendant moves into one current request',
+    doc.querySelectorAll('#requests-list .request-row').length === 2 &&
+      doc.querySelector('#requests-list').textContent.includes('요소 삭제'),
+  );
+  app.undo();
+  app.undo();
+  scene.select(node.id);
+  await app.flushEditor();
   const context = await app.controller.execute({
     name: 'get_design_context',
     document_id: app.state.snapshot.id,

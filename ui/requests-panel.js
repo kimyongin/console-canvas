@@ -1,4 +1,3 @@
-import { activityChanges } from '../activity-history.js';
 import { elementLabel } from './element-labels.js';
 export function createRequestsPanel({ $, state, selectNode, focusComment }) {
   function render() {
@@ -14,24 +13,15 @@ export function createRequestsPanel({ $, state, selectNode, focusComment }) {
       text: c.text || c.comment || state.scene.annotations[c.id],
       comment: true,
     }));
-    const changes = activityChanges(
-      state,
-      { edits: {}, annotations: {}, note: '' },
-      {
-        edits: state.scene.edits,
-        annotations: {},
-        resourceRepairs: state.scene.resourceRepairs,
-        note: '',
-      },
-    ).map((c) => ({
+    const changes = state.scene.changes().map((c) => ({
       id: c.id,
       name: c.name,
       text:
-        c.type === 'delete'
+        c.action === 'delete'
           ? '요소 삭제'
-          : c.type === 'copy'
+          : c.action === 'copy'
             ? '복사본 추가'
-            : c.type === 'code'
+            : c.action === 'resource'
               ? '이미지·폰트 복구'
               : '배치 변경',
       comment: false,

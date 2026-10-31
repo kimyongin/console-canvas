@@ -2,7 +2,7 @@
 
 2026-11-01 · 확정 PRD: [CC-FR/CC-AC](PRD.md) · 상위 [#160](https://github.com/kimyongin/console-canvas/issues/160)
 
-0.45.1 구현과 공통·MCP/Electron 통합·설치 검증을 완료했다. 기존 테스트 자료 보존 면제에 따라 #161은 not_planned로 취소했다.
+0.45.2 구현과 공통·MCP/Electron 통합·설치 검증을 완료했다. 기존 테스트 자료 보존 면제에 따라 #161은 not_planned로 취소했다.
 
 ## 구현 티켓과 선행 조건
 
