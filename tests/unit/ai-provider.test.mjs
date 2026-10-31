@@ -122,7 +122,12 @@ test('API sends frozen context to fixed endpoint, independently registers varian
   provider.configure({ key: 'fake-local-test-key', model: 'test-model' });
   const result = await provider.generate({
     request,
-    context: { html: '<div data-uic-id="n1"></div>' },
+    context: {
+      html: 'LEAK_HTML',
+      styles: 'LEAK_CSS',
+      elements: [{ locator: { selector: 'LEAK_SELECTOR' } }],
+      images: [{ kind: 'overview', image_url: 'data:image/png;base64,AA==' }],
+    },
     register: async (value) => registered.push(value),
   });
   assert.equal(calls.length, 3);
@@ -133,6 +138,8 @@ test('API sends frozen context to fixed endpoint, independently registers varian
     ),
   );
   const bodies = calls.map((call) => JSON.parse(call.body));
+  assert.ok(!JSON.stringify(bodies).includes('LEAK_'));
+  assert.ok(bodies.every((b) => b.input[0].content.some((c) => c.type === 'input_image')));
   assert.ok(
     bodies.every(
       (body) =>

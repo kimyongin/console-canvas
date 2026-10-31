@@ -175,7 +175,11 @@ try {
   const context = await app.controller.execute({
     name: 'get_ai_context',
     document_id: state.snapshot.id,
-    arguments: { editor_id: app.controller.metadata().editor_id, request_id: request.id },
+    arguments: {
+      editor_id: app.controller.metadata().editor_id,
+      request_id: request.id,
+      full_context: true,
+    },
   });
   check(
     'MCP context reads the immutable baseline HTML and original locator',

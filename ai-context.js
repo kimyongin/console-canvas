@@ -2,12 +2,14 @@ import { renderPng } from './export.js';
 import { withVersionScene } from './ui/version-preview.js';
 import { layoutContext } from './ai-layout-context.js';
 import { AI_IMAGE_LIMIT, aiInputError, validateAiInput } from './ai-input-policy.js';
+import { buildVisualContext } from './ai-visual-context.js';
 export function buildAiContext(
   snapshot,
   point,
-  { full = false, image = false, compact = false } = {},
+  { full = false, image = false, compact = false, visual = false } = {},
 ) {
   return withVersionScene(snapshot, point, async (scene) => {
+    if (visual) return buildVisualContext(scene, point);
     const selected = point.selection?.filter((id) => scene.elements.has(id)) || [];
     const roots = full ? [] : [...new Set(selected.map((id) => scene.parent(id) || id))];
     const detached = selected.filter(

@@ -17,11 +17,21 @@ export function aiInputError(code) {
   return Object.assign(new Error(aiFailureMessage(code)), { code });
 }
 export function validateAiInput(context) {
-  const { image_url, ...code } = context;
+  const { image_url, images = [], ...code } = context;
   if (JSON.stringify(code).length > AI_CODE_LIMIT) throw aiInputError('input_too_large');
   if (
     image_url &&
     (typeof image_url !== 'string' || image_url.length > (AI_IMAGE_LIMIT * 4) / 3 + 100)
+  )
+    throw aiInputError('input_image_too_large');
+  if (
+    !Array.isArray(images) ||
+    images.length > 8 ||
+    images.reduce(
+      (n, i) => n + (typeof i.image_url === 'string' ? i.image_url.length : Infinity),
+      0,
+    ) >
+      (AI_IMAGE_LIMIT * 4) / 3 + 100 * 8
   )
     throw aiInputError('input_image_too_large');
 }

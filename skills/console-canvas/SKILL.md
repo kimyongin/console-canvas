@@ -5,9 +5,13 @@ description: Console Canvas에서 소스 없이 가져온 웹 화면을 편집�
 
 # Console Canvas
 
-## 큰 화면의 AI 직접 호출 · 0.43
+## 이미지 기반 AI 입력 · 0.44
 
-큰 직접 호출 입력은 원본 ID·선택·부모와 주요 배치 스타일을 담은 `layout_description`으로 줄여 이미지와 함께 보낸다. 중첩 미리보기 등의 생략 범위는 representation에 명시하며 실제 캡처/렌더/스냅샷은 바꾸지 않는다. 생략한 내부 요소의 상세 변경은 해당 영역을 선택해 다시 요청한다. `input_too_large`/`input_image_too_large`는 입력 범위 문제이며 재로그인 안내로 해석하지 않는다. `model_unavailable`일 때 계정·모델 목록을 새로고침한다. 기존 실패 기록은 보존하고 실제 완료 후보/usage로 재시도 결과를 확인한다.
+직접 호출과 기본 `get_ai_context`는 HTML/CSS/원본 selector 없이 전체 화면·선택 영역·스크롤 상세 이미지, 번호/로컬 ID·역할·표시 크기와 요청/주석을 전달한다. MCP 이미지는 image content 블록이며 텍스트 metadata의 images 순서와 연결된다. 스크롤 상세의 viewport/content/offset/coverage를 읽고 펼침 이미지를 실제 패널 높이로 적용하지 않는다. sampled·생략 영역·가상화/아직 없는 내용은 확인되지 않은 것으로 다룬다. 등록/비교는 적용이 아니며 사용자가 선택한다. 원문 코드 진단이 명시적으로 필요할 때만 full_context:true를 조회하고 이를 직접 호출에 넣지 않는다. 이전0.43 배치 코드 압축은 현재 기본 AI 입력이 아니다.
+
+## 과거 큰 화면의 AI 직접 호출 · 0.43
+
+0.43에서는 큰 직접 호출 입력을 원본 ID·선택·부모와 주요 배치 스타일을 담은 `layout_description`으로 줄여 이미지와 함께 보낸다. 중첩 미리보기 등의 생략 범위는 representation에 명시하며 실제 캡처/렌더/스냅샷은 바꾸지 않는다. 생략한 내부 요소의 상세 변경은 해당 영역을 선택해 다시 요청한다. `input_too_large`/`input_image_too_large`는 입력 범위 문제이며 재로그인 안내로 해석하지 않는다. `model_unavailable`일 때 계정·모델 목록을 새로고침한다. 기존 실패 기록은 보존하고 실제 완료 후보/usage로 재시도 결과를 확인한다.
 
 ## Console Canvas 자기 디자인 · 0.42
 

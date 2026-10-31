@@ -529,8 +529,9 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
             </Button>
           )}
           <p className="ai-help">
-            현재 선택·주석·편집을 기준으로 고정합니다. API 실행 시 해당 코드·주석과 화면 이미지를
-            OpenAI에 전송합니다. 에이전트가 시안을 반환해도 선택 전까지 캔버스는 유지됩니다.
+            현재 선택·주석·편집을 기준으로 고정합니다. API 실행 시 전체 화면·스크롤 상세 이미지와
+            요청·주석을 OpenAI에 전송하며 HTML·CSS는 보내지 않습니다. 에이전트가 시안을 반환해도
+            선택 전까지 캔버스는 유지됩니다.
           </p>
         </div>
         <details
@@ -580,9 +581,9 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
                 </p>
               )}
               <p className="ai-help">
-                시스템 브라우저에서 로그인하고 Console Canvas의 요금제 사용에 동의합니다.
-                코드·주석·화면 이미지를 OpenAI에 전송합니다. 한도와 사용 가능한 크레딧은 ChatGPT
-                설정을 따르며 API 키로 자동 전환하지 않습니다.
+                시스템 브라우저에서 로그인하고 Console Canvas의 요금제 사용에 동의합니다. 전체
+                화면·스크롤 상세 이미지와 요청·주석을 OpenAI에 전송합니다. 한도와 사용 가능한
+                크레딧은 ChatGPT 설정을 따르며 API 키로 자동 전환하지 않습니다.
               </p>
               {!actions.chatgptAvailable() && (
                 <p role="status">

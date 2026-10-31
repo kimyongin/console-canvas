@@ -71,7 +71,24 @@ try {
     'Request creation keeps current revision and undo',
     request.screen.revision === screen.revision,
   );
-  const context = await tool('get_ai_context', { ...base, request_id: request.request.id });
+  const context = await tool('get_ai_context', {
+    ...base,
+    request_id: request.request.id,
+    full_context: true,
+  });
+  const visual = await client.callTool({
+    name: 'get_ai_context',
+    arguments: { ...base, request_id: request.request.id },
+  });
+  check(
+    'Default AI context is visual MCP content without HTML/CSS or locators',
+    visual.structuredContent.kind === 'visual' &&
+      !visual.structuredContent.html &&
+      !visual.structuredContent.styles &&
+      !visual.structuredContent.baseline.codePatches &&
+      visual.content.some((c) => c.type === 'image') &&
+      visual.structuredContent.images.every((i) => !i.image_url),
+  );
   const node = context.elements.find((n) => n.locator?.id === 'new-customer');
   assert.ok(node);
   const candidates = [];
@@ -98,6 +115,7 @@ try {
     ...base,
     request_id: request.request.id,
     candidate_id: candidates[1].id,
+    full_context: true,
   });
   check(
     'Agent can inspect actual unselected candidate code',

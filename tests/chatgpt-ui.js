@@ -134,8 +134,9 @@ try {
         (c) =>
           c.value.model === 'qa-model' &&
           c.value.accountId === 'qa-registration' &&
-          c.value.context.html &&
-          c.value.context.image_url.startsWith('data:image/png') &&
+          !c.value.context.html &&
+          !c.value.context.styles &&
+          c.value.context.images[0].image_url.startsWith('data:image/png') &&
           c.value.request.baseline.selection[0] === button.id,
       ),
   );

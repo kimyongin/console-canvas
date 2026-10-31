@@ -159,8 +159,16 @@ def stdio(connection):
                 result = {'tools': definitions()}
             elif method == 'tools/call':
                 try:
-                    value = request(connection, '/agent/call', params, timeout=50 if params.get('name') == 'get_review_image' else 15)
-                    if value.get('ok') and value.get('data_url', '').startswith('data:image/png;base64,'):
+                    value = request(connection, '/agent/call', params, timeout=50 if params.get('name') in ('get_review_image', 'get_ai_context') else 15)
+                    if value.get('ok') and value.get('kind') == 'visual':
+                        blocks = []
+                        for photo in value.get('images', []):
+                            uri = photo.pop('image_url', '')
+                            if not uri.startswith('data:image/png;base64,'):
+                                raise ValueError('Invalid visual image')
+                            blocks.append({'type': 'image', 'mimeType': 'image/png', 'data': uri.split(',', 1)[1]})
+                        result = {'content': [{'type': 'text', 'text': json.dumps(value, ensure_ascii=False)}, *blocks], 'structuredContent': value, 'isError': False}
+                    elif value.get('ok') and value.get('data_url', '').startswith('data:image/png;base64,'):
                         image = value.pop('data_url').split(',', 1)[1]
                         result = {'content': [{'type': 'image', 'mimeType': 'image/png', 'data': image}, {'type': 'text', 'text': json.dumps(value, ensure_ascii=False)}], 'structuredContent': value, 'isError': False}
                     else:

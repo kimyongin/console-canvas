@@ -159,8 +159,7 @@ export function createAiPanel({ $, state, manager, adapter, toast, save, checkpo
         const job = (async () => {
           try {
             const context = await buildAiContext(state.snapshot, item.baseline, {
-              image: true,
-              compact: true,
+              visual: true,
             });
             if (!current() || target.status === 'canceled') return;
             target.status = 'running';

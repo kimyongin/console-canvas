@@ -112,6 +112,9 @@ try {
   ]);
   await active.done;
   active = null;
+  active = start(electron, ['tests/visual-input.cjs']);
+  const visualInput = JSON.parse((await active.done).trim());
+  console.log('Visual input: ' + JSON.stringify(visualInput));
   active = start(electron, ['tests/scoped-capture.cjs']);
   const nativeScopes = JSON.parse((await active.done).trim());
   active = null;
