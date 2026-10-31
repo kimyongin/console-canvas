@@ -72,8 +72,6 @@ const publicFiles = [
   ...new Set([
     'editor.html',
     'agent-guide.md',
-    'review-image.html',
-    'review-image.js',
     'editor-runtime.js',
     'editor-runtime.css',
     'THIRD_PARTY_NOTICES.txt',

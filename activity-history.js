@@ -1,8 +1,7 @@
 import { elementLabel } from './ui/element-labels.js';
 import { pointTarget } from './edit-commands.js';
-import { codeDifferenceIds } from './code-patches.js';
-// Each event points to its predecessor. Restoring a snapshot changes the head,
-// preserving events in other branches without copying the log into snapshots.
+import { resourceDifferenceIds } from './resource-document.js';
+// Recent edit events support undo and MCP inspection.
 export function cleanActivity(value) {
   if (!Array.isArray(value)) return [];
   const seen = new Set();
@@ -17,19 +16,8 @@ export function cleanActivity(value) {
     )
     .map((e) => structuredClone(e));
 }
-export function activityBranch(state, all = false) {
-  if (all) return [...(state.activity || [])].reverse();
-  const map = new Map((state.activity || []).map((e) => [e.id, e])),
-    result = [],
-    seen = new Set();
-  let id = state.activityHead;
-  while (map.has(id) && !seen.has(id)) {
-    seen.add(id);
-    const event = map.get(id);
-    result.push(event);
-    id = event.parent_id;
-  }
-  return result;
+export function activityBranch(state) {
+  return [...(state.activity || [])].reverse();
 }
 export function activityChanges(state, before, after, detail = {}) {
   const named = (id) => {
@@ -50,14 +38,16 @@ export function activityChanges(state, before, after, detail = {}) {
         ? '위치 주석'
         : '이전 요소 · 현재 화면에 없음';
   };
-  const changes = codeDifferenceIds(before?.codePatches, after.codePatches).map((id) => ({
-    id: id.startsWith('@') ? undefined : id,
-    type: 'code',
-    name:
-      id === '@resource' ? '이미지·폰트 복구' : state.scene.nodes.get(id)?.name || '공통 스타일',
-    before: 'HTML·CSS 이전 버전',
-    after: 'HTML·CSS 수정',
-  }));
+  const changes = resourceDifferenceIds(before?.resourceRepairs, after.resourceRepairs).map(
+    (id) => ({
+      id: id.startsWith('@') ? undefined : id,
+      type: 'code',
+      name:
+        id === '@resource' ? '이미지·폰트 복구' : state.scene.nodes.get(id)?.name || '공통 스타일',
+      before: '자산 복구 전',
+      after: '자산 복구 후',
+    }),
+  );
   for (const id of new Set([
     ...Object.keys(before?.edits || {}),
     ...Object.keys(after.edits || {}),
@@ -107,7 +97,6 @@ export function recordActivity(state, before, after, detail = {}) {
   const event = {
     id: crypto.randomUUID(),
     parent_id: state.activityHead || null,
-    snapshot_id: state.timeline?.activeId || null,
     created_at: new Date().toISOString(),
     actor: detail.actor || 'user',
     label: detail.label || (changes.some((c) => c.type === 'comment') ? '주석 편집' : '요소 편집'),

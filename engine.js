@@ -1,7 +1,7 @@
 import { prepareCaptureScope, viewRect as capturedViewRect } from './capture-scope.js';
 import { restoreCapturedLayout } from './capture-layout.js';
 import { applyCaptureMedia } from './capture-media.js';
-import { buildCodeDocument } from './code-patches.js';
+import { buildResourceDocument } from './resource-document.js';
 import { selectionRoots, alignmentOperations, snapDelta } from './selection-tools.js';
 import { expandCopyNodes } from './copy-model.js';
 import { indexNodes } from './node-index.js';
@@ -133,7 +133,7 @@ export class CanvasScene {
     this.nodes = new Map(snapshot.nodes.map((node) => [node.id, copy(node)]));
     this.originalNodes = new Map(this.nodes);
     this.captureNodes = new Map(this.nodes);
-    this.codePatches = [];
+    this.resourceRepairs = [];
     this.copySignature = '{}';
     Object.assign(this, indexNodes(snapshot.nodes));
     this.edits = {};
@@ -203,7 +203,7 @@ export class CanvasScene {
         if (el.tagName === 'INPUT' && el.type === 'password') el.value = '';
       }
     await this.rasterFallbacks();
-    this.codeBaseHtml = '<!doctype html>' + this.doc.documentElement.outerHTML;
+    this.resourceBaseHtml = '<!doctype html>' + this.doc.documentElement.outerHTML;
     const originalTree = this.doc.documentElement.cloneNode(true);
     this.originalElements = new Map(
       [...originalTree.querySelectorAll('[data-uic-id]')].map((el) => [el.dataset.uicId, el]),
@@ -370,13 +370,9 @@ export class CanvasScene {
   hidden(id) {
     return (
       !!this.nodes.get(id)?.scopeHidden ||
-      !!this.nodes.get(id)?.codeDeleted ||
       !!this.nodes.get(id)?.copyHidden ||
       !!this.edits[id]?.deleted ||
-      this.ancestors(id).some(
-        (p) =>
-          this.edits[p]?.deleted || this.nodes.get(p)?.copyHidden || this.nodes.get(p)?.codeDeleted,
-      )
+      this.ancestors(id).some((p) => this.edits[p]?.deleted || this.nodes.get(p)?.copyHidden)
     );
   }
   offset(id) {
@@ -665,10 +661,10 @@ export class CanvasScene {
     lift.wrapper.remove();
     this.lifts.delete(id);
   }
-  setCodePatches(patches = [], targetEdits = this.edits, targetAnnotations = this.annotations) {
-    if (JSON.stringify(patches) === JSON.stringify(this.codePatches)) return;
+  setResourceRepairs(patches = [], targetEdits = this.edits, targetAnnotations = this.annotations) {
+    if (JSON.stringify(patches) === JSON.stringify(this.resourceRepairs)) return;
     // Prepare in an inert document first; invalid patches never touch the live scene.
-    const prepared = buildCodeDocument(this.codeBaseHtml, this.captureNodes, patches);
+    const prepared = buildResourceDocument(this.resourceBaseHtml, this.captureNodes, patches);
     const edits = cleanEdits(targetEdits, prepared.nodes),
       annotations = copy(targetAnnotations);
     for (const lift of this.lifts.values()) {
@@ -681,7 +677,7 @@ export class CanvasScene {
     this.fixedScopes.clear();
     this.doc.head.replaceWith(this.doc.importNode(prepared.doc.head, true));
     this.doc.body.replaceWith(this.doc.importNode(prepared.doc.body, true));
-    this.codePatches = prepared.patches;
+    this.resourceRepairs = prepared.repairs;
     this.nodes = prepared.nodes;
     this.originalNodes = new Map(this.nodes);
     Object.assign(this, indexNodes([...this.nodes.values()]));
@@ -699,10 +695,8 @@ export class CanvasScene {
       ]),
     );
     this.baseRects = new Map([...this.elements.keys()].map((id) => [id, this.rect(id)]));
-    for (const [id, node] of this.nodes)
-      if (node.generated && this.baseRects.has(id)) node.rect = { ...this.baseRects.get(id) };
     // Keep detached source subtrees too: existing copies retain their source
-    // identity even when a later code patch removes the original.
+    // identity when their original source subtree was lifted for editing.
     this.originalElements = new Map(
       [...prepared.elements].map(([id, el]) => [id, el.cloneNode(true)]),
     );
@@ -1380,26 +1374,24 @@ export class CanvasScene {
         affectedDescendants: descendants,
       });
     }
-    for (const op of this.codePatches) {
+    for (const op of this.resourceRepairs) {
       const id = op.element_id || this.captureNodes.keys().next().value;
       if (result.some((change) => change.id === id)) continue;
       const node = this.nodes.get(id);
-      if (!node || this.ancestors(id).some((parent) => this.nodes.get(parent)?.codeDeleted))
-        continue;
+      if (!node) continue;
       result.push({
         id,
-        name: op.type === 'resource' ? '이미지·폰트 복구' : node.name,
+        name: '이미지·폰트 복구',
         kind: node.kind,
         tag: node.tag,
         parentId: node.parentId,
         locator: node.locator,
-        action: node.codeDeleted ? 'delete' : 'code',
+        action: 'resource',
         delta: { x: 0, y: 0 },
         effectiveDelta: this.offset(id),
         before: node.rect,
         after: this.hidden(id) ? null : this.rect(id),
         affectedDescendants: this.descendantCounts.get(id),
-        codeType: op.type,
       });
     }
     return result;
@@ -1425,15 +1417,15 @@ export class CanvasScene {
     return '<!doctype html>' + clone.outerHTML;
   }
   async beforeHtml() {
-    const patches = copy(this.codePatches);
+    const patches = copy(this.resourceRepairs);
     const edits = copy(this.edits),
       annotations = copy(this.annotations),
       selection = [...this.selection],
       selected = this.selected;
-    this.setCodePatches([], {});
+    this.setResourceRepairs([], {});
     this.setEdits({});
     const result = this.serialize();
-    this.setCodePatches(patches, edits, annotations);
+    this.setResourceRepairs(patches, edits, annotations);
     this.setEdits(edits);
     this.setComments(annotations);
     this.select(selected, { ids: selection });

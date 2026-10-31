@@ -1,4 +1,11 @@
-import { cleanHandoffSettings, sourcePath } from './workflow-state.js';
+function sourcePath(source) {
+  try {
+    const url = new URL(source.url);
+    return url.origin + url.pathname;
+  } catch {
+    return String(source?.url || '').slice(0, 500);
+  }
+}
 import { renderPng } from './export.js';
 import { elementLabel } from './ui/element-labels.js';
 export function handoffRequests(scene) {
@@ -22,8 +29,8 @@ export function handoffRequests(scene) {
         id: c.id,
         name: elementLabel(scene.nodes.get(c.id), scene.snapshot.layerNames),
         text:
-          c.action === 'code'
-            ? '그림의 HTML·CSS 변경 결과를 기준으로 색상·글꼴·간격과 반응형 구조를 반영해 주세요.'
+          c.action === 'resource'
+            ? '복구한 이미지·폰트가 올바르게 보이는지 원본 자산과 확인해 주세요.'
             : c.action === 'delete'
               ? '이 요소를 제거하고 주변 배치와 간격을 자연스럽게 정리해 주세요.'
               : c.action === 'copy'
@@ -96,7 +103,7 @@ export async function buildHandoffImage(
   options = {},
 ) {
   progress('변경 후 화면과 요청 카드를 만들고 있습니다.');
-  const mode = cleanHandoffSettings(options).mode;
+  const mode = 'reference';
   const view = scene.viewRect();
   const requests = handoffRequests(scene)
       .filter((r) => !Array.isArray(options.requestIds) || options.requestIds.includes(r.id))

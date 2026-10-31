@@ -1,7 +1,7 @@
 import { suggestDesignIntents, RESPONSIVE_INTENTS, appendIntent } from '../design-intent.js';
 import { renderIntentSuggestions } from './react/intent-suggestions.tsx';
 import { handoffRequests } from '../handoff-image.js';
-import { renderTargetPreview, renderVersionOptions } from './react/versions.tsx';
+import { renderTargetPreview, renderSelectOptions } from './react/scene-preview.tsx';
 import { clearReact } from './react/mount.tsx';
 import { elementLabel } from './element-labels.js';
 import { pointTarget } from '../edit-commands.js';
@@ -46,7 +46,7 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
             ? '위치 주석'
             : elementLabel(state.scene.nodes.get(id), state.snapshot.layerNames),
         });
-      renderVersionOptions(
+      renderSelectOptions(
         $('#comment-request'),
         requests.map((r, i) => ({
           id: r.id,

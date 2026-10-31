@@ -7,7 +7,6 @@ const {
   Menu,
   dialog,
   clipboard,
-  safeStorage,
   shell,
 } = require('electron');
 const fs = require('node:fs'),
@@ -27,9 +26,7 @@ let win,
   current = 'source',
   busy = false,
   editorReady = false,
-  pendingCapture = null,
-  pendingCaptureTarget = null;
-const reviewCaptureSession = require('./review-capture.cjs').createReviewCapture();
+  pendingCapture = null;
 const { createSkillService } = require('./skills.cjs');
 const { registerShellIpc } = require('./ipc.cjs');
 const { captureWebsite } = require('./capture.cjs');
@@ -58,7 +55,6 @@ function state(message) {
     view: current,
     header_height: HEADER_HEIGHT[current],
     busy,
-    review_target: reviewCaptureSession.current(),
     can_go_back: !!source?.webContents.navigationHistory.canGoBack(),
     can_go_forward: !!source?.webContents.navigationHistory.canGoForward(),
     message:
@@ -130,17 +126,6 @@ async function start() {
     { timeout: 15000 },
   );
   connection = JSON.parse(fs.readFileSync(path.join(stateDir, 'connection.json'), 'utf8'));
-  const chatgpt = require('./chatgpt.cjs').createChatgptService({
-    directory: path.join(app.getPath('userData'), 'ai-auth'),
-    safeStorage: await require('./chatgpt.cjs').createChatgptStorage(safeStorage, { lazy: true }),
-    openExternal: (url) => shell.openExternal(url),
-  });
-  require('./chatgpt-ipc.cjs').registerChatgptIpc({
-    ipcMain,
-    service: chatgpt,
-    trust: (event) => trusted(event, 'editor'),
-    openUsage: () => shell.openExternal('https://chatgpt.com/settings/usage'),
-  });
   const browsing = session.fromPartition('persist:console-canvas-websites');
   browsing.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
   browsing.setPermissionCheckHandler(() => false);
@@ -196,7 +181,6 @@ async function start() {
     }
   });
   win.on('closed', () => {
-    chatgpt.close();
     if (!source.webContents.isDestroyed()) source.webContents.close();
     if (!editor.webContents.isDestroyed()) editor.webContents.close();
     win = null;
@@ -248,26 +232,6 @@ async function start() {
     show('source');
     win.webContents.send('canvas:focus-address');
   });
-  ipcMain.handle('canvas:begin-review-capture', (event, value) => {
-    trusted(event, 'editor');
-    if (busy) throw Error('화면을 가져오는 중입니다.');
-    const target = reviewCaptureSession.begin(value);
-    show('source');
-    notify('목표: ' + target.label + ' · 결과 상태를 준비한 뒤 이 검토에 가져오기를 누르세요.');
-    return target;
-  });
-  const cancelReviewCapture = (id) => {
-    if (reviewCaptureSession.clear(id)) {
-      editor.webContents.send('canvas:review-cancelled', id);
-      show('editor');
-      return true;
-    }
-    return false;
-  };
-  ipcMain.handle('canvas:cancel-review-capture', (event, id) => {
-    trusted(event, 'editor');
-    return cancelReviewCapture(id);
-  });
   ipcMain.handle('canvas:connection', (event) => {
     trusted(event, 'editor');
     return { url: connection.url, token: connection.token };
@@ -276,8 +240,7 @@ async function start() {
     trusted(event, 'editor');
     editorReady = true;
     if (pendingCapture) {
-      editor.webContents.send('canvas:snapshot', pendingCapture, pendingCaptureTarget);
-      pendingCaptureTarget = null;
+      editor.webContents.send('canvas:snapshot', pendingCapture);
       pendingCapture = null;
     }
   });
@@ -306,18 +269,15 @@ async function start() {
   });
   async function capture(options) {
     if (busy) throw new Error('화면을 가져오는 중입니다.');
-    const destination = reviewCaptureSession.current();
     busy = true;
     notify('원본 화면을 복제하고 있어요…');
     try {
       show('source');
       const snapshot = await captureWebsite(source.webContents, ROOT, { scope: options });
-      if (editorReady) editor.webContents.send('canvas:snapshot', snapshot, destination);
+      if (editorReady) editor.webContents.send('canvas:snapshot', snapshot);
       else {
         pendingCapture = snapshot;
-        pendingCaptureTarget = destination;
       }
-      if (destination) reviewCaptureSession.clear(destination.request_id);
       show('editor');
       notify('화면을 가져왔어요. 요소를 옮기거나 주석을 남겨 보세요.');
       return { id: snapshot.id, nodes: snapshot.nodes.length };
@@ -329,8 +289,6 @@ async function start() {
   async function captureApp() {
     if (busy || current === 'capture') throw Error('화면 가져오기를 마친 뒤 다시 시도해 주세요.');
     if (!editorReady) throw Error('편집기를 준비 중입니다. 잠시 후 다시 시도해 주세요.');
-    if (reviewCaptureSession.current())
-      throw Error('구현 화면 가져오기를 완료하거나 취소한 뒤 앱 디자인을 편집해 주세요.');
     const view = current,
       [width, height] = win.getContentSize();
     const child = view === 'editor' ? editor : view === 'source' ? source : null;
@@ -382,7 +340,8 @@ async function start() {
         editor.webContents.send('canvas:snapshot', snapshot, null, receipt);
       });
       show('editor');
-      message = '앱 디자인 복제본을 열었어요. 헤더·패널·버튼을 편집하거나 AI 시안을 만들어 보세요.';
+      message =
+        '앱 디자인 복제본을 열었어요. 헤더·패널·버튼을 편집하고 주석이나 작업 티켓으로 목표를 남겨 보세요.';
       return { id: snapshot.id, nodes: snapshot.nodes.length };
     } catch (error) {
       message = error.message;
@@ -407,7 +366,6 @@ async function start() {
     info: state,
     capture,
     captureApp,
-    cancelReviewCapture,
     captureMenu: (position) =>
       new Promise((resolve) => {
         const modes = [
@@ -479,15 +437,6 @@ async function start() {
   await source.webContents.loadURL(connection.url + '/fixtures/console.html');
   if (reopen?.document_id) show('editor');
   notify();
-  // Opt-in operator check in this installed app's signed process. Normal
-  // startup stays lazy; renderer/MCP cannot request this diagnostic.
-  if (process.argv.includes('--check-chatgpt-connection')) {
-    require('./connection-check.cjs')
-      .checkChatgptConnection(chatgpt, appVersion)
-      .then((report) => {
-        process.stdout.write(JSON.stringify(report) + '\n');
-      });
-  }
 }
 if (!app.requestSingleInstanceLock()) app.quit();
 else {

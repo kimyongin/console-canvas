@@ -16,12 +16,15 @@ class RuntimePackageTests(unittest.TestCase):
             self.assertEqual(names, set(manifest['files']) | {'runtime-manifest.json'})
             for name, digest in manifest['files'].items():
                 self.assertEqual(hashlib.sha256(package.read('console-canvas/' + name)).hexdigest(), digest)
-            for retired in ('manifest.json', 'background.js', 'chrome-capture.js', 'webmcp-client.js', 'capture-assets.js'):
+            for retired in ('manifest.json', 'background.js', 'chrome-capture.js', 'webmcp-client.js', 'capture-assets.js', 'snapshot-history.js', 'ai-provider.js', 'desktop/chatgpt.cjs', 'desktop/chatgpt-ipc.cjs', 'code-patches.js', 'ui/snapshot-panel.js'):
                 self.assertNotIn(retired, names)
             self.assertFalse(any(name.startswith(('archive/', 'local/', 'tests/')) for name in names))
             self.assertTrue({'editor.html', 'engine.js', 'capture.js', 'desktop/main.cjs', 'mcp/server.py', 'tool-contract.json', 'edit-policy.json'} <= names)
             editor = package.read('console-canvas/editor-runtime.js').decode()
             self.assertNotIn('webmcp-enable', editor)
+            self.assertNotIn('register_ai_candidate', editor)
+            self.assertNotIn('snapshot-panel', editor)
+            self.assertNotIn('canvas:chatgpt-', package.read('console-canvas/desktop/preload.cjs').decode())
             self.assertNotIn('Chrome 확장 프로그램 설치', editor)
             self.assertEqual(package.read('console-canvas/agent-guide.md'), (ROOT / 'skills/console-canvas/SKILL.md').read_bytes())
         for retired in ('console-canvas-chrome.zip', 'console-canvas-extension.zip', 'chrome-package.json'):

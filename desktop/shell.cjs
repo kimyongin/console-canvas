@@ -14,11 +14,7 @@ function showState(value) {
   $('#capture').hidden = value.view !== 'source';
   $('#capture-menu-button').hidden = value.view !== 'source';
   $('#capture-menu-button').disabled = !!value.busy;
-  $('#cancel-review-capture').hidden = !value.review_target;
   updateCaptureLabel();
-  if (value.review_target && value.view === 'source')
-    $('#status').textContent =
-      '목표: ' + value.review_target.label + ' · 결과 상태를 확인해 주세요.';
   $('#capture-picker').hidden = value.view !== 'capture';
   $('#capture').disabled = !!value.busy;
   $('#capture-app').disabled = !!value.busy || value.view === 'capture';
@@ -90,9 +86,6 @@ $('#capture-menu-button').addEventListener('click', async () => {
     $('#status').textContent = error.message;
   }
 });
-$('#cancel-review-capture').addEventListener('click', () =>
-  api.cancelReview(currentState.review_target?.request_id),
-);
 api.onFocusAddress?.(() => {
   $('#address').focus();
   $('#address').select();
@@ -237,9 +230,7 @@ let captureMode = ['viewport', 'document', 'region'].includes(localStorage.getIt
   : 'viewport';
 function updateCaptureLabel() {
   const name = { viewport: '현재 화면', document: '전체 페이지', region: '영역 지정' }[captureMode];
-  $('#capture').textContent = currentState?.review_target
-    ? '이 검토에 가져오기 · ' + name
-    : name + ' 가져오기 →';
+  $('#capture').textContent = name + ' 가져오기 →';
 }
 updateCaptureLabel();
 const photoPoint = (e) => {

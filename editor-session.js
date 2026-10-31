@@ -12,20 +12,19 @@ export function createEditorSession({
 }) {
   function checkpoint() {
     return {
-      codePatches: copy(state.scene.codePatches || []),
+      resourceRepairs: copy(state.scene.resourceRepairs || []),
       edits: copy(state.scene.edits),
       annotations: copy(state.scene.annotations),
       selected: state.scene.selected,
       selection: [...state.scene.selection],
       note: getNote(),
-      activeSnapshotId: state.timeline?.activeId || null,
       activityHead: state.activityHead || null,
     };
   }
   function applyCheckpoint(point) {
     state.commentTarget = null;
     state.activityHead = point.activityHead || null;
-    state.scene.setCodePatches(point.codePatches || [], point.edits, point.annotations);
+    state.scene.setResourceRepairs(point.resourceRepairs || [], point.edits, point.annotations);
     state.scene.setEdits(point.edits);
     state.scene.setComments(point.annotations);
     state.scene.select(point.selected, {
@@ -67,12 +66,6 @@ export function createEditorSession({
     if (!previous) return;
     to.push(checkpoint());
     applyCheckpoint(previous);
-    if (state.timeline)
-      state.timeline.activeId = state.timeline.entries.some(
-        (e) => e.id === previous.activeSnapshotId && !e.deletedAt,
-      )
-        ? previous.activeSnapshotId
-        : null;
     recordActivity(state, to.at(-1), checkpoint(), {
       ...detail,
       label: direction === 'undo' ? '실행 취소' : '다시 실행',
@@ -105,15 +98,11 @@ export function createEditorSession({
     status('저장 중…');
     state.saving = saveQueue.enqueue(state.snapshot.id, {
       documentName: state.snapshot.documentName,
+      project_id: state.project_id,
       layerNames: state.snapshot.layerNames || {},
-      codePatches: state.scene.codePatches,
-      aiRequests: state.aiRequests || [],
-      aiDraft: state.aiDraft,
-      handoffSettings: state.handoffSettings,
-      implementationReviews: state.implementationReviews || [],
+      resourceRepairs: state.scene.resourceRepairs,
       edits: state.scene.edits,
       annotations: state.scene.annotations,
-      timeline: state.timeline,
       activity: state.activity,
       activityHead: state.activityHead,
       note: getNote(),
@@ -122,7 +111,7 @@ export function createEditorSession({
   }
   function prepareEditor({ allowTransaction = false } = {}) {
     if (state.transactionBusy && !allowTransaction)
-      throw new Error('버전 이동이 끝난 뒤 다시 시도해 주세요.');
+      throw new Error('작업이 끝난 뒤 다시 시도해 주세요.');
     if (state.scene?.drag || state.scene?.areaSelecting)
       throw new Error('드래그를 마친 뒤 다시 시도해 주세요.');
     if (state.snapshot && !state.ready)

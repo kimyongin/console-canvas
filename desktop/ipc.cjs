@@ -17,7 +17,6 @@ function registerShellIpc({
   info,
   capture,
   captureApp,
-  cancelReviewCapture,
   captureMenu,
 }) {
   const handle = (name, callback) =>
@@ -72,6 +71,5 @@ function registerShellIpc({
   handle('capture', capture);
   handle('capture-app', captureApp);
   handle('capture-menu', (position) => captureMenu(position));
-  handle('cancel-review', (id) => cancelReviewCapture(id));
 }
 module.exports = { registerShellIpc };

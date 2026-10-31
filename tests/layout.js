@@ -155,11 +155,19 @@ try {
     'Restoring edits returns layer order and original positions',
     hit('n4', 200, 280) && Math.abs(scene.rect('n3').x - backdrop.x) < 0.1,
   );
-  scene.setCodePatches([
-    { type: 'style', element_id: 'n4', properties: { 'background-color': '#fff0aa' } },
+  scene.resourceBaseHtml = scene.resourceBaseHtml.replace(
+    '</head>',
+    '<style>:root{--repair-test:url(https://assets.test/probe.png)}</style></head>',
+  );
+  scene.setResourceRepairs([
+    {
+      type: 'resource',
+      resource_url: 'https://assets.test/probe.png',
+      data: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==',
+    },
   ]);
   check(
-    'Code patch rebuilding keeps fixed layer hierarchy',
+    'Resource rebuilding keeps fixed layer hierarchy',
     hit('n4', 200, 280) &&
       hit('n6', 20, 20) &&
       hit('n16', 480, 320) &&

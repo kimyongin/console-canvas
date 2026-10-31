@@ -144,9 +144,6 @@ export function createDocumentSwitcher({
         summary: current
           ? {
               ...value,
-              activeSnapshotName:
-                state.timeline?.entries.find((e) => e.id === state.timeline.activeId)?.name ||
-                '기준 버전 없음',
             }
           : value,
         date:

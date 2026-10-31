@@ -16,7 +16,7 @@ import uuid
 
 from server import VERSION, TOOLS
 
-MAX_BODY = 2 * 1024 * 1024
+MAX_BODY = 18 * 1024 * 1024
 
 
 def validate(value, rule):
@@ -56,6 +56,9 @@ def validate(value, rule):
             raise ValueError('Expected an integer')
         if not rule.get('minimum', -math.inf) <= value <= rule.get('maximum', math.inf):
             raise ValueError('Numeric argument is outside the supported range')
+    elif kind == 'boolean':
+        if type(value) is not bool:
+            raise ValueError('Expected a boolean')
     elif kind == 'array':
         if not isinstance(value, list) or not rule.get('minItems', 0) <= len(value) <= rule.get('maxItems', 10000):
             raise ValueError('Invalid array length')
@@ -85,12 +88,15 @@ class Broker:
         for key in ('revision', 'element_count', 'comment_count'):
             if type(meta.get(key)) is not int or meta[key] < 0:
                 raise ValueError('Invalid screen revision or counts')
-        request_revision = meta.get('request_revision')
-        if request_revision is not None and (type(request_revision) is not int or request_revision < 0):
-            raise ValueError('Invalid AI request revision')
+        ticket_revision = meta.get('ticket_revision')
+        if ticket_revision is not None and (type(ticket_revision) is not int or ticket_revision < 0):
+            raise ValueError('Invalid ticket revision')
         meta = {k: meta[k] for k in ('editor_id', 'document_id', 'title', 'url', 'revision', 'element_count', 'comment_count')}
-        if request_revision is not None:
-            meta['request_revision'] = request_revision
+        if ticket_revision is not None:
+            meta['ticket_revision'] = ticket_revision
+        project_id = body.get('screen', {}).get('project_id')
+        if isinstance(project_id, str) and 0 < len(project_id) <= 300:
+            meta['project_id'] = project_id
         with self.condition:
             editor_id = meta['editor_id']
             session = self.sessions.setdefault(editor_id, {'queue': deque(), 'closed': False})
@@ -173,7 +179,7 @@ class Broker:
                 command_id = str(uuid.uuid4())
                 command = {'command_id': command_id, 'editor_id': editor_id, 'document_id': session['screen']['document_id'],
                            'name': name, 'arguments': arguments, 'fingerprint': fingerprint, 'key': key,
-                           'deadline': time.time() + (45 if name == 'get_review_image' else 12), 'delivered': False, 'result': None}
+                           'deadline': time.time() + (60 if name in ('get_review_image', 'get_design_context', 'register_ticket', 'get_ticket', 'update_ticket') else 12), 'delivered': False, 'result': None}
                 self.commands[command_id] = command
                 if key:
                     self.operation_keys[key] = command_id

@@ -1,4 +1,13 @@
-import { database, saveCapture, saveSession, getDocument, listDocuments } from '../db.js';
+import {
+  database,
+  saveCapture,
+  saveSession,
+  getDocument,
+  listDocuments,
+  renameDocument,
+  trashDocument,
+  restoreDocument,
+} from '../db.js';
 const results = [];
 function check(name, value) {
   results.push({ name, passed: !!value });
@@ -28,17 +37,17 @@ try {
   await saveSession(capture.id, {
     edits: { n1: { dx: 25, dy: 9, deleted: false } },
     annotations: { n1: 'keep' },
-    timeline: { entries: [{ id: 'past' }, { id: 'future' }], activeId: 'past' },
+    project_id: 'storage-regression',
     note: 'draft',
     updatedAt: '2099-01-01T00:00:00.000Z',
   });
   const joined = await getDocument(capture.id);
   check(
-    'Capture and mutable state join without losing timeline or comments',
+    'Capture and mutable state join with current project and comments',
     joined.html === original &&
       joined.edits.n1.dx === 25 &&
       joined.annotations.n1 === 'keep' &&
-      joined.timeline.entries.length === 2,
+      joined.project_id === 'storage-regression',
   );
   const recent = await listDocuments(1);
   check(
@@ -47,7 +56,7 @@ try {
       recent[0].id === capture.id &&
       !('html' in recent[0]) &&
       !('nodes' in recent[0]) &&
-      !('timeline' in recent[0]),
+      !('edits' in recent[0]),
   );
   const db = await database();
   check(
@@ -55,6 +64,35 @@ try {
     ['captures', 'sessions', 'documents'].every((name) => db.objectStoreNames.contains(name)),
   );
   db.close();
+  await renameDocument(capture.id, '이름을 바꾼 현재 문서');
+  check(
+    'Rename keeps immutable source, edits and comments',
+    (await getDocument(capture.id)).documentName === '이름을 바꾼 현재 문서' &&
+      (await getDocument(capture.id)).html === original,
+  );
+  await trashDocument(capture.id);
+  check(
+    'Trashed documents leave the normal list but remain recoverable',
+    !(await getDocument(capture.id)) &&
+      (await listDocuments(100, { deleted: true })).some((d) => d.id === capture.id),
+  );
+  let deletedSaveRejected = false;
+  try {
+    await saveSession(capture.id, { note: 'must not resurrect' });
+  } catch {
+    deletedSaveRejected = true;
+  }
+  check(
+    'A delayed save cannot resurrect a trashed document',
+    deletedSaveRejected &&
+      (await getDocument(capture.id, { includeDeleted: true })).note === 'draft',
+  );
+  await restoreDocument(capture.id);
+  check(
+    'Restore preserves edits and current annotations',
+    (await getDocument(capture.id)).edits.n1.dx === 25 &&
+      (await getDocument(capture.id)).annotations.n1 === 'keep',
+  );
   let rejected = false;
   try {
     await saveSession('missing', { updatedAt: 'now' });
@@ -86,6 +124,26 @@ try {
   check(
     'Concurrent document-open requests are serialized',
     app.state.ready && app.state.snapshot.id === b.id,
+  );
+  // Exercise the retained document-name UI against current v2 storage.
+  doc.querySelector('#rename-current').click();
+  const until = async (read) => {
+    const end = Date.now() + 15000;
+    while (!(await read())) {
+      if (Date.now() > end) throw Error('UI persistence timeout');
+      await new Promise((r) => setTimeout(r, 30));
+    }
+  };
+  await until(() => doc.querySelector('#rename-dialog').open);
+  doc.querySelector('#rename-name').value = 'UI 이름 변경';
+  doc
+    .querySelector('#rename-form')
+    .dispatchEvent(new doc.defaultView.Event('submit', { cancelable: true, bubbles: true }));
+  await until(() => !doc.querySelector('#rename-dialog').open);
+  await app.flushEditor();
+  check(
+    'Document rename UI saves the intended title',
+    (await getDocument(app.state.snapshot.id)).documentName === 'UI 이름 변경',
   );
   await saveSession(capture.id, { ...joined, updatedAt: '2000-01-01T00:00:00.000Z' });
   document.querySelector('#status').textContent = JSON.stringify({

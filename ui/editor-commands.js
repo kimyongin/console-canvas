@@ -84,18 +84,7 @@ export function createEditorCommands({
         );
       },
     },
-    {
-      id: 'snapshot-search',
-      name: '스냅샷 검색 열기',
-      key: 'f',
-      shift: false,
-      alt: true,
-      label: mod + '+Alt+F',
-      run: () => {
-        $('#snapshot-dropdown').click();
-        $('#snapshot-search').focus();
-      },
-    },
+
     {
       id: 'open',
       name: '편집 파일 열기',

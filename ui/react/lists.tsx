@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { getDocument, documentSummary } from '../../db.js';
-import { withVersionScene } from '../version-preview.js';
+import { withSceneCopy } from '../../scene-preview.js';
 import { renderReact } from './mount';
 import { Button } from './components/button';
 import { Input } from './components/input';
@@ -85,78 +85,13 @@ export function renderLayerRows(
     </>,
   );
 }
-export interface ActivityRow {
-  id: string;
-  time: string;
-  heading: string;
-  context?: string;
-  children?: ActivityRow[];
-  changes: {
-    id: string;
-    name: string;
-    type: string;
-    description: string;
-    disabled: boolean;
-    run: () => void;
-  }[];
-}
-function ActivityContents({ row }: { row: ActivityRow }) {
-  return (
-    <>
-      <small>{row.time}</small>
-      <strong>{row.heading}</strong>
-      {row.context && <small className="activity-context">{row.context}</small>}
-      {row.changes.map((change, index) => (
-        <Button
-          variant="ghost"
-          key={change.id + '/' + index}
-          className="activity-change"
-          size="content"
-          data-target-id={change.id}
-          data-change-type={change.type}
-          disabled={change.disabled}
-          onClick={change.run}
-        >
-          <strong>{change.name}</strong>
-          <span>{change.description}</span>
-        </Button>
-      ))}
-      {row.children && (
-        <details className="activity-details">
-          <summary>{'개별 기록 ' + row.children.length + '개 보기'}</summary>
-          {row.children.map((child) => (
-            <div className="activity-detail" key={child.id} data-detail-event-id={child.id}>
-              <ActivityContents row={child} />
-            </div>
-          ))}
-        </details>
-      )}
-    </>
-  );
-}
-export function renderActivityRows(host: Element, rows: ActivityRow[], empty: string) {
-  renderReact(
-    host,
-    rows.length ? (
-      <>
-        {rows.map((row) => (
-          <article key={row.id} className="activity-event" data-event-id={row.id}>
-            <ActivityContents row={row} />
-          </article>
-        ))}
-      </>
-    ) : (
-      empty
-    ),
-  );
-}
 export interface DocumentRow {
   id: string;
   title: string;
   url: string;
   date: string;
   captured: string;
-  summary?: { snapshotName?: string; activeSnapshotName?: string; commentCount?: number };
+  summary?: { commentCount?: number; project_id?: string };
   current: boolean;
   disabled: boolean;
   open: () => void;
@@ -434,7 +369,7 @@ export function DocumentVisual({
   summary,
 }: {
   id: string;
-  summary?: { snapshotName?: string; activeSnapshotName?: string; commentCount?: number };
+  summary?: { commentCount?: number; project_id?: string };
 }) {
   const host = useRef<HTMLDivElement>(null);
   const [details, setDetails] = useState(summary);
@@ -454,7 +389,7 @@ export function DocumentVisual({
         const doc = await getDocument(id, { includeDeleted: true });
         if (!live || !doc) return;
         setDetails(documentSummary(doc));
-        const result = await withVersionScene(
+        const result = await withSceneCopy(
           doc,
           doc,
           (scene: import('../../engine.js').CanvasScene) => ({
@@ -494,11 +429,7 @@ export function DocumentVisual({
         )}
       </div>
       <div className="document-summary">
-        <span>
-          {'작업 기준 · ' + (details?.activeSnapshotName || '기록 없음')}
-          <br />
-          {'최근 저장 버전 · ' + (details?.snapshotName || '불러오는 중')}
-        </span>
+        <span>{'프로젝트 · ' + (details?.project_id || '문서를 열어 확인')}</span>
         <small>
           {details?.commentCount === undefined
             ? '주석 불러오는 중'
@@ -529,11 +460,7 @@ export function renderQuickDocuments(host: Element, rows: DocumentRow[], loading
               {row.title}
               {row.current ? ' · 현재 작업' : ''}
             </strong>
-            <small>
-              작업 기준 {row.summary?.activeSnapshotName || '기록 없음'} · 주석{' '}
-              {row.summary?.commentCount ?? '—'}개<br />
-              최근 저장 버전 {row.summary?.snapshotName || '기록 없음'}
-            </small>
+            <small>주석 {row.summary?.commentCount || 0}개</small>
             <small>
               {row.date} · {row.url}
             </small>

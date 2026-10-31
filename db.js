@@ -1,11 +1,18 @@
-import { cleanHandoffSettings } from './handoff-settings.js';
-import { cleanAiDraft } from './ai-draft.js';
 // Captures are immutable; edits and lightweight recent-document metadata are separate.
 export const DATABASE_NAME = 'console-canvas-workspace';
+export let workspaceReset = false;
 export async function database() {
   return await new Promise((resolve, reject) => {
-    const request = indexedDB.open(DATABASE_NAME, 1);
-    request.onupgradeneeded = () => {
+    const request = indexedDB.open(DATABASE_NAME, 2);
+    request.onupgradeneeded = (event) => {
+      workspaceReset = event.oldVersion > 0;
+      // 2026-11-01: user explicitly waived all legacy test documents; no migration.
+      for (const name of [...request.result.objectStoreNames])
+        request.result.deleteObjectStore(name);
+      request.result
+        .createObjectStore('tickets', { keyPath: 'id' })
+        .createIndex('project_id', 'project_id');
+      request.result.createObjectStore('operations', { keyPath: 'id' });
       request.result.createObjectStore('captures', { keyPath: 'id' });
       request.result.createObjectStore('sessions', { keyPath: 'id' });
       request.result
@@ -16,14 +23,15 @@ export async function database() {
     request.onerror = () => reject(request.error);
   });
 }
-async function transact(stores, mode, action) {
+export async function transact(stores, mode, action) {
   const db = await database();
   try {
     return await new Promise((resolve, reject) => {
       const tx = db.transaction(stores, mode);
       let result;
       tx.oncomplete = () => resolve(result);
-      tx.onabort = tx.onerror = () => reject(tx.error || new Error('저장 작업이 중단되었습니다.'));
+      tx.onabort = tx.onerror = () =>
+        reject(tx.failure || tx.error || new Error('저장 작업이 중단되었습니다.'));
       try {
         action(tx, (value) => {
           result = value;
@@ -38,25 +46,29 @@ async function transact(stores, mode, action) {
   }
 }
 export function captureFromDocument(value) {
-  const {
-    codePatches,
-    aiRequests,
-    aiDraft,
-    handoffSettings,
-    implementationReviews,
-    edits,
-    annotations,
-    timeline,
-    activity,
-    activityHead,
-    note,
-    updatedAt,
-    documentName,
-    layerNames,
-    deletedAt,
-    ...capture
-  } = value;
-  return capture;
+  const keys = [
+    'format',
+    'version',
+    'id',
+    'capturedAt',
+    'source',
+    'html',
+    'nodes',
+    'warnings',
+    'assets',
+    'screenshot',
+    'captureScope',
+    'capture_status',
+    'captureStatus',
+    'issues',
+    'captureReport',
+    'screenshotTiles',
+    'title',
+    'assetReport',
+  ];
+  return Object.fromEntries(
+    keys.filter((key) => Object.hasOwn(value, key)).map((key) => [key, value[key]]),
+  );
 }
 export async function saveCapture(value) {
   const capture = captureFromDocument(value);
@@ -80,39 +92,31 @@ export async function saveCapture(value) {
 }
 export async function saveSession(id, value) {
   const {
-    codePatches = [],
-    aiRequests = [],
-    aiDraft,
-    handoffSettings,
-    implementationReviews,
     edits = {},
     annotations = {},
-    timeline = null,
     activity = [],
     activityHead = null,
     note = '',
     layerNames = {},
     updatedAt = new Date().toISOString(),
     documentName,
+    project_id,
+    resourceRepairs = [],
   } = value;
   const session = {
-    codePatches,
-    aiRequests,
-    aiDraft: cleanAiDraft(aiDraft),
-    handoffSettings: cleanHandoffSettings(handoffSettings),
-    implementationReviews: implementationReviews || [],
     edits,
     annotations,
-    timeline,
     activity,
     activityHead,
     note,
-    ...(Object.keys(layerNames).length ? { layerNames } : {}),
+    layerNames,
     updatedAt,
+    project_id,
+    resourceRepairs,
   };
   return transact(['sessions', 'documents'], 'readwrite', (tx) => {
-    const metadata = tx.objectStore('documents');
-    const request = metadata.get(id);
+    const metadata = tx.objectStore('documents'),
+      request = metadata.get(id);
     request.onsuccess = () => {
       if (!request.result || request.result.deletedAt) {
         tx.abort();
@@ -123,7 +127,7 @@ export async function saveSession(id, value) {
         ...request.result,
         ...(typeof documentName === 'string' ? { title: documentName } : {}),
         ...documentSummary(session),
-        updatedAt: session.updatedAt,
+        updatedAt,
       });
     };
   });
@@ -170,7 +174,7 @@ export async function listDocuments(limit = 4, { deleted = false } = {}) {
       if (!!cursor.value.deletedAt === deleted) {
         const value = cursor.value;
         result.push(value);
-        if (!value.activeSnapshotName) {
+        if (value.commentCount === undefined) {
           const read = tx.objectStore('sessions').get(value.id);
           read.onsuccess = () => {
             if (read.result) Object.assign(value, documentSummary(read.result));
@@ -212,17 +216,10 @@ export function restoreDocument(id) {
 }
 
 export function documentSummary(value) {
-  const entry = (value.timeline?.entries || [])
-    .filter((e) => !e.deletedAt && e.kind !== 'automatic')
-    .reverse()
-    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
   return {
-    snapshotName: entry?.name || '스냅샷 없음',
-    activeSnapshotName:
-      value.timeline?.entries.find((e) => e.id === value.timeline.activeId && !e.deletedAt)?.name ||
-      '기준 버전 없음',
+    project_id: value.project_id || '',
     commentCount: Object.values(value.annotations || {}).filter(
-      (text) => typeof text === 'string' && text.trim(),
+      (t) => typeof t === 'string' && t.trim(),
     ).length,
   };
 }

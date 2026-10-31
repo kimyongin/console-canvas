@@ -7,21 +7,13 @@ export interface EditorView {
   selectedHidden: boolean;
   undoCount: number;
   redoCount: number;
-  activeSnapshotId: string | null;
-  previewSnapshotId: string | null;
   save: { pending: boolean; error: string | null; message: string };
 }
 export type EditorCommand =
+  | 'tickets'
+  | 'new-ticket'
   | 'capture-back'
-  | 'ai-connection-back'
-  | 'ai-connection-close'
   | 'layer-search-clear'
-  | 'handoff-retry'
-  | 'handoff-back'
-  | 'snapshot-handoff'
-  | 'implementation-review'
-  | 'ai'
-  | 'ai-new'
   | 'undo'
   | 'redo'
   | 'delete'
@@ -34,11 +26,7 @@ export type EditorCommand =
   | 'source-compare'
   | 'capture-status'
   | 'properties'
-  | 'comment'
-  | 'snapshots'
-  | 'snapshot-current'
-  | 'compare-previous'
-  | 'compare-next';
+  | 'comment';
 export function createEditorAdapter(read: () => EditorView) {
   let snapshot = read();
   const listeners = new Set<() => void>();

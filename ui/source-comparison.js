@@ -1,6 +1,6 @@
 import { buildCapturedPhoto, hasCapturedPhoto } from '../capture-reference.js';
-import { withVersionScene } from './version-preview.js';
-import { renderVersionFrame } from './react/versions.tsx';
+import { withSceneCopy } from '../scene-preview.js';
+import { renderVersionFrame } from './react/scene-preview.tsx';
 import { clearReact } from './react/mount.tsx';
 export function createSourceComparison({ $, state, adapter, commitCommentDraft, workspace }) {
   let generation = 0,
@@ -33,7 +33,7 @@ export function createSourceComparison({ $, state, adapter, commitCommentDraft, 
   }
   async function renderClone(token) {
     const point = $('#source-compare-version').value === 'baseline' ? {} : frozen;
-    const result = await withVersionScene(state.snapshot, point, (scene) => scene.preview());
+    const result = await withSceneCopy(state.snapshot, point, (scene) => scene.preview());
     if (token !== generation || !workspace.active('source')) return;
     const reference = await buildCapturedPhoto(state.snapshot, {
       ...result.origin,
@@ -64,7 +64,7 @@ export function createSourceComparison({ $, state, adapter, commitCommentDraft, 
     photo = null;
     clone = null;
     frozen = {
-      codePatches: structuredClone(state.scene.codePatches),
+      resourceRepairs: structuredClone(state.scene.resourceRepairs),
       edits: structuredClone(state.scene.edits),
       annotations: structuredClone(state.scene.annotations),
     };

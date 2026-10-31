@@ -33,10 +33,10 @@ class ModernProtocol:
 
     @staticmethod
     def uri(editor):
-        return 'console-canvas://editors/' + editor + '/ai-requests'
+        return 'console-canvas://editors/' + editor + '/tickets'
 
     def resources(self):
-        return [{'uri': self.uri(s['editor_id']), 'name': s['title'] + ' · AI requests',
+        return [{'uri': self.uri(s['editor_id']), 'name': s['title'] + ' · Work tickets',
                  'mimeType': 'application/json'} for s in self.screens()]
 
     def notify(self, method, request_id, values):
@@ -44,10 +44,10 @@ class ModernProtocol:
             **values, '_meta': {SUB_KEY: request_id}}})
 
     def read(self, uri):
-        match = re.fullmatch(r'console-canvas://editors/([\w-]{1,100})/ai-requests', uri or '')
+        match = re.fullmatch(r'console-canvas://editors/([\w-]{1,100})/tickets', uri or '')
         if not match or not any(s['editor_id'] == match[1] for s in self.screens()):
             raise ValueError('Resource is not connected')
-        value = self.call('list_ai_requests', {'editor_id': match[1]})
+        value = self.call('list_tickets', {'editor_id': match[1], 'project_id': next(s['project_id'] for s in self.screens() if s['editor_id'] == match[1])})
         if not value.get('ok'):
             raise ValueError('Resource read failed')
         return {'contents': [{'uri': uri, 'mimeType': 'application/json',
@@ -80,7 +80,7 @@ class ModernProtocol:
                 if not self.subscriptions:
                     continue
             try:
-                stamps = {self.uri(s['editor_id']): (s['document_id'], s.get('request_revision', 0))
+                stamps = {self.uri(s['editor_id']): (s['document_id'], s.get('ticket_revision', 0))
                           for s in self.screens()}
                 with self.lock:
                     for request_id, subscription in list(self.subscriptions.items()):

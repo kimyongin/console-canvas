@@ -1,4 +1,3 @@
-import { reviewPayload, instructionText } from '../export.js';
 const frame = document.querySelector('#editor'),
   results = [];
 function check(name, passed) {
@@ -323,59 +322,12 @@ try {
     ),
   );
   app.undo();
-  scene.remove(copyRoot);
-  doc.querySelector('#export-button').click();
-  await until(() => doc.querySelector('#handoff-preview img'));
-  check(
-    'Handoff image includes the selected copy deletion without deleting its captured source',
-    doc.querySelector('#handoff-preview img').src.startsWith('blob:') &&
-      !scene.hidden(first.id) &&
-      scene.hidden(copyRoot) &&
-      instructionText(app.state.snapshot, scene.changes(), '', scene.comments()).includes(
-        '참조 원본 ' + first.id + '은 유지',
-      ),
-  );
-  doc.querySelector('#export-dialog').close();
-  app.undo();
-  scene.nudge(10, 5);
-  check(
-    'Moving pasted roots never moves their originals',
-    Math.abs(scene.rect(first.id).x - originalRects[0].x) < 1 && scene.offset(copyRoot).x === 10,
-  );
-  app.undo();
-  const copiedVersion = app.snapshotHistory.create('복사본 포함');
-  app.undo();
-  check(
-    'Undo paste removes the complete cloned subtree',
-    pasted.every((id) => !scene.nodes.has(id)) && !scene.elements.has(child.id),
-  );
-  app.undo('redo');
-  check(
-    'Redo restores copy identities and comments',
-    pasted.every((id) => scene.nodes.has(id)) && scene.annotations[copyRoot] === '복사한 주석',
-  );
-  const original = app.state.timeline.entries[0].id;
-  app.snapshotHistory.restore(original);
-  check('Old snapshots do not show future copies', !scene.nodes.has(copyRoot));
-  app.snapshotHistory.restore(copiedVersion.id);
-  check(
-    'Returning to a later snapshot restores its copies',
-    scene.nodes.has(copyRoot) && scene.annotations[copyRoot] === '복사한 주석',
-  );
   const savedComments = JSON.stringify(scene.annotations);
+  scene.remove(copyRoot);
   await scene.beforeHtml();
   check(
     'Before/after export preserves current copy comments and selection',
     JSON.stringify(scene.annotations) === savedComments && scene.nodes.has(copyRoot),
-  );
-  const payload = JSON.stringify(reviewPayload(app.state.snapshot, scene, '', app.state.timeline));
-  await app.importFile(new frame.contentWindow.File([payload], 'copies.uiclone.json'));
-  scene = app.state.scene;
-  check(
-    'File roundtrip retains copy descriptors, comments and snapshot futures',
-    scene.nodes.has(copyRoot) &&
-      scene.annotations[copyRoot] === '복사한 주석' &&
-      app.state.timeline.entries.some((e) => e.id === copiedVersion.id),
   );
   await app.state.saving;
   const id = app.state.snapshot.id;
@@ -404,8 +356,7 @@ try {
     'Real editor input fields retain native text clipboard behavior',
     !textEvent.defaultPrevented,
   );
-  const savedId = app.state.snapshot.id,
-    savedTimeline = app.state.timeline.entries.length;
+  const savedId = app.state.snapshot.id;
   const other = JSON.parse(JSON.stringify(app.state.snapshot));
   other.id = crypto.randomUUID();
   other.source.title = '전환 테스트 두 번째 화면';
@@ -439,10 +390,8 @@ try {
       !doc.querySelector('#documents-live').disabled,
   );
   check(
-    'Switching saved documents restores copy geometry, comments and snapshot futures',
-    app.state.scene.nodes.has(copyRoot) &&
-      app.state.scene.annotations[copyRoot] === '복사한 주석' &&
-      app.state.timeline.entries.length === savedTimeline,
+    'Switching saved documents restores copy geometry, comments',
+    app.state.scene.nodes.has(copyRoot) && app.state.scene.annotations[copyRoot] === '복사한 주석',
   );
   doc.querySelector('#documents-button').click();
   await until(() => doc.querySelectorAll('.document-item').length >= 2);

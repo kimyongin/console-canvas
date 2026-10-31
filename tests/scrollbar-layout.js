@@ -39,12 +39,20 @@ try {
     'A child edit does not jump to an unscrolled baseline',
     Math.abs(moved.x - original.x - 7) < 1 && Math.abs(moved.y - original.y) < 1,
   );
-  scene.setCodePatches([
-    { type: 'style', element_id: target.id, properties: { color: '#234567' } },
+  scene.resourceBaseHtml = scene.resourceBaseHtml.replace(
+    '</head>',
+    '<style>:root{--repair-test:url(https://assets.test/probe.png)}</style></head>',
+  );
+  scene.setResourceRepairs([
+    {
+      type: 'resource',
+      resource_url: 'https://assets.test/probe.png',
+      data: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==',
+    },
   ]);
   const rebuilt = scene.rect(target.id);
   check(
-    'Code reconstruction retains scroll and the existing child move once',
+    'Resource reconstruction retains scroll and the existing child move once',
     scene.elements.get(scroll.id).scrollTop === 130 &&
       Math.abs(rebuilt.x - original.x - 7) < 1 &&
       Math.abs(rebuilt.y - original.y) < 1,

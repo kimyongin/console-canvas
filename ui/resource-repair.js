@@ -1,7 +1,7 @@
 import { resourceCandidates, decodeResource, validateResourcePatch } from '../resource-repair.js';
-import { validateCodePatches } from '../code-patches.js';
-import { withVersionScene } from './version-preview.js';
-import { renderVersionFrame } from './react/versions.tsx';
+import { validateResourceRepairs } from '../resource-document.js';
+import { withSceneCopy } from '../scene-preview.js';
+import { renderVersionFrame } from './react/scene-preview.tsx';
 import { clearReact } from './react/mount.tsx';
 export function createResourceRepair({
   $,
@@ -91,11 +91,11 @@ export function createResourceRepair({
       clearReact($('#repair-assets-preview'));
       return;
     }
-    validateCodePatches([...state.scene.codePatches, ...next]);
-    const view = await withVersionScene(
+    validateResourceRepairs([...state.scene.resourceRepairs, ...next]);
+    const view = await withSceneCopy(
       state.snapshot,
       {
-        codePatches: [...state.scene.codePatches, ...next],
+        resourceRepairs: [...state.scene.resourceRepairs, ...next],
         edits: structuredClone(state.scene.edits),
         annotations: structuredClone(state.scene.annotations),
       },
@@ -168,7 +168,7 @@ export function createResourceRepair({
     busy = false;
     identity = { document: state.snapshot.id, revision: state.revision };
     patches = [];
-    items = resourceCandidates(state.snapshot, state.scene.codePatches).map((i, index) => ({
+    items = resourceCandidates(state.snapshot, state.scene.resourceRepairs).map((i, index) => ({
       ...i,
       selected: index < 16,
     }));
@@ -196,9 +196,9 @@ export function createResourceRepair({
       return;
     }
     try {
-      const next = validateCodePatches([...state.scene.codePatches, ...patches]);
+      const next = validateResourceRepairs([...state.scene.resourceRepairs, ...patches]);
       historyBefore();
-      state.scene.setCodePatches(next, state.scene.edits, state.scene.annotations);
+      state.scene.setResourceRepairs(next, state.scene.edits, state.scene.annotations);
       changeCommitted({ label: '이미지·폰트 복구' });
       workspace.back();
       toast('자산 복구를 적용했습니다. 실행 취소하거나 스냅샷으로 보관할 수 있습니다.');

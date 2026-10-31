@@ -83,16 +83,14 @@ class BrokerTests(unittest.TestCase):
         for origin in ('https://evil.example', 'http://127.0.0.1.evil.example:8849', 'http://user@127.0.0.1:8849', 'chrome-extension://invalid'):
             self.assertFalse(allowed_origin(origin))
 
-    def test_snapshot_tools_require_revision_and_operation_identity(self):
-        from server import definitions
-        definitions_by_name = {item['name']: item for item in definitions()}
-        self.assertTrue(definitions_by_name['list_snapshots']['annotations']['readOnlyHint'])
-        for name in ('create_snapshot', 'restore_snapshot'):
-            self.assertFalse(definitions_by_name[name]['annotations']['readOnlyHint'])
-            rule = definitions_by_name[name]['inputSchema']
+    def test_ticket_tools_require_project_revision_and_identity(self):
+        definitions_by_name = {t[0]: {'inputSchema': t[2]} for t in TOOLS}
+        self.assertNotIn('list_snapshots', definitions_by_name)
+        for name in ('register_ticket', 'update_ticket'):
             with self.assertRaises(ValueError):
-                validate({'editor_id': 'test-editor'}, rule)
-        validate({'editor_id': 'test-editor', 'expected_revision': 2, 'operation_id': 'once', 'snapshot_id': 'version-a'}, definitions_by_name['restore_snapshot']['inputSchema'])
+                validate({'editor_id': 'test-editor'}, definitions_by_name[name]['inputSchema'])
+        validate({'editor_id':'test-editor','project_id':'project','expected_revision':0,'operation_id':'once','title':'chosen','request':'responsive goal','selection_confirmed':True},definitions_by_name['register_ticket']['inputSchema'])
+
 
 
 class HttpBoundaryTests(unittest.TestCase):

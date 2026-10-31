@@ -75,10 +75,6 @@
   overflow: hidden;
   min-height: 0;
 }
-#editor-root #history-panel {
-  min-height: 0;
-  padding: 12px;
-}
 #editor-root .layer-search {
   padding: 12px;
 }
@@ -195,81 +191,14 @@
 #editor-root .nudge-controls button {
   height: 32px;
 }
-#editor-root .snapshot-create {
-  align-items: center;
-}
-#editor-root #snapshot-save-dialog #snapshot-form {
-  padding: 0;
-}
-#editor-root .snapshot-save-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 16px;
-}
-#editor-root .snapshot-save-actions button {
-  height: 32px;
-  min-width: 88px;
-}
-#editor-root #snapshot-name,
-#editor-root #save-snapshot,
-#editor-root #snapshot-search,
-#editor-root #snapshot-find-current {
+#editor-root #save-snapshot {
   height: 32px;
   min-height: 32px;
-}
-#editor-root .handoff-label {
-  display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
-  gap: 12px;
-}
-#editor-root .handoff-label select {
-  width: 100%;
-}
-#editor-root .compare-tools select {
-  height: 32px;
-  margin: 0;
-}
-#editor-root .compare-step button {
-  height: 32px;
 }
 #editor-root .export-actions > button,
 #editor-root .rename-actions > button {
   height: 32px;
   min-width: 88px;
-}
-#editor-root .ai-request-actions {
-  align-items: center;
-}
-#editor-root .ai-request-actions label {
-  min-height: 32px;
-}
-#editor-root .ai-request-actions :is(button, input, select) {
-  height: 32px;
-  min-height: 32px;
-}
-#editor-root .ai-preview-heading {
-  min-height: 48px;
-  height: 48px;
-  padding: 7px 8px;
-}
-#editor-root .ai-preview-heading select {
-  height: 32px;
-}
-#editor-root .implementation-controls {
-  align-items: end;
-}
-#editor-root .implementation-controls > label,
-#editor-root .implementation-result-control {
-  grid-template-rows: 18px 32px;
-  line-height: 18px;
-}
-#editor-root .implementation-controls > button,
-#editor-root .implementation-controls select {
-  height: 32px;
-}
-#editor-root .implementation-result-label {
-  min-height: 18px;
 }
 @media (max-width: 400px) {
   #editor-root .intent-suggestions > div {
@@ -516,34 +445,6 @@
   border-color: #bd7131;
   background: #fff5e9;
 }
-.implementation-judgement-options {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 6px 0;
-}
-.implementation-judgement-options label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.implementation-verdict-buttons {
-  display: flex;
-  gap: 6px;
-  margin: 6px 0;
-  flex-wrap: wrap;
-}
-.implementation-verdict-buttons [aria-pressed='true'] {
-  border-color: var(--accent);
-  background: #efedff;
-  color: var(--accent);
-}
-.activity-controls input[type='checkbox'] {
-  width: 16px;
-  height: 16px;
-}
 .document-management {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -559,11 +460,6 @@
   min-width: 0;
   white-space: normal;
   text-align: left;
-}
-.activity-controls > label:first-child {
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 #direct-source-compare {
   white-space: nowrap;
@@ -591,16 +487,6 @@
   position: static;
   height: 30px;
   padding: 3px;
-}
-.implementation-verdict-buttons {
-  flex-wrap: nowrap;
-  gap: 4px;
-}
-.implementation-verdict-buttons button {
-  font-size: 11px;
-  min-width: 0;
-  padding: 5px 6px;
-  white-space: nowrap;
 }
 .search-match-badge {
   font-size: 10px;
@@ -652,8 +538,7 @@
     gap: 5px;
     padding-inline: 6px;
   }
-  #editor-root .canvas-tools #paste,
-  #editor-root .canvas-tools #ai-variants-button {
+  #editor-root .canvas-tools #paste {
     display: none;
   }
   #editor-root #compact-tools-button {
@@ -664,16 +549,6 @@
   }
   #editor-root .canvas-tools #document-menu {
     max-width: 96px;
-  }
-  #editor-root .canvas-tools #snapshot-dropdown {
-    flex: 1 1 90px;
-    min-width: 70px;
-    max-width: 120px;
-    padding-inline: 6px;
-    font-size: 10px;
-  }
-  #editor-root #snapshot-active-name {
-    display: none;
   }
   #editor-root .history-controls {
     gap: 3px;
@@ -722,39 +597,6 @@
 }
 #selection-parent {
   margin-left: auto;
-}
-#snapshot-graph-space {
-  position: relative;
-}
-#snapshot-list {
-  position: absolute;
-  left: 0;
-  top: 0;
-}
-#snapshot-overflow {
-  margin: 4px 0;
-  font-size: 10px;
-  color: var(--muted);
-}
-.snapshot-preview-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  margin-top: 4px;
-}
-.snapshot-preview-controls select {
-  width: auto;
-}
-#implementation-results-visual {
-  position: fixed;
-  inset: 12vh auto auto 10vw;
-  width: min(720px, 80vw);
-  max-height: 65vh;
-  overflow: auto;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
 }
 .result-visual-row {
   display: flex;
@@ -818,95 +660,6 @@
   color: var(--muted);
   margin: 8px 0;
 }
-#handoff-preview[aria-busy='true'] {
-  min-height: 100px;
-  display: grid;
-  place-items: center;
-  color: var(--muted);
-}
-.implementation-result-control {
-  min-width: 0;
-}
-#implementation-visual-picker {
-  margin-top: 4px;
-  font-size: 11px;
-}
-.handoff-conflicts {
-  padding: 12px;
-  background: #fff8e8;
-  border: 1px solid #ebd8a7;
-  border-radius: 8px;
-  font-size: 12px;
-  margin: 8px 0;
-}
-.handoff-conflicts > div {
-  padding: 10px 0;
-  border-top: 1px solid #ebd8a7;
-}
-.handoff-conflicts label {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.handoff-conflicts input {
-  width: 16px;
-  height: 16px;
-}
-.handoff-conflicts p {
-  white-space: pre-wrap;
-}
-.activity-context {
-  border-radius: 4px;
-  background: #f0edf9;
-  padding: 4px;
-}
-#editor-root .ai-request-form {
-  min-width: 0;
-}
-.ai-auth {
-  margin-top: 12px;
-}
-.ai-auth[open] {
-  max-height: 240px;
-  overflow: auto;
-}
-.ai-followup-settings {
-  min-width: 0;
-  margin: 12px 0;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
-.ai-followup-details > summary {
-  display: list-item;
-  cursor: pointer;
-  margin: 8px 0;
-}
-.ai-followup-summary {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-}
-.ai-followup-details[open] + .ai-followup-actions {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
-  padding: 8px 0;
-  background: #fff;
-  border-top: 1px solid var(--line);
-}
-.ai-followup-settings legend {
-  padding: 0 4px;
-  font-weight: 600;
-}
-.ai-followup-settings textarea {
-  min-height: 72px;
-  max-height: 200px;
-  resize: vertical;
-}
 
 #editor-root .canvas-footer #fit {
   display: inline-flex;
@@ -916,69 +669,10 @@
   scrollbar-width: thin;
 }
 
-.snapshot-preview-controls {
-  flex: none;
-  margin: 0;
-}
-.snapshot-preview-heading {
-  flex-wrap: wrap;
-}
-#snapshot-overflow {
-  display: inline;
-}
-
 @container (max-width:610px) {
-  #editor-root .canvas-tools #snapshot-dropdown {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 8px;
-    grid-template-rows: 12px 12px;
-    gap: 0 3px;
-    padding-block: 2px;
-  }
-  #editor-root #snapshot-dropdown > span:first-child {
-    grid-column: 1;
-    grid-row: 1;
-    font-size: 9px;
-    line-height: 12px;
-  }
-  #editor-root #snapshot-active-name {
-    display: block;
-    grid-column: 1;
-    grid-row: 2;
-    font-size: 9px;
-    line-height: 12px;
-    max-width: 100%;
-  }
-  #editor-root #snapshot-dropdown > .snapshot-chevron {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-  }
 }
 
 /* Subtasks share the existing modal surface instead of adding floating work windows. */
-.implementation-workspace {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  gap: 10px;
-}
-#editor-root #implementation-results-visual {
-  position: static;
-  inset: auto;
-  width: auto;
-  max-height: none;
-  border: 0;
-  border-radius: 0;
-  padding: 0;
-  box-shadow: none;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  gap: 8px;
-}
 .result-picker-list {
   flex: 1;
   min-height: 0;
@@ -1033,18 +727,6 @@
   margin: 0;
   padding: 0;
 }
-#ai-connection-page {
-  padding: 20px;
-  min-height: 300px;
-}
-#ai-connection-host {
-  max-width: 680px;
-  margin: auto;
-}
-#editor-root #ai-dialog[data-page='connection'] {
-  width: min(1320px, 96vw);
-  height: 90dvh;
-}
 .result-picker-actions {
   display: flex;
   align-items: center;
@@ -1090,10 +772,6 @@
 .task-header-close form {
   margin: 0;
 }
-#ai-connection-host #mcp-content > .eyebrow,
-#ai-connection-host #mcp-content > h2 {
-  display: none;
-}
 .name-draft-status {
   color: var(--muted);
   font-size: 12px;
@@ -1102,48 +780,7 @@
   color: var(--accent);
   font-weight: 600;
 }
-.implementation-request-navigation {
-  display: grid;
-  gap: 8px;
-  margin: 12px 0;
-}
 /* Bound scaled content to the allocated grid row; only the frame scrolls. */
-.implementation-body {
-  grid-template-rows: minmax(0, 1fr);
-}
-.implementation-comparison {
-  grid-template-rows: minmax(0, 1fr);
-  min-width: 0;
-}
-.implementation-comparison > section {
-  min-height: 0;
-}
-.implementation-context > span {
-  flex: 1;
-  min-width: 0;
-}
-.implementation-record-control {
-  display: grid;
-  grid-template-rows: 18px 32px;
-  gap: 5px;
-  font-size: 11px;
-  min-width: 0;
-}
-.implementation-record-select,
-.implementation-result-select {
-  display: flex;
-  gap: 6px;
-  min-width: 0;
-}
-.implementation-record-select select,
-.implementation-result-select select {
-  min-width: 0;
-  flex: 1;
-}
-.implementation-record-select button,
-.implementation-result-select button {
-  flex: none;
-}
 .review-records-page {
   flex: 1;
   min-height: 0;
@@ -1206,39 +843,6 @@
   background: #fff4f5;
   border-radius: 6px;
 }
-.implementation-requests {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-}
-.implementation-request-header {
-  flex: none;
-  background: white;
-  padding-bottom: 8px;
-}
-.implementation-request-header > strong {
-  display: block;
-  font-size: 12px;
-}
-.implementation-request-navigation {
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 6px;
-  margin: 6px 0 0;
-}
-.implementation-request-navigation > small,
-.implementation-request-navigation > p {
-  grid-column: 1 / -1;
-}
-.implementation-request-list {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
-}
-.implementation-request-list section {
-  scroll-margin-top: 4px;
-}
 #export-dialog {
   width: min(1200px, 96vw);
   height: 90dvh;
@@ -1269,64 +873,6 @@
   overflow: auto;
   padding-right: 4px;
 }
-#export-dialog .handoff-label {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 6px;
-}
-#export-dialog .handoff-preview {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  margin: 0;
-}
-.handoff-preview-tools {
-  flex: none;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding-bottom: 8px;
-}
-.handoff-preview-tools strong {
-  flex: 1;
-  font-size: 12px;
-}
-.handoff-preview-tools label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-}
-.handoff-preview-tools select {
-  width: 112px;
-}
-.handoff-preview-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 8px;
-  overscroll-behavior: contain;
-  background: #f5f6fa;
-  border-radius: 8px;
-}
-.handoff-preview-scroll .handoff-interactive {
-  margin: 0 auto;
-  flex: none;
-}
-.handoff-preview-scroll img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-}
-.handoff-preview-size {
-  flex: none;
-  font-size: 10px;
-  color: var(--muted);
-  padding-top: 6px;
-}
 #export-dialog[data-preview-wide='true'] .export-scroll {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -1339,21 +885,6 @@
     gap: 12px;
     padding: 12px;
   }
-}
-#snapshot-parent-name,
-.activity-context {
-  overflow-wrap: anywhere;
-  min-width: 0;
-}
-.implementation-request-navigation label {
-  font-size: 12px;
-  color: var(--muted);
-}
-.implementation-request-navigation small,
-.implementation-request-navigation p {
-  font-size: 12px;
-  color: var(--muted);
-  margin: 0;
 }
 #editor-root .comment-target-preview {
   display: block;

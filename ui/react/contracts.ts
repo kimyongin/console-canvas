@@ -4,8 +4,8 @@ export interface SaveView {
   error: string | null;
   message: string;
 }
-export interface SnapshotPoint {
-  codePatches?: unknown[];
+export interface EditorPoint {
+  resourceRepairs?: unknown[];
   edits: Record<string, { dx?: number; dy?: number; deleted?: boolean; copy?: unknown }>;
   annotations: Record<string, string>;
   selected: string | null;
@@ -13,19 +13,9 @@ export interface SnapshotPoint {
   note: string;
   activityHead: string | null;
 }
-export interface SnapshotEntry {
-  id: string;
-  parentId: string | null;
-  name: string;
-  createdAt: string;
-  kind: 'initial' | 'automatic' | 'manual';
-  deletedAt?: string;
-  state: SnapshotPoint;
-}
 export interface ActivityEvent {
   id: string;
   parent_id: string | null;
-  snapshot_id: string | null;
   created_at: string;
   actor: 'user' | 'agent';
   label: string;
@@ -33,8 +23,8 @@ export interface ActivityEvent {
     id: string;
     type: string;
     name: string;
-    before: string | SnapshotPoint['edits'][string];
-    after: string | SnapshotPoint['edits'][string];
+    before: string | EditorPoint['edits'][string];
+    after: string | EditorPoint['edits'][string];
   }[];
 }
 export type FileSaveResult = { canceled: true } | { path: string };

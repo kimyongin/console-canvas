@@ -62,7 +62,7 @@ export function createWorkspaceLayout({ $, commitCommentDraft }) {
   }
   function renderPanels() {
     for (const [key, visible] of Object.entries(panels)) {
-      const label = key === 'layers' ? '레이어' : '변경 이력',
+      const label = key === 'layers' ? '레이어' : '요청·주석',
         button = $('#toggle-' + key);
       const focused = document.activeElement === button;
       const home = $('#' + key + (visible ? '-toggle-home' : '-toggle-rail'));

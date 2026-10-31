@@ -136,7 +136,7 @@ def stdio(connection):
                 if not is_modern:
                     raise ValueError('server/discover requires per-request version and capabilities')
                 result = {'supportedVersions': [MODERN] + list(PROTOCOLS), 'capabilities': {'tools': {'listChanged': False}, 'resources': {'listChanged': True}},
-                          'instructions': 'Read get_agent_guide. Frozen AI requests are resources and list_ai_requests/get_ai_context. Register alternatives without applying. Only the user chooses. Notifications do not automatically start an agent.'}
+                          'instructions': 'Read get_agent_guide. Confirmed work tickets are resources and list_tickets/get_ticket. Discuss proposals in the agent conversation; register only the human-selected goal. Registration does not authorize implementation. Notifications do not automatically start an agent.'}
             elif method == 'subscriptions/listen' and is_modern:
                 modern.listen(message['id'], params)
                 continue
@@ -159,14 +159,14 @@ def stdio(connection):
                 result = {'tools': definitions()}
             elif method == 'tools/call':
                 try:
-                    value = request(connection, '/agent/call', params, timeout=50 if params.get('name') in ('get_review_image', 'get_ai_context') else 15)
-                    if value.get('ok') and value.get('kind') == 'visual':
+                    value = request(connection, '/agent/call', params, timeout=65 if params.get('name') in ('get_review_image', 'get_design_context', 'register_ticket', 'get_ticket', 'update_ticket') else 15)
+                    if value.get('ok') and isinstance(value.get('images'), list):
                         blocks = []
                         for photo in value.get('images', []):
                             uri = photo.pop('image_url', '')
-                            if not uri.startswith('data:image/png;base64,'):
+                            if not any(uri.startswith('data:image/' + mime + ';base64,') for mime in ('png', 'jpeg', 'webp')):
                                 raise ValueError('Invalid visual image')
-                            blocks.append({'type': 'image', 'mimeType': 'image/png', 'data': uri.split(',', 1)[1]})
+                            blocks.append({'type': 'image', 'mimeType': uri[5:uri.index(';')], 'data': uri.split(',', 1)[1]})
                         result = {'content': [{'type': 'text', 'text': json.dumps(value, ensure_ascii=False)}, *blocks], 'structuredContent': value, 'isError': False}
                     elif value.get('ok') and value.get('data_url', '').startswith('data:image/png;base64,'):
                         image = value.pop('data_url').split(',', 1)[1]

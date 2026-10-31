@@ -1,6 +1,5 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('ConsoleCanvasShell', {
-  cancelReview: (id) => ipcRenderer.invoke('canvas:cancel-review', id),
   chooseCaptureMode: (position) => ipcRenderer.invoke('canvas:capture-menu', position),
   onFocusAddress: (callback) => ipcRenderer.on('canvas:focus-address', () => callback()),
   navigate: (url) => ipcRenderer.invoke('canvas:navigate', url),

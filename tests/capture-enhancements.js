@@ -3,7 +3,7 @@ import { buildHandoffImage } from '../handoff-image.js';
 import { buildCapturedPhoto, coveredArea } from '../capture-reference.js';
 import { prepareCaptureScope, renderScope } from '../capture-scope.js';
 import { resourceCandidates, validateResourcePatch, decodeResource } from '../resource-repair.js';
-import { buildCodeDocument } from '../code-patches.js';
+import { buildResourceDocument } from '../resource-document.js';
 import { renderPng } from '../export.js';
 const results = [],
   frame = document.querySelector('#editor');
@@ -142,7 +142,9 @@ try {
   });
   const patch = { type: 'resource', resource_url: url, data: png },
     before = JSON.stringify(repair),
-    built = buildCodeDocument(repair.html, new Map(repair.nodes.map((n) => [n.id, n])), [patch]);
+    built = buildResourceDocument(repair.html, new Map(repair.nodes.map((n) => [n.id, n])), [
+      patch,
+    ]);
   check(
     'Resource patch restores only observed image reference',
     built.elements.get('n999999').src === png &&
@@ -155,7 +157,7 @@ try {
     { ...patch, resource_url: 'https://unobserved.test/a.png' },
   ])
     try {
-      buildCodeDocument(repair.html, new Map(repair.nodes.map((n) => [n.id, n])), [invalid]);
+      buildResourceDocument(repair.html, new Map(repair.nodes.map((n) => [n.id, n])), [invalid]);
     } catch {
       rejected++;
     }
@@ -183,46 +185,29 @@ try {
   await until(() => !doc.querySelector('#repair-assets-apply').disabled);
   check(
     'Resource preview leaves current scene untouched',
-    app.state.scene.codePatches.length === 0 && doc.querySelector('#repair-assets-preview iframe'),
+    app.state.scene.resourceRepairs.length === 0 &&
+      doc.querySelector('#repair-assets-preview iframe'),
   );
   doc.querySelector('#repair-assets-apply').click();
   check(
     'Explicit apply commits resource as one undo step',
-    app.state.scene.codePatches.length === 1 && app.state.undo.length === 1,
+    app.state.scene.resourceRepairs.length === 1 && app.state.undo.length === 1,
   );
   doc.querySelector('#undo').click();
-  check('Undo restores missing image state', app.state.scene.codePatches.length === 0);
+  check('Undo restores missing image state', app.state.scene.resourceRepairs.length === 0);
   doc.querySelector('#redo').click();
-  check('Redo restores resource bytes', app.state.scene.codePatches[0]?.data === png);
+  check('Redo restores resource bytes', app.state.scene.resourceRepairs[0]?.data === png);
   await app.state.saving;
   const saved = await (await import('../db.js')).getDocument(repair.id);
-  check('Resource bytes persist with document session', saved.codePatches[0].data === png);
+  check('Resource bytes persist with document session', saved.resourceRepairs[0].data === png);
   check('Original capture remains immutable after repair', JSON.stringify(repair) === before);
-  const a = app.snapshotHistory.create('복구 A');
-  await app.state.saving;
-  app.state.scene.setComment('n999999', '기존 주석 보존');
-  const b = app.snapshotHistory.create('주석 B');
-  await app.state.saving;
-  await app.snapshotHistory.restorePersisted(a.id);
+  app.state.scene.setComment('n999999', '복구 후 주석');
+  await app.flushEditor();
+  const portable = await app.exportDocument();
   check(
-    'Returning to past snapshot restores embedded resource independently',
-    app.state.scene.codePatches[0]?.data === png && !app.state.scene.annotations.n999999,
-  );
-  await app.snapshotHistory.restorePersisted(b.id);
-  check(
-    'Future snapshot preserves repair and annotation',
-    app.state.scene.annotations.n999999 === '기존 주석 보존',
-  );
-  const portable = JSON.parse(
-    JSON.stringify(await (await import('../db.js')).getDocument(repair.id)),
-  );
-  await app.openSnapshot(portable, portable.edits, portable.note, portable.annotations);
-  check(
-    'Portable document roundtrip retains resource, annotation and snapshots',
-    app.state.scene.codePatches[0]?.data === png &&
-      app.state.scene.annotations.n999999 === '기존 주석 보존' &&
-      app.state.timeline.entries.some((e) => e.id === a.id) &&
-      app.state.timeline.entries.some((e) => e.id === b.id),
+    'Portable backup retains resource repair and current annotation',
+    portable.session.resourceRepairs[0].data === png &&
+      portable.session.annotations.n999999 === '복구 후 주석',
   );
   const scratch = document.createElement('iframe');
   document.body.append(scratch);

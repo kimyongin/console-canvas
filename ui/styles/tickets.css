@@ -1,0 +1,129 @@
+#tickets-dialog {
+  width: min(1000px, 94vw);
+  max-height: 90dvh;
+  overflow: auto;
+  padding: 24px;
+}
+#tickets-content {
+  display: grid;
+  gap: 16px;
+}
+#tickets-content h2,
+#tickets-content h3 {
+  margin: 0;
+}
+.ticket-heading,
+.ticket-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+#tickets-content label {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  font-size: 13px;
+}
+#tickets-content textarea {
+  min-height: 90px;
+  width: 100%;
+}
+#tickets-content p {
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+#tickets-content pre {
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 11px;
+}
+.ticket-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.ticket-row {
+  display: grid;
+  width: 100%;
+  height: auto;
+  text-align: left;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding: 16px;
+  margin: 8px 0;
+  white-space: normal;
+}
+.ticket-row small {
+  grid-column: 1/-1;
+  overflow-wrap: anywhere;
+}
+.ticket-record {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-block: 12px;
+}
+.ticket-record time {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+#requests-panel {
+  padding: 16px;
+  overflow: auto;
+  min-height: 0;
+}
+#requests-panel label {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+}
+#review-note {
+  min-height: 100px;
+  margin-bottom: 16px;
+  width: 100%;
+}
+#requests-search {
+  width: 100%;
+  margin-bottom: 12px;
+}
+.request-row {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  margin-bottom: 8px;
+  color: inherit;
+}
+.request-row span {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.request-row:hover {
+  border-color: var(--accent, #6350e8);
+}
+
+#tickets-content > button {
+  justify-self: start;
+}
+.ticket-heading > button {
+  align-self: flex-start;
+}
+#tickets-content .ticket-heading p {
+  margin-bottom: 0;
+}
+#tickets-content > p {
+  margin: 0;
+}

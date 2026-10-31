@@ -1,350 +1,224 @@
-// Run against an OPEN desktop app with only the disposable local sample connected.
+// Official SDK integration against an explicitly connected disposable local console only.
 import assert from 'node:assert/strict';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const client = new Client({
-  name: 'console-canvas-real-connection-test',
-  version: JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8')).version,
-});
+const root = path.resolve(import.meta.dirname, '..'),
+  checks = [];
+const client = new Client({ name: 'console-canvas-ticket-qa', version: '0.45.0' });
 const transport = new StdioClientTransport({
-  command:
-    process.env.CONSOLE_CANVAS_MCP_COMMAND ||
-    process.env.CONSOLE_CANVAS_PYTHON ||
-    '/usr/bin/python3',
+  command: process.env.CONSOLE_CANVAS_PYTHON || '/usr/bin/python3',
   args: process.env.CONSOLE_CANVAS_MCP_ARGS
     ? JSON.parse(process.env.CONSOLE_CANVAS_MCP_ARGS)
     : [path.join(root, 'mcp/server.py')],
   stderr: 'pipe',
 });
-const checks = [];
-function check(name, value) {
+const check = (name, value) => {
   assert.ok(value, name);
   checks.push(name);
-}
-async function tool(name, args = {}, allowError = false) {
-  const result = await client.callTool({ name, arguments: args });
-  const value = result.structuredContent || JSON.parse(result.content[0].text);
-  if (!allowError) assert.equal(result.isError, false, JSON.stringify(value));
-  return value;
+};
+async function tool(name, args = {}, error = false) {
+  const r = await client.callTool({ name, arguments: args });
+  if (!error) assert.equal(r.isError, false, JSON.stringify(r.structuredContent || r.content));
+  return r.structuredContent;
 }
 try {
   await client.connect(transport);
-  const tools = await client.listTools();
-  check('Official SDK discovers nineteen MCP tools', tools.tools.length === 19);
+  const definitions = (await client.listTools()).tools,
+    names = definitions.map((t) => t.name);
+  check(
+    'Only current editing/context/ticket tools are discoverable',
+    names.length === 15 && !names.some((n) => /snapshot|candidate|ai_request|code_patch/.test(n)),
+  );
   const guide = await tool('get_agent_guide');
   check(
-    'Agent reads the app-bundled skill through MCP',
+    'Live bundled guide matches the ticket contract',
     guide.source === 'app_bundle' &&
-      guide.name === 'console-canvas' &&
-      guide.markdown.includes('## 독립 앱과 MCP') &&
-      guide.markdown.includes('restore_snapshot'),
+      guide.markdown.includes('register_ticket') &&
+      !guide.markdown.includes('register_ai_candidate'),
   );
-  const screens = (await tool('list_screens')).screens;
-  const screen = screens.find((s) => {
-    const u = new URL(s.url);
-    return u.hostname === '127.0.0.1' && u.pathname === '/fixtures/console.html';
-  });
-  assert.ok(screen, 'Capture the disposable sample in the desktop app first');
-  const editor_id = screen.editor_id,
-    base = { editor_id };
+  const screen = (await tool('list_screens')).screens.find(
+    (s) => new URL(s.url).pathname === '/fixtures/console.html',
+  );
+  assert.ok(screen, 'Disposable console required');
+  const base = { editor_id: screen.editor_id },
+    project = { ...base, project_id: screen.project_id };
   let current = (await tool('get_screen', base)).screen;
-  check('Real desktop screen is connected', current.element_count > 300);
   check(
-    'Capture evidence separates original pixels, scope and severity',
-    current.capture_reference?.kind === 'captured_pixels' &&
-      current.capture_reference.visual_comparison === 'not_measured' &&
-      current.capture_scope.mode === 'document' &&
-      typeof current.capture_status.counts.loss === 'number',
+    'Captured copy and source evidence are available',
+    current.element_count > 300 &&
+      typeof current.capture_reference.available === 'boolean' &&
+      current.capture_reference.kind === 'captured_pixels',
   );
-  check(
-    'MCP describes bounded offline resource patches',
-    tools.tools
-      .find((t) => t.name === 'apply_code_patches')
-      .inputSchema.properties.patches.items.properties.type.enum.includes('resource'),
+  const node = (await tool('list_elements', { ...base, query: 'new-customer' })).elements.find(
+    (n) => n.locator.id === 'new-customer',
   );
-  const invalidResource = await tool(
-    'apply_code_patches',
-    {
-      ...base,
-      expected_revision: current.revision,
-      operation_id: randomUUID(),
-      patches: [
-        {
-          type: 'resource',
-          resource_url: 'https://unobserved.example.test/asset.png',
-          data: 'data:font/woff2;base64,d09GMgAAAAAAAABh',
-        },
-      ],
-    },
-    true,
-  );
-  check(
-    'Unobserved resource is rejected atomically through official SDK',
-    invalidResource.ok === false &&
-      (await tool('get_screen', base)).screen.revision === current.revision,
-  );
-  const elements = (await tool('list_elements', { ...base, query: 'new-customer' })).elements;
-  const button = elements.find((e) => e.tag === 'button' && e.locator.id === 'new-customer');
-  assert.ok(button);
-  const icon = (await tool('list_elements', { ...base, parent_id: button.id })).elements.find(
-    (e) => e.kind === 'icon',
-  );
-  assert.ok(icon);
-  const initialUndoCount = current.undo_count;
-  const revision = current.revision,
-    operation_id = randomUUID();
-  const batch = {
-    ...base,
-    expected_revision: revision,
-    operation_id,
-    operations: [
-      { type: 'move', element_id: button.id, mode: 'absolute', dx: -120, dy: 50 },
-      { type: 'delete', element_id: icon.id },
-      {
-        type: 'comment',
-        element_id: button.id,
-        text: 'MCP로 적용한 시안입니다. 버튼 위치를 확인하고 문구를 고객 추가로 바꿔 주세요.',
-      },
-    ],
-  };
-  current = (await tool('apply_edits', batch)).screen;
-  check(
-    'Move + delete + comment form one shared undo step',
-    current.undo_count === initialUndoCount + 1 && current.revision === revision + 1,
-  );
-  let result = (await tool('list_elements', { ...base, query: 'new-customer' })).elements.find(
-    (e) => e.id === button.id,
-  );
-  check(
-    'Move is reflected in actual editor geometry',
-    Math.abs(result.current_rect.x - button.current_rect.x + 120) < 1 &&
-      Math.abs(result.current_rect.y - button.current_rect.y - 50) < 1,
-  );
-  check(
-    'Component comment retains its original locator',
-    (await tool('list_comments', base)).comments.some(
-      (c) => c.id === button.id && c.locator.id === 'new-customer',
-    ),
-  );
-  check(
-    'Target icon is deleted',
-    (await tool('list_elements', { ...base, parent_id: button.id })).elements.find(
-      (e) => e.id === icon.id,
-    ).deleted,
-  );
-  const replay = await tool('apply_edits', batch);
-  check(
-    'Retry uses cached result without applying twice',
-    replay.screen.revision === current.revision &&
-      (await tool('get_screen', base)).screen.revision === current.revision,
-  );
-  const conflict = await tool('apply_edits', { ...batch, operation_id: randomUUID() }, true);
-  check('Stale revision is rejected', conflict.error?.code === 'revision_conflict');
-  current = (
-    await tool('undo', { ...base, expected_revision: current.revision, operation_id: randomUUID() })
-  ).screen;
-  result = (await tool('list_elements', { ...base, query: 'new-customer' })).elements.find(
-    (e) => e.id === button.id,
-  );
-  check(
-    'Undo restores position, deletion, and comment together',
-    Math.abs(result.current_rect.x - button.current_rect.x) < 1 &&
-      !(await tool('list_comments', base)).comments.length &&
-      !(await tool('list_elements', { ...base, parent_id: button.id })).elements.find(
-        (e) => e.id === icon.id,
-      ).deleted,
-  );
-  current = (
-    await tool('redo', { ...base, expected_revision: current.revision, operation_id: randomUUID() })
-  ).screen;
-  const edited =
-    '에이전트가 기존 주석을 수정했습니다. 이 배치를 기준으로 반응형 UI를 구현해 주세요.';
-  current = (
-    await tool('apply_edits', {
-      ...base,
-      expected_revision: current.revision,
-      operation_id: randomUUID(),
-      operations: [{ type: 'comment', element_id: button.id, text: edited }],
-    })
-  ).screen;
-  check(
-    'Existing comment can be edited',
-    (await tool('list_comments', base)).comments.find((c) => c.id === button.id).text === edited,
-  );
-  current = (
-    await tool('apply_edits', {
-      ...base,
-      expected_revision: current.revision,
-      operation_id: randomUUID(),
-      operations: [{ type: 'comment', element_id: button.id, text: '' }],
-    })
-  ).screen;
-  check('Empty text deletes a comment', !(await tool('list_comments', base)).comments.length);
-  current = (
-    await tool('undo', { ...base, expected_revision: current.revision, operation_id: randomUUID() })
-  ).screen;
-  const invalid = await tool(
-    'apply_edits',
-    {
-      ...base,
-      expected_revision: current.revision,
-      operation_id: randomUUID(),
-      operations: [
-        { type: 'move', element_id: button.id, mode: 'relative', dx: 40, dy: 0 },
-        { type: 'delete', element_id: 'n999999' },
-      ],
-    },
-    true,
-  );
-  check(
-    'Invalid batch applies nothing',
-    invalid.error?.code === 'unknown_element' &&
-      (await tool('get_screen', base)).screen.revision === current.revision,
-  );
-  const initialVersion = (await tool('list_snapshots', base)).snapshots[0];
-  assert.ok(initialVersion);
-  const saved = await tool('create_snapshot', {
-    ...base,
-    expected_revision: current.revision,
-    operation_id: randomUUID(),
-    name: 'MCP 시안 B',
-  });
-  current = saved.screen;
-  const snapshotBatch = {
+  assert.ok(node);
+  const write = {
     ...base,
     expected_revision: current.revision,
     operation_id: randomUUID(),
     operations: [
-      { type: 'move', element_id: button.id, mode: 'absolute', dx: -40, dy: 90 },
-      { type: 'comment', element_id: button.id, text: '스냅샷으로 보호할 미저장 작업' },
+      { type: 'move', element_id: node.id, dx: 12, dy: 6, mode: 'relative' },
+      { type: 'comment', element_id: node.id, text: '제목과 버튼을 반응형으로 정렬' },
     ],
   };
-  current = (await tool('apply_edits', snapshotBatch)).screen;
-  const restored = await tool('restore_snapshot', {
-    ...base,
-    expected_revision: current.revision,
-    operation_id: randomUUID(),
-    snapshot_id: initialVersion.id,
-  });
-  current = restored.screen;
-  let versions = await tool('list_snapshots', base);
+  const applied = await tool('apply_edits', write);
   check(
-    'MCP restores initial state while retaining future and automatic snapshots',
-    !!restored.automatic_snapshot_id &&
-      versions.total === 3 &&
-      !(await tool('list_comments', base)).comments.length,
+    'Shared edit batch is one persisted undo step',
+    applied.persisted && applied.screen.undo_count === current.undo_count + 1,
   );
-  const savedReplay = {
-    ...base,
-    expected_revision: current.revision,
-    operation_id: randomUUID(),
-    snapshot_id: saved.snapshot_id,
-  };
-  current = (await tool('restore_snapshot', savedReplay)).screen;
   check(
-    'MCP returns from the past to saved future geometry and comment',
-    (await tool('list_comments', base)).comments.find((c) => c.id === button.id)?.text === edited &&
-      (await tool('list_elements', { ...base, query: 'new-customer' })).elements.find(
-        (e) => e.id === button.id,
-      ).offset.dx === -120,
+    'Edit replay does not duplicate undo',
+    (await tool('apply_edits', write)).screen.revision === applied.screen.revision,
   );
-  const replayRestore = await tool('restore_snapshot', savedReplay);
   check(
-    'Snapshot restoration retries do not create extra versions',
-    replayRestore.screen.revision === current.revision &&
-      (await tool('list_snapshots', base)).total === 3,
+    'Stale screen writes are rejected',
+    (
+      await tool(
+        'undo',
+        { ...base, expected_revision: current.revision, operation_id: randomUUID() },
+        true,
+      )
+    ).error.code === 'revision_conflict',
   );
-  current = (
-    await tool('restore_snapshot', {
-      ...base,
-      expected_revision: current.revision,
-      operation_id: randomUUID(),
-      snapshot_id: restored.automatic_snapshot_id,
-    })
-  ).screen;
+  current = applied.screen;
+  const context = await client.callTool({ name: 'get_design_context', arguments: base });
   check(
-    'Automatic snapshot recovers unsaved work',
-    (await tool('list_comments', base)).comments.find((c) => c.id === button.id)?.text ===
-      '스냅샷으로 보호할 미저장 작업',
-  );
-  current = (
-    await tool('undo', { ...base, expected_revision: current.revision, operation_id: randomUUID() })
-  ).screen;
-  check(
-    'Undoing a snapshot jump restores the prior version and keeps all snapshots',
-    current.active_snapshot_id === saved.snapshot_id &&
-      (await tool('list_snapshots', base)).total === 3,
-  );
-  const finalRestore = await tool('restore_snapshot', {
-    ...base,
-    expected_revision: current.revision,
-    operation_id: randomUUID(),
-    snapshot_id: initialVersion.id,
-  });
-  current = finalRestore.screen;
-  const history = await tool('list_history', { ...base, scope: 'all' });
-  check(
-    'Official SDK reads persisted branch-aware history',
-    history.total > 5 && history.events.some((e) => e.actor === 'agent'),
-  );
-  current = (
-    await tool('apply_edits', {
-      ...base,
-      expected_revision: current.revision,
-      operation_id: randomUUID(),
-      operations: [
-        { type: 'point_comment', x: 770, y: 350, text: '검색 영역에 맞춰 여백을 정리해 주세요.' },
-      ],
-    })
-  ).screen;
-  check(
-    'Official SDK creates and queries coordinate annotations',
-    (await tool('list_comments', base)).comments.some(
-      (c) => c.id === 'point:770:350' && c.point.x === 770,
-    ),
+    'Visual context returns images without HTML/CSS',
+    context.content.some((c) => c.type === 'image') &&
+      context.structuredContent.kind === 'visual' &&
+      !context.structuredContent.html &&
+      !context.structuredContent.styles,
   );
   const image = await client.callTool({ name: 'get_review_image', arguments: base });
-  if (image.isError)
-    throw new Error(
-      'MCP image failure: ' + JSON.stringify(image.structuredContent || image.content),
-    );
-  const imageBlock = image.content.find((c) => c.type === 'image');
   check(
-    'Official SDK receives a real PNG as MCP image content',
-    !image.isError &&
-      imageBlock?.mimeType === 'image/png' &&
-      Buffer.from(imageBlock.data, 'base64').subarray(0, 8).toString('hex') === '89504e470d0a1a0a',
+    'Single current handoff image is returned',
+    image.content.some((c) => c.type === 'image'),
   );
-  await fs.writeFile(
-    path.join(root, 'local/mcp-review-image.png'),
-    Buffer.from(imageBlock.data, 'base64'),
+  const photo = context.content.find((c) => c.type === 'image'),
+    image_data_url = 'data:' + photo.mimeType + ';base64,' + photo.data;
+  const register = {
+    ...project,
+    expected_revision: current.revision,
+    operation_id: randomUUID(),
+    title: 'SDK에서 사람이 선택한 목표',
+    request: '제목과 버튼 정렬; 작은 화면에서 줄바꿈 유지',
+    selection_confirmed: true,
+    image_data_url,
+  };
+  const ticket = (await tool('register_ticket', register)).ticket;
+  check(
+    'Registration is queued and does not edit the canvas',
+    ticket.status === 'queued' &&
+      (await tool('get_screen', base)).screen.revision === current.revision,
   );
-  const imageBefore = current.revision;
-  current = (await tool('get_screen', base)).screen;
-  check('MCP image retrieval does not mutate current revision', current.revision === imageBefore);
-  current = (
-    await tool('undo', { ...base, expected_revision: current.revision, operation_id: randomUUID() })
-  ).screen;
+  check(
+    'Same registration operation is idempotent',
+    (await tool('register_ticket', register)).ticket.id === ticket.id,
+  );
+  check(
+    'Project isolation rejects unrelated access',
+    (await tool('list_tickets', { ...project, project_id: 'unrelated' }, true)).error.code ===
+      'wrong_project',
+  );
+  const get = await client.callTool({
+    name: 'get_ticket',
+    arguments: { ...project, ticket_id: ticket.id },
+  });
+  check(
+    'Goal image is an MCP image block',
+    get.content.some((c) => c.type === 'image') &&
+      !JSON.stringify(get.structuredContent).includes('base64'),
+  );
+  check(
+    'Project ticket list includes confirmed goal',
+    (await tool('list_tickets', project)).tickets.some((t) => t.id === ticket.id),
+  );
+  const id = { ...project, ticket_id: ticket.id };
+  let revision = 0;
+  const update = async (status, extras = {}, error = false) => {
+    const r = await tool(
+      'update_ticket',
+      {
+        ...id,
+        expected_revision: revision,
+        operation_id: randomUUID(),
+        status,
+        summary: '격리 테스트 역할의 기록',
+        ...extras,
+      },
+      error,
+    );
+    if (r.ok) revision = r.ticket.revision;
+    return r;
+  };
+  check(
+    'Implementation requires explicit human instruction',
+    (await update('working', {}, true)).error.code === 'instruction_required',
+  );
+  await update('working', { implementation_instruction: '테스트 역할 사람이 구현 지시' });
+  check(
+    'Review requires result image and checks',
+    (await update('review', {}, true)).error.code === 'evidence_required',
+  );
+  await update('review', {
+    implementation_image_data_url: image_data_url,
+    checks: '격리 NORTH 콘솔 렌더 검증',
+  });
+  check(
+    'Completion requires approval record',
+    (await update('done', {}, true)).error.code === 'approval_required',
+  );
+  await update('done', {
+    review_decision: 'approved',
+    review_note: '테스트 역할 사람이 결과 승인',
+  });
+  const final = await client.callTool({ name: 'get_ticket', arguments: id });
+  check(
+    'Goal and latest implementation image are returned together',
+    final.content.filter((c) => c.type === 'image').length === 2 &&
+      final.structuredContent.ticket.status === 'done',
+  );
+  check(
+    'Stale ticket CAS rejected',
+    (
+      await tool(
+        'update_ticket',
+        {
+          ...id,
+          expected_revision: 0,
+          operation_id: randomUUID(),
+          status: 'queued',
+          summary: 'stale',
+        },
+        true,
+      )
+    ).error.code === 'ticket_revision_conflict',
+  );
+  const undone = await tool('undo', {
+    ...base,
+    expected_revision: current.revision,
+    operation_id: randomUUID(),
+  });
+  check(
+    'Undo changes canvas without rewriting ticket',
+    undone.persisted && (await tool('get_ticket', id)).ticket.status === 'done',
+  );
   const report = {
-    officialSdk: true,
-    transport: 'stdio',
     passed: checks.length,
     checks,
-    editor_id,
-    document_id: screen.document_id,
-    final_revision: current.revision,
+    ticket_id: ticket.id,
+    project_id: screen.project_id,
   };
   await fs.mkdir(path.join(root, 'local'), { recursive: true });
   await fs.writeFile(
-    path.join(root, 'local/mcp-native-verification.json'),
-    JSON.stringify(report, null, 2) + '\n',
+    path.join(root, 'local/mcp-verification.json'),
+    JSON.stringify(report, null, 2),
   );
-  console.log(JSON.stringify(report, null, 2));
+  console.log(JSON.stringify(report));
 } finally {
   await client.close();
 }

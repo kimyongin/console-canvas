@@ -193,17 +193,12 @@ try {
     app.state.scene.annotations[node.id] === '접어도 보존할 수정 방향' &&
       app.state.scene.selected === node.id,
   );
-  click('snapshot-dropdown');
+  click('tickets-button');
   check(
-    'Snapshot dropdown opens independently while the right panel remains collapsed',
-    doc.querySelector('#properties-panel').hidden &&
-      doc.querySelector('#snapshot-panel').matches(':popover-open'),
+    'Ticket dialog opens without expanding the collapsed request panel',
+    doc.querySelector('#properties-panel').hidden && doc.querySelector('#tickets-dialog').open,
   );
-  doc.querySelector('#snapshot-panel').hidePopover();
-  check(
-    'Dropdown does not consume a side panel or change its width',
-    doc.querySelector('#properties-rail').getBoundingClientRect().width === 36,
-  );
+  doc.querySelector('#tickets-dialog').close();
   click('toggle-layers');
   await app.state.saving;
   const documentId = app.state.snapshot.id;
@@ -224,12 +219,12 @@ try {
     panelWidth('layers') === 312 && panelWidth('properties') === 360,
   );
   check(
-    'Reopened panels retain the saved document, comment and snapshot list',
+    'Reopened panels retain the saved document, comment',
     app.state.snapshot.id === documentId &&
       doc.querySelector('#component-comment').value === '접어도 보존할 수정 방향' &&
-      app.state.timeline.entries.length === 1,
+      !app.state.timeline,
   );
-  doc.querySelector('.activity-change[data-change-type="comment"]').click();
+  doc.querySelector('.request-row').click();
   check(
     'Comment opens a modal independent of side-panel visibility',
     doc.querySelector('#comment-dialog').open && doc.activeElement.id === 'component-comment',
