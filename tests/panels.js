@@ -194,6 +194,8 @@ try {
       app.state.scene.selected === node.id,
   );
   click('tickets-button');
+  for (let i = 0; i < 200 && !doc.querySelector('#tickets-dialog').open; i++)
+    await new Promise((r) => setTimeout(r, 20));
   check(
     'Ticket dialog opens without expanding the collapsed request panel',
     doc.querySelector('#properties-panel').hidden && doc.querySelector('#tickets-dialog').open,

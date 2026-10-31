@@ -10,7 +10,16 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
   useSyncExternalStore(adapter?.subscribe || emptySubscribe, () => {
     const v = adapter?.getSnapshot();
     return v
-      ? [v.ready, v.selected, v.selectedHidden, v.undoCount, v.redoCount].join('/')
+      ? [
+          v.ready,
+          v.selected,
+          v.selectedHidden,
+          v.undoCount,
+          v.redoCount,
+          v.ticketDisplayId,
+          v.ticketStatus,
+          v.emptyCapture,
+        ].join('/')
       : 'initial';
   });
   const view = adapter?.getSnapshot();
@@ -39,8 +48,34 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
         </div>
         <div className="header-actions">
           <Button
+            id="create-ticket"
+            variant="outline"
+            onClick={() => dispatchEditorCommand('create-ticket')}
+          >
+            ＋ 새 티켓
+          </Button>
+          <Button
+            id="ticket-id"
+            variant="outline"
+            aria-label="티켓 ID 복사"
+            hidden={!view?.ticketDisplayId}
+          >
+            {view?.ticketDisplayId}
+          </Button>
+          <span id="ticket-stage" aria-live="polite">
+            {
+              {
+                draft: '준비 중',
+                queued: '구현 대기',
+                working: '작업 중',
+                review: '검토 대기',
+                done: '완료',
+                blocked: '확인 필요',
+              }[view?.ticketStatus || '']
+            }
+          </span>
+          <Button
             id="tickets-button"
-            disabled={!view?.ready}
             onClick={() => dispatchEditorCommand('tickets')}
             variant="outline"
           >
@@ -48,7 +83,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           </Button>
           <Button
             id="new-ticket-button"
-            disabled={!view?.ready}
+            disabled={!view?.ready || view?.goalConfirmed || view?.emptyCapture}
             onClick={() => dispatchEditorCommand('new-ticket')}
           >
             목표 확정
@@ -171,7 +206,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
               <Button
                 id="document-menu-button"
                 popoverTarget="document-menu-content"
-                aria-label="문서 메뉴"
+                aria-label="티켓 메뉴"
                 variant="outline"
               >
                 <span id="source-title">{'문서 열기'}</span>
@@ -181,7 +216,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                 <Input
                   id="quick-document-search"
                   type="search"
-                  aria-label="문서 바로 검색"
+                  aria-label="티켓 바로 검색"
                   placeholder="문서 이름·주소로 검색"
                 />
                 <div id="quick-documents" className="quick-documents"></div>
@@ -195,7 +230,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                     명령과 단축키…
                   </Button>
                   <Button id="documents-button" variant="outline">
-                    {'전체 저장 화면 목록…'}
+                    {'전체 티켓 목록…'}
                   </Button>
                   <Button
                     id="rename-current"
@@ -218,7 +253,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                   </Button>
                   <p className="document-save-help">
                     {
-                      '\n                작업은 자동 저장됩니다. 확정한 목표는 작업 티켓에, 문서와 티켓 백업은 편집 파일에 저장합니다.\n              '
+                      '\n                작업은 자동 저장됩니다. 티켓 안의 편집·주석·목표·작업 기록이 함께 저장됩니다.\n              '
                     }
                   </p>
                   <Button
@@ -239,7 +274,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                       />
                     </label>
                     <Button id="duplicate-document" variant="outline">
-                      현재 문서 복제
+                      새 티켓으로 복제
                     </Button>
                     <summary>{'원본 정보'}</summary>
                     <a id="source-url" target="_blank" rel="noreferrer" hidden={true}></a>
@@ -251,7 +286,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                     </Button>
                   </details>
                   <Button id="documents-trash-button" variant="outline">
-                    {'문서 휴지통…'}
+                    {'티켓 휴지통…'}
                   </Button>
                   <Button
                     id="trash-current"
@@ -260,7 +295,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                     disabled={true}
                     variant="outline"
                   >
-                    {'\n                이 문서를 휴지통으로 이동\n              '}
+                    {'\n                이 티켓을 휴지통으로 이동\n              '}
                   </Button>
                 </div>
               </div>
@@ -316,6 +351,9 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           </div>
           <div id="viewport" className="canvas-viewport">
             <div id="welcome" className="welcome">
+              <Button onClick={() => dispatchEditorCommand('create-ticket')}>
+                ＋ 새 티켓으로 시작
+              </Button>
               <div className="welcome-icon">{'▧'}</div>
               <div className="eyebrow">{'FROM BROWSER TO CANVAS'}</div>
               <h2>
@@ -326,7 +364,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
               <p>
                 {'실제 콘솔 화면을 복제하고'}
                 <br />
-                {'원하는 배치나 요소별 주석으로 방향을 전달하세요.'}
+                {'티켓 안에서 편집하고, 에이전트에게 티켓 ID로 요청하세요.'}
               </p>
               <Button id="sample-button" className="primary large" variant="outline">
                 {'\n              샘플 콘솔로 시작 '}
@@ -348,6 +386,17 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
               <div id="recent-documents" className="recent-documents"></div>
             </div>
             <div id="artboard-space" className="artboard-space" hidden={true}>
+              <div id="ticket-empty" className="ticket-empty" hidden>
+                <h2>이 티켓에서 편집을 시작하세요</h2>
+                <p>
+                  웹사이트에서 화면을 가져오면 이 티켓에 저장됩니다. 에이전트에게 티켓 ID만 알려
+                  주세요.
+                </p>
+                <Button id="ticket-source">웹사이트에서 가져오기</Button>
+                <Button id="ticket-sample" variant="outline">
+                  샘플 화면 가져오기
+                </Button>
+              </div>
               <div className="artboard-caption">
                 <div id="artboard-label" className="artboard-label"></div>
                 <Button
@@ -838,34 +887,6 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             </Button>
           </div>
         </form>
-      </DialogSurface>
-      <DialogSurface id="documents-dialog" aria-label="저장된 화면">
-        <form method="dialog">
-          <Button className="dialog-close" aria-label="문서 목록 닫기" variant="outline">
-            {'×'}
-          </Button>
-        </form>
-        <h2>{'저장된 화면'}</h2>
-        <p>
-          캔버스 편집은 자동 저장됩니다. 화면 이름은 ‘저장’으로 확정하세요. 삭제한 화면은 휴지통에서
-          복구할 수 있습니다.
-        </p>
-        <div className="list-tabs">
-          <Button id="documents-live" aria-pressed="true" variant="outline">
-            {'저장된 화면'}
-          </Button>
-          <Button id="documents-trash" aria-pressed="false" variant="outline">
-            {'휴지통'}
-          </Button>
-        </div>
-        <Input
-          id="document-search"
-          type="search"
-          aria-label="저장된 화면 검색"
-          placeholder="화면 이름 또는 주소로 검색"
-        />
-        <p id="document-list-status" role="status"></p>
-        <div id="document-list" className="document-list"></div>
       </DialogSurface>
 
       <aside

@@ -1,11 +1,27 @@
-import { registerTicket, listTickets, getTicket, updateTicket } from '../ticket-model.js';
+import {
+  createTicket,
+  getTicket,
+  listTickets,
+  confirmTicketGoal,
+  updateTicket,
+} from '../ticket-model.js';
+import {
+  getDocument,
+  setProjectAccess,
+  trashDocument,
+  restoreDocument,
+  sharedProjects,
+  renameDocument,
+  transact,
+  saveSession,
+} from '../db.js';
 import { importDocument } from '../portable-document.js';
 const frame = document.querySelector('#editor'),
   results = [];
-function check(name, passed) {
-  results.push({ name, passed: !!passed });
+function check(name, value) {
+  results.push({ name, passed: !!value });
   document.querySelector('#results').textContent = JSON.stringify(results);
-  if (!passed) throw Error(name);
+  if (!value) throw Error(name);
 }
 async function until(read) {
   const end = Date.now() + 30000;
@@ -13,11 +29,11 @@ async function until(read) {
     if (await read()) return;
     await new Promise((r) => setTimeout(r, 30));
   }
-  throw Error('Timed out: ' + read);
+  throw Error('Timeout: ' + read);
 }
-async function rejects(action, code) {
+async function rejects(run, code) {
   try {
-    await action();
+    await run();
     return false;
   } catch (e) {
     return !code || e.code === code;
@@ -26,366 +42,365 @@ async function rejects(action, code) {
 try {
   await until(() => frame.contentWindow.ConsoleCanvas?.state.ready);
   let app = frame.contentWindow.ConsoleCanvas,
-    doc = frame.contentDocument,
-    scene = app.state.scene;
+    doc = frame.contentDocument;
+  const initial = app.state.snapshot.id,
+    project = app.state.project_id;
+  let ticket = await getTicket(initial, project);
   check(
-    'Retired UI and runtime APIs are removed',
-    !doc.querySelector('#snapshot-panel,#ai-dialog,#implementation-dialog,#snapshot-dropdown') &&
-      !app.snapshotHistory &&
-      !app.aiRequests &&
-      !app.implementationReview,
+    'Every imported capture already belongs to a draft ticket',
+    ticket.status === 'draft' &&
+      !ticket.goal &&
+      ticket.id === initial &&
+      ticket.display_id.startsWith('CC-'),
   );
-  const node = [...scene.nodes.values()].find((n) => n.locator.id === 'new-customer');
-  scene.select(node.id);
-  scene.nudge(12, 4);
-  scene.setComment(node.id, '버튼을 제목과 같은 줄에 반응형으로 정렬');
+  const originalId = ticket.id;
+  await setProjectAccess(project, true);
+  await app.ticketWorkspace.permissions();
+  const call = (name, args = {}) =>
+    app.ticketWorkspace.execute({ name, arguments: args, deadline: Date.now() / 1000 + 60 });
+  let node = [...app.state.scene.nodes.values()].find((n) => n.locator.id === 'new-customer');
+  app.state.scene.select(node.id);
+  app.state.scene.nudge(12, 4);
+  app.state.scene.setComment(node.id, '고객 등록을 제목과 정렬, 모바일에서는 전체 너비');
   await app.flushEditor();
+  const read = await call('get_ticket', { ticket_ref: ticket.display_id });
   check(
-    'Requests panel shows current intent and edit without event filters',
-    doc.querySelector('#requests-list').textContent.includes('반응형') &&
-      !doc.querySelector('#activity-filter'),
+    'Display ID reads current images and associated comments without a screen ID',
+    read.ok && read.images.length && read.ticket.workspace.annotations[node.id].includes('모바일'),
   );
-  const child = [...scene.nodes.values()].find((n) => n.parentId === node.id && n.kind === 'text');
-  scene.select(child.id);
-  scene.nudge(3, 0);
-  scene.remove(node.id);
   check(
-    'Deleting a parent folds descendant moves into one current request',
-    doc.querySelectorAll('#requests-list .request-row').length === 2 &&
-      doc.querySelector('#requests-list').textContent.includes('요소 삭제'),
+    'Current images are identified separately from an unconfirmed goal',
+    read.images.every((i) => i.role === 'current') && !read.ticket.goal,
   );
-  app.undo();
-  app.undo();
-  scene.select(node.id);
-  await app.flushEditor();
-  const context = await app.controller.execute({
-    name: 'get_design_context',
-    document_id: app.state.snapshot.id,
-    arguments: { editor_id: app.controller.metadata().editor_id },
-    deadline: Date.now() / 1000 + 60,
+  const other = await call('get_ticket', { ticket_ref: ticket.id, project_id: 'unrelated' });
+  check('An unrelated project is not exposed', !other.ok && other.error.code === 'not_authorized');
+  const blank = await createTicket({
+    project_id: project,
+    title: '비어 있는 티켓',
+    operation_id: 'blank-create',
   });
   check(
-    'Visual context uses image blocks and coverage, never HTML/CSS',
-    context.ok &&
-      context.images.length > 0 &&
-      !context.html &&
-      !context.styles &&
-      !!context.coverage,
-  );
-  doc.querySelector('#new-ticket-button').click();
-  await until(() => doc.querySelector('#ticket-request'));
-  check(
-    'Selected comment prefills goal request without retyping',
-    doc.querySelector('#ticket-request').value.includes('반응형'),
-  );
-  const input = doc.querySelector('#ticket-request');
-  input.value = '제목과 버튼 정렬, 작은 화면에서 줄바꿈 유지';
-  input.dispatchEvent(new frame.contentWindow.Event('input', { bubbles: true }));
-  // Use model API for deterministic immutable goal + idempotency; UI submission is separately exercised below.
-  doc.querySelector('#tickets-dialog').close();
-  const canvas = document.createElement('canvas');
-  canvas.width = 100;
-  canvas.height = 60;
-  canvas.getContext('2d').fillRect(0, 0, 100, 60);
-  const image = canvas.toDataURL();
-  const args = {
-    project_id: app.state.project_id,
-    document_id: app.state.snapshot.id,
-    operation_id: crypto.randomUUID(),
-    title: '확정 목표',
-    request: '반응형으로 제목과 버튼 정렬',
-    selection_confirmed: true,
-    image_data_url: image,
-    annotations: structuredClone(scene.annotations),
-    source: app.state.snapshot.source,
-  };
-  const ticket = await registerTicket(args),
-    goal = JSON.stringify(ticket.goal);
-  check(
-    'Retry registration returns same durable ticket',
-    (await registerTicket(args)).id === ticket.id,
+    'Blank creation is replay safe and independent of goals',
+    (
+      await createTicket({
+        project_id: project,
+        title: '비어 있는 티켓',
+        operation_id: 'blank-create',
+      })
+    ).id === blank.id && !blank.goal,
   );
   check(
-    'Reusing receipt for different payload is rejected',
-    await rejects(() => registerTicket({ ...args, title: '다른 목표' }), 'operation_id_reused'),
-  );
-  check(
-    'Registration requires explicit selection',
+    'Reusing a create operation with other input is rejected',
     await rejects(
-      () =>
-        registerTicket({ ...args, operation_id: crypto.randomUUID(), selection_confirmed: false }),
-      'selection_required',
+      () => createTicket({ project_id: project, title: '다른 이름', operation_id: 'blank-create' }),
+      'operation_id_reused',
     ),
   );
-  scene.nudge(6, 0);
-  scene.setComment(node.id, '이후에 바뀐 주석');
-  await app.flushEditor();
+  await app.openTicket(blank.id);
+  const beforeUI = app.state.snapshot.id;
+  let closed = await call('get_ticket', { ticket_ref: originalId });
   check(
-    'Canvas changes cannot mutate fixed goal',
-    JSON.stringify((await getTicket(ticket.id, args.project_id)).goal) === goal,
+    'Closed ticket reads render saved edits without changing the visible ticket',
+    closed.ok && closed.images.length && app.state.snapshot.id === beforeUI,
+  );
+  const revision = closed.ticket.workspace.edit_revision;
+  const edited = await call('apply_edits', {
+    ticket_ref: originalId,
+    expected_edit_revision: revision,
+    operation_id: 'closed-move',
+    operations: [{ type: 'move', element_id: node.id, dx: 10, dy: 0, mode: 'relative' }],
+  });
+  check(
+    'Closed ticket editing uses the shared saved session',
+    edited.ok && edited.persisted && (await getDocument(originalId)).edits[node.id].dx === 22,
+  );
+  const stale = await call('apply_edits', {
+    ticket_ref: originalId,
+    expected_edit_revision: revision,
+    operation_id: 'stale-move',
+    operations: [{ type: 'move', element_id: node.id, dx: 100, dy: 0, mode: 'relative' }],
+  });
+  check(
+    'Stale edit revision cannot overwrite work',
+    !stale.ok && stale.error.code === 'revision_conflict',
+  );
+  const undo = await call('undo', {
+    ticket_ref: originalId,
+    expected_edit_revision: edited.screen.revision,
+    operation_id: 'closed-undo',
+  });
+  check(
+    'Closed ticket undo restores the actual previous edit',
+    undo.ok && (await getDocument(originalId)).edits[node.id].dx === 12,
+  );
+  const replay = await call('apply_edits', {
+    ticket_ref: originalId,
+    expected_edit_revision: revision,
+    operation_id: 'closed-move',
+    operations: [{ type: 'move', element_id: node.id, dx: 10, dy: 0, mode: 'relative' }],
+  });
+  check(
+    'Durable editing receipt prevents duplicate writes even after undo',
+    replay.ok && replay.replayed && (await getDocument(originalId)).edits[node.id].dx === 12,
+  );
+  await renameDocument(originalId, '고객 검색 개선');
+  check(
+    'An exact name resolves to the same stable ticket ID',
+    (await call('get_ticket', { ticket_ref: '고객 검색 개선' })).ticket.id === originalId,
+  );
+  const twin = await createTicket({
+    project_id: project,
+    title: '고객 검색 개선',
+    operation_id: 'same-name',
+  });
+  const ambiguous = await call('get_ticket', { ticket_ref: '고객 검색 개선' });
+  check(
+    'Duplicate names return only scoped candidates instead of guessing',
+    !ambiguous.ok &&
+      ambiguous.error.code === 'ambiguous_ticket' &&
+      ambiguous.error.candidates.length === 2,
+  );
+  await trashDocument(twin.id);
+  check(
+    'Trash immediately removes tickets from agent lookup',
+    !(await call('get_ticket', { ticket_ref: twin.id })).ok,
+  );
+  await restoreDocument(twin.id);
+  check('Recover restores the same ticket ID', (await getTicket(twin.id)).id === twin.id);
+  await setProjectAccess(project, false);
+  check(
+    'Revoking access hides list and image/detail paths',
+    !(await call('get_ticket', { ticket_ref: originalId })).ok &&
+      (await call('list_tickets', {})).total === 0,
+  );
+  await setProjectAccess(project, true);
+  const canvas = document.createElement('canvas');
+  canvas.width = 80;
+  canvas.height = 50;
+  canvas.getContext('2d').fillRect(0, 0, 80, 50);
+  const image = canvas.toDataURL();
+  let fresh = await getTicket(originalId);
+  const saved = await getDocument(originalId);
+  const goalArgs = {
+    ticket_id: originalId,
+    project_id: project,
+    expected_revision: fresh.revision,
+    expected_edit_revision: saved.edit_revision,
+    operation_id: 'confirm-once',
+    image_data_url: image,
+    request: '제목과 정렬, 모바일 줄바꿈',
+    selection_confirmed: true,
+    source: saved.source,
+    annotations: saved.annotations,
+  };
+  ticket = await confirmTicketGoal(goalArgs);
+  const goal = JSON.stringify(ticket.goal);
+  check(
+    'Goal confirmation transitions the SAME ticket to queued',
+    ticket.id === originalId && ticket.status === 'queued' && !!ticket.goal.id,
   );
   check(
-    'Projects are isolated',
-    !(await getTicket(ticket.id, 'other-project')) &&
-      (await listTickets('other-project')).total === 0,
+    'Goal confirmation retry is idempotent',
+    (await confirmTicketGoal(goalArgs)).goal.id === ticket.goal.id,
+  );
+  check(
+    'Goal cannot be silently replaced',
+    await rejects(
+      () => confirmTicketGoal({ ...goalArgs, operation_id: 'replace' }),
+      'goal_already_confirmed',
+    ),
+  );
+  const draftUpdate = {
+    ticket_id: blank.id,
+    project_id: project,
+    expected_revision: blank.revision,
+    operation_id: 'invalid-working',
+    status: 'working',
+    summary: 'start',
+    implementation_instruction: 'human',
+  };
+  check(
+    'A draft cannot enter implementation before goal confirmation',
+    await rejects(() => updateTicket(draftUpdate), 'invalid_transition'),
   );
   async function update(status, extras = {}) {
+    const current = await getTicket(originalId);
     return updateTicket({
-      project_id: args.project_id,
-      ticket_id: ticket.id,
-      expected_revision: (await getTicket(ticket.id, args.project_id)).revision,
+      ticket_id: originalId,
+      project_id: project,
+      expected_revision: current.revision,
+      goal_id: current.goal.id,
       operation_id: crypto.randomUUID(),
       status,
-      summary: '격리 테스트 기록',
+      summary: '실제 QA 기록',
       ...extras,
     });
   }
   check(
-    'Registration is not implementation authorization',
+    'Starting implementation requires a human instruction',
     await rejects(() => update('working'), 'instruction_required'),
   );
   await update('working', { implementation_instruction: '이 티켓을 구현해 주세요' });
   check(
-    'Review requires image and verification evidence',
+    'Review requires implementation evidence',
     await rejects(() => update('review'), 'evidence_required'),
   );
-  const reviewed = await update('review', {
-    implementation_image_data_url: image,
-    checks: '고정 목표 및 좁은 화면에서 레이아웃 검증',
-  });
+  await update('review', { implementation_image_data_url: image, checks: '가상 반응형 결과 검증' });
   check(
-    'Agent cannot finish without human approval record',
+    'Human approval cannot be inferred from test success',
     await rejects(() => update('done'), 'approval_required'),
   );
-  const done = await update('done', {
+  await update('done', {
     review_decision: 'approved',
-    review_note: '테스트 역할의 사람이 목표와 결과를 확인함',
+    review_note: '가상 검토자가 목표와 결과를 확인함',
   });
   check(
-    'Approved implementation reaches done and preserves goal',
-    done.status === 'done' && JSON.stringify(done.goal) === goal && done.records.length === 3,
+    'Records and completion retain the fixed goal',
+    JSON.stringify((await getTicket(originalId)).goal) === goal &&
+      (await getTicket(originalId)).records.length === 3,
   );
+  await app.openTicket(originalId);
+  app.state.scene.select(node.id);
+  app.state.scene.nudge(3, 0);
+  await app.flushEditor();
   check(
-    'Stale ticket revision rejects overwrite',
-    await rejects(
-      () =>
-        updateTicket({
-          project_id: args.project_id,
-          ticket_id: ticket.id,
-          expected_revision: reviewed.revision,
-          operation_id: crypto.randomUUID(),
-          status: 'queued',
-          summary: 'stale',
-        }),
-      'ticket_revision_conflict',
-    ),
-  );
-  await update('queued');
-  await update('blocked');
-  check(
-    'Same goal corrections and blocked states append records',
-    (await getTicket(ticket.id, args.project_id)).records.length === 5,
+    'Further manual editing does not overwrite the confirmed goal',
+    JSON.stringify((await getTicket(originalId)).goal) === goal,
   );
   const exported = await app.exportDocument();
   check(
-    'Portable document contains fixed goal evidence',
-    exported.version === 2 &&
-      exported.tickets.some((t) => t.id === ticket.id && JSON.stringify(t.goal) === goal),
+    'Ticket backup owns edits and fixed goal',
+    exported.format === 'console-canvas-ticket' &&
+      exported.version === 3 &&
+      exported.tickets.length === 1 &&
+      exported.tickets[0].id === originalId,
   );
   check(
-    'Conflicting import cannot overwrite existing document',
-    await rejects(() => importDocument(exported)),
+    'Conflicting backup import leaves the original intact',
+    (await rejects(() => importDocument(exported))) &&
+      JSON.stringify((await getTicket(originalId)).goal) === goal,
   );
-  const originalId = app.state.snapshot.id;
-  doc.querySelector('#duplicate-document').click();
-  await until(() => app.state.ready && app.state.snapshot.id !== originalId);
-  scene = app.state.scene;
-  scene.setComment(node.id, '독립 문서 주석');
-  await app.flushEditor();
-  const original = await (await import('../db.js')).getDocument(originalId);
+  const old = await getDocument(originalId);
+  const competing = {
+    ...old,
+    writer_id: 'other-writer',
+    expected_storage_revision: old.storage_revision,
+    note: 'other edit',
+  };
+  await saveSession(originalId, competing);
   check(
-    'Document copy is independent and tickets remain original',
-    original.annotations[node.id] === '이후에 바뀐 주석' &&
-      (await getTicket(ticket.id, args.project_id)).goal.document_id === originalId,
+    'A stale writer cannot replace another editor session',
+    await rejects(
+      () =>
+        saveSession(originalId, {
+          ...old,
+          writer_id: 'stale-writer',
+          expected_storage_revision: old.storage_revision,
+          note: 'overwrite',
+        }),
+      'revision_conflict',
+    ),
   );
-  const id = app.state.snapshot.id;
-  frame.src = '../editor.html?id=' + encodeURIComponent(id);
+  // Reload a new editor identity and verify the saved ticket, not an old live session.
+  frame.src = '../editor.html?id=' + originalId;
   await new Promise((r) => frame.addEventListener('load', r, { once: true }));
   await until(() => frame.contentWindow.ConsoleCanvas?.state.ready);
   app = frame.contentWindow.ConsoleCanvas;
   doc = frame.contentDocument;
   check(
-    'Restart restores new current work and immutable ticket',
-    app.state.scene.annotations[node.id] === '독립 문서 주석' &&
-      JSON.stringify((await getTicket(ticket.id, args.project_id)).goal) === goal,
+    'Restart keeps ticket ID, comments, fixed goal and review records',
+    app.state.snapshot.id === originalId &&
+      app.state.ticket.id === originalId &&
+      app.state.scene.annotations[node.id].includes('모바일') &&
+      JSON.stringify((await getTicket(originalId)).goal) === goal,
   );
-  doc.querySelector('#tickets-button').click();
-  await until(() => doc.querySelector('#ticket-list .ticket-row'));
-  doc.querySelector('#ticket-list .ticket-row').click();
-  await until(() => doc.querySelector('.ticket-image'));
+  doc.querySelector('#create-ticket').click();
+  await until(() => app.state.ready && app.state.snapshot.id !== originalId);
+  const newId = app.state.snapshot.id;
   check(
-    'Ticket list opens goal and work records in one dialog',
-    doc.querySelectorAll('dialog[open]').length === 1 &&
-      doc.querySelector('.ticket-request').textContent === args.request &&
-      doc.querySelectorAll('.ticket-record').length === 5,
+    'New ticket creates a visible ID without a naming modal',
+    !!app.state.ticket.display_id &&
+      !doc.querySelector('dialog:modal') &&
+      app.state.ticket.status === 'draft',
   );
-  doc.querySelector('#tickets-dialog').close();
-  // Create through the actual React form with an external selected image.
+  doc.querySelector('#ticket-sample').click();
+  await until(() => app.state.ready && app.state.scene.nodes.size > 300);
+  check(
+    'Capture attaches to the existing empty ticket without creating another',
+    app.state.snapshot.id === newId && app.state.ticket.id === newId,
+  );
+  doc.querySelector('#review-note').value = '같은 티켓 목표 확정 UI';
+  doc.querySelector('#review-note').dispatchEvent(new frame.contentWindow.Event('change'));
+  await app.flushEditor();
   doc.querySelector('#new-ticket-button').click();
   await until(() => doc.querySelector('#ticket-request'));
-  function setInput(selector, value) {
-    const el = doc.querySelector(selector);
-    const proto =
-      el.tagName === 'TEXTAREA'
-        ? frame.contentWindow.HTMLTextAreaElement.prototype
-        : frame.contentWindow.HTMLInputElement.prototype;
-    Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, value);
-    el.dispatchEvent(new frame.contentWindow.Event('input', { bubbles: true }));
-  }
-  setInput('#ticket-title', '현재 편집 목표');
-  setInput('#ticket-request', '현재 화면을 반응형 구현 기준으로 확정합니다.');
-  await new Promise((r) => setTimeout(r, 50));
+  check(
+    'Goal form includes current comments and intent without retyping',
+    doc.querySelector('#ticket-request').value.includes('같은 티켓'),
+  );
   doc.querySelector('#ticket-register').click();
+  await until(() => doc.querySelector('.ticket-image'));
+  check(
+    'Actual form confirms a goal on the same ID',
+    (await getTicket(newId)).status === 'queued' &&
+      doc.querySelector('#tickets-content').textContent.includes(app.state.ticket.display_id),
+  );
+  doc.querySelector('#tickets-dialog').close();
+  doc.querySelector('#tickets-button').click();
   await until(
-    () =>
-      doc.querySelector('.ticket-request')?.textContent ===
-      '현재 화면을 반응형 구현 기준으로 확정합니다.',
+    () => doc.querySelector('#tickets-dialog').open && doc.querySelector('#share-project'),
   );
-  check(
-    'UI registers current image and shows queued fixed goal',
-    doc.querySelector('.ticket-image').src.startsWith('data:image/png') &&
-      doc.querySelector('#tickets-content').textContent.includes('구현 대기'),
-  );
-  // File roundtrip recreates the original document and exact fixed goal in a clean slot.
-  const { transact } = await import('../db.js');
-  await transact(['captures', 'sessions', 'documents', 'tickets'], 'readwrite', (tx) => {
-    for (const name of ['captures', 'sessions', 'documents'])
-      tx.objectStore(name).delete(originalId);
-    tx.objectStore('tickets').delete(ticket.id);
-  });
-  const bytes = JSON.stringify(exported);
-  await app.importFile(
-    new frame.contentWindow.File([bytes], 'backup.json', { type: 'application/json' }),
-  );
-  check(
-    'Real file import restores current document and immutable ticket goal',
-    app.state.snapshot.id === originalId &&
-      JSON.stringify((await getTicket(ticket.id, args.project_id)).goal) === goal &&
-      app.state.scene.annotations[node.id] === '이후에 바뀐 주석',
-  );
-  const malformed = structuredClone(exported);
-  malformed.capture.id = crypto.randomUUID();
-  malformed.tickets[0].goal.document_id = malformed.capture.id;
-  malformed.tickets[0].goal.image.data_url = 'data:image/png;base64,' + btoa('not an image');
-  check(
-    'Invalid imported image leaves no partial document',
-    (await rejects(() => importDocument(malformed))) &&
-      !(await (await import('../db.js')).getDocument(malformed.capture.id)),
-  );
-  const replayArgs = {
-    editor_id: app.controller.metadata().editor_id,
-    project_id: app.state.project_id,
-    expected_revision: app.state.revision,
-    operation_id: crypto.randomUUID(),
-    title: '응답 재시도 목표',
-    request: '이 목표를 그대로 유지',
-    selection_confirmed: true,
-  };
-  const invoke = () =>
-    app.controller.execute({
-      name: 'register_ticket',
-      document_id: app.state.snapshot.id,
-      arguments: replayArgs,
-      deadline: Date.now() / 1000 + 60,
-    });
-  const registered = await invoke();
-  check('Current-image MCP registration succeeds', registered.ok);
-  app.state.scene.select(node.id);
-  app.state.scene.nudge(5, 0);
-  await app.flushEditor();
-  const retried = await invoke();
-  check(
-    'Uncertain registration retries after canvas changes without rendering another goal',
-    retried.ok && retried.replayed && retried.ticket.id === registered.ticket.id,
-  );
-  frame.src = '../editor.html?id=' + encodeURIComponent(originalId);
-  await new Promise((r) => frame.addEventListener('load', r, { once: true }));
-  await until(() => frame.contentWindow.ConsoleCanvas?.state.ready);
-  app = frame.contentWindow.ConsoleCanvas;
-  replayArgs.editor_id = app.controller.metadata().editor_id;
-  const restarted = await invoke();
-  check(
-    'Registration receipt survives restart and a new editor identity',
-    restarted.ok && restarted.replayed && restarted.ticket.id === registered.ticket.id,
-  );
-  const factory = frame.contentWindow.indexedDB,
-    originalOpen = factory.open;
-  let backup;
-  try {
-    factory.open = () => {
-      throw new Error('QA storage unavailable');
-    };
-    backup = await app.exportDocument({ allowPartial: true });
-  } finally {
-    factory.open = originalOpen;
-  }
-  check(
-    'Unavailable DB still permits clearly marked memory-only emergency backup',
-    backup.backupWarnings.length === 1 &&
-      backup.tickets.length === 0 &&
-      backup.session.edits[node.id],
-  );
-  const countBefore = (await listTickets(args.project_id)).total,
-    failedArgs = { ...args, operation_id: crypto.randomUUID(), title: '저장 실패 뒤 재시도' };
-  const add = IDBObjectStore.prototype.add,
-    hideExpected = (e) => {
-      if (e.error?.name === 'QuotaExceededError') e.preventDefault();
-    };
+  let share = doc.querySelector('#share-project');
+  await until(() => share.checked);
+  share.click();
+  await until(async () => !(await sharedProjects()).includes(project) && !share.checked);
+  check('Public-access switch stays off after asynchronous persistence', !share.checked);
+  share.click();
+  await until(async () => (await sharedProjects()).includes(project) && share.checked);
+  check('Public-access switch stays on and reflects the real permission', share.checked);
+  doc.querySelector('#tickets-dialog').close();
+  const originalCount = (await listTickets(project, { limit: 10000 })).total;
+  const originalAdd = IDBObjectStore.prototype.add;
   let failed = false;
-  addEventListener('error', hideExpected);
+  const silence = (e) => {
+    if (e.error?.name === 'QuotaExceededError') e.preventDefault();
+  };
+  addEventListener('error', silence);
   try {
-    IDBObjectStore.prototype.add = function (...values) {
+    IDBObjectStore.prototype.add = function (...args) {
       if (this.name === 'tickets') throw new DOMException('QA quota', 'QuotaExceededError');
-      return add.apply(this, values);
+      return originalAdd.apply(this, args);
     };
-    failed = await rejects(() => registerTicket(failedArgs));
+    failed = await rejects(() =>
+      createTicket({ project_id: project, title: 'failure', operation_id: 'failure' }),
+    );
   } finally {
-    IDBObjectStore.prototype.add = add;
-    removeEventListener('error', hideExpected);
+    IDBObjectStore.prototype.add = originalAdd;
+    removeEventListener('error', silence);
   }
   check(
-    'Quota abort leaves neither partial ticket nor success receipt',
-    failed && (await listTickets(args.project_id)).total === countBefore,
-  );
-  const retriedAfterFailure = await registerTicket(failedArgs);
-  check(
-    'Same operation can succeed after storage recovers',
-    (await listTickets(args.project_id)).total === countBefore + 1 &&
-      retriedAfterFailure.status === 'queued',
-  );
-  const race = await Promise.allSettled(
-    ['first', 'second'].map((summary) =>
-      updateTicket({
-        project_id: args.project_id,
-        ticket_id: retriedAfterFailure.id,
-        expected_revision: 0,
-        operation_id: crypto.randomUUID(),
-        status: 'working',
-        summary,
-        implementation_instruction: 'QA human requested',
-      }),
-    ),
+    'Failed ticket creation leaves neither workspace nor success receipt',
+    failed && (await listTickets(project, { limit: 10000 })).total === originalCount,
   );
   check(
-    'Concurrent ticket writers cannot lose a record',
-    race.filter((r) => r.status === 'fulfilled').length === 1 &&
-      race.some((r) => r.status === 'rejected' && r.reason.code === 'ticket_revision_conflict') &&
-      (await getTicket(retriedAfterFailure.id, args.project_id)).records.length === 1,
+    'Creation retry after storage recovery succeeds',
+    (await createTicket({ project_id: project, title: 'failure', operation_id: 'failure' }))
+      .status === 'draft',
+  );
+  await transact(['captures', 'sessions', 'documents', 'tickets'], 'readwrite', (tx) => {
+    for (const name of ['captures', 'sessions', 'documents', 'tickets'])
+      tx.objectStore(name).delete(originalId);
+  });
+  await importDocument(exported);
+  check(
+    'Backup restores stable identity and immutable goal',
+    JSON.stringify((await getTicket(originalId)).goal) === goal &&
+      (await getDocument(originalId)).annotations[node.id].includes('모바일'),
   );
   document.querySelector('#status').textContent = `PASS ${results.length} checks`;
   document.body.dataset.result = 'pass';
 } catch (e) {
   console.error(e);
-  document.querySelector('#status').textContent = 'FAIL ' + e.message;
+  document.querySelector('#status').textContent = 'FAIL ' + e.stack;
   document.body.dataset.result = 'fail';
 }

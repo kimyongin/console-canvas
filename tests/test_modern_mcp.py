@@ -29,7 +29,7 @@ class ModernTests(unittest.TestCase):
         self.assertEqual(results[1]['result']['resultType'], 'complete')
         self.assertEqual(results[1]['result']['ttlMs'], 0)
         self.assertEqual(results[1]['result']['cacheScope'], 'private')
-        self.assertEqual(len(results[1]['result']['tools']), 15)
+        self.assertEqual(len(results[1]['result']['tools']), 16)
         self.assertEqual(results[2]['error']['code'], -32602)
 
     def test_invalid_versions_and_missing_capabilities_fail_before_tools(self):
@@ -43,7 +43,7 @@ class ModernTests(unittest.TestCase):
         results = invoke([rpc(1, 'initialize', {'protocolVersion': '2025-11-25'}), rpc(2, 'tools/list')])
         self.assertEqual(results[0]['result']['protocolVersion'], '2025-11-25')
         self.assertNotIn('resultType', results[1]['result'])
-        self.assertEqual(len(results[1]['result']['tools']), 15)
+        self.assertEqual(len(results[1]['result']['tools']), 16)
 
 
 if __name__ == '__main__':

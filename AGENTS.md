@@ -1,6 +1,6 @@
 # Console Canvas 작업 지침
 
-- 2026-11-01 최신 제품 기준은 `docs/PRD.md`의 티켓 우선 CC-FR/CC-AC와 #169~#176이다. 티켓을 먼저 만들고 그 안에서 편집·주석·같은 ID 목표 확정/구현·검토를 진행한다. 현재 설치본은 0.45.2이며 새 요구사항은 미구현이다. 사후 목표 티켓 등록의 이전 계약/증빙은 `docs/PRD-0.45-history.md`·`docs/ticket-review-0.45-history.md`에 보존한다.
+- 2026-11-01 최신 제품 기준은 `docs/PRD.md`의 티켓 우선 CC-FR/CC-AC와 #169~#176이다. 티켓을 먼저 만들고 그 안에서 편집·주석·같은 ID 목표 확정/구현·검토를 진행한다. 현재 설치본과 MCP·스킬은 0.46.0이며 구현·검증 기록은 `docs/ticket-first-0.46.md`에 둔다. 사후 목표 티켓 등록의 이전 계약/증빙은 `docs/PRD-0.45-history.md`·`docs/ticket-review-0.45-history.md`에 보존한다.
 - 과거 테스트 자료 보존 면제는 0.45 전환에 한정한다. 이후 새로 만든 자료에 대한 이번 전환은 보존·백업·검증된 매핑과 실패 롤백을 제공한다. 브라우저 로그인·OS 서명·개인 스킬은 초기화 대상이 아니다. 0.44 이전 계약은 `docs/PRD-0.44-history.md`에 보관한다.
 
 - 제품 요구사항과 확정한 UI 동작은 `docs/PRD.md`를 기준으로 한다. 동작을 바꾸면 해당 FR/AC와 연결된 이슈, README·관련 스킬을 함께 갱신한다. 사용법·구현 구조·검증 결과의 역할을 구분하고 계획/미검증을 구현/검증 완료로 표시하지 않는다.
@@ -15,7 +15,7 @@
 - 변경 뒤 `npm run check`를 실행한다. 기본은 타입·포맷·번들/스킬 패키징·Python·Node·Chromium 웹/공통 검사다. `check:web`은 같은 범위를 명시하고 `check:all`은 Electron 통합까지 실행한다. `test:desktop`은 통합 검사만 실행한다. 웹 검사의 Electron은 Chromium 실행기이며 앱 설치/OS 통합 검증을 의미하지 않는다. 검사는 가상 자료와 별도 임시 프로필·포트를 사용한다.
 - 독립 실행 `preview.html`과 `dist/`는 생성물이다. 공통 런타임 파일이 바뀌면 빌드 후 스킬의 ZIP 자산도 함께 갱신한다.
 - 개발용 웹 검사와 내장 앱 수집·설치 검증을 구분한다. Chrome 확장 지원 종료를 이유로 기존 사용자 확장/저장 자료를 삭제하지 않는다.
-- `mcp/server.py`는 stdio MCP 어댑터, `mcp/bridge.py`는 인증된 루프백 연결, `editor-controller.js`는 캡처 복제본만 조작한다. 현재 0.45는 연결한 화면만 공개한다. 새 티켓 우선 계약은 명시적으로 허용한 프로젝트/티켓의 저장 작업을 닫힌 편집기에서도 조회한다. 목록/이름 후보·상세·이미지·resource/구독의 권한을 동일하게 하고 철회/휴지통을 반영한다. 원본 웹사이트에 MCP 명령을 전달하지 않는다.
+- `mcp/server.py`는 stdio MCP 어댑터, `mcp/bridge.py`는 인증된 루프백 연결, `editor-controller.js`는 캡처 복제본만 조작한다. 0.46 티켓 우선 계약은 명시적으로 허용한 프로젝트/티켓의 저장 작업을 닫힌 편집기에서도 조회한다. 목록/이름 후보·상세·이미지·resource/구독의 권한을 동일하게 하고 철회/휴지통을 반영한다. 원본 웹사이트에 MCP 명령을 전달하지 않는다.
 - 쓰기에는 화면 버전과 고유 operation_id를 요구한다. 작업 묶음은 한 실행 취소 단계이며, 사람의 편집과 같은 기록을 사용한다. 토큰·실제 캡처·로그인 프로필을 커밋하지 않는다.
 - 데스크톱 원본 사이트는 Node 없이 contextIsolation·sandbox·webSecurity를 유지한다. 로컬 편집기에만 제한된 preload API를 제공하고 IPC 호출자의 프레임을 검증한다.
 - MCP 변경은 실제 SDK 클라이언트로 검증한다. `node scripts/verify_mcp.mjs`는 독립 앱에 연결한 가상 샘플에만 사용한다. 앱 배포는 `python3 scripts/build_desktop.py`로 공식 Electron SHA-256 검증 후 생성한다.
@@ -28,6 +28,6 @@
 - 사용자 승인으로 Apple Development 신원을 선택한 기기는 `apple_signing.py`가 기록한 같은 인증서 지문·Team ID를 우선한다. Apple 체인과 실제 개인 키 보유를 검증한 서명 앱에서만 선택한다. 선택한 신원이 사라지면 자체 서명으로도 자동 전환하지 않는다. Xcode 계정 로그인/약관·OS 보안 창은 사용자에게 맡기고 개인 키를 내보내거나 기존 키체인 ACL을 넓히지 않는다. DR·Team ID 일치와 실제 업데이트 후 보호 저장소 무재승인을 따로 검증한다.
 - `db.js`는 immutable 캡처·mutable 세션·최근 목록 메타데이터를 분리한다. `editor-session.js`의 저장 큐와 flush를 우회하지 않는다. 종료·업데이트는 `desktop/lifecycle.cjs`의 같은 저장 응답을 기다린다.
 
-- 현재 0.45 문서 메타데이터는 티켓 우선 전환에서 통합 티켓 이름·휴지통/복구로 이전한다. 티켓 생성과 목표 확정을 구별하며 같은 ID의 목표 확정 시 이미지/요청/출처를 고정한다. 현재 편집 revision·티켓/상태 revision·goal_id를 구별하고 CAS/operation_id·원자 저장을 유지한다. 작업 복제는 새 ID의 독립 준비 중 티켓이며 목표/진행 기록을 승계하지 않는다.
+- 0.45 문서 메타데이터는 0.46에서 통합 티켓 이름·휴지통/복구로 이전한다. 티켓 생성과 목표 확정을 구별하며 같은 ID의 목표 확정 시 이미지/요청/출처를 고정한다. 현재 편집 revision·티켓/상태 revision·goal_id를 구별하고 CAS/operation_id·원자 저장을 유지한다. 작업 복제는 새 ID의 독립 준비 중 티켓이며 목표/진행 기록을 승계하지 않는다.
 
 - `ui/react/`는 안정된 셸과 목록 UI를 소유한다. `editor-runtime.js/css`는 생성물이며 직접 수정하지 않는다. 새 UI 명령은 `store.ts`/`commands.ts`에 연결하고 React 버튼의 disabled와 DOM 상태가 달라지지 않게 한다. 캡처 iframe은 엔진 소유이며 React 렌더마다 교체하지 않는다.

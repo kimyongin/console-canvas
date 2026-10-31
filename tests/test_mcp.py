@@ -44,17 +44,17 @@ class BrokerTests(unittest.TestCase):
         self.assertEqual(len(self.broker.call('list_screens', {})['screens']), 1)
         self.broker.disconnect('test-editor')
         self.assertEqual(self.broker.call('list_screens', {})['screens'], [])
-        self.assertEqual(self.broker.call('get_screen', {'editor_id': 'missing'})['error']['code'], 'not_connected')
+        self.assertEqual(self.broker.call('get_screen', {'editor_id': 'missing','ticket_ref':'CC-1'})['error']['code'], 'not_connected')
 
     def test_strict_schemas_reject_extra_or_malformed_operations(self):
         self.assertEqual(self.broker.call('list_screens', {'unexpected': True})['error']['code'], 'invalid_arguments')
         rule = next(t[2] for t in TOOLS if t[0] == 'apply_edits')
         for operation in ({'type': 'eval', 'element_id': 'n1'}, {'type': 'move', 'element_id': 'n1', 'dx': float('inf'), 'dy': 0, 'mode': 'relative'}):
             with self.assertRaises(ValueError):
-                validate({'editor_id': 'test-editor', 'expected_revision': 1, 'operation_id': 'unique', 'operations': [operation]}, rule)
+                validate({'editor_id': 'test-editor', 'expected_edit_revision': 1,'ticket_ref':'CC-1', 'operation_id': 'unique', 'operations': [operation]}, rule)
 
     def test_delivery_is_scoped_and_writes_are_idempotent(self):
-        arguments = {'editor_id': 'test-editor', 'expected_revision': 1, 'operation_id': 'once',
+        arguments = {'editor_id': 'test-editor', 'expected_edit_revision': 1,'ticket_ref':'CC-1', 'operation_id': 'once',
                      'operations': [{'type': 'comment', 'element_id': 'n1', 'text': 'move me'}]}
         results = []
         thread = threading.Thread(target=lambda: results.append(self.broker.call('apply_edits', arguments)))
@@ -73,7 +73,7 @@ class BrokerTests(unittest.TestCase):
         thread.join(1)
         self.assertEqual(results, [{'ok': True, 'revision': 2}])
         self.assertEqual(self.broker.call('apply_edits', arguments), results[0])
-        changed = {**arguments, 'expected_revision': 2}
+        changed = {**arguments, 'expected_edit_revision': 2}
         self.assertEqual(self.broker.call('apply_edits', changed)['error']['code'], 'operation_id_reused')
         self.broker.disconnect('different');wrong_poll.join(1)
 
@@ -86,10 +86,10 @@ class BrokerTests(unittest.TestCase):
     def test_ticket_tools_require_project_revision_and_identity(self):
         definitions_by_name = {t[0]: {'inputSchema': t[2]} for t in TOOLS}
         self.assertNotIn('list_snapshots', definitions_by_name)
-        for name in ('register_ticket', 'update_ticket'):
+        for name in ('confirm_ticket_goal', 'update_ticket'):
             with self.assertRaises(ValueError):
                 validate({'editor_id': 'test-editor'}, definitions_by_name[name]['inputSchema'])
-        validate({'editor_id':'test-editor','project_id':'project','expected_revision':0,'operation_id':'once','title':'chosen','request':'responsive goal','selection_confirmed':True},definitions_by_name['register_ticket']['inputSchema'])
+        validate({'ticket_ref':'CC-1','expected_ticket_revision':0,'expected_edit_revision':0,'operation_id':'once','request':'responsive goal','selection_confirmed':True},definitions_by_name['confirm_ticket_goal']['inputSchema'])
 
 
 

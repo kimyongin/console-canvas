@@ -1,8 +1,8 @@
 # Console Canvas PRD
 
-확정 방향: 2026-11-01 · **티켓 우선 편집 전환: 계획/미구현** · 상위 [#169](https://github.com/kimyongin/console-canvas/issues/169)
+확정 방향: 2026-11-01 · **티켓 우선 편집 · 0.46.0 구현** · 상위 [#169](https://github.com/kimyongin/console-canvas/issues/169)
 
-설치 앱·실제 MCP·번들 스킬은 현재 **0.45.2**다. 그 버전의 사후 목표 티켓 등록을 아래 요구사항의 구현 완료로 해석하지 않는다. 실행 순서와 상태는 [티켓 추적표](ticket-review.md), 상세 계약은 [티켓 우선 MCP·스킬](ticket-first-mcp-skill.md)에 둔다. 이전 CC-FR/AC와 완료 증빙은 [0.45 PRD](PRD-0.45-history.md)·[0.45 티켓](ticket-review-0.45-history.md)·[0.45 검증](simplification-0.45.md)에 보존한다. 이번 문서의 CC-FR/AC는 아래 전환을 기준으로 다시 정의했다.
+설치 앱·MCP·번들/설치 스킬은 **0.46.0**이다. 티켓 생성부터 같은 ID 목표 확정까지 구현했으며 [검증 기록](ticket-first-0.46.md)에 공통 UI·공식 SDK·설치 앱의 증빙과 한계를 구별했다. 실행 순서와 상태는 [티켓 추적표](ticket-review.md), 상세 계약은 [티켓 우선 MCP·스킬](ticket-first-mcp-skill.md)에 둔다. 이전 CC-FR/AC와 완료 증빙은 [0.45 PRD](PRD-0.45-history.md)·[0.45 티켓](ticket-review-0.45-history.md)·[0.45 검증](simplification-0.45.md)에 보존한다. 이번 문서의 CC-FR/AC는 아래 전환을 기준으로 다시 정의했다.
 
 ## 1. 배경과 제품 목적
 
@@ -183,7 +183,7 @@
 
 ## 7. 기록·현재 상태
 
-- 이번 변경은 PRD/개발 티켓/차기 MCP·스킬 계약 확정이며 **아직 앱·MCP·설치 스킬을 바꾸지 않았다.**
+- #170~#176의 티켓 우선 저장·UI·목표·MCP·스킬·가이드·설치 경로를 구현했다. 상세 결과와 환경 제한은 [0.46 검증](ticket-first-0.46.md)에 둔다.
 - 0.45 #160/#162~#168 완료는 당시 요구사항의 증빙으로 보존하고 다시 열지 않는다. 새 요구사항은 #169~#176으로 추적한다.
 - 원본 재현 #68/#73, 일반 OS 통합 #7, 공개 배포 적격 #152의 별도 잔여는 유지한다.
-- 현재 구현/사용법: [README](../README.md), [구현 구조](architecture.md), [0.45 검증](simplification-0.45.md). 외부 HTML은 #175에서 실제 구현 후 갱신하며 새 PRD보다 앞선 동작 계약으로 사용하지 않는다.
+- 현재 구현/사용법: [README](../README.md), [구현 구조](architecture.md), [0.46 검증](ticket-first-0.46.md), [실제 화면 사용 가이드](https://console-canvas-guide.yonginkim.chatgpt.site/). 개념 HTML도 티켓 우선 흐름으로 갱신했다.

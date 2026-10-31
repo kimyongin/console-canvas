@@ -91,7 +91,13 @@ class Broker:
         ticket_revision = meta.get('ticket_revision')
         if ticket_revision is not None and (type(ticket_revision) is not int or ticket_revision < 0):
             raise ValueError('Invalid ticket revision')
+        workspace=meta.get('workspace') is True
+        projects=meta.get('project_ids',[])
+        if not isinstance(projects,list) or len(projects)>1000 or any(not isinstance(p,str) or len(p)>300 for p in projects):
+            raise ValueError('Invalid workspace projects')
         meta = {k: meta[k] for k in ('editor_id', 'document_id', 'title', 'url', 'revision', 'element_count', 'comment_count')}
+        if workspace:
+            meta.update(workspace=True,project_ids=projects)
         if ticket_revision is not None:
             meta['ticket_revision'] = ticket_revision
         project_id = body.get('screen', {}).get('project_id')
@@ -155,8 +161,17 @@ class Broker:
             def live(session):
                 return not session.get('closed') and time.monotonic() - session['seen'] < 20
             if name == 'list_screens':
-                return {'ok': True, 'screens': [s['screen'] for s in self.sessions.values() if live(s)]}
-            editor_id = arguments['editor_id']
+                return {'ok': True, 'screens': [({**{k:v for k,v in s['screen'].items() if k!='project_id'},'title':'Console Canvas 티켓','url':'','document_id':'workspace','element_count':0,'comment_count':0} if s['screen'].get('workspace') and s['screen'].get('project_id') not in s['screen'].get('project_ids',[]) else s['screen']) for s in self.sessions.values() if live(s)]}
+            editor_id = arguments.get('editor_id')
+            if not editor_id:
+                candidates=[s for s in self.sessions.values() if live(s) and s['screen'].get('workspace') and
+                            (not arguments.get('project_id') or arguments['project_id'] in s['screen'].get('project_ids',[]))]
+                # One catalog owns a storage origin. Never combine independent browser profiles.
+                if len(candidates)>1:
+                    return error('ambiguous_workspace','More than one workspace is connected; disconnect unused workspaces or specify editor_id')
+                if not candidates:
+                    return error('not_authorized' if arguments.get('project_id') and any(live(s) and s['screen'].get('workspace') for s in self.sessions.values()) else 'not_connected','Run Console Canvas and allow the project in Work tickets')
+                editor_id=candidates[0]['screen']['editor_id']
             session = self.sessions.get(editor_id)
             if not session or not live(session):
                 return error('not_connected', 'Open the editor and connect its MCP button first')
@@ -179,7 +194,7 @@ class Broker:
                 command_id = str(uuid.uuid4())
                 command = {'command_id': command_id, 'editor_id': editor_id, 'document_id': session['screen']['document_id'],
                            'name': name, 'arguments': arguments, 'fingerprint': fingerprint, 'key': key,
-                           'deadline': time.time() + (60 if name in ('get_review_image', 'get_design_context', 'register_ticket', 'get_ticket', 'update_ticket') else 12), 'delivered': False, 'result': None}
+                           'deadline': time.time() + (60 if name in ('get_review_image', 'get_design_context', 'confirm_ticket_goal', 'get_ticket', 'update_ticket') else 12), 'delivered': False, 'result': None}
                 self.commands[command_id] = command
                 if key:
                     self.operation_keys[key] = command_id

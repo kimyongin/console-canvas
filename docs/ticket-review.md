@@ -2,19 +2,19 @@
 
 2026-11-01 · [PRD](PRD.md) · [MCP·스킬 구현 계약](ticket-first-mcp-skill.md) · 상위 [#169](https://github.com/kimyongin/console-canvas/issues/169)
 
-**계획/미구현.** 설치 앱·실제 MCP·스킬은 0.45.2다. 이전 사후 티켓 등록 구현과 검증은 [0.45 추적표](ticket-review-0.45-history.md)에 보존한다. 이 표는 티켓 생성부터 편집·시안·목표 확정·구현·검토를 같은 ID로 이어가는 새 요구사항이다.
+**0.46.0 구현·검증 완료.** 저장·UI·같은 ID 목표·MCP·스킬을 순서대로 구현했다. [검증 기록](ticket-first-0.46.md)과 [실제 화면 가이드](https://console-canvas-guide.yonginkim.chatgpt.site/)를 제공하며 설치 앱도 갱신했다. 이전 증빙은 [0.45 추적표](ticket-review-0.45-history.md)에 보존한다.
 
 ## 실행 순서
 
 | 순서 | GitHub | 범위 | 선행 | 상태 |
 | --- | --- | --- | --- | --- |
-| 1 | [#170](https://github.com/kimyongin/console-canvas/issues/170) | 티켓 소유 모델·ID·저장·0.45 전환/백업·공유 경계 | 없음 | 미착수 |
-| 2 | [#171](https://github.com/kimyongin/console-canvas/issues/171) | 새 티켓·통합 목록·모든 가져오기/편집 진입·티켓 헤더·편집 격리 | #170 | 미착수 |
-| 3 | [#172](https://github.com/kimyongin/console-canvas/issues/172) | 같은 ID 목표 확정·불변 기준·준비/구현/검토 상태 전이 | #171 | 미착수 |
-| 4 | [#173](https://github.com/kimyongin/console-canvas/issues/173) | ID/이름 기반 MCP·닫힌 티켓 조회·이미지·편집·권한·공식 SDK | #170/#172 | 미착수 |
-| 5 | [#174](https://github.com/kimyongin/console-canvas/issues/174) | 짧은 명령/번호 선택·대상 유지·시안/구현·번들/설치 스킬 | #173 | 미착수 |
-| 6 | [#175](https://github.com/kimyongin/console-canvas/issues/175) | README/개념 HTML/사용 가이드·실제 새 캡처·발행 | #171~#174 | 미착수 |
-| 7 | [#176](https://github.com/kimyongin/console-canvas/issues/176) | 전체 시나리오/액션 수·실패/격리·공식 SDK·서명 앱 설치/재실행 | #170~#175 | 미착수 |
+| 1 | [#170](https://github.com/kimyongin/console-canvas/issues/170) | 티켓 소유 모델·ID·저장·0.45 전환/백업·공유 경계 | 없음 | 완료 |
+| 2 | [#171](https://github.com/kimyongin/console-canvas/issues/171) | 새 티켓·통합 목록·모든 가져오기/편집 진입·티켓 헤더·편집 격리 | #170 | 완료 |
+| 3 | [#172](https://github.com/kimyongin/console-canvas/issues/172) | 같은 ID 목표 확정·불변 기준·준비/구현/검토 상태 전이 | #171 | 완료 |
+| 4 | [#173](https://github.com/kimyongin/console-canvas/issues/173) | ID/이름 기반 MCP·닫힌 티켓 조회·이미지·편집·권한·공식 SDK | #170/#172 | 완료 |
+| 5 | [#174](https://github.com/kimyongin/console-canvas/issues/174) | 짧은 명령/번호 선택·대상 유지·시안/구현·번들/설치 스킬 | #173 | 완료 |
+| 6 | [#175](https://github.com/kimyongin/console-canvas/issues/175) | README/개념 HTML/사용 가이드·실제 새 캡처·발행 | #171~#174 | 완료 |
+| 7 | [#176](https://github.com/kimyongin/console-canvas/issues/176) | 전체 시나리오/액션 수·실패/격리·공식 SDK·서명 앱 설치/재실행 | #170~#175 | 완료 |
 
 순차 기본: **#170 → #171 → #172 → #173 → #174 → #175 → #176**. 개발 중 공통 검사를 각 변경에 맞게 수행하고 마지막에만 문제를 발견하는 방식으로 미루지 않는다.
 
@@ -60,8 +60,8 @@
 
 초기 연결 이후 목표는 ‘티켓 목록 요청 + 번호/다음 행동 요청’ 두 번 또는 ‘ID/이름+행동’ 한 번이다. 이는 대화 요청 횟수 목표이며 전체 기능을 두 클릭으로 완료한다는 뜻이 아니다. 모호성 해소·손실 방지·구현 지시·실제 승인에 필요한 행동은 유지한다.
 
-## 이번 정리의 완료 범위
+## 구현·검증 결과
 
-PRD와 차기 MCP/스킬 계약, GitHub 상위/개발 티켓 및 의존성 정리까지다. 런타임·설치 스킬·앱 교체·HTML 재발행은 #170~#176 구현에 포함한다. 현재 가이드는 0.45 사용법이며 새 UI 캡처로 바꾸기 전까지 이번 기능의 증빙이 아니다.
+0.46.0에서 #170~#176을 구현했다. Python47·Node41·Chromium272+스모크2, 공식 SDK16·최신 연결 SDK6, 격리 Electron 종료/재실행·파일·스킬 검사를 통과했다. 실제 공통 편집기로 CC-2 생성·편집·주석·목표 확정, 공유 설정 변경·목록·가이드를 확인했다. 설치 앱은 정상 종료·백업·동일 Apple Development 서명 업데이트 후 CC-5의 ID·이름·주석·이미지·목표 확정과 재실행 보존을 확인했다.
 
-문서 검토: 9개 FR/21개 AC의 고유 ID·로컬 문서 링크·GitHub #169~#176의 실제 생성과 열림 상태·선행 관계를 확인했다. 저장소 지침의 `npm run check`는 타입/포맷/패키징·Python 47·Node 41·Chromium 공통 검사에 통과했다. 최초 샌드박스 실행은 임시 로컬 서버 바인딩 권한으로 실패했고, 허용된 격리 서버 실행에서 다시 통과했다. 이는 기존 0.45 공통 회귀 확인이며 새 기능·MCP·설치 검증은 아니다. README 변경에 따른 런타임 manifest/스킬 런타임 ZIP만 빌드로 재생성했으며 설치 스킬과 앱은 교체하지 않았다.
+실제 외부 AI의 시안 생성이나 프로젝트 구현 성공을 fixture 검증으로 대체해 주장하지 않는다. 이번 범위는 그 작업에 필요한 이미지·주석·ID·목표·구현/검토 기록 계약이다. 실제 OS의 모든 버튼/IME/성능 조합은 별도 #7 잔여이며 공통 UI와 통합 경계를 구별한다.

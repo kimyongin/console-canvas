@@ -1,4 +1,4 @@
 interface:
   display_name: "Console Canvas"
-  short_description: "독립 앱과 MCP로 콘솔 화면을 가져와 요소·주석을 함께 편집"
-  default_prompt: "$console-canvas로 독립 앱의 가져온 화면에 연결해서 요소와 주석을 조회하고 요청한 편집을 반영해 줘."
+  short_description: "티켓 ID·이름으로 편집·주석을 읽고 시안·구현·검토 이어가기"
+  default_prompt: "$console-canvas로 캔버스 티켓을 가져와 목록을 보여줘."

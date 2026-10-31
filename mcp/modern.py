@@ -37,7 +37,7 @@ class ModernProtocol:
 
     def resources(self):
         return [{'uri': self.uri(s['editor_id']), 'name': s['title'] + ' · Work tickets',
-                 'mimeType': 'application/json'} for s in self.screens()]
+                 'mimeType': 'application/json'} for s in self.screens() if not s.get('workspace') or s.get('project_ids')]
 
     def notify(self, method, request_id, values):
         self.emit({'jsonrpc': '2.0', 'method': method, 'params': {
@@ -47,7 +47,7 @@ class ModernProtocol:
         match = re.fullmatch(r'console-canvas://editors/([\w-]{1,100})/tickets', uri or '')
         if not match or not any(s['editor_id'] == match[1] for s in self.screens()):
             raise ValueError('Resource is not connected')
-        value = self.call('list_tickets', {'editor_id': match[1], 'project_id': next(s['project_id'] for s in self.screens() if s['editor_id'] == match[1])})
+        value = self.call('list_tickets', {'editor_id': match[1]})
         if not value.get('ok'):
             raise ValueError('Resource read failed')
         return {'contents': [{'uri': uri, 'mimeType': 'application/json',
@@ -80,7 +80,7 @@ class ModernProtocol:
                 if not self.subscriptions:
                     continue
             try:
-                stamps = {self.uri(s['editor_id']): (s['document_id'], s.get('ticket_revision', 0))
+                stamps = {self.uri(s['editor_id']): (s['document_id'], s.get('ticket_revision', 0),s.get('revision',0),tuple(s.get('project_ids',[])))
                           for s in self.screens()}
                 with self.lock:
                     for request_id, subscription in list(self.subscriptions.items()):

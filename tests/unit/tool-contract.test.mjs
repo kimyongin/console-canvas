@@ -12,18 +12,19 @@ test('Python MCP and editor consume identical resolved contracts', () => {
       { cwd: new URL('../..', import.meta.url), encoding: 'utf8' },
     ),
   );
-  assert.equal(python.length, 15);
+  assert.equal(python.length, 16);
   assert.deepEqual(python, toolContract.tools);
   const valid = {
+    ticket_ref: 'CC-1',
     editor_id: 'editor',
-    expected_revision: 1,
+    expected_edit_revision: 1,
     operation_id: 'retry',
     operations: [{ type: 'comment', element_id: 'n1', text: '의도 😀' }],
   };
   validateToolArguments('apply_edits', valid);
   for (const invalid of [
-    { ...valid, expected_revision: true },
-    { ...valid, expected_revision: 1.5 },
+    { ...valid, expected_edit_revision: true },
+    { ...valid, expected_edit_revision: 1.5 },
     { ...valid, unknown: true },
     { ...valid, operations: [] },
     {

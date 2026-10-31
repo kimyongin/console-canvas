@@ -79,24 +79,38 @@ export function createEditorSession({
     render();
     save();
   }
-  const saveQueue = createSaveQueue(saveSession, {
-    onSaved(id) {
-      if (id === state.snapshot?.id) {
-        state.lastSaveError = null;
-        status('자동 저장 완료');
-      }
+  const saveQueue = createSaveQueue(
+    async (id, value) => {
+      const revision = await saveSession(id, value);
+      if (id === state.snapshot?.id) state.storageRevision = revision;
+      return revision;
     },
-    onError(error, id) {
-      if (id === state.snapshot?.id) {
-        state.lastSaveError = error.message;
-        status('자동 저장 실패 · 파일로 저장해 주세요');
-      }
+    {
+      onSaved(id) {
+        if (id === state.snapshot?.id) {
+          state.lastSaveError = null;
+          status('자동 저장 완료');
+        }
+      },
+      onError(error, id) {
+        if (id === state.snapshot?.id) {
+          state.lastSaveError = error.message;
+          status('자동 저장 실패 · 파일로 저장해 주세요');
+        }
+      },
     },
-  });
+  );
   function save() {
     if (!state.snapshot || !state.scene || !state.ready) return;
     status('저장 중…');
     state.saving = saveQueue.enqueue(state.snapshot.id, {
+      operation_receipt: state.operationReceipt,
+      writer_id: state.writerId,
+      expected_storage_revision: state.storageRevision || 0,
+      edit_revision: state.revision,
+      undo: state.undo,
+      redo: state.redo,
+      selection: [...state.scene.selection],
       documentName: state.snapshot.documentName,
       project_id: state.project_id,
       layerNames: state.snapshot.layerNames || {},

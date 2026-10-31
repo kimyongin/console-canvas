@@ -1,4 +1,3 @@
-// Official SDK integration against an explicitly connected disposable local console only.
 import assert from 'node:assert/strict';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -7,7 +6,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 const root = path.resolve(import.meta.dirname, '..'),
   checks = [];
-const client = new Client({ name: 'console-canvas-ticket-qa', version: '0.45.0' });
+const client = new Client({ name: 'console-canvas-ticket-first-qa', version: '0.46.0' });
 const transport = new StdioClientTransport({
   command: process.env.CONSOLE_CANVAS_PYTHON || '/usr/bin/python3',
   args: process.env.CONSOLE_CANVAS_MCP_ARGS
@@ -19,200 +18,160 @@ const check = (name, value) => {
   assert.ok(value, name);
   checks.push(name);
 };
-async function tool(name, args = {}, error = false) {
+async function tool(name, args = {}, allowError = false) {
   const r = await client.callTool({ name, arguments: args });
-  if (!error) assert.equal(r.isError, false, JSON.stringify(r.structuredContent || r.content));
+  if (!allowError) assert.equal(r.isError, false, JSON.stringify(r.structuredContent || r.content));
   return r.structuredContent;
 }
 try {
   await client.connect(transport);
-  const definitions = (await client.listTools()).tools,
-    names = definitions.map((t) => t.name);
+  const names = (await client.listTools()).tools.map((t) => t.name);
   check(
-    'Only current editing/context/ticket tools are discoverable',
-    names.length === 15 && !names.some((n) => /snapshot|candidate|ai_request|code_patch/.test(n)),
+    'Ticket-first tools replace post-edit registration',
+    names.length === 16 &&
+      names.includes('create_ticket') &&
+      names.includes('confirm_ticket_goal') &&
+      !names.includes('register_ticket'),
   );
   const guide = await tool('get_agent_guide');
   check(
-    'Live bundled guide matches the ticket contract',
-    guide.source === 'app_bundle' &&
-      guide.markdown.includes('register_ticket') &&
-      !guide.markdown.includes('register_ai_candidate'),
+    'App guide explains short ticket commands and same-ticket confirmation',
+    guide.markdown.includes('캔버스 편집/티켓 가져와') &&
+      guide.markdown.includes('confirm_ticket_goal'),
   );
-  const screen = (await tool('list_screens')).screens.find(
-    (s) => new URL(s.url).pathname === '/fixtures/console.html',
-  );
-  assert.ok(screen, 'Disposable console required');
-  const base = { editor_id: screen.editor_id },
-    project = { ...base, project_id: screen.project_id };
-  let current = (await tool('get_screen', base)).screen;
+  const rows = await tool('list_tickets');
+  assert.ok(rows.tickets.length, 'Disposable shared project required');
+  const t = rows.tickets.find((t) => t.status === 'draft');
+  assert.ok(t);
+  const ref = { ticket_ref: t.display_id, project_id: t.project_id };
+  let current = await tool('get_ticket', ref);
   check(
-    'Captured copy and source evidence are available',
-    current.element_count > 300 &&
-      typeof current.capture_reference.available === 'boolean' &&
-      current.capture_reference.kind === 'captured_pixels',
+    'ID alone reads saved edits and images without editor selection',
+    current.ticket.id === t.id &&
+      current.ticket.workspace &&
+      !current.ticket.goal &&
+      current.images.length,
   );
-  const node = (await tool('list_elements', { ...base, query: 'new-customer' })).elements.find(
-    (n) => n.locator.id === 'new-customer',
+  check(
+    'Exact name resolves stable identity',
+    (await tool('get_ticket', { ticket_ref: t.title, project_id: t.project_id })).ticket.id ===
+      t.id,
   );
+  const elements = await tool('list_elements', { ...ref, query: 'new-customer' }),
+    node = elements.elements.find((n) => n.locator.id === 'new-customer');
   assert.ok(node);
   const write = {
-    ...base,
-    expected_revision: current.revision,
+    ...ref,
+    expected_edit_revision: current.ticket.workspace.edit_revision,
     operation_id: randomUUID(),
     operations: [
-      { type: 'move', element_id: node.id, dx: 12, dy: 6, mode: 'relative' },
-      { type: 'comment', element_id: node.id, text: '제목과 버튼을 반응형으로 정렬' },
+      { type: 'move', element_id: node.id, dx: 12, dy: 5, mode: 'relative' },
+      { type: 'comment', element_id: node.id, text: 'SDK: 제목과 정렬, 모바일에서 줄바꿈' },
     ],
   };
   const applied = await tool('apply_edits', write);
   check(
-    'Shared edit batch is one persisted undo step',
-    applied.persisted && applied.screen.undo_count === current.undo_count + 1,
+    'Official SDK performs a durable editing batch',
+    applied.persisted && applied.screen.revision > write.expected_edit_revision,
   );
   check(
-    'Edit replay does not duplicate undo',
+    'Uncertain retry does not duplicate the saved edit',
     (await tool('apply_edits', write)).screen.revision === applied.screen.revision,
   );
   check(
-    'Stale screen writes are rejected',
-    (
-      await tool(
-        'undo',
-        { ...base, expected_revision: current.revision, operation_id: randomUUID() },
-        true,
-      )
-    ).error.code === 'revision_conflict',
+    'Old edit revision is rejected',
+    (await tool('apply_edits', { ...write, operation_id: randomUUID() }, true)).error.code ===
+      'revision_conflict',
   );
-  current = applied.screen;
-  const context = await client.callTool({ name: 'get_design_context', arguments: base });
-  check(
-    'Visual context returns images without HTML/CSS',
-    context.content.some((c) => c.type === 'image') &&
-      context.structuredContent.kind === 'visual' &&
-      !context.structuredContent.html &&
-      !context.structuredContent.styles,
-  );
-  const image = await client.callTool({ name: 'get_review_image', arguments: base });
-  check(
-    'Single current handoff image is returned',
-    image.content.some((c) => c.type === 'image'),
-  );
-  const photo = context.content.find((c) => c.type === 'image'),
-    image_data_url = 'data:' + photo.mimeType + ';base64,' + photo.data;
-  const register = {
-    ...project,
-    expected_revision: current.revision,
+  const blank = await tool('create_ticket', {
+    project_id: t.project_id,
+    title: 'SDK 닫힌 준비 중 티켓',
     operation_id: randomUUID(),
-    title: 'SDK에서 사람이 선택한 목표',
-    request: '제목과 버튼 정렬; 작은 화면에서 줄바꿈 유지',
-    selection_confirmed: true,
-    image_data_url,
-  };
-  const ticket = (await tool('register_ticket', register)).ticket;
-  check(
-    'Registration is queued and does not edit the canvas',
-    ticket.status === 'queued' &&
-      (await tool('get_screen', base)).screen.revision === current.revision,
-  );
-  check(
-    'Same registration operation is idempotent',
-    (await tool('register_ticket', register)).ticket.id === ticket.id,
-  );
-  check(
-    'Project isolation rejects unrelated access',
-    (await tool('list_tickets', { ...project, project_id: 'unrelated' }, true)).error.code ===
-      'wrong_project',
-  );
-  const get = await client.callTool({
-    name: 'get_ticket',
-    arguments: { ...project, ticket_id: ticket.id },
   });
   check(
-    'Goal image is an MCP image block',
-    get.content.some((c) => c.type === 'image') &&
-      !JSON.stringify(get.structuredContent).includes('base64'),
+    'Create returns draft identity before a screen exists',
+    blank.ticket.status === 'draft' && !blank.ticket.goal,
   );
   check(
-    'Project ticket list includes confirmed goal',
-    (await tool('list_tickets', project)).tickets.some((t) => t.id === ticket.id),
+    'A closed empty ticket is readable by ID',
+    (await tool('get_ticket', { ticket_ref: blank.ticket.id })).ticket.workspace.empty,
   );
-  const id = { ...project, ticket_id: ticket.id };
-  let revision = 0;
-  const update = async (status, extras = {}, error = false) => {
-    const r = await tool(
+  const context = await client.callTool({ name: 'get_design_context', arguments: ref });
+  check(
+    'Visual context is delivered as real MCP image blocks',
+    context.content.some((b) => b.type === 'image'),
+  );
+  current = await tool('get_ticket', ref);
+  const confirm = {
+    ...ref,
+    expected_ticket_revision: current.ticket.revision,
+    expected_edit_revision: current.ticket.workspace.edit_revision,
+    operation_id: randomUUID(),
+    request: '고객 등록을 제목과 정렬하고 모바일에서는 전체 너비로 표시',
+    selection_confirmed: true,
+  };
+  const confirmed = await tool('confirm_ticket_goal', confirm);
+  check(
+    'Goal is confirmed on the same ticket ID',
+    confirmed.ticket.id === t.id &&
+      confirmed.ticket.status === 'queued' &&
+      confirmed.ticket.goal.id,
+  );
+  check(
+    'Confirmation retry is durable without re-rendering another goal',
+    (await tool('confirm_ticket_goal', confirm)).ticket.goal.id === confirmed.ticket.goal.id,
+  );
+  const goalId = confirmed.ticket.goal.id;
+  async function update(status, extra = {}, bad = false) {
+    const r = await tool('get_ticket', ref);
+    return tool(
       'update_ticket',
       {
-        ...id,
-        expected_revision: revision,
+        ...ref,
+        goal_id: goalId,
+        expected_ticket_revision: r.ticket.revision,
         operation_id: randomUUID(),
         status,
-        summary: '격리 테스트 역할의 기록',
-        ...extras,
+        summary: 'SDK 작업·검토 기록',
+        ...extra,
       },
-      error,
+      bad,
     );
-    if (r.ok) revision = r.ticket.revision;
-    return r;
-  };
+  }
   check(
-    'Implementation requires explicit human instruction',
+    'Implementation does not begin without instruction',
     (await update('working', {}, true)).error.code === 'instruction_required',
   );
-  await update('working', { implementation_instruction: '테스트 역할 사람이 구현 지시' });
-  check(
-    'Review requires result image and checks',
-    (await update('review', {}, true)).error.code === 'evidence_required',
-  );
+  await update('working', {
+    implementation_instruction: '가상 프로젝트에 이 티켓을 구현하라는 QA 지시',
+  });
+  const block = context.content.find((b) => b.type === 'image');
+  const png = 'data:' + block.mimeType + ';base64,' + block.data;
   await update('review', {
-    implementation_image_data_url: image_data_url,
-    checks: '격리 NORTH 콘솔 렌더 검증',
+    implementation_image_data_url: png,
+    checks: '가상 결과와 반응형 완료 조건 확인',
   });
   check(
-    'Completion requires approval record',
+    'Review cannot automatically become human approval',
     (await update('done', {}, true)).error.code === 'approval_required',
   );
   await update('done', {
     review_decision: 'approved',
-    review_note: '테스트 역할 사람이 결과 승인',
+    review_note: 'QA 역할 검토자가 결과를 확인하고 승인',
   });
-  const final = await client.callTool({ name: 'get_ticket', arguments: id });
+  const final = await client.callTool({ name: 'get_ticket', arguments: ref });
   check(
-    'Goal and latest implementation image are returned together',
-    final.content.filter((c) => c.type === 'image').length === 2 &&
-      final.structuredContent.ticket.status === 'done',
+    'Goal and implementation images remain distinguishable',
+    final.structuredContent.ticket.status === 'done' &&
+      final.structuredContent.ticket.goal.id === goalId &&
+      final.content.filter((b) => b.type === 'image').length >= 2,
   );
   check(
-    'Stale ticket CAS rejected',
-    (
-      await tool(
-        'update_ticket',
-        {
-          ...id,
-          expected_revision: 0,
-          operation_id: randomUUID(),
-          status: 'queued',
-          summary: 'stale',
-        },
-        true,
-      )
-    ).error.code === 'ticket_revision_conflict',
+    'Unauthorized project returns no ticket candidates',
+    (await tool('list_tickets', { project_id: 'not-shared' }, true)).error.code ===
+      'not_authorized',
   );
-  const undone = await tool('undo', {
-    ...base,
-    expected_revision: current.revision,
-    operation_id: randomUUID(),
-  });
-  check(
-    'Undo changes canvas without rewriting ticket',
-    undone.persisted && (await tool('get_ticket', id)).ticket.status === 'done',
-  );
-  const report = {
-    passed: checks.length,
-    checks,
-    ticket_id: ticket.id,
-    project_id: screen.project_id,
-  };
+  const report = { passed: checks.length, checks, ticket_id: t.id, project_id: t.project_id };
   await fs.mkdir(path.join(root, 'local'), { recursive: true });
   await fs.writeFile(
     path.join(root, 'local/mcp-verification.json'),

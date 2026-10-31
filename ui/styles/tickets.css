@@ -127,3 +127,51 @@
 #tickets-content > p {
   margin: 0;
 }
+.ticket-row {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--border, #dde2eb);
+  border-radius: 8px;
+  background: white;
+  margin-bottom: 10px;
+}
+.ticket-row > button {
+  display: grid;
+  text-align: left;
+  justify-items: start;
+  height: auto;
+  white-space: normal;
+  padding: 8px;
+}
+.ticket-share {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: #f4f3fc;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.ticket-empty {
+  position: absolute;
+  z-index: 4;
+  inset: 60px 20px auto;
+  padding: 36px;
+  text-align: center;
+  background: white;
+  border: 1px solid #dddce7;
+  border-radius: 12px;
+}
+.ticket-empty button {
+  margin: 12px 8px;
+}
+#ticket-stage {
+  font-size: 12px;
+  white-space: nowrap;
+  color: #5b5670;
+}
+#ticket-id {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

@@ -435,7 +435,7 @@ async function start() {
       (reopen?.document_id ? '?id=' + encodeURIComponent(reopen.document_id) : ''),
   );
   await source.webContents.loadURL(connection.url + '/fixtures/console.html');
-  if (reopen?.document_id) show('editor');
+  show('editor');
   notify();
 }
 if (!app.requestSingleInstanceLock()) app.quit();

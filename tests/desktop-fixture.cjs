@@ -67,6 +67,10 @@ async function main() {
       'Capture/MCP missing',
     );
     assert.equal(await evaluate(source, 'document.documentElement.outerHTML'), before);
+    await evaluate(
+      editor,
+      "(async()=>{const m=await import('/db.js');await m.setProjectAccess(window.ConsoleCanvas.state.project_id,true);await window.ConsoleCanvas.ticketWorkspace.permissions();})()",
+    );
     const originalSave = dialog.showSaveDialog;
     const pngFile = path.join(directory, 'current-goal.png');
     dialog.showSaveDialog = async () => ({ canceled: false, filePath: pngFile });
@@ -103,7 +107,7 @@ async function main() {
       'utf8',
     );
     assert.ok(
-      installed.includes('register_ticket') && !installed.includes('register_ai_candidate'),
+      installed.includes('confirm_ticket_goal') && !installed.includes('register_ai_candidate'),
     );
     await evaluate(shell, "window.ConsoleCanvasShell.show('editor')");
     await fs.writeFile(
@@ -127,7 +131,7 @@ async function main() {
     );
     const expected = await evaluate(
       editor,
-      `(async()=>{const a=window.ConsoleCanvas,n=[...a.state.scene.nodes.values()].find(n=>n.locator.id==='new-customer');a.selectNode(n.id);a.state.scene.setPosition(23,31);a.state.scene.setComment(n.id,'native persisted comment');const copy=a.state.scene.pasteSelection(a.state.scene.copySelection())[0];document.querySelector('#review-note').value='native persisted note';a.state.snapshot.documentName='새 흐름 재실행 검증';await a.flushEditor();const tickets=await(await import('/ticket-model.js')).listTickets(a.state.project_id);return {document_id:a.state.snapshot.id,node:n.id,copyId:copy,ticketId:tickets.tickets[0].id,project_id:a.state.project_id};})()`,
+      `(async()=>{const a=window.ConsoleCanvas,n=[...a.state.scene.nodes.values()].find(n=>n.locator.id==='new-customer');a.selectNode(n.id);a.state.scene.setPosition(23,31);a.state.scene.setComment(n.id,'native persisted comment');const copy=a.state.scene.pasteSelection(a.state.scene.copySelection())[0];document.querySelector('#review-note').value='native persisted note';a.state.snapshot.documentName='새 흐름 재실행 검증';await a.flushEditor();const tickets=await(await import('/ticket-model.js')).listTickets(a.state.project_id);return {document_id:a.state.snapshot.id,node:n.id,copyId:copy,ticketId:tickets.tickets.find(t=>t.document_id===a.state.snapshot.id).id,project_id:a.state.project_id};})()`,
     );
     await fs.writeFile(path.join(directory, 'expected.json'), JSON.stringify(expected));
   } else {

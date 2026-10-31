@@ -366,41 +366,56 @@ try {
   doc.querySelector('#component-comment').value = '전환 전에 남긴 미저장 주석';
   doc.querySelector('#review-note').value = '전환 전에 남긴 추가 설명';
   doc.querySelector('#documents-button').click();
-  await until(() => doc.querySelectorAll('.document-item').length >= 2);
-  check(
-    'Document switcher lists all saved screens and identifies the current document',
-    !!doc.querySelector('.document-item[aria-current]') &&
-      doc.querySelector('#document-list').textContent.includes('전환 테스트 두 번째 화면'),
+  await until(
+    () =>
+      doc.querySelector('#tickets-dialog').open && doc.querySelectorAll('.ticket-row').length >= 2,
   );
-  doc.querySelector('#document-search').value = '검색 결과 없음 928372';
-  doc.querySelector('#document-search').dispatchEvent(new Event('input', { bubbles: true }));
   check(
-    'Document search has an explicit empty result state',
-    !doc.querySelectorAll('.document-item').length &&
-      doc.querySelector('#document-list-status').textContent.includes('검색 결과가 없습니다'),
+    'Unified ticket list includes current and saved work',
+    !!doc.querySelector('.ticket-row [aria-current]') &&
+      doc.querySelector('#ticket-list').textContent.includes('전환 테스트 두 번째 화면'),
   );
-  doc.querySelector('#document-search').value = '';
-  doc.querySelector('#document-search').dispatchEvent(new Event('input', { bubbles: true }));
-  doc.querySelector('[data-document-id="' + savedId + '"]').click();
+  const search = doc.querySelector('[aria-label="티켓 검색"]');
+  function searchTickets(value) {
+    Object.getOwnPropertyDescriptor(
+      frame.contentWindow.HTMLInputElement.prototype,
+      'value',
+    ).set.call(search, value);
+    search.dispatchEvent(new frame.contentWindow.Event('input', { bubbles: true }));
+  }
+  searchTickets('검색 결과 없음 928372');
+  await until(() => !doc.querySelectorAll('.ticket-row').length);
+  check(
+    'Ticket search has an explicit empty result',
+    doc.querySelector('#ticket-list').textContent.includes('티켓이 없습니다'),
+  );
+  searchTickets('');
+  await until(
+    () =>
+      doc.querySelector('#tickets-dialog').open && doc.querySelectorAll('.ticket-row').length >= 2,
+  );
+  doc.querySelector('[data-ticket-id="' + savedId + '"] > button').click();
   await until(
     () =>
       app.state.ready &&
       app.state.snapshot.id === savedId &&
-      !doc.querySelector('#documents-dialog').open &&
-      !doc.querySelector('#documents-live').disabled,
+      !doc.querySelector('#tickets-dialog').open,
   );
   check(
     'Switching saved documents restores copy geometry, comments',
     app.state.scene.nodes.has(copyRoot) && app.state.scene.annotations[copyRoot] === '복사한 주석',
   );
   doc.querySelector('#documents-button').click();
-  await until(() => doc.querySelectorAll('.document-item').length >= 2);
-  doc.querySelector('[data-document-id="' + otherId + '"]').click();
+  await until(
+    () =>
+      doc.querySelector('#tickets-dialog').open && doc.querySelectorAll('.ticket-row').length >= 2,
+  );
+  doc.querySelector('[data-ticket-id="' + otherId + '"] > button').click();
   await until(
     () =>
       app.state.ready &&
       app.state.snapshot.id === otherId &&
-      !doc.querySelector('#documents-dialog').open,
+      !doc.querySelector('#tickets-dialog').open,
   );
   check(
     'Document switch flushes comment drafts and the review note before leaving',

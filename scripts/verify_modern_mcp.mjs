@@ -3,7 +3,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 const client = new Client(
-    { name: 'console-canvas-modern-ticket-qa', version: '0.45.0' },
+    { name: 'console-canvas-modern-ticket-qa', version: '0.46.0' },
     { versionNegotiation: { mode: { pin: '2026-07-28' } } },
   ),
   checks = [];
@@ -28,9 +28,9 @@ try {
     'Modern server identity without initialize',
     client.getServerVersion()?.name === 'console-canvas',
   );
-  check('Modern discovers current shared tools', (await client.listTools()).tools.length === 15);
-  const screen = (await tool('list_screens')).screens.find((s) =>
-    s.url.includes('/fixtures/console.html'),
+  check('Modern discovers current shared tools', (await client.listTools()).tools.length === 16);
+  const screen = (await tool('list_screens')).screens.find(
+    (s) => s.workspace && s.project_ids?.length,
   );
   assert.ok(screen);
   const resource = (await client.listResources()).resources.find((r) =>
@@ -60,12 +60,13 @@ try {
       editor_id: screen.editor_id,
       project_id: screen.project_id,
     }),
-    t = tickets.tickets[0];
+    t = tickets.tickets.find((t) => t.has_goal);
   await tool('update_ticket', {
     editor_id: screen.editor_id,
     project_id: screen.project_id,
-    ticket_id: t.id,
-    expected_revision: t.revision,
+    ticket_ref: t.id,
+    goal_id: t.goal_id,
+    expected_ticket_revision: t.revision,
     operation_id: randomUUID(),
     status: 'queued',
     summary: '동일 목표 수정 요청 · 격리 테스트',

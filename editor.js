@@ -1,3 +1,5 @@
+import { createTicketWorkspace } from './ticket-workspace.js';
+import { createTicket, getTicket } from './ticket-model.js';
 import { createEditorCommands } from './ui/editor-commands.js';
 import { createResourceRepair } from './ui/resource-repair.js';
 import { resourceCandidates } from './resource-repair.js';
@@ -76,8 +78,13 @@ const state = {
 const editorId =
   globalThis.crypto?.randomUUID?.() ||
   'editor-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+state.writerId = editorId;
 const adapter = createEditorAdapter(() => ({
   documentId: state.snapshot?.id || null,
+  ticketDisplayId: state.ticket?.display_id || '',
+  ticketStatus: state.ticket?.status || '',
+  goalConfirmed: !!state.ticket?.goal,
+  emptyCapture: !!state.snapshot?.source.empty,
   generation: state.generation,
   revision: state.revision,
   ready: state.ready,
@@ -163,8 +170,8 @@ const renameDialog = createRenameDialog({ $ });
 createDocumentSwitcher({
   $,
   state,
-  openSnapshot,
-  commitCommentDraft,
+  openTicket,
+  showTickets,
   flushEditor,
   closeDocument,
   renameCurrent,
@@ -175,12 +182,19 @@ function renameCurrent(name) {
   state.snapshot.documentName = name;
   renderDocumentName();
   save();
+  getTicket(state.snapshot.id).then((t) => {
+    state.ticket = t;
+    renderTicketIdentity();
+  });
 }
 function renderDocumentName() {
-  const name = state.snapshot?.documentName || state.snapshot?.source.title || '문서 열기';
+  const name = state.ticket
+    ? state.ticket.display_id + ' · ' + (state.snapshot?.documentName || state.ticket.title)
+    : '티켓을 만들어 시작하세요';
   $('#source-title').textContent = name;
   $('#document-title').textContent = name;
   $('#document-menu-button').title = name;
+  renderTicketIdentity();
   for (const button of document.querySelectorAll('[data-current-document]'))
     button.disabled = !state.snapshot;
   $('#artboard-label').textContent = state.snapshot
@@ -198,6 +212,7 @@ function closeDocument(id) {
       clipboard.reset();
       commentEditor.reset();
       state.snapshot = null;
+      state.ticket = null;
       editorCommands.reset();
       state.scene = null;
       state.activity = [];
@@ -224,6 +239,7 @@ function closeDocument(id) {
       renderInspector();
       renderHistory();
       renderRecentDocuments();
+      connectDesktopIfReady();
     });
   opening = next;
   return next;
@@ -468,14 +484,17 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}) {
   // A long-poll may still advertise the preceding document after a switch.
   // Withdraw it before replacing the scene, then reconnect with fresh metadata.
   state.desktopConnection = (await mcpBridge.suspend()) || state.desktopConnection;
-  state.revision++;
+  state.revision = snapshot.edit_revision || 0;
+  state.storageRevision = snapshot.storage_revision || 0;
+  state.ticket = await getTicket(snapshot.id);
   $('#welcome').hidden = true;
   $('#artboard-space').hidden = false;
   $('#export-button').disabled = true;
   const storedCodePatches = snapshot.resourceRepairs;
   const storedLayerNames = snapshot.layerNames;
   const capture = captureFromDocument(snapshot);
-  state.project_id = snapshot.project_id || defaultProject(snapshot.source.url);
+  state.project_id =
+    state.ticket?.project_id || snapshot.project_id || defaultProject(snapshot.source.url);
   $('#project-id').value = state.project_id;
   state.snapshot = {
     ...capture,
@@ -486,8 +505,8 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}) {
   state.activityHead = snapshot.activityHead || null;
   state.lastCheckpoint = null;
   state.pendingBefore = null;
-  state.undo = [];
-  state.redo = [];
+  state.undo = snapshot.undo || [];
+  state.redo = snapshot.redo || [];
   state.expanded = new Set(snapshot.nodes.filter((node) => !node.parentId).map((node) => node.id));
   restoreNavigation();
   renderDocumentName();
@@ -544,6 +563,7 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}) {
     scene.setResourceRepairs(storedCodePatches || []);
     scene.setEdits(edits);
     scene.setComments(annotations);
+    scene.select(null, { ids: snapshot.selection || [] });
     fit(() => {
       if (generation !== state.generation) return;
       $('#viewport').scrollLeft = (snapshot.source.scroll?.x || 0) * state.zoom;
@@ -558,11 +578,21 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}) {
     state.lastCheckpoint = checkpoint();
     activityPanel.render();
     state.ready = true;
+    const route = new URL(location.href);
+    route.searchParams.delete('sample');
+    route.searchParams.set('id', state.snapshot.id);
+    history.replaceState(null, '', route);
+    $('#ticket-empty').hidden = !state.snapshot.source.empty;
+    renderTicketIdentity();
     adapter.publish();
     connectDesktopIfReady();
     renderMcpStatus();
     save();
-    toast('화면을 가져왔어요. 요소를 옮기거나 주석으로 수정 방향을 남겨 보세요.');
+    toast(
+      state.snapshot.source.empty
+        ? '티켓을 만들었습니다. 화면을 가져와 편집하세요.'
+        : '화면을 가져왔어요. 이 티켓에서 편집과 주석을 이어가세요.',
+    );
   } catch (error) {
     state.snapshot = null;
     state.scene = null;
@@ -580,7 +610,7 @@ async function loadSample() {
   let source;
   try {
     if (window.CONSOLE_CANVAS_SAMPLE) {
-      await openSnapshot(copy(window.CONSOLE_CANVAS_SAMPLE));
+      await receiveCapture(copy(window.CONSOLE_CANVAS_SAMPLE));
       return;
     }
     source = document.createElement('iframe');
@@ -595,7 +625,7 @@ async function loadSample() {
     document.body.append(source);
     await loaded;
     const snapshot = await globalThis.UICloneCapture.capture(source.contentDocument);
-    await openSnapshot(snapshot);
+    await receiveCapture(snapshot);
   } catch (error) {
     notice(error.message);
   } finally {
@@ -770,55 +800,132 @@ function defaultProject(url) {
     return 'local-project';
   }
 }
-function showTickets(create = false) {
-  if (!state.ready) return;
-  commitCommentDraft();
-  const generation = state.generation;
-  const selected = [...state.scene.selection];
-  const requested = state.scene
-    .comments()
-    .filter(
-      (c) =>
-        !selected.length ||
-        selected.some((id) => id === c.id || state.scene.ancestors(c.id).includes(id)),
-    )
-    .map((c) => c.text);
-  const goalRequest = [$('#review-note').value, ...requested].filter((v) => v?.trim()).join('\n\n');
-  renderTickets($('#tickets-content'), {
-    project: state.project_id,
-    documentId: state.snapshot.id,
-    title: state.snapshot.documentName || state.snapshot.source.title,
-    note: goalRequest,
-    source: state.snapshot.source,
-    annotations: copy(state.scene.annotations),
-    selection: [...state.scene.selection],
-    create,
-    capture: async () => {
-      const revision = state.revision;
-      const image = await imageResult();
-      if (generation !== state.generation || revision !== state.revision)
-        throw Error('화면이 변경되었습니다. 다시 등록해 주세요.');
-      return blobUrl(image.blob);
-    },
-    close: () => $('#tickets-dialog').close(),
-    changed: () => {
-      state.ticketRevision = (state.ticketRevision || 0) + 1;
-    },
+function renderTicketIdentity() {
+  const ticket = state.ticket;
+  $('#ticket-stage').textContent = ticket
+    ? {
+        draft: '준비 중',
+        queued: '구현 대기',
+        working: '작업 중',
+        review: '검토 대기',
+        done: '완료',
+        blocked: '확인 필요',
+      }[ticket.status] || ''
+    : '';
+  $('#ticket-id').textContent = ticket?.display_id || '';
+  $('#ticket-id').hidden = !ticket;
+  $('#new-ticket-button').disabled =
+    !state.ready || !!ticket?.goal || !!state.snapshot?.source.empty;
+  $('#ticket-empty').hidden = !state.snapshot?.source.empty;
+  $('#artboard-label').dataset.confirmed = String(!!ticket?.goal);
+}
+async function refreshTicket() {
+  if (state.snapshot) state.ticket = await getTicket(state.snapshot.id);
+  renderDocumentName();
+  adapter.publish();
+  await ticketWorkspace.permissions();
+}
+async function openTicket(id) {
+  await flushEditor();
+  const doc = await getDocument(id);
+  if (!doc) throw Error('티켓 작업 공간을 찾을 수 없습니다.');
+  await openSnapshot(doc, doc.edits, doc.note, doc.annotations);
+}
+async function newTicket() {
+  await flushEditor();
+  const ticket = await createTicket({
+    title: '새 편집 티켓',
+    project_id: state.project_id || 'local-project',
+    operation_id: crypto.randomUUID(),
   });
-  $('#tickets-dialog').showModal();
+  await openTicket(ticket.id);
+}
+async function receiveCapture(value) {
+  if (state.snapshot?.source.empty)
+    value = {
+      ...value,
+      id: state.snapshot.id,
+      project_id: state.project_id,
+      documentName:
+        state.ticket?.title === '새 편집 티켓' ? value.source.title : state.ticket?.title,
+    };
+  await openSnapshot(value);
+}
+async function showTickets(confirm = false) {
+  try {
+    await flushEditor();
+    const ticket = state.snapshot ? await getTicket(state.snapshot.id) : null;
+    const goalRequest = [
+      $('#review-note').value,
+      ...(state.scene?.comments() || []).map((c) => c.text),
+    ]
+      .filter((v) => v?.trim())
+      .join('\n\n');
+    const revision = state.revision,
+      generation = state.generation;
+    renderTickets($('#tickets-content'), {
+      project: state.project_id,
+      documentId: state.snapshot?.id,
+      ticket: confirm ? ticket : null,
+      confirm,
+      note: goalRequest,
+      source: state.snapshot?.source,
+      annotations: state.scene ? copy(state.scene.annotations) : {},
+      selection: state.scene ? [...state.scene.selection] : [],
+      editRevision: revision,
+      capture: async () => {
+        await flushEditor();
+        const image = await imageResult();
+        if (revision !== state.revision || generation !== state.generation)
+          throw Error('편집이 바뀌었습니다. 다시 확정해 주세요.');
+        return blobUrl(image.blob);
+      },
+      create: async () => {
+        $('#tickets-dialog').close();
+        await newTicket();
+      },
+      open: async (id) => {
+        $('#tickets-dialog').close();
+        await openTicket(id);
+      },
+      close: () => $('#tickets-dialog').close(),
+      removed: async (id) => {
+        if (state.snapshot?.id === id) await closeDocument(id);
+      },
+      changed: () => {
+        state.ticketRevision = (state.ticketRevision || 0) + 1;
+        void refreshTicket();
+      },
+    });
+    $('#tickets-dialog').showModal();
+  } catch (e) {
+    toast(e.message);
+  }
 }
 adapter.register('tickets', () => showTickets());
 adapter.register('new-ticket', () => showTickets(true));
+adapter.register('create-ticket', () => newTicket().catch((e) => toast(e.message)));
+$('#ticket-id').addEventListener('click', async () => {
+  await navigator.clipboard.writeText(state.ticket.display_id);
+  toast('티켓 ID를 복사했습니다. 에이전트에게 이 ID로 요청하세요.');
+});
+$('#ticket-source').addEventListener('click', () => window.ConsoleCanvasDesktop?.showSource());
+$('#ticket-sample').addEventListener('click', loadSample);
 $('#project-id').addEventListener('change', async () => {
   const key = $('#project-id').value.trim();
   if (!key) {
     $('#project-id').value = state.project_id;
     return;
   }
+  if (state.ticket?.goal) {
+    $('#project-id').value = state.project_id;
+    toast('목표를 확정한 티켓의 프로젝트는 바꿀 수 없습니다.');
+    return;
+  }
   state.project_id = key;
   state.revision++;
   await flushEditor();
-  toast('이 문서의 프로젝트를 설정했습니다. 기존 티켓의 프로젝트는 유지됩니다.');
+  toast('이 티켓의 프로젝트를 설정했습니다.');
 });
 $('#duplicate-document').addEventListener('click', async () => {
   try {
@@ -837,7 +944,7 @@ $('#duplicate-document').addEventListener('click', async () => {
       $('#review-note').value,
       copy(state.scene.annotations),
     );
-    toast('독립 문서를 만들었습니다. 기존 티켓은 복제하지 않습니다.');
+    toast('새 ID의 독립 티켓을 만들었습니다. 확정 목표와 진행 기록은 복사하지 않습니다.');
   } catch (e) {
     toast(e.message);
   }
@@ -976,9 +1083,19 @@ const controller = createEditorController({
     return true;
   },
 });
+const ticketWorkspace = createTicketWorkspace({
+  state,
+  editorId,
+  controller,
+  flushEditor,
+  refresh: () => {
+    state.ticketRevision = (state.ticketRevision || 0) + 1;
+    void refreshTicket();
+  },
+});
 const mcpBridge = createMcpBridge({
-  metadata: controller.metadata,
-  execute: controller.execute,
+  metadata: ticketWorkspace.metadata,
+  execute: ticketWorkspace.execute,
   onStatus: (status) => {
     state.mcpStatus = status;
     if (status.agent_command)
@@ -1067,7 +1184,7 @@ if (window.ConsoleCanvasDesktop) {
   });
   window.ConsoleCanvasDesktop.onSnapshot(async (value) => {
     try {
-      await openSnapshot(value);
+      await receiveCapture(value);
       return { ok: true };
     } catch (error) {
       notice(error.message);
@@ -1124,6 +1241,9 @@ window.ConsoleCanvas = {
   undo,
   selectNode,
   controller,
+  ticketWorkspace,
+  newTicket,
+  openTicket,
   checkpoint,
   flushEditor,
   showTickets,
@@ -1132,7 +1252,7 @@ window.ConsoleCanvas = {
     exportDocument(state.snapshot, checkpoint(), state.project_id, options),
 };
 function connectDesktopIfReady() {
-  if (state.desktopConnection && state.ready && !mcpBridge.isConnected()) {
+  if (state.desktopConnection && !mcpBridge.isConnected()) {
     const connection = state.desktopConnection;
     state.desktopConnection = null;
     mcpBridge.connect(connection.url, connection.token).catch((error) => notice(error.message));

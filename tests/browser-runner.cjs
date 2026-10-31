@@ -56,6 +56,7 @@ async function main() {
   const reports = [];
   for (const suite of [
     'workspace-reset',
+    'ticket-migration',
     'iframes',
     'capture-quality',
     'capture-enhancements',
