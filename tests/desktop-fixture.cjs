@@ -360,6 +360,14 @@ async function main() {
       );
       throw error;
     });
+    await until(
+      () =>
+        evaluate(
+          editor,
+          `(()=>{const a=window.ConsoleCanvas,v=document.querySelector('#viewport');return v.clientWidth>96&&Math.abs(a.state.zoom-Math.min(1,Math.max(.1,(v.clientWidth-96)/a.state.scene.viewRect().width)))<.001})()`,
+        ),
+      'Restored visible editor did not fit its canvas',
+    );
     const expected = JSON.parse(await fs.readFile(path.join(directory, 'expected.json')));
     const actual = await evaluate(
       editor,
@@ -428,12 +436,11 @@ async function main() {
       }),
     );
   }
-  if (phase === 'reopen' && !process.env.CONSOLE_CANVAS_OFFSCREEN) {
-    await fs.writeFile(
-      path.join(__dirname, '../dist/editor-panel-controls.png'),
-      (await editor.capturePage(undefined, { stayHidden: true, stayAwake: true })).toPNG(),
-    );
-  }
+  // Reopen is verified by the persisted state and DOM assertions above. A hidden
+  // WebContentsView has no reliable macOS Viz surface even with stayAwake;
+  // capturePage here made an optional artifact fail the completed integration.
+  // Native capture is exercised by self-design/scoped-capture; visible installed
+  // app screenshots belong to the separate deployment check.
   window.close();
 }
 main().catch((error) => {

@@ -236,6 +236,63 @@ try {
   );
   doc.querySelector('#close-comment-dialog').click();
   await app.state.saving;
+  const hiddenSnapshot = structuredClone(app.state.snapshot);
+  hiddenSnapshot.id = crypto.randomUUID();
+  hiddenSnapshot.source.width = 2400;
+  hiddenSnapshot.source.height = 8000;
+  hiddenSnapshot.source.scroll = { x: 0, y: 600 };
+  frame.style.display = 'none';
+  const beforeHiddenZoom = app.state.zoom;
+  await app.openSnapshot(hiddenSnapshot);
+  check(
+    'Hidden restore does not force the canvas down to 10%',
+    app.state.zoom === beforeHiddenZoom,
+  );
+  frame.style.display = '';
+  async function rendered() {
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  }
+  await rendered();
+  const expectedFit = () =>
+    Math.min(
+      1,
+      Math.max(
+        0.1,
+        (doc.querySelector('#viewport').clientWidth - 96) / app.state.scene.viewRect().width,
+      ),
+    );
+  check(
+    'Restored canvas fits after its viewport becomes visible',
+    Math.abs(app.state.zoom - expectedFit()) < 0.001,
+  );
+  check(
+    'Deferred fit restores the original scroll using the fitted scale',
+    Math.abs(doc.querySelector('#viewport').scrollTop - 600 * app.state.zoom) < 2,
+  );
+  frame.style.display = 'none';
+  await app.openSnapshot({ ...hiddenSnapshot, id: crypto.randomUUID() });
+  doc.querySelector('#zoom').value = '0.5';
+  doc.querySelector('#zoom').dispatchEvent(new Event('change'));
+  frame.style.display = '';
+  await rendered();
+  check('Manual zoom cancels a hidden pending fit', app.state.zoom === 0.5);
+  frame.style.width = '1100px';
+  await rendered();
+  check('Later viewport resizing preserves manual zoom', app.state.zoom === 0.5);
+  frame.style.display = 'none';
+  await app.openSnapshot({ ...hiddenSnapshot, id: crypto.randomUUID() });
+  await app.openSnapshot({
+    ...hiddenSnapshot,
+    id: crypto.randomUUID(),
+    source: { ...hiddenSnapshot.source, width: 1800, scroll: { x: 0, y: 0 } },
+  });
+  frame.style.display = '';
+  await rendered();
+  check(
+    'Replacing a hidden document fits only the latest scene',
+    Math.abs(app.state.zoom - expectedFit()) < 0.001 &&
+      doc.querySelector('#viewport').scrollTop === 0,
+  );
   document.querySelector('#status').textContent = JSON.stringify({
     passed: results.length,
     failed: 0,

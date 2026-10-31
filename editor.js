@@ -639,9 +639,11 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}, t
     scene.setEdits(edits);
     scene.setComments(annotations);
     snapshotHistory.initialise(timeline);
-    fit();
-    $('#viewport').scrollLeft = (snapshot.source.scroll?.x || 0) * state.zoom;
-    $('#viewport').scrollTop = (snapshot.source.scroll?.y || 0) * state.zoom;
+    fit(() => {
+      if (generation !== state.generation) return;
+      $('#viewport').scrollLeft = (snapshot.source.scroll?.x || 0) * state.zoom;
+      $('#viewport').scrollTop = (snapshot.source.scroll?.y || 0) * state.zoom;
+    });
     renderInspector();
     renderLayers();
     activityPanel.render();

@@ -5,9 +5,11 @@ description: Console Canvas에서 소스 없이 가져온 웹 화면을 편집�
 
 # Console Canvas
 
-## Console Canvas 자기 디자인 · 0.41
+## Console Canvas 자기 디자인 · 0.42
 
 상단 **앱 디자인 편집**은 현재 앱의 웹 UI를 새 문서로 복제한다. `console-canvas://app/<화면>`과 `source.application`의 앱 버전/화면, locator의 `app_surface`로 헤더/편집 영역의 출처를 구별한다. 복제본의 버튼은 원본 앱 기능을 실행하지 않으며 기존 편집·AI·MCP·주석·스냅샷으로 디자인한다. 시안 적용은 복제본 변경이며 실제 Console Canvas 소스/설치 앱 갱신은 사용자가 요청한 개발 작업으로 수행한다.
+
+실제 앱 반영까지 요청받으면 선택 후보의 `get_ai_context`와 화면으로 의도를 읽고 원본 locator·`app_surface`에 해당하는 소스를 수정한다. 캡처가 고정한 픽셀 너비·중요도·vendor 색상 전체를 복사하지 않고 원래 레이아웃과 hover/focus/disabled를 유지한다. 후보 선택/형제 스냅샷 보존과 실제 소스/설치 반영·재실행 검증 결과를 구별한다. 자기 편집 테스트는 새 문서에서 진행해 기존 작업을 바꾸지 않는다.
 
 ## AI 시안 상세 비교 · 0.40
 

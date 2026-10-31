@@ -1,4 +1,10 @@
 export function createCanvasViewport({ $, state }) {
+  let pendingFit = null,
+    fitObserver = null;
+  function cancelFit() {
+    pendingFit = null;
+    fitObserver?.disconnect();
+  }
   function sizeChanged(size) {
     state.size = size;
     updateZoom();
@@ -30,6 +36,7 @@ export function createCanvasViewport({ $, state }) {
       view.width + ' × ' + view.height + ' · ' + Math.round(zoom * 100) + '%';
   }
   function zoomTo(value, anchor = null) {
+    cancelFit();
     const rect = $('#scene-frame').getBoundingClientRect(),
       viewport = $('#viewport'),
       bounds = viewport.getBoundingClientRect();
@@ -45,10 +52,30 @@ export function createCanvasViewport({ $, state }) {
     viewport.scrollLeft += (state.zoom - previous) * (x - state.scene.viewRect().x);
     viewport.scrollTop += (state.zoom - previous) * (y - state.scene.viewRect().y);
   }
-  function fit() {
-    zoomTo(
-      Math.min(1, Math.max(0.1, ($('#viewport').clientWidth - 96) / state.scene.viewRect().width)),
-    );
+  function applyFit() {
+    if (!pendingFit) return true;
+    if (pendingFit.scene !== state.scene) {
+      cancelFit();
+      return true;
+    }
+    const viewport = $('#viewport');
+    if (viewport.clientWidth <= 96 || !viewport.clientHeight) return false;
+    const onFit = pendingFit.onFit;
+    zoomTo(Math.min(1, Math.max(0.1, (viewport.clientWidth - 96) / state.scene.viewRect().width)));
+    if (typeof onFit === 'function') onFit();
+    return true;
+  }
+  function fit(onFit) {
+    cancelFit();
+    if (!state.scene) return;
+    pendingFit = { scene: state.scene, onFit };
+    // Electron restores the document before displaying its WebContentsView.
+    // Wait for a usable viewport without delaying document readiness or later
+    // overwriting a manual zoom. The observer belongs only to this pending fit.
+    if (!applyFit()) {
+      fitObserver ||= new ResizeObserver(applyFit);
+      fitObserver.observe($('#viewport'));
+    }
   }
 
   function fitSelection() {

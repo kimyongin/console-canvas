@@ -55,6 +55,21 @@ button {
 button:hover {
   background: #f5f4ff;
 }
+#capture-app {
+  color: #3730a3;
+  background: #eef2ff;
+  border-color: #a5b4fc;
+  font-weight: 600;
+  box-shadow: 0 1px 2px #312e8114;
+}
+#capture-app:not(:disabled):hover {
+  background: #e0e7ff;
+  border-color: #818cf8;
+}
+#capture-app:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
 nav button {
   border: 0;
   background: transparent;
