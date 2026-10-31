@@ -54,6 +54,8 @@ window.ConsoleCanvasDesktop = {
         if (name === 'models')
           return { ok: true, value: [{ id: 'qa-model', name: 'QA 가상 모델' }] };
         if (name === 'generate') {
+          if (window.chatgptMock.mode === 'input-too-large')
+            return { ok: false, error: { code: 'input_too_large', message: 'QA input size' } };
           if (window.chatgptMock.mode === 'failure')
             return {
               ok: true,

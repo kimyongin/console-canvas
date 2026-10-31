@@ -27,20 +27,26 @@ export function createChatgptProvider(transport = globalThis.ConsoleCanvasDeskto
       const accountId = selectedAccount;
       try {
         for (let i = 0; i < request.count && !job.canceled; i++) {
-          const result = await call('generate', {
-            request: {
-              id: request.id,
-              prompt: request.prompt,
-              count: 1,
-              baseline: { selection: request.baseline.selection },
-            },
-            context,
-            model,
-            accountId,
-            variantIndex: i,
-            variantTotal: request.count,
-            previousDirections: usage.map((item) => item.name).filter(Boolean),
-          });
+          let result;
+          try {
+            result = await call('generate', {
+              request: {
+                id: request.id,
+                prompt: request.prompt,
+                count: 1,
+                baseline: { selection: request.baseline.selection },
+              },
+              context,
+              model,
+              accountId,
+              variantIndex: i,
+              variantTotal: request.count,
+              previousDirections: usage.map((item) => item.name).filter(Boolean),
+            });
+          } catch (error) {
+            failures.push({ index: i + 1, code: error.code || 'generation_failed' });
+            break;
+          }
           // Inference has already consumed usage even if local patch validation fails.
           usage.push(...result.usage);
           failures.push(...result.failures);

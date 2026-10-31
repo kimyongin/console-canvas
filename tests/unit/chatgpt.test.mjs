@@ -301,7 +301,22 @@ test('Available model catalog and completed SSE produce common patches without t
     model: 'allowed',
     accountId: (await f.service.status()).activeId,
   };
-  await assert.rejects(f.service.generate({ ...args, model: 'hidden' }));
+  await assert.rejects(f.service.generate({ ...args, model: 'hidden' }), {
+    code: 'model_unavailable',
+  });
+  const calls = f.calls.filter((c) => c.url.endsWith('/responses')).length;
+  await assert.rejects(f.service.generate({ ...args, context: { html: 'x'.repeat(2_000_001) } }), {
+    code: 'input_too_large',
+  });
+  await assert.rejects(
+    f.service.generate({ ...args, context: { image_url: 'x'.repeat(20_000_101) } }),
+    { code: 'input_image_too_large' },
+  );
+  assert.equal(
+    f.calls.filter((c) => c.url.endsWith('/responses')).length,
+    calls,
+    'Local input rejection must not consume inference',
+  );
   const result = await f.service.generate(args);
   assert.equal(result.candidates.length, 1);
   assert.deepEqual(result.candidates[0].patches[0].properties, { gap: '12px' });
@@ -327,6 +342,37 @@ test('OAuth bearer tokens longer than API keys reach inference without crossing 
   assert.equal(result.failures.length, 0);
   assert.ok(f.calls.some((call) => call.url.endsWith('/responses')));
   assert.ok(!JSON.stringify(result).includes(f.accessToken));
+});
+test('A later local input rejection preserves prior candidate usage and stops retries', async () => {
+  let calls = 0;
+  const provider = createChatgptProvider({
+    generate: async ({ request }) =>
+      ++calls === 1
+        ? {
+            ok: true,
+            value: {
+              candidates: [
+                { request_id: request.id, name: 'First', summary: 'Complete', patches: [] },
+              ],
+              usage: [{ name: 'First', input_tokens: 40, output_tokens: 10 }],
+              failures: [],
+              canceled: false,
+            },
+          }
+        : { ok: false, error: { code: 'input_too_large', message: 'Input too large' } },
+  });
+  provider.setModel('allowed', 'qa');
+  const registered = [];
+  const result = await provider.generate({
+    request: { id: 'partial', prompt: 'Improve', count: 3, baseline: { selection: ['n1'] } },
+    context: {},
+    register: async (c) => registered.push(c),
+  });
+  assert.equal(calls, 2);
+  assert.equal(registered.length, 1);
+  assert.equal(result.usage[0].input_tokens, 40);
+  assert.equal(result.model, 'allowed');
+  assert.equal(result.failures[0].code, 'input_too_large');
 });
 test('Cancel before credential loading and during streaming prevents late candidates; logout retains registration', async (t) => {
   const f = await fixture(t);

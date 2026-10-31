@@ -195,6 +195,21 @@ try {
     d.documentElement.scrollWidth <= w.innerWidth + 1,
   );
   check('UI uses one modal for account setup', d.querySelectorAll('dialog:modal').length === 1);
+  w.chatgptMock.mode = 'input-too-large';
+  $('.ai-request-details').open = true;
+  click('#ai-regenerate-baseline');
+  await until(() => a.state.aiRequests[2]?.execution);
+  check(
+    'Input-size failure is distinguished from account and usage errors',
+    a.state.aiRequests[2].execution.failures[0].code === 'input_too_large' &&
+      d.querySelector('.ai-waiting').textContent.includes('더 작은 영역') &&
+      !d.querySelector('.ai-waiting').textContent.includes('계정'),
+  );
+  check(
+    'Local failure keeps completed alternatives and their usage metadata',
+    a.state.aiRequests[0].candidates.length === 3 &&
+      a.state.aiRequests[2].execution.model === 'qa-model',
+  );
 } catch (error) {
   results.push({ name: String(error.stack || error), passed: false });
   document.querySelector('#results').textContent = results

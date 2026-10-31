@@ -158,7 +158,10 @@ export function createAiPanel({ $, state, manager, adapter, toast, save, checkpo
         target.authentication = requestedAuth;
         const job = (async () => {
           try {
-            const context = await buildAiContext(state.snapshot, item.baseline, { image: true });
+            const context = await buildAiContext(state.snapshot, item.baseline, {
+              image: true,
+              compact: true,
+            });
             if (!current() || target.status === 'canceled') return;
             target.status = 'running';
             await manager.persist();

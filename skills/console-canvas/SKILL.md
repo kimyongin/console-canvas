@@ -5,6 +5,10 @@ description: Console Canvas에서 소스 없이 가져온 웹 화면을 편집�
 
 # Console Canvas
 
+## 큰 화면의 AI 직접 호출 · 0.43
+
+큰 직접 호출 입력은 원본 ID·선택·부모와 주요 배치 스타일을 담은 `layout_description`으로 줄여 이미지와 함께 보낸다. 중첩 미리보기 등의 생략 범위는 representation에 명시하며 실제 캡처/렌더/스냅샷은 바꾸지 않는다. 생략한 내부 요소의 상세 변경은 해당 영역을 선택해 다시 요청한다. `input_too_large`/`input_image_too_large`는 입력 범위 문제이며 재로그인 안내로 해석하지 않는다. `model_unavailable`일 때 계정·모델 목록을 새로고침한다. 기존 실패 기록은 보존하고 실제 완료 후보/usage로 재시도 결과를 확인한다.
+
 ## Console Canvas 자기 디자인 · 0.42
 
 상단 **앱 디자인 편집**은 현재 앱의 웹 UI를 새 문서로 복제한다. `console-canvas://app/<화면>`과 `source.application`의 앱 버전/화면, locator의 `app_surface`로 헤더/편집 영역의 출처를 구별한다. 복제본의 버튼은 원본 앱 기능을 실행하지 않으며 기존 편집·AI·MCP·주석·스냅샷으로 디자인한다. 시안 적용은 복제본 변경이며 실제 Console Canvas 소스/설치 앱 갱신은 사용자가 요청한 개발 작업으로 수행한다.

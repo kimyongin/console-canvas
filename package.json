@@ -1,6 +1,6 @@
 {
   "name": "console-canvas",
-  "version": "0.42.1",
+  "version": "0.43.0",
   "private": true,
   "description": "Embedded Chromium console UI editor with MCP control",
   "main": "desktop/main.cjs",

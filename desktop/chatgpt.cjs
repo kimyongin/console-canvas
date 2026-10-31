@@ -534,10 +534,12 @@ function createChatgptService({
       previousDirections.length > 12 ||
       previousDirections.some((v) => typeof v !== 'string' || v.length > 120) ||
       !context ||
-      JSON.stringify(context).length > 22000000 ||
-      !catalogs.get(id)?.some((m) => m.id === model)
+      typeof context !== 'object' ||
+      Array.isArray(context)
     )
       throw fail('generation_invalid', '계정의 모델 목록을 새로고침하고 요청을 확인하세요.');
+    if (!catalogs.get(id)?.some((m) => m.id === model))
+      throw fail('model_unavailable', '계정의 모델 목록을 새로고침하세요.');
     if (jobs.size) throw fail('generation_busy', '이미 생성 중입니다.');
     let canceled = false,
       provider;
@@ -548,6 +550,8 @@ function createChatgptService({
       },
     });
     try {
+      const { validateAiInput } = await import('../ai-input-policy.js');
+      validateAiInput(context);
       const { createAiProvider } = await import('../ai-provider.js');
       const record = await credential(id);
       if (id !== data.active) throw fail('account_changed', '계정이 변경되었습니다.');

@@ -1,3 +1,4 @@
+import { validateAiInput } from './ai-input-policy.js';
 // API credentials live only in this closure, never in document/session state.
 const ENDPOINT = 'https://api.openai.com/v1/responses';
 const variantSchema = {
@@ -126,12 +127,9 @@ export function createAiProvider({
       const failures = [],
         usage = [];
       try {
+        validateAiInput(context);
         const { image_url, ...codeContext } = context;
         const serialized = JSON.stringify(codeContext);
-        if (serialized.length > 2_000_000)
-          throw Object.assign(new Error('AI 입력이 너무 큽니다. 더 작은 영역을 선택해 주세요.'), {
-            code: 'input_too_large',
-          });
         for (let index = 0; index < request.count; index++) {
           if (controller.signal.aborted) break;
           onProgress({ index, total: request.count });

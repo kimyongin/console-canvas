@@ -66,6 +66,7 @@ async function main() {
     'scrollbar-layout',
     'integration',
     'ai-variants',
+    'ai-context',
     'developer-workflow',
     'snapshots',
     'panels',

@@ -4,6 +4,7 @@ import { Button } from './components/button';
 import { Input } from './components/input';
 import { Textarea } from './components/textarea';
 import { NativeSelect } from './components/surfaces';
+import { aiFailureMessage } from '../../ai-input-policy.js';
 interface Candidate {
   id: string;
   name: string;
@@ -868,7 +869,7 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
                     {request.execution.usage?.reduce((sum, u) => sum + u.output_tokens, 0) || 0}{' '}
                     토큰
                     {request.execution.failures?.length
-                      ? ` · 실패 ${request.execution.failures.length}개 (${request.execution.failures.map((f) => f.code).join(', ')}) · 계정·인증·모델·한도를 확인하고 새 요청으로 다시 시도하세요.`
+                      ? ` · 실패 ${request.execution.failures.length}개 (${request.execution.failures.map((f) => f.code).join(', ')}) · ${aiFailureMessage(request.execution.failures.at(-1)?.code)}`
                       : ''}
                   </p>
                 )}
@@ -1016,7 +1017,7 @@ function AiVariants({ requests, actions }: { requests: Request[]; actions: Actio
                 ) : (
                   <div className="ai-waiting">
                     {request.status === 'failed'
-                      ? '시안 생성에 실패했습니다. 키·모델·사용 한도를 확인해 주세요.'
+                      ? aiFailureMessage(request.execution?.failures?.at(-1)?.code)
                       : request.status === 'canceled'
                         ? '요청을 취소했습니다. 완성된 시안은 보존됩니다.'
                         : request.route === 'api'
