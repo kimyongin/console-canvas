@@ -4,6 +4,24 @@
 
 **0.46.0 구현·검증 완료.** 저장·UI·같은 ID 목표·MCP·스킬을 순서대로 구현했다. [검증 기록](ticket-first-0.46.md)과 [실제 화면 가이드](https://console-canvas-guide.yonginkim.chatgpt.site/)를 제공하며 설치 앱도 갱신했다. 이전 증빙은 [0.45 추적표](ticket-review-0.45-history.md)에 보존한다.
 
+## 후속: 5개 프로젝트 실사용과 UI/UX 간소화
+
+**계획/미착수** · 상위 [#177](https://github.com/kimyongin/console-canvas/issues/177) · [25사례·액션 계수·간소화 기준](usability-five-projects.md)
+
+분석 대시보드·쇼핑 운영·칸반 업무·예약 관리·콘텐츠 CMS에서 각각 배치/정렬·중복 제거·입력/작업 흐름·반응형·스크롤/밀도 유형의 사용자 티켓을 5개씩 만든다. 실제 수집/편집 경로로 25개를 사용한 후 관측된 군더더기를 제거·통합하고 동일 사례로 전후 비교한다. 아래는 GitHub 개발 이슈이며 캔버스 사용자 티켓25개와 별개다.
+
+| 순서 | GitHub | 작업 | 상태 |
+| --- | --- | --- | --- |
+| 1 | [#178](https://github.com/kimyongin/console-canvas/issues/178) | 서로 다른 5개 독립 샘플 웹 프로젝트와 재현 환경 구성 | 미착수 |
+| 2 | [#179](https://github.com/kimyongin/console-canvas/issues/179) | 캔버스를 직접 사용해 프로젝트별 5유형·총 25티켓 생성 및 UX 기준선 기록 | 미착수 |
+| 3 | [#180](https://github.com/kimyongin/console-canvas/issues/180) | 실사용 근거로 티켓 목록·편집기 헤더·메뉴·모달의 중복과 왕복 제거 | 미착수 |
+| 4 | [#181](https://github.com/kimyongin/console-canvas/issues/181) | 선택·주석·스크롤 편집의 방해 요소와 반복 조작 간소화 | 미착수 |
+| 5 | [#182](https://github.com/kimyongin/console-canvas/issues/182) | 여러 티켓 일괄 구현 요청·대상 유지·부분 실패·상태 추적을 MCP와 스킬로 검증·보완 | 미착수 |
+| 6 | [#183](https://github.com/kimyongin/console-canvas/issues/183) | 개선한 UI로 25사례 재사용·액션/왕복 전후 비교와 회귀 확인 | 미착수 |
+| 7 | [#184](https://github.com/kimyongin/console-canvas/issues/184) | 확정 UX의 PRD·실제 캡처 가이드·MCP/스킬·설치 앱 동기화 | 미착수 |
+
+현재 제품 구현은 0.46.0이며 이 후속 테스트·개선·설치 갱신은 아직 수행하지 않았다. 목록/헤더·편집/주석·일괄 에이전트 요청은 감사 범위이고 발견 완료를 뜻하지 않는다. 메뉴/링크·화면/앱 왕복을 세되 같은 클릭과 그 결과 전환은 총수에 이중 합산하지 않는다. 동선 감소가 기능 발견성·복구·권한·목표/승인 보호를 손상시키면 채택하지 않는다.
+
 ## 실행 순서
 
 | 순서 | GitHub | 범위 | 선행 | 상태 |
