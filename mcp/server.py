@@ -100,13 +100,50 @@ def ensure_bridge(state_dir, app_dir, port):
     raise ValueError('Bridge startup timed out')
 
 
-def stdio(connection):
+class BridgeClient:
+    """Refresh a rotated local credential, without changing the paired origin."""
+    def __init__(self, connection, connection_file=None):
+        self.connection = dict(connection)
+        self.connection_file = connection_file
+        self.lock = threading.RLock()
+
+    def request(self, path, data=None, timeout=15):
+        with self.lock:
+            attempted = self.connection
+        try:
+            return request(attempted, path, data, timeout)
+        except urllib.error.HTTPError as error:
+            if error.code != 401 or self.connection_file is None:
+                raise
+            # A 401 is rejected before command delivery. Do not replay network
+            # errors or conflicts, and never follow a different origin/port.
+            original = error
+            with self.lock:
+                try:
+                    fresh = self.connection
+                    if fresh['token'] == attempted['token']:
+                        fresh = json.loads(self.connection_file.read_text())
+                        if (not isinstance(fresh, dict) or fresh.get('url') != attempted['url'] or
+                                not isinstance(fresh.get('token'), str) or not fresh['token'] or
+                                fresh['token'] == attempted['token']):
+                            raise ValueError('No rotated credential for the paired server')
+                        health = request(fresh, '/health', timeout=1)
+                        if not isinstance(health, dict) or health.get('service') != 'console-canvas':
+                            raise ValueError('Unexpected local service')
+                except (OSError, ValueError, KeyError):
+                    raise original
+                self.connection = fresh
+            return request(fresh, path, data, timeout)
+
+
+def stdio(connection, connection_file=None):
+    bridge = BridgeClient(connection, connection_file)
     initialized = False
     output_lock = threading.RLock()
     def emit(value):
         with output_lock:
             print(json.dumps(value, ensure_ascii=False, allow_nan=False), flush=True)
-    modern = ModernProtocol(lambda name, args: request(connection, '/agent/call', {'name': name, 'arguments': args}), VERSION, emit)
+    modern = ModernProtocol(lambda name, args: bridge.request('/agent/call', {'name': name, 'arguments': args}), VERSION, emit)
     for line in sys.stdin:
         message = None
         try:
@@ -159,7 +196,7 @@ def stdio(connection):
                 result = {'tools': definitions()}
             elif method == 'tools/call':
                 try:
-                    value = request(connection, '/agent/call', params, timeout=65 if params.get('name') in ('get_review_image', 'get_design_context', 'confirm_ticket_goal', 'get_ticket', 'update_ticket') else 15)
+                    value = bridge.request('/agent/call', params, timeout=65 if params.get('name') in ('get_review_image', 'get_design_context', 'confirm_ticket_goal', 'get_ticket', 'update_ticket') else 15)
                     if value.get('ok') and isinstance(value.get('images'), list):
                         blocks = []
                         for photo in value.get('images', []):
@@ -207,7 +244,7 @@ def main():
             if args.start:
                 print(json.dumps({'editor_url': connection['url'] + '/editor.html', 'connection_file': str(args.state_dir.expanduser().resolve() / 'connection.json')}, ensure_ascii=False))
             else:
-                stdio(connection)
+                stdio(connection, args.state_dir.expanduser().resolve() / 'connection.json')
     except (OSError, ValueError) as error:
         print(str(error), file=sys.stderr)
         return 1

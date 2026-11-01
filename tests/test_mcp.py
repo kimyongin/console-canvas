@@ -15,10 +15,41 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'mcp'))
 from bridge import Broker, Handler, ThreadingHTTPServer, allowed_origin, validate
-from server import TOOLS, VERSION, ensure_bridge
+from server import TOOLS, VERSION, ensure_bridge, BridgeClient
 
 
 class UpgradeTests(unittest.TestCase):
+    def test_rotated_credential_recovers_same_origin_once(self):
+        with tempfile.TemporaryDirectory() as directory:
+            connection_file = Path(directory) / 'connection.json'
+            old = {'url': 'http://127.0.0.1:8849', 'token': 'old'}
+            new = {**old, 'token': 'new'}
+            connection_file.write_text(json.dumps(new))
+            rejected = urllib.error.HTTPError(old['url'], 401, 'Unauthorized', {}, None)
+            client = BridgeClient(old, connection_file)
+            with patch('server.request', side_effect=[rejected, {'service': 'console-canvas'}, {'ok': True}, {'ok': True}]) as call:
+                self.assertEqual(client.request('/agent/call', {'operation_id': 'same'}), {'ok': True})
+                self.assertEqual(client.request('/agent/call'), {'ok': True})
+            self.assertEqual(call.call_count, 4)
+            self.assertEqual(call.call_args_list[2].args[2], {'operation_id': 'same'})
+            self.assertEqual(call.call_args_list[3].args[0], new)
+
+    def test_refresh_never_follows_changed_origin_or_retries_other_errors(self):
+        with tempfile.TemporaryDirectory() as directory:
+            connection_file = Path(directory) / 'connection.json'
+            old = {'url': 'http://127.0.0.1:8849', 'token': 'old'}
+            for candidate in ({**old, 'url': 'http://127.0.0.1:9000', 'token': 'new'}, old, {**old, 'token': ''}, [], None):
+                connection_file.write_text(json.dumps(candidate))
+                with patch('server.request', side_effect=urllib.error.HTTPError(old['url'], 401, 'Unauthorized', {}, None)) as call:
+                    with self.assertRaises(urllib.error.HTTPError):
+                        BridgeClient(old, connection_file).request('/agent/call')
+                    self.assertEqual(call.call_count, 1)
+            for error in (OSError('lost acknowledgement'), urllib.error.HTTPError(old['url'], 403, 'Forbidden', {}, None)):
+                with patch('server.request', side_effect=error) as call:
+                    with self.assertRaises(type(error)):
+                        BridgeClient(old, connection_file).request('/agent/call')
+                    self.assertEqual(call.call_count, 1)
+
     def test_upgrade_tolerates_an_old_bridge_closing_before_acknowledgement(self):
         with tempfile.TemporaryDirectory() as directory:
             state_dir = Path(directory)

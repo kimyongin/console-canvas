@@ -1,6 +1,8 @@
 # 5개 프로젝트 × 25티켓 실사용과 UI/UX 간소화
 
-2026-11-01 · **5회차 실행 완료 · 일부 검증 조건 미확정** · 상위 [#177](https://github.com/kimyongin/console-canvas/issues/177)
+2026-11-01 · **5회차와 후속 동등 조건 검증 완료** · 상위 [#177](https://github.com/kimyongin/console-canvas/issues/177)
+
+최신 완료 근거는 [0.51.1 정리](cleanup-0.51.1.md)다. 아래 표의 회차 당시 미확정 계수·독립 대화는 새 측정/독립 에이전트로 보완했다. 과거 로그를 복원한 것으로 해석하지 않는다.
 
 이번 문서는 실행에 사용한 계획이다. 실제25개 UI 티켓·샘플 소스 구현·제품 개선·회차별 설치 갱신은 [실행 기록](usability-study-results.md)에, 전후 계수의 한계와25개 ID는 [매핑](usability-study-matrix.md)에 있다. 계획의 모든 조건을 검증 완료로 해석하지 않는다.
 
@@ -15,11 +17,11 @@ GitHub의 상위1/개발7 이슈와 테스트 과정에서 **캔버스 안에 �
 | 순서 | 이슈 | 작업 | 상태 |
 | --- | --- | --- | --- |
 | 1 | [#178](https://github.com/kimyongin/console-canvas/issues/178) | 서로 다른 5개 독립 샘플 웹 프로젝트와 재현 환경 구성 | 완료 |
-| 2 | [#179](https://github.com/kimyongin/console-canvas/issues/179) | 캔버스를 직접 사용해 프로젝트별 5유형·총 25티켓 생성 및 UX 기준선 기록 | 25개 생성 · 계수 일부 미확정 |
+| 2 | [#179](https://github.com/kimyongin/console-canvas/issues/179) | 캔버스를 직접 사용해 프로젝트별 5유형·총 25티켓 생성 및 UX 기준선 기록 | 완료 · 새 동등 조건25개 계수 |
 | 3 | [#180](https://github.com/kimyongin/console-canvas/issues/180) | 실사용 근거로 티켓 목록·편집기 헤더·메뉴·모달의 중복과 왕복 제거 | 5회차 개선 완료 |
 | 4 | [#181](https://github.com/kimyongin/console-canvas/issues/181) | 선택·주석·스크롤 편집의 방해 요소와 반복 조작 간소화 | 5회차 개선 완료 |
-| 5 | [#182](https://github.com/kimyongin/console-canvas/issues/182) | 여러 티켓 일괄 구현 요청·대상 유지·부분 실패·상태 추적을 MCP와 스킬로 검증·보완 | SDK 묶음 검증 · 별도 대화 미검증 |
-| 6 | [#183](https://github.com/kimyongin/console-canvas/issues/183) | 개선한 UI로 25사례 재사용·액션/왕복 전후 비교와 회귀 확인 | 25개 재조회 · 동등 조건 계수 잔여 |
+| 5 | [#182](https://github.com/kimyongin/console-canvas/issues/182) | 여러 티켓 일괄 구현 요청·대상 유지·부분 실패·상태 추적을 MCP와 스킬로 검증·보완 | 완료 · 독립 에이전트 범위/부분 조회 |
+| 6 | [#183](https://github.com/kimyongin/console-canvas/issues/183) | 개선한 UI로 25사례 재사용·액션/왕복 전후 비교와 회귀 확인 | 완료 · 주경로399/399·복구/감사 별도 |
 | 7 | [#184](https://github.com/kimyongin/console-canvas/issues/184) | 확정 UX의 PRD·실제 캡처 가이드·MCP/스킬·설치 앱 동기화 | 0.51 최종 동기화 |
 
 기본 순서: #178 준비 후 프로젝트 하나마다 #179→#184를 반복한다. 후속 UX 항목은 매 회차 #179의 근본 평가·관측을 근거로 범위를 확정한다. 실제 추가 발견은 해당 이슈에 재현/전후/완료 조건을 붙이고, 범위가 다른 문제는 별도 개발 이슈로 연결해 누락하지 않는다.
