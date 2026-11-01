@@ -432,3 +432,66 @@ details summary {
     grid-column: auto;
   }
 }
+
+/* CMS-1..5: content-first spacing, keep live preview and form actions. */
+.editor-tools {
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+}
+#article-form label {
+  margin: 12px 0;
+  gap: 7px;
+}
+#article-title {
+  font-size: 17px;
+  font-weight: 650;
+}
+#article-form input,
+#article-form textarea,
+#article-form select {
+  width: 100%;
+}
+#article-form .form-actions {
+  background: white;
+  padding: 12px 0;
+  border-top: 1px solid #e0e6ee;
+}
+.document-tree button {
+  padding: 6px 4px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+#article-preview .scroll-inner {
+  max-height: 560px;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+#article-preview > h2 {
+  margin-bottom: 12px;
+}
+@media (max-width: 800px) {
+  .page-head {
+    flex-direction: column;
+    gap: 14px;
+  }
+  #primary-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 700px) {
+  .cms-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cms-layout > .panel {
+    min-width: 0;
+    padding: 14px;
+  }
+  .document-tree details {
+    max-height: 150px;
+  }
+}

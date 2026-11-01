@@ -2,7 +2,7 @@
 
 실제 웹 화면을 소스 없이 복제해 편집하고, 디자인 의도를 이미지와 주석으로 로컬 개발 에이전트에게 전달하는 Chromium 내장 앱입니다.
 
-**0.46: 티켓을 먼저 만들고 그 안에서 편집합니다.** 화면·현재 편집·주석·시안의 확정 목표·구현/검토 기록을 같은 티켓 ID로 이어갑니다. 시안 제안·비교·선택은 기존 에이전트 대화에서 하며 앱에 AI 계정/API 키를 입력하지 않습니다.
+**0.51: 티켓을 먼저 만들고 그 안에서 편집합니다.** 화면·현재 편집·주석·시안의 확정 목표·구현/검토 기록을 같은 티켓 ID로 이어갑니다. 시안 제안·비교·선택은 기존 에이전트 대화에서 하며 앱에 AI 계정/API 키를 입력하지 않습니다.
 
 ## 사용 흐름
 
@@ -53,3 +53,5 @@ python3 scripts/install_desktop.py --update
 공통 UI·타입·포맷·저장/수집·패키지와 Electron/공식 SDK 통합을 구별해 검증합니다. offscreen을 실제 설치 앱 사용으로 표시하지 않습니다. macOS 빌드는 준비된 고정 Apple 개발 서명을 사용하며 ad-hoc으로 자동 전환하지 않습니다.
 
 [사용 가이드](https://console-canvas-guide.yonginkim.chatgpt.site/) · [PRD](docs/PRD.md) · [개발 티켓](docs/ticket-review.md) · [구조](docs/architecture.md) · [MCP·스킬 계약](docs/ticket-first-mcp-skill.md) · [0.46 검증](docs/ticket-first-0.46.md)
+
+5프로젝트25티켓 실사용의 개선·검증·한계: [실행 기록](docs/usability-study-results.md), [25개 매핑](docs/usability-study-matrix.md).

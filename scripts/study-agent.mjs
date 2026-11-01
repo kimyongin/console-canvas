@@ -53,6 +53,60 @@ try {
   }
   const summaries = [];
   if (mode === 'audit') {
+    if (round === 'I5') {
+      const original = (
+        await call('get_ticket', { project_id: project, ticket_ref: tickets[0].id })
+      ).structuredContent.ticket;
+      const aux = JSON.parse(await fs.readFile(path.join(dir, 'aux.json'), 'utf8'));
+      const ambiguous = await client.callTool({
+        name: 'get_ticket',
+        arguments: { project_id: project, ticket_ref: original.title },
+      });
+      if (
+        ambiguous.structuredContent?.ok !== false ||
+        !JSON.stringify(ambiguous.structuredContent).includes('ambiguous')
+      )
+        throw Error('Duplicate name was guessed');
+      let draft = (await call('get_ticket', { project_id: project, ticket_ref: aux.id }))
+        .structuredContent.ticket;
+      if (draft.goal || draft.status !== 'draft') throw Error('Auxiliary unexpectedly owns a goal');
+      const blocked = (
+        await call('update_ticket', {
+          project_id: project,
+          ticket_ref: draft.id,
+          expected_ticket_revision: draft.revision,
+          operation_id: 'study-I5-aux-blocked',
+          status: 'blocked',
+          summary: '검사 사본은 목표 미확정으로 구현 대상에서 제외합니다.',
+        })
+      ).structuredContent.ticket;
+      const working = (
+        await call('list_tickets', { project_id: project, status: 'working', limit: 50 })
+      ).structuredContent.tickets;
+      if (working.length !== 5 || working.some((t) => t.id === aux.id) || blocked.goal)
+        throw Error('Unconfirmed/blocked target joined batch');
+      await call('update_ticket', {
+        project_id: project,
+        ticket_ref: blocked.id,
+        expected_ticket_revision: blocked.revision,
+        operation_id: 'study-I5-aux-draft',
+        status: 'draft',
+        summary: '경계 검사 완료. 실제 구현 대상에는 포함하지 않습니다.',
+      });
+      await fs.writeFile(
+        path.join(dir, 'scope-audit.json'),
+        JSON.stringify(
+          {
+            duplicateNameRejected: true,
+            blockedAndUnconfirmedExcluded: true,
+            frozenIds: working.map((t) => t.id),
+            aux: aux.id,
+          },
+          null,
+          2,
+        ),
+      );
+    }
     const first = (await call('get_ticket', { project_id: project, ticket_ref: tickets[0].id }))
       .structuredContent.ticket;
     const negative = await client.callTool({
@@ -131,8 +185,8 @@ try {
         summary: '묶음 요청의 대상 ID와 목표를 고정하고 실제 샘플 소스 구현을 시작합니다.',
       });
     }
-    if (mode === 'review') {
-      if (value.status !== 'working')
+    if (mode === 'review' || mode === 'evidence') {
+      if (value.status !== (mode === 'review' ? 'working' : 'review'))
         throw Error('Review requires actual implementation in progress');
       const bytes = await fs.readFile(path.join(dir, 'implementation.jpg'));
       const mime = bytes[0] === 0x89 ? 'image/png' : 'image/jpeg';
@@ -145,7 +199,7 @@ try {
           ticket_ref: t.id,
           expected_ticket_revision: value.revision,
           goal_id: value.goal.id,
-          operation_id: 'study-' + round + '-review-' + t.id,
+          operation_id: 'study-' + round + '-' + mode + '-' + t.id,
           status: 'review',
           implementation_image_data_url: 'data:' + mime + ';base64,' + bytes.toString('base64'),
           checks: Array.isArray(report.checks) ? report.checks.join('\n') : report.checks,

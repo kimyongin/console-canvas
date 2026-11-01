@@ -562,6 +562,7 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}) {
     state.lastCheckpoint = checkpoint();
     activityPanel.render();
     state.ready = true;
+    notice('');
     const route = new URL(location.href);
     route.searchParams.delete('sample');
     route.searchParams.set('id', state.snapshot.id);
@@ -626,7 +627,20 @@ async function importFile(file) {
   if (data.format && data.format !== 'console-canvas-snapshot') {
     const doc = await importDocument(data);
     await openSnapshot(doc, doc.edits, doc.note || '', doc.annotations || {});
-  } else await openSnapshot(data, data.edits || {}, data.note || '', data.annotations || {});
+  } else {
+    const prepared = prepareCaptureScope(data);
+    validateDocumentInput(prepared, data.edits || {}, data.annotations || {});
+    const existing = await getDocument(data.id);
+    if (existing) {
+      if (
+        JSON.stringify(captureFromDocument(existing)) !==
+        JSON.stringify(captureFromDocument(prepared))
+      )
+        throw Error('같은 ID에 다른 원본이 저장돼 있습니다. 기존 작업은 바꾸지 않았습니다.');
+      await openTicket(data.id);
+      toast('이미 저장된 화면입니다. 기존 티켓과 편집을 열었습니다.');
+    } else await openSnapshot(prepared, data.edits || {}, data.note || '', data.annotations || {});
+  }
 }
 $('#file-input').addEventListener('change', (event) => {
   importFile(event.target.files[0]).catch((error) =>

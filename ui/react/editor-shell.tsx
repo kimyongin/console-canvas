@@ -532,6 +532,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             </label>
             <Input
               id="requests-search"
+              hidden={true}
               type="search"
               placeholder="요청·주석 찾기"
               aria-label="요청과 주석 검색"

@@ -1,11 +1,17 @@
 import { elementLabel } from './element-labels.js';
 export function createRequestsPanel({ $, state, selectNode, focusComment }) {
+  let documentId = null;
   function render() {
     const host = $('#requests-list');
     host.replaceChildren();
     if (!state.scene) {
       $('#activity-count').textContent = '0';
+      $('#requests-search').hidden = true;
       return;
+    }
+    if (documentId !== state.snapshot.id) {
+      documentId = state.snapshot.id;
+      $('#requests-search').value = '';
     }
     const comments = state.scene.comments().map((c) => ({
       id: c.id,
@@ -28,6 +34,7 @@ export function createRequestsPanel({ $, state, selectNode, focusComment }) {
     }));
     const rows = [...comments, ...changes],
       query = $('#requests-search').value.toLowerCase();
+    $('#requests-search').hidden = rows.length < 6 && !query;
     $('#activity-count').textContent = String(rows.length);
     for (const r of rows.filter((r) => (r.name + ' ' + r.text).toLowerCase().includes(query))) {
       const b = document.createElement('button');

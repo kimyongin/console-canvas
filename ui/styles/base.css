@@ -113,22 +113,6 @@ strong {
   display: block;
   margin-top: 1px;
 }
-.document-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border-left: 1px solid var(--line);
-  padding-left: 22px;
-  color: #838b9a;
-  min-width: 0;
-  flex: 1;
-  font-size: 12px;
-}
-.document-title > span:last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .status-dot {
   width: 6px;
   height: 6px;
@@ -756,9 +740,6 @@ dialog > p {
   color: #b0b5c2 !important;
 }
 @media (max-width: 1100px) {
-  .document-title {
-    display: none;
-  }
   .header-actions {
     margin-left: auto;
   }
@@ -883,9 +864,6 @@ dialog > p {
   }
   .export-actions button {
     flex: 1;
-  }
-  .document-title {
-    display: none;
   }
 }
 

@@ -115,7 +115,9 @@
   font-size: 12px;
 }
 #review-note {
-  min-height: 100px;
+  field-sizing: content;
+  min-height: 64px;
+  max-height: 180px;
   margin-bottom: 16px;
   width: 100%;
 }

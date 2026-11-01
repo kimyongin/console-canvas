@@ -62,6 +62,33 @@ try {
     'An actual collector snapshot file opens as a ticket instead of a backup error',
     app.state.snapshot.id === rawCapture.id && rawTicket?.status === 'draft',
   );
+  const repeatNode = [...app.state.scene.nodes.values()].find(
+    (n) => n.locator.id === 'new-customer',
+  );
+  app.state.scene.select(repeatNode.id);
+  app.state.scene.nudge(7, 3);
+  app.state.scene.setComment(repeatNode.id, 'Keep edits on raw capture reopen');
+  await app.flushEditor();
+  const repeatSaved = await getDocument(rawCapture.id);
+  await app.importFile(new File([JSON.stringify(rawCapture)], 'collector.uiclone'));
+  await app.flushEditor();
+  check(
+    'Reopening a raw capture retains saved edits and comments without a stale writer',
+    JSON.stringify((await getDocument(rawCapture.id)).edits) ===
+      JSON.stringify(repeatSaved.edits) &&
+      app.state.scene.annotations[repeatNode.id] === 'Keep edits on raw capture reopen',
+  );
+  check(
+    'Same-ID different capture cannot replace the original',
+    await rejects(() =>
+      app.importFile(
+        new File(
+          [JSON.stringify({ ...rawCapture, html: rawCapture.html + '<!-- conflict -->' })],
+          'conflict.uiclone',
+        ),
+      ),
+    ),
+  );
   check(
     'An unknown file format is rejected without replacing current work',
     (await rejects(() =>
