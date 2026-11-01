@@ -75,6 +75,7 @@ const publicFiles = [
     'editor-runtime.js',
     'editor-runtime.css',
     'THIRD_PARTY_NOTICES.txt',
+    'LICENSE',
     'editor.css',
     'preview.html',
     'sample.uiclone.json',

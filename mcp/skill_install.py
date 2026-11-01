@@ -11,7 +11,7 @@ import tempfile
 import zipfile
 
 RETIRED = ('assets/console-canvas-extension.zip',)
-MANAGED = ('SKILL.md', 'agents/openai.yaml', 'scripts/console_canvas.py', 'assets/console-canvas-runtime.zip')
+MANAGED = ('SKILL.md', 'LICENSE', 'agents/openai.yaml', 'scripts/console_canvas.py', 'assets/console-canvas-runtime.zip')
 
 
 def default_target():

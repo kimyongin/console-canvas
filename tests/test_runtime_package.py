@@ -27,6 +27,14 @@ class RuntimePackageTests(unittest.TestCase):
             self.assertNotIn('canvas:chatgpt-', package.read('console-canvas/desktop/preload.cjs').decode())
             self.assertNotIn('Chrome 확장 프로그램 설치', editor)
             self.assertEqual(package.read('console-canvas/agent-guide.md'), (ROOT / 'skills/console-canvas/SKILL.md').read_bytes())
+            self.assertEqual(package.read('console-canvas/LICENSE'), (ROOT / 'LICENSE').read_bytes())
+        with zipfile.ZipFile(ROOT / 'dist/console-canvas-skill.zip') as package:
+            self.assertEqual(package.read('console-canvas/LICENSE'), (ROOT / 'LICENSE').read_bytes())
+        html = (ROOT / 'dist/Console Canvas.html').read_text()
+        import re
+        licenses = json.loads(re.search(r'<script type="application/json" id="software-licenses">(.*?)</script>', html).group(1))
+        self.assertEqual(licenses['project'], (ROOT / 'LICENSE').read_text())
+        self.assertEqual(licenses['third_party'], (ROOT / 'THIRD_PARTY_NOTICES.txt').read_text())
         for retired in ('console-canvas-chrome.zip', 'console-canvas-extension.zip', 'chrome-package.json'):
             self.assertFalse((ROOT / 'dist' / retired).exists())
         self.assertTrue((ROOT / 'archive/chrome-extension/manifest.json').is_file())

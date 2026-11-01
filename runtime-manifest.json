@@ -1,5 +1,6 @@
 {
   "public": [
+    "LICENSE",
     "THIRD_PARTY_NOTICES.txt",
     "activity-history.js",
     "agent-guide.md",
@@ -82,10 +83,11 @@
     "ui/workspace-layout.js"
   ],
   "files": {
-    "README.md": "b1e99f5b402f5ffcea216e57c29a1121b14606692e40fd565c6f1126e73252db",
+    "LICENSE": "a9a2e7d1232a132ca132b9b648296ceb3304f6fb813a317d210f252c27dbe6bd",
+    "README.md": "04cb669a5100c038bcf76ccfd75bcc7cd5a2f04e6b76dd43dc09f6b8daf6ecf9",
     "THIRD_PARTY_NOTICES.txt": "9d3f495b26abdb05b674d3c226556d3de044d9ca7e8a6ba850e3ebb26b2d7b77",
     "activity-history.js": "cd00821a0f991bc0e28e3fbd37a92e1708e6f32588d9fde1e81d6fe5b18fa82c",
-    "agent-guide.md": "4c20b5e5bc251b5f5a5e2dc761d03930d5bb598bbe462cb0c452660e094095e4",
+    "agent-guide.md": "56d7df1fbf8e8ff7db9a4d79c2bb3181cd476771f24563ea3808e99903dc61b8",
     "bridge-client.js": "f85a3279ecf0ef9202231da51f166989141d75b4f8eb140fb9fe128af7e78743",
     "capture-layout.js": "d63be8fb744d5addcbd3b44a6d45ab252fac627b526e95e0b4ec0ec2e8bf126b",
     "capture-media.js": "a7b79a9994885329bd814ef5f21038de03c9709976c536248715fe8457ee4c5f",
@@ -140,11 +142,11 @@
     "mcp/bridge.py": "93a302da6a9492c94bbd258eb60c19b6d0d7d4d4324f66563b8f57cd1661eb10",
     "mcp/modern.py": "f8925a8bac3b357ece1c023a32d681de9bc8c7a48e286b2625a3b8783f23fa7a",
     "mcp/server.py": "e8f4f9c63d1ed49ec7050f647f4ede7ee3ed5a5207baf4ad70e4bc8242cdbd55",
-    "mcp/skill_install.py": "fa7969f8c996c8248a9914d2e155de4e2c87534835e253e1aec72f6be735e392",
+    "mcp/skill_install.py": "216e7d7b73a1c42b9663459feddc1729022f8974968de04cac4b70c6058fc91a",
     "node-index.js": "c6f454f9ec03fede28a554f1eac9a337a8eb3ca93bffa76726a82afebc2ba573",
-    "package.json": "45006c66196cb594a1a6edb2f227314184edc0c3b474ff6f19b0930f4cb8647d",
+    "package.json": "cfd4d987644ffd1cfcaaea728bac4a2ed892963467a7874103a3fea474a4f0e6",
     "portable-document.js": "ad81e17ee8da596f87ec3374af3640efcbbe2e00252fa2c65c48b5546c505e23",
-    "preview.html": "02d90915dd9a720af8d3e7319cdda2f3234ef4fb0f48f627f1d4ea3864af1f9b",
+    "preview.html": "25ecd12da89594e09d65296c0143ac3204241c8e7ac4ff351b09731805e74129",
     "resource-document.js": "c44615e7a0d5ba84dee131dfb600432ede548bfce4b15566ce9c6607eaf1d2b6",
     "resource-repair.js": "c4e75231429800b534a49987188be2a4acb505df0b74adda12dbdf59e3ce8f38",
     "sample.uiclone.json": "a90e333b7ff628b0a41f7ef6091c5731096d360ffdb7acebe564b081691c0cb1",

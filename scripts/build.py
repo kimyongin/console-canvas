@@ -39,7 +39,10 @@ def build_standalone(output):
         'document.getElementById("embedded-sample").textContent);</script>'
         '<script>' + bundle + '</script>'
     )
-    html = html.replace('</body>', bootstrap + '</body>')
+    licenses = json.dumps({'project': (ROOT / 'LICENSE').read_text(),
+                           'third_party': (ROOT / 'THIRD_PARTY_NOTICES.txt').read_text()},
+                          ensure_ascii=False).replace('<', '\\u003c')
+    html = html.replace('</body>', bootstrap + '<script type="application/json" id="software-licenses">' + licenses + '</script></body>')
     (ROOT / 'preview.html').write_text(html)
     (output / 'Console Canvas.html').write_text(html)
 
@@ -74,6 +77,8 @@ def main():
 
     version = json.loads((ROOT / 'package.json').read_text())['version']
     skill = ROOT / 'skills/console-canvas'
+    shutil.copyfile(ROOT / 'LICENSE', skill / 'LICENSE')
+    shutil.copyfile(ROOT / 'LICENSE', output / 'LICENSE')
     (ROOT / 'agent-guide.md').write_text((skill / 'SKILL.md').read_text())
     build_standalone(output)
 
