@@ -60,12 +60,10 @@ export function createRequestsPanel({ $, state, selectNode, focusComment }) {
       };
       host.append(b);
     }
-    if (!host.childElementCount && !state.commentEditing) {
+    if (!host.childElementCount && !state.commentEditing && query) {
       const p = document.createElement('p');
       p.className = 'empty-small';
-      p.textContent = query
-        ? '일치하는 요청이 없습니다.'
-        : '요소를 편집하거나 주석으로 의도를 남기세요.';
+      p.textContent = '일치하는 요청이 없습니다.';
       host.append(p);
     }
   }

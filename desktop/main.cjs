@@ -309,6 +309,8 @@ async function start() {
       show(command.action === 'tickets' ? 'tickets' : 'editor');
     const previous = workspaceState?.project?.id;
     const result = await requestEditor({ ...command, viaShell: true });
+    if (command.action === 'ticket-menu')
+      (result.ticket_menu_open ? editor.webContents : win.webContents).focus();
     if (['copy-connection', 'copy-ticket-id', 'copy-handoff'].includes(command.action))
       clipboard.writeText(result.connection_request);
     if (command.action === 'select' && previous !== result.project?.id && result.project?.last_url)

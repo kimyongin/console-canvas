@@ -43,6 +43,9 @@ export function createProjectWorkflow({
             revision_requested: state.ticket.revision_requested,
           }
         : null,
+      ticket_menu_open: !!document
+        .querySelector('#document-menu-content')
+        ?.matches(':popover-open'),
       ready: state.ready,
       confirming: !!state.confirming,
       save: { pending: !!state.savePending, error: state.lastSaveError || null },
@@ -118,9 +121,11 @@ export function createProjectWorkflow({
     else if (action === 'import-file') {
       await ensure();
       await importFile(new File([content], name, { type: 'application/json' }));
-    } else if (action === 'ticket-menu')
-      document.querySelector('#document-menu-content').showPopover();
-    else if (action === 'editor' && state.ready) leave();
+    } else if (action === 'ticket-menu') {
+      const menu = document.querySelector('#document-menu-content');
+      menu.togglePopover();
+      if (menu.matches(':popover-open')) menu.querySelector('button:not(:disabled)')?.focus();
+    } else if (action === 'editor' && state.ready) leave();
     else if (action === 'editor' && !state.ready) throw Error('아직 가져온 티켓이 없습니다.');
     return emit();
   }

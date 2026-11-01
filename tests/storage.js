@@ -129,7 +129,7 @@ try {
     'Concurrent document-open requests are serialized',
     app.state.ready && app.state.snapshot.id === b.id,
   );
-  // Name and project use one form and one atomic session save.
+  // Reuse the existing rename dialog, without an always-visible menu form.
   doc.querySelector('#document-menu-button').click();
   const until = async (read) => {
     const end = Date.now() + 15000;
@@ -139,11 +139,32 @@ try {
     }
   };
   await until(() => doc.querySelector('#document-menu-content').matches(':popover-open'));
-  doc.querySelector('#ticket-name').value = 'UI 이름 변경';
+  check(
+    'Opening the ticket menu has no always-on name form',
+    !doc.querySelector('#ticket-settings-form') && !doc.querySelector('#ticket-name'),
+  );
+  const oldName = app.state.snapshot.documentName;
+  doc.querySelector('#rename-ticket').click();
+  check(
+    'Renaming closes the popover and selects the current name in the shared dialog',
+    !doc.querySelector('#document-menu-content').matches(':popover-open') &&
+      doc.querySelector('#rename-dialog').open &&
+      doc.querySelector('#rename-name').selectionEnd ===
+        doc.querySelector('#rename-name').value.length,
+  );
+  doc.querySelector('#rename-cancel').click();
+  check(
+    'Canceling rename preserves the document title',
+    app.state.snapshot.documentName === oldName,
+  );
+  doc.querySelector('#document-menu-button').click();
+  await until(() => doc.querySelector('#document-menu-content').matches(':popover-open'));
+  doc.querySelector('#rename-ticket').click();
+  doc.querySelector('#rename-name').value = 'UI 이름 변경';
   doc
-    .querySelector('#ticket-settings-form')
+    .querySelector('#rename-form')
     .dispatchEvent(new doc.defaultView.Event('submit', { cancelable: true, bubbles: true }));
-  await until(() => !doc.querySelector('#document-menu-content').matches(':popover-open'));
+  await until(() => !doc.querySelector('#rename-dialog').open);
   await app.flushEditor();
   check(
     'Document rename UI saves the intended title',

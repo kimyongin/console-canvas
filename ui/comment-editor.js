@@ -85,14 +85,14 @@ export function createCommentEditor({
     if (!point && !state.scene.nodes.has(id)) return;
     state.commentTarget = id;
     state.commentEditing = true;
-    $('#comment-dialog-title').textContent = point
-      ? '위치에 주석 남기기'
-      : '컴포넌트에 주석 남기기';
-    $('#comment-target-title').textContent = point
+    const targetName = point
       ? `위치 · ${point.x}, ${point.y}`
       : elementLabel(state.scene.nodes.get(id), state.snapshot.layerNames);
+    $('#comment-dialog-title').textContent = targetName + ' · 주석';
+    $('#comment-target-title').textContent = targetName;
     field.value = state.scene.annotations[id] || '';
     $('#clear-comment').disabled = !field.value;
+    $('#clear-comment').hidden = !field.value.trim();
     $('#inline-comment-heading').hidden = expanded;
     $('#save-comment').hidden = !expanded;
     $('#comment-target-preview').hidden = !expanded;
@@ -107,7 +107,9 @@ export function createCommentEditor({
 
     $('#comment-status').textContent = state.lastSaveError
       ? '자동 저장 실패 · 파일로 백업해 주세요: ' + state.lastSaveError
-      : '입력 내용은 자동 저장됩니다.';
+      : field.value.trim()
+        ? '저장된 주석'
+        : '';
     const scene = state.scene,
       request = handoffRequests(scene).find((r) => r.id === id);
     const rect =
@@ -132,6 +134,7 @@ export function createCommentEditor({
   }
   function scheduleSave() {
     $('#clear-comment').disabled = !field.value.trim();
+    $('#clear-comment').hidden = !field.value.trim();
     clearTimeout(timer);
     $('#comment-status').textContent = '입력 중 · 자동 저장됩니다.';
     if (composing) return;

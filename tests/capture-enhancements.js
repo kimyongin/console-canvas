@@ -32,6 +32,10 @@ try {
       { x: 50, y: 0, width: 100, height: 100 },
     ]) === 15000,
   );
+  check(
+    'Healthy capture has no always-on comparison-pending diagnostic',
+    doc.querySelector('#capture-status-button').hidden && !doc.querySelector('#recapture-button'),
+  );
   const snapshot = structuredClone(app.state.snapshot);
   snapshot.id = 'capture-enhancements-qa';
   const canvas = document.createElement('canvas');
@@ -48,6 +52,10 @@ try {
   ];
   const original = JSON.stringify(snapshot);
   await app.openSnapshot(snapshot);
+  check(
+    'Actual capture limits retain a direct diagnostic entry',
+    !doc.querySelector('#capture-status-button').hidden,
+  );
   doc.querySelector('#capture-status-button').click();
   check(
     'Evidence is grouped into loss, constraint and information',

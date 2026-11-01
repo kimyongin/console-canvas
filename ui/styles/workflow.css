@@ -193,7 +193,7 @@
   padding: 3px 7px;
 }
 #inline-comment-editor #component-comment {
-  min-height: 120px;
+  min-height: 88px;
   width: 100%;
   resize: vertical;
 }
@@ -233,4 +233,26 @@
   .workflow-nav button {
     padding-inline: 6px;
   }
+}
+
+#inline-comment-editor .component-comment {
+  margin-top: 0;
+}
+#inline-comment-heading {
+  justify-content: flex-end;
+}
+#inline-comment-heading strong {
+  overflow-wrap: anywhere;
+}
+#comment-status:empty {
+  display: none;
+}
+
+.capture-source-details {
+  margin-bottom: 16px;
+  overflow-wrap: anywhere;
+}
+.capture-source-details #source-url {
+  display: block;
+  margin-bottom: 6px;
 }

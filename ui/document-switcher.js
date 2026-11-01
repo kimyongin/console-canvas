@@ -1,54 +1,47 @@
 import { trashDocument, cleanDocumentName } from '../db.js';
-export function createDocumentSwitcher({ $, state, flushEditor, closeDocument, refresh, toast }) {
-  const menu = $('#document-menu-content'),
-    form = $('#ticket-settings-form');
-  let busy = false;
+export function createDocumentSwitcher({
+  $,
+  state,
+  flushEditor,
+  closeDocument,
+  refresh,
+  toast,
+  renameDialog,
+}) {
+  const menu = $('#document-menu-content');
   menu.addEventListener('toggle', () => {
-    if (!menu.matches(':popover-open')) return;
-    $('#ticket-name').value = state.snapshot?.documentName || state.snapshot?.source.title || '';
-    $('#ticket-settings-error').hidden = true;
+    $('#document-menu-button').setAttribute('aria-expanded', String(menu.matches(':popover-open')));
+    state.publishWorkspace?.();
   });
   menu.addEventListener('beforetoggle', (e) => {
     if (e.newState !== 'open') return;
     const r = $('#document-menu-button').getBoundingClientRect();
-    if (window.ConsoleCanvasDesktop) {
-      menu.style.left = Math.max(8, innerWidth - 388) + 'px';
-      menu.style.top = '4px';
-      return;
-    }
-    menu.style.left = Math.max(8, Math.min(innerWidth - 388, r.left)) + 'px';
-    menu.style.top = r.bottom + 4 + 'px';
+    menu.style.left =
+      Math.max(
+        8,
+        Math.min(innerWidth - 388, window.ConsoleCanvasDesktop ? innerWidth - 388 : r.left),
+      ) + 'px';
+    menu.style.top = window.ConsoleCanvasDesktop ? '4px' : r.bottom + 4 + 'px';
   });
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    if (busy || !state.snapshot) return;
-    const inputName = $('#ticket-name').value;
-    const previous = {
-      name: state.snapshot.documentName,
-      project: state.project_id,
-      revision: state.revision,
-    };
-    busy = true;
-    $('#save-ticket-settings').disabled = true;
-    try {
-      const name = cleanDocumentName(inputName);
+  $('#rename-ticket').addEventListener('click', () => {
+    if (!state.snapshot) return;
+    menu.hidePopover();
+    const snapshot = state.snapshot,
+      previous = snapshot.documentName;
+    renameDialog.open('티켓 이름 변경', previous || snapshot.source.title || '', async (input) => {
+      const name = cleanDocumentName(input);
       await flushEditor();
-      state.snapshot.documentName = name;
-
-      await flushEditor();
-      await refresh();
-      menu.hidePopover();
-      toast('티켓 설정을 저장했습니다.');
-    } catch (error) {
-      state.snapshot.documentName = previous.name;
-      state.project_id = previous.project;
-      state.revision = previous.revision;
-      $('#ticket-settings-error').textContent = error.message;
-      $('#ticket-settings-error').hidden = false;
-    } finally {
-      busy = false;
-      $('#save-ticket-settings').disabled = !state.snapshot;
-    }
+      if (state.snapshot !== snapshot) throw Error('편집 티켓이 바뀌었습니다. 다시 열어 주세요.');
+      try {
+        snapshot.documentName = name;
+        await flushEditor();
+        await refresh();
+        toast('티켓 이름을 변경했습니다.');
+      } catch (error) {
+        snapshot.documentName = previous;
+        throw error;
+      }
+    });
   });
   $('#trash-current').addEventListener('click', async () => {
     if (!state.snapshot) return;

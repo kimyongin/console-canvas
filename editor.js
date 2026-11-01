@@ -183,7 +183,15 @@ function commitCommentDraft() {
 }
 const { sizeChanged, zoomTo, fit, fitSelection } = createCanvasViewport({ $, state });
 const renameDialog = createRenameDialog({ $ });
-createDocumentSwitcher({ $, state, flushEditor, closeDocument, refresh: refreshTicket, toast });
+createDocumentSwitcher({
+  $,
+  state,
+  flushEditor,
+  closeDocument,
+  refresh: refreshTicket,
+  toast,
+  renameDialog,
+});
 function renderDocumentName() {
   const name = state.ticket
     ? state.ticket.display_id + ' · ' + (state.snapshot?.documentName || state.ticket.title)
@@ -256,6 +264,8 @@ function renderCaptureStatus() {
     state.scene?.resourceRepairs,
   );
   $('#capture-status-button').textContent = assessment.label;
+  $('#capture-status-button').hidden =
+    assessment.remaining_counts.loss === 0 && assessment.remaining_counts.constraint === 0;
   $('#capture-status-button').classList.toggle(
     'needs-review',
     assessment.remaining_counts.loss > 0,
@@ -299,7 +309,7 @@ function renderCaptureStatus() {
     $('#capture-status-dialog').close();
     selectNode(id, { reveal: true });
     fitSelection();
-    $('#capture-status-button').focus();
+    ($('#capture-status-button').hidden ? $('#viewport') : $('#capture-status-button')).focus();
   });
   const candidates = resourceCandidates(state.snapshot, state.scene.resourceRepairs);
   $('#repair-assets-button').disabled =
@@ -313,6 +323,7 @@ function renderCaptureStatus() {
       : '다시 읽을 수 있는 미복구 자산 선언이 없습니다.';
   $('#source-compare-button').disabled = !hasCapturedPhoto(state.snapshot);
   $('#direct-source-compare').disabled = !hasCapturedPhoto(state.snapshot);
+  $('#direct-source-compare').hidden = !hasCapturedPhoto(state.snapshot);
   $('#direct-source-compare').title = hasCapturedPhoto(state.snapshot)
     ? '가져오기 당시 실제 사진과 비교'
     : '저장된 실제 원본 사진이 없습니다.';
@@ -329,6 +340,7 @@ const captureWorkspace = createCaptureWorkspace({
 });
 adapter.register('capture-status', () => {
   if (!state.ready) return;
+  $('#document-menu-content').hidePopover();
   renderCaptureStatus();
   captureWorkspace.show('info');
 });
@@ -712,7 +724,9 @@ $('#clear-comment').addEventListener('click', () => {
   if (commentEditor.isComposing()) return;
   $('#component-comment').value = '';
   $('#clear-comment').disabled = true;
+  $('#clear-comment').hidden = true;
   commitCommentDraft();
+  $('#component-comment').focus();
   renderInspector();
 });
 function setMode() {
@@ -1294,14 +1308,6 @@ if (window.ConsoleCanvasDesktop) {
   tools.setAttribute('aria-label', '편집 도구');
 
   // The native shell owns the single common header; editor tools stay by the canvas.
-  $('#recapture-button').hidden = false;
-  $('#recapture-button').addEventListener('click', () =>
-    state.snapshot?.source.application
-      ? window.ConsoleCanvasDesktop.openSource(state.snapshot.source.url).catch((error) =>
-          notice(error.message),
-        )
-      : window.ConsoleCanvasDesktop.showSource(),
-  );
   $('#source-url').addEventListener('click', (event) => {
     event.preventDefault();
     window.ConsoleCanvasDesktop.openSource(state.snapshot.source.url).catch((error) =>

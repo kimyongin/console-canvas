@@ -430,6 +430,7 @@ function updateWorkspaceVisibility() {
   $('#shell-ticket').hidden = !editing || !ticket;
   $('#shell-confirm').hidden = !editing || !ticket;
   $('#shell-ticket-menu').hidden = !editing || !ticket;
+  $('#shell-ticket-menu').setAttribute('aria-expanded', String(!!workspace?.ticket_menu_open));
   $('#shell-handoff').hidden = !editing || !ticket;
   $('#show-editor').disabled = !workspace?.ready;
   $('#show-tickets').disabled = !workspace?.project;

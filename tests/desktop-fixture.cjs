@@ -124,6 +124,29 @@ async function main() {
       'Capture/MCP missing',
     );
     assert.equal(await evaluate(source, 'document.documentElement.outerHTML'), before);
+    const menuOpen = await evaluate(
+      shell,
+      "window.ConsoleCanvasShell.workspace({action:'ticket-menu'})",
+    );
+    assert.equal(menuOpen.ticket_menu_open, true);
+    assert.equal(await evaluate(editor, 'document.activeElement.id'), 'rename-ticket');
+    const menuClosed = await evaluate(
+      shell,
+      "window.ConsoleCanvasShell.workspace({action:'ticket-menu'})",
+    );
+    assert.equal(menuClosed.ticket_menu_open, false);
+    await evaluate(shell, "window.ConsoleCanvasShell.workspace({action:'ticket-menu'})");
+    editor.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
+    editor.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
+    await until(
+      () =>
+        evaluate(
+          editor,
+          "!document.querySelector('#document-menu-content').matches(':popover-open')",
+        ),
+      'Native Escape did not close menu',
+    );
+
     const clipboard = require('electron').clipboard;
     const originalCopy = clipboard.writeText,
       copies = [];
@@ -291,6 +314,7 @@ async function main() {
     await fs.writeFile(
       path.join(directory, 'prepare-ready.json'),
       JSON.stringify({
+        menuToggleEscape: true,
         scopedRequestClipboard: true,
         narrowHeader: true,
         firstImportCancel: true,

@@ -52,9 +52,9 @@
 }
 #review-note {
   field-sizing: content;
-  min-height: 64px;
+  min-height: 48px;
   max-height: 180px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   width: 100%;
 }
 #requests-search {

@@ -223,21 +223,15 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           ></div>
           <div className="canvas-tools">
             <div id="document-menu-content" className="document-menu-content" popover="auto">
-              <form id="ticket-settings-form" className="ticket-settings-form">
-                <label htmlFor="ticket-name">티켓 이름</label>
-                <Input id="ticket-name" maxLength={120} required />
-
-                <Button
-                  id="save-ticket-settings"
-                  type="submit"
-                  data-current-document=""
-                  disabled={true}
-                >
-                  저장
-                </Button>
-                <p id="ticket-settings-error" role="alert" hidden></p>
-              </form>
               <div className="document-management">
+                <Button
+                  id="rename-ticket"
+                  data-current-document=""
+                  disabled={!view?.ready}
+                  variant="ghost"
+                >
+                  이름 변경…
+                </Button>
                 <Button
                   id="show-commands"
                   variant="outline"
@@ -283,16 +277,15 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                 >
                   원본 사이트 열기
                 </Button>
-                <details id="source-details">
-                  <summary>{'원본 정보'}</summary>
-                  <a id="source-url" target="_blank" rel="noreferrer" hidden={true}></a>
-                  <div id="source-meta" className="source-meta">
-                    {'편집할 화면을 열어 주세요.'}
-                  </div>
-                  <Button id="recapture-button" hidden={true} variant="outline">
-                    {'원본에서 다시 가져오기'}
-                  </Button>
-                </details>
+                <Button
+                  id="capture-menu-info"
+                  data-current-document=""
+                  disabled={!view?.ready}
+                  variant="ghost"
+                  onClick={() => dispatchEditorCommand('capture-status')}
+                >
+                  원본·가져오기 정보
+                </Button>
                 <Button
                   id="trash-current"
                   data-current-document=""
@@ -353,7 +346,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
               캔버스 넓히기 · 이전 패널로 복귀
             </Button>
           </div>
-          <div id="viewport" className="canvas-viewport">
+          <div id="viewport" className="canvas-viewport" tabIndex={-1}>
             <div id="welcome" className="welcome">
               <div className="welcome-icon">{'▧'}</div>
               <div className="eyebrow">{'FROM BROWSER TO CANVAS'}</div>
@@ -398,6 +391,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                 </Button>
                 <Button
                   id="capture-status-button"
+                  hidden
                   variant="outline"
                   onClick={() => dispatchEditorCommand('capture-status')}
                   disabled={!view?.ready}
@@ -526,14 +520,13 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             <div id="properties-toggle-home" className="panel-toggle-slot"></div>
           </div>
           <section id="requests-panel" aria-label="요청과 주석">
-            <label>
-              추가 설명
-              <Textarea
-                maxLength={12000}
-                id="review-note"
-                placeholder="공통으로 반영할 의도와 조건을 남기세요."
-              />
-            </label>
+            <Textarea
+              maxLength={12000}
+              id="review-note"
+              rows={2}
+              aria-label="추가 설명"
+              placeholder="화면 전체에 대한 요청(선택)"
+            />
             <Input
               id="requests-search"
               hidden={true}
@@ -718,6 +711,10 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           }
         />
         <section id="capture-info-view" hidden={false} className="capture-task-page">
+          <div className="capture-source-details">
+            <a id="source-url" target="_blank" rel="noreferrer" hidden />
+            <div id="source-meta" className="source-meta" />
+          </div>
           <p id="capture-status-summary" role="status"></p>
           <p id="capture-repair-summary" role="status"></p>
           <p className="capture-verification-note">
@@ -826,7 +823,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
         </div>
         <div id="comment-composer">
           <div id="inline-comment-heading">
-            <strong>주석 편집</strong>
+            <strong id="comment-target-title"></strong>
             <Button id="expand-comment-editor" variant="ghost" aria-label="주석 크게 보기">
               ↗
             </Button>
@@ -844,7 +841,6 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                 다음 →
               </Button>
             </div>
-            <strong id="comment-target-title"></strong>
             <div
               id="comment-target-preview"
               className="comment-target-preview"
@@ -852,7 +848,9 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             ></div>
             <small id="comment-preview-label"></small>
             <div className="component-comment">
-              <label htmlFor="component-comment">{'이 요소에 주석 남기기'}</label>
+              <label className="sr-only" htmlFor="component-comment">
+                {'이 요소에 주석 남기기'}
+              </label>
               <Textarea
                 id="component-comment"
                 rows={4}
