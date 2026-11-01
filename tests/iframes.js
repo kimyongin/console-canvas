@@ -1,3 +1,4 @@
+import { createProject } from '../project-model.js';
 import { CanvasScene, validateSnapshot, copy } from '../engine.js';
 import { saveCapture, saveSession, getDocument } from '../db.js';
 import { elementLabel } from '../ui/element-labels.js';
@@ -123,6 +124,7 @@ try {
     edits: copy(scene.edits),
     annotations: copy(scene.annotations),
   };
+  saved.project_id = (await createProject('수집 회귀')).id;
   await saveCapture(saved);
   await saveSession(saved.id, saved);
   const restored = await getDocument(snapshot.id);

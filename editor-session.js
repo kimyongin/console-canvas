@@ -79,9 +79,12 @@ export function createEditorSession({
     render();
     save();
   }
+  const savedRevisions = new Map();
   const saveQueue = createSaveQueue(
     async (id, value) => {
-      const revision = await saveSession(id, value);
+      const expected = Math.max(value.expected_storage_revision || 0, savedRevisions.get(id) || 0);
+      const revision = await saveSession(id, { ...value, expected_storage_revision: expected });
+      savedRevisions.set(id, revision);
       if (id === state.snapshot?.id) state.storageRevision = revision;
       return revision;
     },

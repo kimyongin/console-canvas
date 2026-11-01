@@ -13,17 +13,32 @@
     <header>
       <div class="top">
         <strong><span>▧</span> Console Canvas</strong>
+        <div id="shell-project-control">
+          <select id="shell-project" aria-label="프로젝트">
+            <option value="">프로젝트 선택</option>
+          </select>
+          <button id="project-menu-button" aria-label="프로젝트 메뉴">⌄</button>
+        </div>
         <nav>
           <button id="show-source" class="active">웹사이트</button
-          ><button id="show-editor">편집기</button>
+          ><button id="show-editor" disabled title="화면을 가져오면 열 수 있습니다">편집</button
+          ><button id="show-tickets">티켓 목록</button>
         </nav>
-        <small id="status" role="status">원하는 화면을 열어 주세요.</small
-        ><button id="capture" class="primary">이 화면 가져오기 →</button>
+        <div id="status-slot">
+          <small id="status" role="status"></small>
+          <section id="project-connect-hint" hidden>
+            <span id="project-created-name"></span
+            ><button id="copy-project-created">연결 요청 복사</button
+            ><button id="dismiss-project-hint" aria-label="연결 안내 닫기">×</button>
+          </section>
+        </div>
+        <button id="shell-ticket" hidden aria-label="티켓 ID 복사"></button
+        ><span id="shell-ticket-status" hidden></span>
+        <button id="shell-confirm" class="primary" hidden>확정</button>
+        <button id="shell-ticket-menu" hidden aria-label="티켓 메뉴">⋯</button>
+        <button id="capture" class="primary">현재 화면 가져오기</button>
         <button id="capture-menu-button" aria-label="가져오기 실행 메뉴" aria-haspopup="menu">
           ▾
-        </button>
-        <button id="capture-app" title="현재 앱 화면을 새 문서로 가져와 디자인합니다">
-          앱 디자인 편집
         </button>
         <button id="show-settings" title="에이전트 연결·스킬 설치·앱 업데이트" aria-label="앱 설정">
           앱 설정
@@ -40,7 +55,31 @@
           placeholder="https://console.example.com"
         /><button type="submit">열기</button><button id="demo" type="button">샘플 콘솔</button>
       </form>
+      <section id="project-setup" hidden aria-label="프로젝트 만들기">
+        <form id="create-project-form">
+          <label for="new-project-name">프로젝트 이름</label
+          ><input id="new-project-name" maxlength="120" value="새 프로젝트" required /><button
+            class="primary"
+            id="create-project-submit"
+          >
+            만들기</button
+          ><button id="cancel-project" type="button">취소</button>
+        </form>
+        <p id="project-setup-error" role="alert"></p>
+      </section>
     </header>
+    <div id="project-menu" hidden>
+      <small id="project-connection-state"></small>
+      <button id="copy-project-connection">연결 요청 복사</button>
+      <form id="rename-project">
+        <input
+          id="rename-project-name"
+          aria-label="프로젝트 새 이름"
+          maxlength="120"
+          required
+        /><button>이름 변경</button><button type="button" id="cancel-project-rename">취소</button>
+      </form>
+    </div>
     <section id="capture-picker" hidden aria-label="가져올 영역 선택">
       <h1>가져올 영역을 드래그하세요</h1>
       <p>
@@ -144,8 +183,8 @@
       <div class="agent-next">
         <strong>준비되었다면</strong>
         <p>
-          웹사이트에서 <b>이 화면 가져오기</b>를 누르고, 에이전트에게 “가져온 화면의 주석을 읽고
-          수정해 줘”라고 요청하세요.
+          웹사이트에서 <b>이 화면 가져오기</b>를 누르고, 에이전트에게 “캔버스 티켓 가져와”라고
+          요청하세요.
         </p>
         <p>
           MCP의 <code>get_agent_guide</code>로 앱에 포함된 스킬 지침을 직접 읽을 수 있습니다. 스킬이
@@ -159,7 +198,7 @@
         <div class="eyebrow">APP UPDATES</div>
         <h1>편집은 그대로. 앱은 최신으로.</h1>
         <p>
-          공개 GitHub Releases에서 업데이트를 가져옵니다.<br />편집 화면과 스냅샷은 이 Mac에
+          공개 GitHub Releases에서 업데이트를 가져옵니다.<br />티켓과 편집·주석은 이 Mac에
           유지됩니다.
         </p>
         <span id="update-version" class="version-tag"></span>

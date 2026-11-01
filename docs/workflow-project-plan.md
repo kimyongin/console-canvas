@@ -1,6 +1,6 @@
 # 프로젝트 연결과 가져오기 중심 워크플로우 · 승인 계획
 
-2026-11-01 · 상위 [#189](https://github.com/kimyongin/console-canvas/issues/189). **계획 등록 단계이며 미구현이다. 현재 소스·설치 앱·MCP·스킬은0.51.4다.** 이 문서는 다음 구현의 확정 방향이며 아래와 충돌하는 이전 빈 티켓 우선 생성/헤더/프로젝트 연결 규정보다 우선한다.
+2026-11-01 · 상위 [#189](https://github.com/kimyongin/console-canvas/issues/189). **0.52.1에서 구현·검증·설치 완료했다. [검증 결과](workflow-0.52.md)에 실제 범위와 동선 액션을 기록한다.** 이 문서는 구현에 사용한 승인 기준이며 아래와 충돌하는 이전 빈 티켓 우선 생성/헤더/프로젝트 연결 규정보다 우선한다.
 
 ## 기존 자료 초기화 승인
 
@@ -88,14 +88,14 @@
 
 | 순서 | GitHub | 작업 | 선행 | 상태 |
 | --- | --- | --- | --- | --- |
-| 1 | [#190](https://github.com/kimyongin/console-canvas/issues/190) | 프로젝트·저장소 모델과 업무 데이터 초기화 | 없음 | 미착수 |
-| 2 | [#192](https://github.com/kimyongin/console-canvas/issues/192) | 에이전트 저장소 연결·요청별 프로젝트 맥락/MCP | #190 | 미착수 |
-| 3 | [#191](https://github.com/kimyongin/console-canvas/issues/191) | 프로젝트 생성·전환·연결 요청 복사/상태 UI | #190/#192 | 미착수 |
-| 4 | [#188](https://github.com/kimyongin/console-canvas/issues/188) | 가져오기→자동 티켓→편집·한 번의 확정 | #190/#191 | 미착수 |
-| 5 | [#193](https://github.com/kimyongin/console-canvas/issues/193) | 한 줄 헤더·메뉴·화면 전환 통합 | #191/#188 | 미착수 |
-| 6 | [#194](https://github.com/kimyongin/console-canvas/issues/194) | 프로젝트별 목록·일괄 구현·진행/검토 | #190/#192/#188 | 미착수 |
-| 7 | [#195](https://github.com/kimyongin/console-canvas/issues/195) | 실제 도구 스킬·PRD·실제 캡처 HTML 가이드 갱신 | #191/#192/#188/#193/#194 | 미착수 |
-| 8 | [#196](https://github.com/kimyongin/console-canvas/issues/196) | 전체 시나리오·액션 계수·초기화/설치 검증 | 위 전체 | 미착수 |
+| 1 | [#190](https://github.com/kimyongin/console-canvas/issues/190) | 프로젝트·저장소 모델과 업무 데이터 초기화 | 없음 | 완료 |
+| 2 | [#192](https://github.com/kimyongin/console-canvas/issues/192) | 에이전트 저장소 연결·요청별 프로젝트 맥락/MCP | #190 | 완료 |
+| 3 | [#191](https://github.com/kimyongin/console-canvas/issues/191) | 프로젝트 생성·전환·연결 요청 복사/상태 UI | #190/#192 | 완료 |
+| 4 | [#188](https://github.com/kimyongin/console-canvas/issues/188) | 가져오기→자동 티켓→편집·한 번의 확정 | #190/#191 | 완료 |
+| 5 | [#193](https://github.com/kimyongin/console-canvas/issues/193) | 한 줄 헤더·메뉴·화면 전환 통합 | #191/#188 | 완료 |
+| 6 | [#194](https://github.com/kimyongin/console-canvas/issues/194) | 프로젝트별 목록·일괄 구현·진행/검토 | #190/#192/#188 | 완료 |
+| 7 | [#195](https://github.com/kimyongin/console-canvas/issues/195) | 실제 도구 스킬·PRD·실제 캡처 HTML 가이드 갱신 | #191/#192/#188/#193/#194 | 완료 |
+| 8 | [#196](https://github.com/kimyongin/console-canvas/issues/196) | 전체 시나리오·액션 계수·초기화/설치 검증 | 위 전체 | 완료 |
 
 의존성은 컴포넌트와 연동 책임을 구분한다. #190은 프로젝트 미선택/변경·확정의 저장 모델, #191은 생성/선택 컴포넌트·복사 피드백/결과 콜백, #188은 첫 가져오기에서 그 컴포넌트를 호출해 캡처로 이어가는 흐름, #193은 공통 시작 화면/헤더를 담당한다. 후행 UI 전체를 선행 모델/컴포넌트 티켓의 완료 조건으로 요구하지 않는다.
 

@@ -1,3 +1,4 @@
+import { createProject } from '../project-model.js';
 import {
   database,
   saveCapture,
@@ -27,6 +28,8 @@ async function openEditor() {
 try {
   const capture = await (await fetch('../sample.uiclone.json')).json();
   capture.id = crypto.randomUUID();
+  const storageProject = await createProject('저장 회귀');
+  capture.project_id = storageProject.id;
   await saveCapture(capture);
   const original = capture.html;
   capture.html = 'this replacement must never be written';
@@ -37,7 +40,7 @@ try {
   await saveSession(capture.id, {
     edits: { n1: { dx: 25, dy: 9, deleted: false } },
     annotations: { n1: 'keep' },
-    project_id: 'storage-regression',
+    project_id: storageProject.id,
     note: 'draft',
     updatedAt: '2099-01-01T00:00:00.000Z',
   });
@@ -47,7 +50,7 @@ try {
     joined.html === original &&
       joined.edits.n1.dx === 25 &&
       joined.annotations.n1 === 'keep' &&
-      joined.project_id === 'storage-regression',
+      joined.project_id === storageProject.id,
   );
   const recent = await listDocuments(1);
   check(
@@ -136,7 +139,6 @@ try {
   };
   await until(() => doc.querySelector('#document-menu-content').matches(':popover-open'));
   doc.querySelector('#ticket-name').value = 'UI 이름 변경';
-  doc.querySelector('#project-id').value = 'ui-project';
   doc
     .querySelector('#ticket-settings-form')
     .dispatchEvent(new doc.defaultView.Event('submit', { cancelable: true, bubbles: true }));
@@ -145,7 +147,7 @@ try {
   check(
     'Document rename UI saves the intended title',
     (await getDocument(app.state.snapshot.id)).documentName === 'UI 이름 변경' &&
-      (await getDocument(app.state.snapshot.id)).project_id === 'ui-project',
+      (await getDocument(app.state.snapshot.id)).project_id === app.state.project_id,
   );
   await saveSession(capture.id, { ...joined, updatedAt: '2000-01-01T00:00:00.000Z' });
   document.querySelector('#status').textContent = JSON.stringify({

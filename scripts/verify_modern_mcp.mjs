@@ -3,7 +3,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 const client = new Client(
-    { name: 'console-canvas-modern-ticket-qa', version: '0.46.0' },
+    { name: 'console-canvas-modern-ticket-qa', version: '0.52.0' },
     { versionNegotiation: { mode: { pin: '2026-07-28' } } },
   ),
   checks = [];
@@ -28,16 +28,16 @@ try {
     'Modern server identity without initialize',
     client.getServerVersion()?.name === 'console-canvas',
   );
-  check('Modern discovers current shared tools', (await client.listTools()).tools.length === 16);
+  check('Modern discovers current shared tools', (await client.listTools()).tools.length === 19);
   const screen = (await tool('list_screens')).screens.find((s) => s.workspace);
   assert.ok(screen);
   const resource = (await client.listResources()).resources.find((r) =>
-    r.uri.includes(screen.editor_id),
+    r.uri.includes(screen.editor_id + '/projects/' + screen.project_id + '/'),
   );
   check('Connected workspace catalog is an explicit resource', resource?.uri.endsWith('/tickets'));
   const read = await client.readResource({ uri: resource.uri });
   check(
-    'Read full workspace ticket resource',
+    'Read explicit project ticket resource',
     JSON.parse(read.contents[0].text).tickets.length > 0,
   );
   let notifications = 0;
@@ -57,6 +57,7 @@ try {
   const tickets = await tool('list_tickets', {
       editor_id: screen.editor_id,
       project_id: screen.project_id,
+      status: 'all',
     }),
     t = tickets.tickets.find((t) => t.has_goal);
   await tool('update_ticket', {

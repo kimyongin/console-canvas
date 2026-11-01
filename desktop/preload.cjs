@@ -1,8 +1,22 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('ConsoleCanvasDesktop', {
+  publishWorkspace: (value) => ipcRenderer.send('canvas:workspace-state', value),
+  onWorkspace: (callback) =>
+    ipcRenderer.on('canvas:workspace-command', async (_event, id, command) => {
+      try {
+        ipcRenderer.send('canvas:workspace-result', id, {
+          ok: true,
+          value: await callback(command),
+        });
+      } catch (error) {
+        ipcRenderer.send('canvas:workspace-result', id, { ok: false, message: error.message });
+      }
+    }),
+  openFile: () => ipcRenderer.invoke('canvas:open-file'),
   focusAddress: () => ipcRenderer.invoke('canvas:focus-address'),
   retryAssets: (urls) => ipcRenderer.invoke('canvas:retry-assets', urls),
   openSource: (url) => ipcRenderer.invoke('canvas:open-source', url),
+  showEditor: () => ipcRenderer.invoke('canvas:show-editor'),
   showSource: () => ipcRenderer.invoke('canvas:show-source'),
   renderImage: (value) => ipcRenderer.invoke('canvas:render-image', value),
   saveFile: (value) => ipcRenderer.invoke('canvas:save-file', value),

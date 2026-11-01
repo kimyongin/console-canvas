@@ -12,7 +12,7 @@ test('Python MCP and editor consume identical resolved contracts', () => {
       { cwd: new URL('../..', import.meta.url), encoding: 'utf8' },
     ),
   );
-  assert.equal(python.length, 16);
+  assert.equal(python.length, 19);
   assert.deepEqual(python, toolContract.tools);
   const valid = {
     ticket_ref: 'CC-1',

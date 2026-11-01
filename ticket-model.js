@@ -1,3 +1,4 @@
+import { semanticState } from './semantic-state.js';
 import { transact } from './db.js';
 export const TICKET_STATES = {
   draft: '준비 중',
@@ -104,6 +105,7 @@ export async function validateStoredTicket(t, project_id, document_id) {
   if (!Number.isFinite(Date.parse(t.created_at)) || !Number.isFinite(Date.parse(t.updated_at)))
     invalid('티켓 날짜를 확인해 주세요.');
   if (t.goal) {
+    if (t.goal.document_id !== document_id) invalid('목표의 화면 ID가 다릅니다.');
     await ticketImage(t.goal.image?.data_url);
     metadata(t.goal.source || {}, '출처');
     metadata(t.goal.annotations || {}, '주석');
@@ -143,10 +145,18 @@ export async function ticketReceipt(project_id, operation_id, payload) {
         tx.abort();
         return;
       }
-      const read = tx.objectStore('tickets').get(r.result.ticket_id);
-      read.onsuccess = () => done(read.result);
+      done(r.result.result);
     };
   });
+}
+function receiptResult(t) {
+  // Preserve the acknowledged effect without duplicating raster bytes on each status write.
+  const image = (value) => (value ? { ...value, data_url: undefined } : value);
+  return {
+    ...t,
+    goal: t.goal ? { ...t.goal, semantic_state: undefined, image: image(t.goal.image) } : null,
+    records: t.records.map((r) => ({ ...r, ...(r.image ? { image: image(r.image) } : {}) })),
+  };
 }
 async function mutate(key, payload, work) {
   const hash = await fingerprint(payload);
@@ -164,74 +174,26 @@ async function mutate(key, payload, work) {
             tx.abort();
             return;
           }
-          const read = tx.objectStore('tickets').get(request.result.ticket_id);
-          read.onsuccess = () => done(read.result);
+          done(request.result.result);
           return;
         }
         work(tx, (result) => {
-          tx.objectStore('operations').put({ id: key, hash, ticket_id: result.id });
+          const document = tx.objectStore('documents').get(result.document_id);
+          document.onsuccess = () => {
+            if (document.result)
+              tx.objectStore('documents').put({ ...document.result, updatedAt: result.updated_at });
+          };
+          tx.objectStore('operations').put({
+            id: key,
+            hash,
+            ticket_id: result.id,
+            result: receiptResult(result),
+          });
           done(result);
         });
       };
     },
   );
-}
-export function emptyCapture(id, title) {
-  return {
-    format: 'console-canvas-snapshot',
-    version: 1,
-    id,
-    capturedAt: now(),
-    html: '<!doctype html><html><body></body></html>',
-    nodes: [],
-    warnings: [],
-    source: {
-      title,
-      url: 'console-canvas://ticket/' + id,
-      width: 1360,
-      height: 900,
-      viewport: { width: 1360, height: 900 },
-      empty: true,
-    },
-  };
-}
-export async function createTicket(input = {}) {
-  const project_id = projectKey(input.project_id || 'local-project'),
-    op = operation(input.operation_id);
-  const title = text(input.title || '새 편집 티켓', '티켓 이름', 120);
-  return mutate('create:' + project_id + ':' + op, { project_id, title }, (tx, done) => {
-    const seq = tx.objectStore('settings').get('ticket-sequence');
-    seq.onsuccess = () => {
-      const n = (seq.result?.value || 0) + 1,
-        id = crypto.randomUUID(),
-        at = now();
-      const t = {
-        id,
-        display_id: 'CC-' + n,
-        title,
-        document_id: id,
-        project_id,
-        status: 'draft',
-        goal: null,
-        revision: 0,
-        records: [],
-        created_at: at,
-        updated_at: at,
-      };
-      tx.objectStore('settings').put({ id: 'ticket-sequence', value: n });
-      tx.objectStore('tickets').add(t);
-      tx.objectStore('captures').add(emptyCapture(id, title));
-      tx.objectStore('documents').add({
-        id,
-        title,
-        project_id,
-        url: '',
-        updatedAt: at,
-        capturedAt: at,
-      });
-      done(t);
-    };
-  });
 }
 export async function confirmTicketGoal(input) {
   const project_id = projectKey(input.project_id),
@@ -239,7 +201,24 @@ export async function confirmTicketGoal(input) {
   if (input.selection_confirmed !== true)
     invalid('사람이 선택한 목표만 확정할 수 있습니다.', 'selection_required');
   const image = await ticketImage(input.image_data_url),
-    request = text(input.request, '변경 요청');
+    request = text(
+      input.request || '현재 편집 화면과 주석을 기준으로 반응형 UI를 구현해 주세요.',
+      '변경 요청',
+    );
+  let thumbnail;
+  try {
+    if (typeof createImageBitmap === 'function') {
+      const bitmap = await createImageBitmap(await (await fetch(image.data_url)).blob());
+      const canvas = document.createElement('canvas');
+      canvas.width = 240;
+      canvas.height = 150;
+      canvas.getContext('2d').drawImage(bitmap, 0, 0, bitmap.width, bitmap.height, 0, 0, 240, 150);
+      bitmap.close();
+      thumbnail = canvas.toDataURL('image/jpeg', 0.65);
+    }
+  } catch {
+    /* A thumbnail is optional and never gates work. */
+  }
   return mutate(
     'confirm:' + project_id + ':' + op,
     input.operation_payload || input,
@@ -254,14 +233,17 @@ export async function confirmTicketGoal(input) {
           tx.abort();
           return;
         }
-        if (t.revision !== input.expected_revision || t.goal) {
+        if (
+          t.revision !== input.expected_revision ||
+          ['working', 'review', 'done'].includes(t.status)
+        ) {
           tx.failure = Object.assign(
             Error(
               t.goal
-                ? '이미 확정한 목표입니다. 목표가 바뀌면 새 티켓을 만드세요.'
+                ? '진행 중인 작업의 확정 목표는 변경할 수 없습니다. 변경 요청을 주석으로 남겨 주세요.'
                 : '최신 티켓을 조회해 주세요.',
             ),
-            { code: t.goal ? 'goal_already_confirmed' : 'ticket_revision_conflict' },
+            { code: 'ticket_revision_conflict' },
           );
           tx.abort();
           return;
@@ -289,11 +271,16 @@ export async function confirmTicketGoal(input) {
             selection: metadata(input.selection || [], '선택'),
             edit_revision: input.expected_edit_revision || 0,
             confirmed_at: now(),
+            semantic_state: semanticState(sr.result || {}),
           };
           const next = {
             ...t,
             goal,
+            thumbnail,
             status: 'queued',
+            needs_reconfirmation: false,
+            confirmation_held: false,
+            revision_requested: false,
             revision: t.revision + 1,
             updated_at: now(),
           };
@@ -306,16 +293,8 @@ export async function confirmTicketGoal(input) {
 }
 // Project names describe catalog contents; they do not authorize agent access.
 export async function listTicketProjects() {
-  return transact(['tickets'], 'readonly', (tx, done) => {
-    const projects = new Set();
-    const request = tx.objectStore('tickets').openCursor();
-    request.onsuccess = () => {
-      const cursor = request.result;
-      if (!cursor) return done([...projects].sort());
-      if (!cursor.value.deletedAt) projects.add(cursor.value.project_id);
-      cursor.continue();
-    };
-  });
+  const { listProjects } = await import('./project-model.js');
+  return (await listProjects()).map((p) => p.id);
 }
 /** @param {string|undefined} project_id @param {any} options */
 export async function listTickets(
@@ -331,7 +310,12 @@ export async function listTickets(
     offset < 0
   )
     invalid('목록 범위를 확인해 주세요.');
-  if (status && !Object.hasOwn(TICKET_STATES, status)) invalid('티켓 상태를 확인해 주세요.');
+  if (
+    status &&
+    !['unfinished', 'all', 'ready'].includes(status) &&
+    !Object.hasOwn(TICKET_STATES, status)
+  )
+    invalid('티켓 상태를 확인해 주세요.');
   return transact(['tickets', 'sessions'], 'readonly', (tx, done) => {
     const r = tx.objectStore('tickets').getAll();
     r.onsuccess = () => {
@@ -340,7 +324,13 @@ export async function listTickets(
           (t) =>
             (!project_id || t.project_id === project_id) &&
             !!t.deletedAt === !!deleted &&
-            (!status || t.status === status) &&
+            (!status ||
+              status === 'all' ||
+              (status === 'unfinished'
+                ? t.status !== 'done'
+                : status === 'ready'
+                  ? t.status === 'queued' && !t.needs_reconfirmation && !t.claim
+                  : t.status === status)) &&
             (!query ||
               [t.title, t.display_id, t.goal?.request]
                 .join(' ')
@@ -361,6 +351,8 @@ export async function listTickets(
         sr.onsuccess = () => {
           t.comment_count = Object.values(sr.result?.annotations || {}).filter(Boolean).length;
           t.edit_revision = sr.result?.edit_revision || 0;
+          t.current_note = sr.result?.note || '';
+          t.source_url = sr.result?.source_url || '';
         };
       }
       done({
@@ -422,6 +414,16 @@ export function applyTicketUpdate(ticket, patch) {
     invalid('구현 전에 목표를 확정해 주세요.', 'goal_required');
   if (ticket.goal?.id && patch.goal_id !== ticket.goal.id)
     invalid('구현 목표가 일치하지 않습니다.', 'wrong_goal');
+  if (
+    status === 'working' &&
+    ticket.status !== 'working' &&
+    (ticket.needs_reconfirmation || ticket.confirmation_held)
+  )
+    invalid('편집 내용을 다시 확정해 주세요.', 'reconfirmation_required');
+  if (ticket.claim && patch.claim_token !== ticket.claim.token)
+    invalid('다른 작업자가 이미 착수했습니다. 최신 상태를 조회해 주세요.', 'claim_conflict');
+  if (status === 'working' && !patch.claim_token)
+    invalid('중복 착수를 막기 위한 claim_token이 필요합니다.', 'claim_required');
   const summary = text(patch.summary, '작업/검토 기록', 6000);
   if (status === 'working' && status !== ticket.status && !patch.implementation_instruction?.trim())
     invalid('사람의 구현 지시를 기록해 주세요.', 'instruction_required');
@@ -457,6 +459,13 @@ export function applyTicketUpdate(ticket, patch) {
     revision: ticket.revision + 1,
     updated_at: record.at,
     records: [...ticket.records, record],
+    confirmation_held: status === 'blocked' || (status === 'draft' && !!ticket.goal),
+    claim: ['queued', 'done', 'blocked'].includes(status)
+      ? null
+      : ticket.claim ||
+        (status === 'working'
+          ? { token: patch.claim_token, goal_id: ticket.goal.id, at: record.at }
+          : null),
   };
 }
 export async function updateTicket(input) {
@@ -485,6 +494,55 @@ export async function updateTicket(input) {
         tx.failure = e;
         tx.abort();
       }
+    };
+  });
+}
+
+export async function prepareImplementation(input) {
+  const project_id = projectKey(input.project_id),
+    instruction = text(input.instruction, '구현 지시', 3000);
+  const key = 'manifest:' + project_id + ':' + operation(input.operation_id);
+  return transact(['tickets', 'operations'], 'readwrite', (tx, done) => {
+    const receipt = tx.objectStore('operations').get(key);
+    receipt.onsuccess = () => {
+      if (receipt.result) {
+        if (receipt.result.instruction !== instruction) {
+          tx.failure = Object.assign(Error('다른 요청에 사용한 작업 ID입니다.'), {
+            code: 'operation_id_reused',
+          });
+          tx.abort();
+        } else done(receipt.result.result);
+        return;
+      }
+      const read = tx.objectStore('tickets').getAll();
+      read.onsuccess = () => {
+        const tickets = read.result
+          .filter(
+            (t) =>
+              t.project_id === project_id &&
+              !t.deletedAt &&
+              t.status === 'queued' &&
+              t.goal &&
+              !t.claim &&
+              !t.needs_reconfirmation,
+          )
+          .map((t) => ({
+            id: t.id,
+            display_id: t.display_id,
+            title: t.title,
+            revision: t.revision,
+            goal_id: t.goal.id,
+          }));
+        const result = {
+          id: crypto.randomUUID(),
+          project_id,
+          instruction,
+          tickets,
+          created_at: now(),
+        };
+        tx.objectStore('operations').put({ id: key, instruction, result });
+        done(result);
+      };
     };
   });
 }

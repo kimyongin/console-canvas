@@ -20,6 +20,8 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           v.ticketDisplayId,
           v.ticketStatus,
           v.emptyCapture,
+          v.goalConfirmed,
+          v.needsReconfirmation,
         ].join('/')
       : 'initial';
   });
@@ -30,64 +32,54 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
   };
   return (
     <>
-      <header className="app-header">
-        <a
-          className="brand"
-          href={location.href.split('?')[0]}
-          aria-label="Console Canvas 시작 화면"
-        >
-          <span className="brand-mark">{'▧'}</span>
-          <span>
-            {'Console '}
-            <strong>{'Canvas'}</strong>
-          </span>
-        </a>
-        <div className="header-actions">
-          <Button
-            id="create-ticket"
-            variant="outline"
-            onClick={() => dispatchEditorCommand('create-ticket')}
-          >
-            ＋ 새 티켓
+      <header className="app-header" hidden={!!(window as any).ConsoleCanvasDesktop}>
+        <strong className="brand">▧ Console Canvas</strong>
+        <div id="project-control" />
+        <nav className="workflow-nav">
+          <Button id="web-source" variant="ghost">
+            웹사이트
           </Button>
-          <Button
-            id="ticket-id"
-            variant="outline"
-            aria-label="티켓 ID 복사"
-            hidden={!view?.ticketDisplayId}
-          >
-            <Copy size={14} aria-hidden="true" />
+          <Button id="web-editor" variant="ghost" disabled={!view?.ready}>
+            편집
           </Button>
-          <span id="ticket-stage" aria-live="polite">
-            {
-              {
-                draft: '준비 중',
-                queued: '구현 대기',
-                working: '작업 중',
-                review: '검토 대기',
-                done: '완료',
-                blocked: '확인 필요',
-              }[view?.ticketStatus || '']
-            }
-          </span>
           <Button
             id="tickets-button"
+            variant="ghost"
             onClick={() => dispatchEditorCommand('tickets')}
-            variant="outline"
           >
-            작업 티켓
+            티켓 목록
           </Button>
+        </nav>
+        <Button
+          id="header-ticket-identity"
+          variant="ghost"
+          aria-label="티켓 ID 복사"
+          disabled={!view?.ready}
+        />
+        <span id="ticket-stage" aria-live="polite" />
+        <div className="header-actions">
           <Button
             id="new-ticket-button"
-            disabled={!view?.ready || view?.goalConfirmed || view?.emptyCapture}
-            onClick={() => dispatchEditorCommand('new-ticket')}
+            disabled={
+              !view?.ready ||
+              view?.emptyCapture ||
+              (view?.goalConfirmed && !view?.needsReconfirmation) ||
+              ['working', 'review', 'done'].includes(view?.ticketStatus || '')
+            }
+            onClick={() => dispatchEditorCommand('confirm-ticket')}
           >
-            목표 확정
+            {view?.needsReconfirmation ? '재확정' : '확정'}
           </Button>
-
-          <Button id="export-button" className="primary" disabled={true} variant="outline">
-            {'\n          전달 이미지 '}
-            <span aria-hidden="true">{'↗'}</span>
+          <Button
+            id="document-menu-button"
+            popoverTarget="document-menu-content"
+            aria-label="티켓 메뉴"
+            variant="outline"
+          >
+            <span id="source-title" className="sr-only">
+              {'티켓 메뉴'}
+            </span>
+            <span aria-hidden="true">⋯</span>
           </Button>
         </div>
       </header>
@@ -198,92 +190,72 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             title="드래그로 요청·주석 너비 조절 · 방향키로 미세 조절"
           ></div>
           <div className="canvas-tools">
-            <div id="document-menu" className="document-menu">
-              <Button
-                id="document-menu-button"
-                popoverTarget="document-menu-content"
-                aria-label="티켓 메뉴"
-                variant="outline"
-              >
-                <span id="source-title">{'문서 열기'}</span>
-                <span aria-hidden="true">{'⌄'}</span>
-              </Button>
-              <div id="document-menu-content" className="document-menu-content" popover="auto">
-                <form id="ticket-settings-form" className="ticket-settings-form">
-                  <label htmlFor="ticket-name">티켓 이름</label>
-                  <Input id="ticket-name" maxLength={120} required />
-                  <label htmlFor="project-id">프로젝트</label>
-                  <Input
-                    id="project-id"
-                    placeholder="레포지터리 이름 또는 로컬 경로"
-                    maxLength={300}
-                    required
-                  />
-                  <Button
-                    id="save-ticket-settings"
-                    type="submit"
-                    data-current-document=""
-                    disabled={true}
-                  >
-                    저장
+            <div id="document-menu-content" className="document-menu-content" popover="auto">
+              <form id="ticket-settings-form" className="ticket-settings-form">
+                <label htmlFor="ticket-name">티켓 이름</label>
+                <Input id="ticket-name" maxLength={120} required />
+
+                <Button
+                  id="save-ticket-settings"
+                  type="submit"
+                  data-current-document=""
+                  disabled={true}
+                >
+                  저장
+                </Button>
+                <p id="ticket-settings-error" role="alert" hidden></p>
+              </form>
+              <div className="document-management">
+                <Button
+                  id="show-commands"
+                  variant="outline"
+                  onClick={() => dispatchEditorCommand('commands')}
+                >
+                  명령과 단축키…
+                </Button>
+                <Button
+                  id="save-document"
+                  data-current-document=""
+                  disabled={true}
+                  variant="outline"
+                >
+                  {'편집 파일 저장…'}
+                </Button>
+                <Button
+                  id="export-button"
+                  data-current-document=""
+                  disabled={true}
+                  variant="outline"
+                >
+                  전달 이미지 저장
+                </Button>
+                <Button
+                  id="direct-open-source"
+                  data-current-document=""
+                  disabled={true}
+                  variant="outline"
+                >
+                  원본 사이트 열기
+                </Button>
+                <details id="source-details">
+                  <summary>{'원본 정보'}</summary>
+                  <a id="source-url" target="_blank" rel="noreferrer" hidden={true}></a>
+                  <div id="source-meta" className="source-meta">
+                    {'편집할 화면을 열어 주세요.'}
+                  </div>
+                  <Button id="recapture-button" hidden={true} variant="outline">
+                    {'원본에서 다시 가져오기'}
                   </Button>
-                  <p id="ticket-settings-error" role="alert" hidden></p>
-                </form>
-                <div className="document-management">
-                  <Button
-                    id="show-commands"
-                    variant="outline"
-                    onClick={() => dispatchEditorCommand('commands')}
-                  >
-                    명령과 단축키…
-                  </Button>
-                  <Button id="import-button" variant="outline">
-                    {'편집 파일 열기…'}
-                  </Button>
-                  <Button
-                    id="save-document"
-                    data-current-document=""
-                    disabled={true}
-                    variant="outline"
-                  >
-                    {'편집 파일 저장…'}
-                  </Button>
-                  <Button
-                    id="duplicate-document"
-                    variant="outline"
-                    data-current-document=""
-                    disabled={true}
-                  >
-                    새 티켓으로 복제
-                  </Button>
-                  <Button
-                    id="direct-open-source"
-                    data-current-document=""
-                    disabled={true}
-                    variant="outline"
-                  >
-                    원본 사이트 열기
-                  </Button>
-                  <details id="source-details">
-                    <summary>{'원본 정보'}</summary>
-                    <a id="source-url" target="_blank" rel="noreferrer" hidden={true}></a>
-                    <div id="source-meta" className="source-meta">
-                      {'편집할 화면을 열어 주세요.'}
-                    </div>
-                    <Button id="recapture-button" hidden={true} variant="outline">
-                      {'원본에서 다시 가져오기'}
-                    </Button>
-                  </details>
-                  <Button
-                    id="trash-current"
-                    data-current-document=""
-                    className="danger-menu"
-                    disabled={true}
-                    variant="outline"
-                  >
-                    {'\n                이 티켓을 휴지통으로 이동\n              '}
-                  </Button>
-                </div>
+                </details>
+                <Button
+                  id="trash-current"
+                  data-current-document=""
+                  className="danger-menu"
+                  disabled={true}
+                  variant="outline"
+                >
+                  {'\n                이 티켓을 휴지통으로 이동\n              '}
+                </Button>
               </div>
             </div>
             <div className="canvas-toolbar">
@@ -337,9 +309,6 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           </div>
           <div id="viewport" className="canvas-viewport">
             <div id="welcome" className="welcome">
-              <Button onClick={() => dispatchEditorCommand('create-ticket')}>
-                ＋ 새 티켓으로 시작
-              </Button>
               <div className="welcome-icon">{'▧'}</div>
               <div className="eyebrow">{'FROM BROWSER TO CANVAS'}</div>
               <h2>
@@ -372,17 +341,6 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
               <div id="recent-documents" className="recent-documents"></div>
             </div>
             <div id="artboard-space" className="artboard-space" hidden={true}>
-              <div id="ticket-empty" className="ticket-empty" hidden>
-                <h2>이 티켓에서 편집을 시작하세요</h2>
-                <p>
-                  웹사이트에서 화면을 가져오면 이 티켓에 저장됩니다. 에이전트에게 티켓 ID만 알려
-                  주세요.
-                </p>
-                <Button id="ticket-source">웹사이트에서 가져오기</Button>
-                <Button id="ticket-sample" variant="outline">
-                  샘플 화면 가져오기
-                </Button>
-              </div>
               <div className="artboard-caption">
                 <div id="artboard-label" className="artboard-label"></div>
                 <Button

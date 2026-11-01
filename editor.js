@@ -1,6 +1,8 @@
+import { createProjectWorkflow } from './ui/project-workflow.js';
+import { updateProject, listProjects, activeProject } from './project-model.js';
 import { createTicketWorkspace } from './ticket-workspace.js';
 import { isComposingKey } from './ui/keyboard.js';
-import { createTicket, getTicket } from './ticket-model.js';
+import { getTicket, confirmTicketGoal } from './ticket-model.js';
 import { createEditorCommands } from './ui/editor-commands.js';
 import { createResourceRepair } from './ui/resource-repair.js';
 import { resourceCandidates } from './resource-repair.js';
@@ -85,6 +87,7 @@ const adapter = createEditorAdapter(() => ({
   ticketDisplayId: state.ticket?.display_id || '',
   ticketStatus: state.ticket?.status || '',
   goalConfirmed: !!state.ticket?.goal,
+  needsReconfirmation: !!state.ticket?.needs_reconfirmation,
   emptyCapture: !!state.snapshot?.source.empty,
   generation: state.generation,
   revision: state.revision,
@@ -130,6 +133,7 @@ const {
     state.saveMessage = message;
     $('#emergency-backup').hidden = !state.lastSaveError;
     state.savePending = message === '저장 중…';
+    if (message === '자동 저장 완료') void refreshTicket();
     adapter.publish();
   },
   commitCommentDraft,
@@ -172,7 +176,7 @@ createDocumentSwitcher({ $, state, flushEditor, closeDocument, refresh: refreshT
 function renderDocumentName() {
   const name = state.ticket
     ? state.ticket.display_id + ' · ' + (state.snapshot?.documentName || state.ticket.title)
-    : '티켓을 만들어 시작하세요';
+    : '웹사이트에서 화면을 가져오세요';
   $('#source-title').textContent = name;
   $('#document-menu-button').title = name;
   renderTicketIdentity();
@@ -182,7 +186,7 @@ function renderDocumentName() {
     ? '원본 · ' + state.snapshot.source.title + ' · ' + state.snapshot.source.viewport.width + ' px'
     : '';
 }
-function closeDocument(id) {
+function closeDocument(id = state.snapshot?.id) {
   const next = opening
     .catch(() => {})
     .then(async () => {
@@ -443,7 +447,10 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}) {
     : existingMeta?.title && existingMeta.title !== snapshot.source.title
       ? existingMeta.title
       : undefined;
-  await saveCapture({ ...snapshot, ...(documentName ? { documentName } : {}) });
+  if (!snapshot.project_id && !existingMeta) {
+    const p = await projectWorkflow.ensure(state.project_id);
+    snapshot = { ...snapshot, project_id: p.id };
+  }
   if (
     state.revision !== outgoingRevision ||
     $('#review-note').value !== outgoingNote ||
@@ -478,9 +485,8 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}) {
   const storedCodePatches = snapshot.resourceRepairs;
   const storedLayerNames = snapshot.layerNames;
   const capture = captureFromDocument(snapshot);
-  state.project_id =
-    state.ticket?.project_id || snapshot.project_id || defaultProject(snapshot.source.url);
-  $('#project-id').value = state.project_id;
+  state.project_id = state.ticket?.project_id || snapshot.project_id;
+  await activeProject(state.project_id);
   state.snapshot = {
     ...capture,
     layerNames: cleanLayerNames(storedLayerNames),
@@ -541,6 +547,14 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}) {
   scene.snapshot.layerNames = state.snapshot.layerNames;
   try {
     await scene.mount();
+    await saveCapture({
+      ...snapshot,
+      edits,
+      annotations,
+      note,
+      ...(documentName ? { documentName } : {}),
+    });
+    state.ticket = await getTicket(snapshot.id);
     areaSelection.bind(scene);
     clipboard.bindScene(scene);
     if (generation !== state.generation) return;
@@ -563,22 +577,18 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}) {
     state.lastCheckpoint = checkpoint();
     activityPanel.render();
     state.ready = true;
+    await updateProject(state.project_id, { last_ticket_id: snapshot.id });
     notice('');
     const route = new URL(location.href);
     route.searchParams.delete('sample');
     route.searchParams.set('id', state.snapshot.id);
     history.replaceState(null, '', route);
-    $('#ticket-empty').hidden = !state.snapshot.source.empty;
     renderTicketIdentity();
     adapter.publish();
     connectDesktopIfReady();
     renderMcpStatus();
     save();
-    toast(
-      state.snapshot.source.empty
-        ? '티켓을 만들었습니다. 화면을 가져와 편집하세요.'
-        : '화면을 가져왔어요. 이 티켓에서 편집과 주석을 이어가세요.',
-    );
+    toast('화면을 가져왔어요. 이 티켓에서 편집과 주석을 이어가세요.');
   } catch (error) {
     state.snapshot = null;
     state.scene = null;
@@ -626,13 +636,15 @@ async function importFile(file) {
     throw new Error('파일이 너무 큽니다. 85MB 이하의 화면 파일을 선택해 주세요.');
   const data = JSON.parse(await file.text());
   if (data.format && data.format !== 'console-canvas-snapshot') {
-    const doc = await importDocument(data);
+    const doc = await importDocument(data, state.project_id);
     await openSnapshot(doc, doc.edits, doc.note || '', doc.annotations || {});
   } else {
     const prepared = prepareCaptureScope(data);
     validateDocumentInput(prepared, data.edits || {}, data.annotations || {});
     const existing = await getDocument(data.id);
     if (existing) {
+      if (existing.project_id !== state.project_id)
+        throw Error('다른 프로젝트에 저장된 티켓입니다. 해당 프로젝트에서 열어 주세요.');
       if (
         JSON.stringify(captureFromDocument(existing)) !==
         JSON.stringify(captureFromDocument(prepared))
@@ -640,7 +652,13 @@ async function importFile(file) {
         throw Error('같은 ID에 다른 원본이 저장돼 있습니다. 기존 작업은 바꾸지 않았습니다.');
       await openTicket(data.id);
       toast('이미 저장된 화면입니다. 기존 티켓과 편집을 열었습니다.');
-    } else await openSnapshot(prepared, data.edits || {}, data.note || '', data.annotations || {});
+    } else
+      await openSnapshot(
+        { ...prepared, project_id: state.project_id },
+        data.edits || {},
+        data.note || '',
+        data.annotations || {},
+      );
   }
 }
 $('#file-input').addEventListener('change', (event) => {
@@ -649,7 +667,7 @@ $('#file-input').addEventListener('change', (event) => {
   );
   event.target.value = '';
 });
-for (const id of ['#import-button', '#welcome-import'])
+for (const id of ['#welcome-import'])
   $(id).addEventListener('click', () => {
     $('#document-menu-content').hidePopover();
     $('#file-input').click();
@@ -789,33 +807,23 @@ async function blobUrl(blob) {
     reader.readAsDataURL(blob);
   });
 }
-function defaultProject(url) {
-  try {
-    const parsed = new URL(url);
-    return parsed.origin === 'null'
-      ? parsed.protocol + '//' + (parsed.host || 'local-project')
-      : parsed.origin;
-  } catch {
-    return 'local-project';
-  }
-}
 function renderTicketIdentity() {
   const ticket = state.ticket;
-  $('#ticket-stage').textContent = ticket
-    ? {
-        draft: '준비 중',
-        queued: '구현 대기',
-        working: '작업 중',
-        review: '검토 대기',
-        done: '완료',
-        blocked: '확인 필요',
-      }[ticket.status] || ''
-    : '';
-  $('#ticket-id').hidden = !ticket;
-  $('#new-ticket-button').disabled =
-    !state.ready || !!ticket?.goal || !!state.snapshot?.source.empty;
-  $('#ticket-empty').hidden = !state.snapshot?.source.empty;
-  $('#artboard-label').dataset.confirmed = String(!!ticket?.goal);
+  $('#ticket-stage').textContent = ticket?.revision_requested
+    ? '변경 요청 있음'
+    : ticket?.needs_reconfirmation
+      ? '재확정 필요'
+      : {
+          draft: '편집 중',
+          queued: '확정',
+          working: '작업 중',
+          review: '검토 대기',
+          done: '완료',
+          blocked: '확인 필요',
+        }[ticket?.status] || '';
+  $('#header-ticket-identity').textContent = ticket ? ticket.display_id + ' · ' + ticket.title : '';
+  $('#artboard-label').dataset.confirmed = String(!!ticket?.goal && !ticket.needs_reconfirmation);
+  void projectWorkflow?.emit();
 }
 async function refreshTicket() {
   if (state.snapshot) state.ticket = await getTicket(state.snapshot.id);
@@ -829,62 +837,55 @@ async function openTicket(id) {
   if (!doc) throw Error('티켓 작업 공간을 찾을 수 없습니다.');
   await openSnapshot(doc, doc.edits, doc.note, doc.annotations);
 }
-async function newTicket() {
-  await flushEditor();
-  const ticket = await createTicket({
-    title: '새 편집 티켓',
-    project_id: state.project_id || 'local-project',
-    operation_id: crypto.randomUUID(),
-  });
-  await openTicket(ticket.id);
-}
 async function receiveCapture(value) {
-  if (state.snapshot?.source.empty)
-    value = {
-      ...value,
-      id: state.snapshot.id,
-      project_id: state.project_id,
-      documentName:
-        state.ticket?.title === '새 편집 티켓' ? value.source.title : state.ticket?.title,
-    };
-  await openSnapshot(value);
+  const project = await projectWorkflow.ensure(value.project_id);
+  if (/^https?:\/\//.test(value.source.url))
+    await updateProject(project.id, { last_url: value.source.url });
+  await openSnapshot({ ...value, project_id: project.id });
+  await refreshTicket();
 }
-async function showTickets(confirm = false) {
+async function confirmCurrentTicket() {
+  if (!state.ready) return;
+  await flushEditor();
+  const ticket = await getTicket(state.snapshot.id);
+  const revision = state.revision,
+    generation = state.generation;
+  const image = await blobUrl((await imageResult()).blob);
+  if (revision !== state.revision || generation !== state.generation)
+    throw Error('편집이 바뀌었습니다. 다시 확정해 주세요.');
+  await confirmTicketGoal({
+    ticket_id: ticket.id,
+    project_id: ticket.project_id,
+    expected_revision: ticket.revision,
+    expected_edit_revision: revision,
+    operation_id: crypto.randomUUID(),
+    image_data_url: image,
+    selection_confirmed: true,
+    source: state.snapshot.source,
+    annotations: copy(state.scene.annotations),
+    selection: [...state.scene.selection],
+    request: [$('#review-note').value, ...state.scene.comments().map((c) => c.text)]
+      .filter(Boolean)
+      .join('\n\n'),
+  });
+  await refreshTicket();
+  toast('확정했습니다. 에이전트에게 확정된 티켓 구현을 요청하세요.');
+}
+async function showTickets() {
   try {
+    if (!state.project_id) {
+      toast('프로젝트를 먼저 선택해 주세요.');
+      return;
+    }
     await flushEditor();
-    const ticket = state.snapshot ? await getTicket(state.snapshot.id) : null;
-    const goalRequest = [
-      $('#review-note').value,
-      ...(state.scene?.comments() || []).map((c) => c.text),
-    ]
-      .filter((v) => v?.trim())
-      .join('\n\n');
-    const revision = state.revision,
-      generation = state.generation;
+    for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
     renderTickets($('#tickets-content'), {
       project: state.project_id,
       documentId: state.snapshot?.id,
-      ticket: confirm ? ticket : null,
-      confirm,
-      note: goalRequest,
-      source: state.snapshot?.source,
-      annotations: state.scene ? copy(state.scene.annotations) : {},
-      selection: state.scene ? [...state.scene.selection] : [],
-      editRevision: revision,
-      capture: async () => {
-        await flushEditor();
-        const image = await imageResult();
-        if (revision !== state.revision || generation !== state.generation)
-          throw Error('편집이 바뀌었습니다. 다시 확정해 주세요.');
-        return blobUrl(image.blob);
-      },
-      create: async () => {
-        $('#tickets-dialog').close();
-        await newTicket();
-      },
       open: async (id) => {
         $('#tickets-dialog').close();
         await openTicket(id);
+        window.ConsoleCanvasDesktop?.showEditor();
       },
       close: () => $('#tickets-dialog').close(),
       removed: async (id) => {
@@ -895,42 +896,13 @@ async function showTickets(confirm = false) {
         void refreshTicket();
       },
     });
-    $('#tickets-dialog').showModal();
+    if (!$('#tickets-dialog').open) $('#tickets-dialog').showModal();
   } catch (e) {
     toast(e.message);
   }
 }
 adapter.register('tickets', () => showTickets());
-adapter.register('new-ticket', () => showTickets(true));
-adapter.register('create-ticket', () => newTicket().catch((e) => toast(e.message)));
-$('#ticket-id').addEventListener('click', async () => {
-  await navigator.clipboard.writeText(state.ticket.display_id);
-  toast('티켓 ID를 복사했습니다. 에이전트에게 이 ID로 요청하세요.');
-});
-$('#ticket-source').addEventListener('click', () => window.ConsoleCanvasDesktop?.showSource());
-$('#ticket-sample').addEventListener('click', loadSample);
-$('#duplicate-document').addEventListener('click', async () => {
-  try {
-    await flushEditor();
-    const doc = {
-      ...copy(state.snapshot),
-      id: crypto.randomUUID(),
-      project_id: state.project_id,
-      documentName:
-        (state.snapshot.documentName || state.snapshot.source.title).slice(0, 115) + ' 복사본',
-      resourceRepairs: copy(state.scene.resourceRepairs),
-    };
-    await openSnapshot(
-      doc,
-      copy(state.scene.edits),
-      $('#review-note').value,
-      copy(state.scene.annotations),
-    );
-    toast('새 ID의 독립 티켓을 만들었습니다. 확정 목표와 진행 기록은 복사하지 않습니다.');
-  } catch (e) {
-    toast(e.message);
-  }
-});
+adapter.register('confirm-ticket', () => confirmCurrentTicket().catch((e) => toast(e.message)));
 $('#export-button').addEventListener('click', async () => {
   const button = $('#export-button');
   button.disabled = true;
@@ -1118,15 +1090,102 @@ $('#mcp-disconnect').addEventListener('click', async () => {
   await mcpBridge.disconnect();
   $('#mcp-dialog').close();
 });
+const projectWorkflow = createProjectWorkflow({
+  state,
+  flush: flushEditor,
+  openTicket,
+  closeDocument,
+  showTickets,
+  confirm: confirmCurrentTicket,
+  importFile,
+  leave: () => {
+    for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
+    for (const popover of document.querySelectorAll(':popover-open')) popover.hidePopover();
+  },
+  publish: (value) => {
+    window.ConsoleCanvasDesktop?.publishWorkspace(value);
+    void ticketWorkspace.refreshProjects();
+    renderProjectControl(value);
+  },
+});
+function renderProjectControl(value) {
+  const host = $('#project-control');
+  if (host.contains(document.activeElement)) return;
+  host.replaceChildren();
+  const select = document.createElement('select');
+  select.setAttribute('aria-label', '프로젝트');
+  const placeholder = new Option('프로젝트 선택', '');
+  select.add(placeholder);
+  for (const p of value.projects) select.add(new Option(p.name, p.id));
+  select.add(new Option('+ 새 프로젝트', 'new'));
+  if (value.project) select.add(new Option('프로젝트 이름 변경', 'rename'));
+  select.value = value.project?.id || '';
+  select.onchange = async () => {
+    if (select.value === 'new') showProjectName();
+    else if (select.value === 'rename') showProjectName(value.project);
+    else await projectWorkflow.execute({ action: 'select', id: select.value });
+  };
+  host.append(select);
+  if (value.project) {
+    const copy = document.createElement('button');
+    copy.textContent = value.project.repository ? '저장소 연결됨' : '연결 요청 복사';
+    copy.title = value.project.repository?.root || '현재 저장소의 에이전트 대화에 붙여 넣으세요.';
+    copy.onclick = () =>
+      projectWorkflow
+        .execute({ action: 'copy-connection' })
+        .then(() => toast('연결 요청을 복사했습니다.'))
+        .catch((e) => toast(e.message));
+    host.append(copy);
+  }
+}
+function showProjectName(project = null) {
+  const host = $('#project-control');
+  host.replaceChildren();
+  const form = document.createElement('form'),
+    input = document.createElement('input'),
+    save = document.createElement('button'),
+    cancel = document.createElement('button');
+  input.value = project?.name || '새 프로젝트';
+  input.maxLength = 120;
+  input.setAttribute('aria-label', '프로젝트 이름');
+  save.textContent = project ? '이름 변경' : '만들기';
+  cancel.type = 'button';
+  cancel.textContent = '취소';
+  cancel.onclick = () => {
+    document.activeElement?.blur();
+    projectWorkflow.emit();
+  };
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      document.activeElement?.blur();
+      await projectWorkflow.execute({ action: project ? 'rename' : 'create', name: input.value });
+    } catch (error) {
+      toast(error.message);
+    }
+  };
+  form.append(input, save, cancel);
+  host.append(form);
+  input.focus();
+  input.select();
+}
+$('#header-ticket-identity').onclick = () => {
+  if (state.ticket)
+    navigator.clipboard
+      .writeText(state.ticket.display_id)
+      .then(() => toast('티켓 ID를 복사했습니다.'));
+};
+$('#web-source').onclick = () =>
+  window.ConsoleCanvasDesktop?.showSource() || toast('내장 앱의 웹사이트에서 화면을 가져오세요.');
+$('#web-editor').onclick = () => $('#tickets-dialog').close();
+void projectWorkflow.initialize().then(() => projectWorkflow.emit());
 if (window.ConsoleCanvasDesktop) {
   document.body.classList.add('desktop-editor');
   const tools = $('.canvas-toolbar');
   tools.setAttribute('role', 'toolbar');
   tools.setAttribute('aria-label', '편집 도구');
-  const actions = $('.header-actions');
-  actions.setAttribute('role', 'group');
-  actions.setAttribute('aria-label', '목표 티켓과 전달 이미지');
-  $('.canvas-tools').append(actions);
+
+  // The native shell owns the single common header; editor tools stay by the canvas.
   $('#recapture-button').hidden = false;
   $('#recapture-button').addEventListener('click', () =>
     state.snapshot?.source.application
@@ -1146,6 +1205,7 @@ if (window.ConsoleCanvasDesktop) {
     window.ConsoleCanvasDesktop.showSource(),
   );
   $('.app-header').hidden = true;
+  window.ConsoleCanvasDesktop.onWorkspace((command) => projectWorkflow.execute(command));
   window.ConsoleCanvasDesktop.onHistory((command) => {
     if (document.activeElement?.closest('input,textarea,[contenteditable="true"]')) {
       document.execCommand(command);
@@ -1190,14 +1250,28 @@ if (params.has('id'))
       if (!value)
         throw new Error(
           workspaceReset
-            ? '0.45 전환으로 이전 테스트 자료를 초기화했습니다. 웹사이트에서 새 화면을 가져와 주세요.'
+            ? '새 작업 공간을 준비했습니다. 웹사이트에서 화면을 가져와 주세요.'
             : '저장된 화면을 찾을 수 없습니다. 웹사이트에서 다시 가져와 주세요.',
         );
       return openSnapshot(value, value.edits, value.note, value.annotations);
     })
     .catch((error) => notice(error.message));
-else if (params.has('sample')) loadSample();
-else renderRecentDocuments();
+else if (params.has('sample')) {
+  projectWorkflow
+    .initialize()
+    .then(async () => {
+      if (!(await listProjects()).length)
+        await projectWorkflow.execute({ action: 'create', name: '샘플 콘솔' });
+      await loadSample();
+    })
+    .catch((e) => notice(e.message));
+} else
+  projectWorkflow.initialize().then(async () => {
+    const { project } = await projectWorkflow.view();
+    if (project?.last_ticket_id && (await getDocument(project.last_ticket_id)))
+      await openTicket(project.last_ticket_id);
+    else await renderRecentDocuments();
+  });
 async function renderRecentDocuments() {
   try {
     const values = await listDocuments();
@@ -1224,7 +1298,9 @@ window.ConsoleCanvas = {
   selectNode,
   controller,
   ticketWorkspace,
-  newTicket,
+  projectWorkflow,
+  receiveCapture,
+  confirmCurrentTicket,
   openTicket,
   checkpoint,
   flushEditor,

@@ -26,6 +26,26 @@ async function until(read, message, timeout = 30000) {
   throw Error(message);
 }
 const evaluate = (wc, code) => wc.executeJavaScript(code);
+async function screenshot(window, name) {
+  const directory = process.env.CONSOLE_CANVAS_GUIDE_CAPTURE_DIR;
+  if (!directory) return;
+  await fs.mkdir(directory, { recursive: true });
+  const [width, height] = window.getContentSize();
+  const child = window.contentView.children.find((v) => v.webContents && v.getVisible());
+  const bounds = child?.getBounds(),
+    top = bounds?.y || height;
+  const header = (
+    await window.webContents.capturePage({ x: 0, y: 0, width, height: top })
+  ).toDataURL();
+  const content = child ? (await child.webContents.capturePage()).toDataURL() : null;
+  const png = await window.webContents.executeJavaScript(`(async()=>{
+    const c=document.createElement('canvas');c.width=${width};c.height=${height};const x=c.getContext('2d');
+    async function draw(src,left,top,w,h){const i=new Image();i.src=src;await i.decode();x.drawImage(i,left,top,w,h);}
+    await draw(${JSON.stringify(header)},0,0,${width},${top});
+    ${content ? `await draw(${JSON.stringify(content)},${bounds.x},${bounds.y},${bounds.width},${bounds.height});` : ''}
+    return c.toDataURL('image/png');})()`);
+  await fs.writeFile(path.join(directory, name + '.png'), Buffer.from(png.split(',')[1], 'base64'));
+}
 async function main() {
   await app.whenReady();
   const window = await until(() => BrowserWindow.getAllWindows()[0], 'Window missing'),
@@ -37,8 +57,22 @@ async function main() {
           ?.webContents,
       'Missing ' + part,
     );
-  const editor = await get('/editor.html'),
-    source = await get('/fixtures/console.html');
+  const editor = await get('/editor.html');
+  await until(
+    () => evaluate(shell, 'typeof window.ConsoleCanvasShell!=="undefined"'),
+    'Shell preload missing',
+  );
+  await until(
+    () => evaluate(editor, '!!window.ConsoleCanvas?.projectWorkflow'),
+    'Workspace missing',
+  );
+  if (phase === 'prepare') {
+    await evaluate(
+      shell,
+      '(async()=>{ const a=window.ConsoleCanvasShell; const info=await a.info(); await a.navigate(info.demo_url); })()',
+    );
+  }
+  const source = await get('/fixtures/console.html');
   await until(
     () => evaluate(shell, 'typeof window.ConsoleCanvasShell!=="undefined"'),
     'Shell preload missing',
@@ -57,7 +91,30 @@ async function main() {
   );
   if (phase === 'prepare') {
     const before = await evaluate(source, 'document.documentElement.outerHTML');
-    await evaluate(shell, 'window.ConsoleCanvasShell.capture()');
+    await screenshot(window, '01-website');
+    await evaluate(shell, "document.querySelector('#capture').click()");
+    await until(
+      () => evaluate(shell, "!document.querySelector('#project-setup').hidden"),
+      'First-import project form missing',
+    );
+    await screenshot(window, '02-project');
+    await evaluate(shell, "document.querySelector('#cancel-project').click()");
+    assert.deepEqual(
+      await evaluate(
+        editor,
+        `(async()=>({projects:(await(await import('/project-model.js')).listProjects()).length,tickets:(await(await import('/ticket-model.js')).listTickets()).total}))()`,
+      ),
+      { projects: 0, tickets: 0 },
+    );
+    await evaluate(shell, "document.querySelector('#capture').click()");
+    await until(
+      () => evaluate(shell, "!document.querySelector('#project-setup').hidden"),
+      'Project form did not reopen',
+    );
+    await evaluate(
+      shell,
+      "document.querySelector('#new-project-name').value='QA 고객 콘솔';document.querySelector('#create-project-form').requestSubmit()",
+    );
     await until(
       () =>
         evaluate(
@@ -67,7 +124,75 @@ async function main() {
       'Capture/MCP missing',
     );
     assert.equal(await evaluate(source, 'document.documentElement.outerHTML'), before);
-    await evaluate(editor, 'window.ConsoleCanvas.ticketWorkspace.refreshProjects()');
+    await evaluate(
+      editor,
+      `(async()=>{const a=window.ConsoleCanvas,n=[...a.state.scene.nodes.values()].find(n=>n.locator.id==='new-customer');a.selectNode(n.id);a.state.scene.setComment(n.id,'제목과 정렬하고 모바일에서는 전체 너비로 보여주세요.');await a.flushEditor();})()`,
+    );
+    await screenshot(window, '03-edit');
+    if (process.env.CONSOLE_CANVAS_GUIDE_CAPTURE_DIR) {
+      await evaluate(editor, 'window.ConsoleCanvas.confirmCurrentTicket()');
+      await until(
+        () =>
+          evaluate(shell, "document.querySelector('#shell-ticket-status').textContent==='확정'"),
+        'Guide confirmation missing',
+      );
+      await screenshot(window, '04-confirmed');
+      await evaluate(
+        editor,
+        `(async()=>{const a=window.ConsoleCanvas;a.state.scene.nudge(1,0);await a.flushEditor();})()`,
+      );
+    }
+
+    const originalUrl = source.getURL();
+    await evaluate(
+      source,
+      "document.querySelector('#customer-search').value='김민서';scrollTo(0,40)",
+    );
+    const sourceState = await evaluate(
+      source,
+      "({value:document.querySelector('#customer-search').value,y:scrollY})",
+    );
+    await evaluate(shell, "window.ConsoleCanvasShell.show('source')");
+    await evaluate(shell, "window.ConsoleCanvasShell.workspace({action:'editor'})");
+    await evaluate(shell, "window.ConsoleCanvasShell.show('source')");
+    assert.equal(source.getURL(), originalUrl);
+    assert.deepEqual(
+      await evaluate(
+        source,
+        "({value:document.querySelector('#customer-search').value,y:scrollY})",
+      ),
+      sourceState,
+    );
+    const originalOpen = dialog.showOpenDialog;
+    dialog.showOpenDialog = async () => ({ canceled: true, filePaths: [] });
+    assert.equal(
+      (await evaluate(shell, "window.ConsoleCanvasShell.workspace({action:'open-file'})")).canceled,
+      true,
+    );
+    assert.equal((await evaluate(shell, 'window.ConsoleCanvasShell.info()')).view, 'source');
+    const file = path.join(directory, 'new-ticket.uiclone.json');
+    const incoming = await evaluate(
+      editor,
+      `(async()=>{const d=await window.ConsoleCanvas.exportDocument();d.capture.id=crypto.randomUUID();d.tickets[0].id=d.capture.id;d.tickets[0].document_id=d.capture.id;if(d.tickets[0].goal){d.tickets[0].goal.document_id=d.capture.id;d.tickets[0].goal.id=crypto.randomUUID();}d.tickets[0].title='파일 복원 확인';d.session.documentName='파일 복원 확인';return d;})()`,
+    );
+    await fs.writeFile(file, JSON.stringify(incoming));
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] });
+    const originalTicket = await evaluate(editor, 'window.ConsoleCanvas.state.snapshot.id');
+    await evaluate(shell, "window.ConsoleCanvasShell.workspace({action:'open-file'})");
+    assert.equal(
+      await evaluate(editor, 'window.ConsoleCanvas.state.snapshot.id'),
+      incoming.capture.id,
+    );
+    await evaluate(
+      editor,
+      `(async()=>{await window.ConsoleCanvas.openTicket(${JSON.stringify(originalTicket)});await(await import('/db.js')).trashDocument(${JSON.stringify(incoming.capture.id)});})()`,
+    );
+    dialog.showOpenDialog = originalOpen;
+
+    await evaluate(
+      editor,
+      `(async()=>{const a=window.ConsoleCanvas, model=await import('/project-model.js'), db=await import('/db.js'); const primary=a.state.project_id; const other=await model.createProject('QA 다른 저장소'); const capture={...structuredClone(a.state.snapshot), id:crypto.randomUUID(), project_id:other.id}; await db.saveCapture(capture); await model.activeProject(primary); await a.ticketWorkspace.refreshProjects();})()`,
+    );
     const originalSave = dialog.showSaveDialog;
     const pngFile = path.join(directory, 'current-goal.png');
     dialog.showSaveDialog = async () => ({ canceled: false, filePath: pngFile });
@@ -110,6 +235,10 @@ async function main() {
     await fs.writeFile(
       path.join(directory, 'prepare-ready.json'),
       JSON.stringify({
+        firstImportCancel: true,
+        sourceRoundTrip: true,
+        fileOpenCancel: true,
+        fileRestore: true,
         sandbox: true,
         sourceUnchanged: true,
         retiredIpcAbsent: true,
@@ -128,7 +257,22 @@ async function main() {
     );
     const expected = await evaluate(
       editor,
-      `(async()=>{const a=window.ConsoleCanvas,n=[...a.state.scene.nodes.values()].find(n=>n.locator.id==='new-customer');a.selectNode(n.id);a.state.scene.setPosition(23,31);a.state.scene.setComment(n.id,'native persisted comment');const copy=a.state.scene.pasteSelection(a.state.scene.copySelection())[0];document.querySelector('#review-note').value='native persisted note';a.state.snapshot.documentName='새 흐름 재실행 검증';await a.flushEditor();const tickets=await(await import('/ticket-model.js')).listTickets(a.state.project_id);return {document_id:a.state.snapshot.id,node:n.id,copyId:copy,ticketId:tickets.tickets.find(t=>t.document_id===a.state.snapshot.id).id,project_id:a.state.project_id};})()`,
+      `(async()=>{const a=window.ConsoleCanvas,n=[...a.state.scene.nodes.values()].find(n=>n.locator.id==='new-customer');a.selectNode(n.id);a.state.scene.setPosition(23,31);a.state.scene.setComment(n.id,'제목과 정렬하고 모바일에서는 전체 너비로 배치해 주세요.');const copy=a.state.scene.pasteSelection(a.state.scene.copySelection())[0];document.querySelector('#review-note').value='버튼과 검색 영역의 간격을 정리해 주세요.';a.state.snapshot.documentName='고객 검색 개선';await a.flushEditor();await a.confirmCurrentTicket();const current=await(await import('/ticket-model.js')).getTicket(a.state.snapshot.id);const tickets=await(await import('/ticket-model.js')).listTickets(a.state.project_id);return {document_id:a.state.snapshot.id,node:n.id,copyId:copy,ticketId:tickets.tickets.find(t=>t.document_id===a.state.snapshot.id).id,project_id:a.state.project_id,goal_id:current.goal.id};})()`,
+    );
+    await until(
+      () => evaluate(shell, "document.querySelector('#shell-ticket-status').textContent==='확정'"),
+      'Confirmed header missing',
+    );
+    await evaluate(shell, "window.ConsoleCanvasShell.workspace({action:'tickets'})");
+    await until(
+      () => evaluate(editor, "!!document.querySelector('.ticket-compact-row')"),
+      'Ticket catalog missing',
+    );
+    await screenshot(window, '05-tickets');
+    await evaluate(shell, "window.ConsoleCanvasShell.workspace({action:'editor'})");
+    await evaluate(
+      editor,
+      `window.ConsoleCanvas.openTicket(${JSON.stringify(expected.document_id)})`,
     );
     await fs.writeFile(path.join(directory, 'expected.json'), JSON.stringify(expected));
   } else {
@@ -146,17 +290,23 @@ async function main() {
       `(async()=>{const a=window.ConsoleCanvas,t=await(await import('/ticket-model.js')).getTicket(${JSON.stringify(e.ticketId)},${JSON.stringify(e.project_id)});return {id:a.state.snapshot.id,title:a.state.snapshot.documentName,edits:a.state.scene.edits,annotations:a.state.scene.annotations,note:document.querySelector('#review-note').value,ticket:t};})()`,
     );
     assert.equal(actual.id, e.document_id);
-    assert.equal(actual.title, '새 흐름 재실행 검증');
+    assert.equal(actual.title, '고객 검색 개선');
     assert.equal(actual.edits[e.node].dx, 23);
     assert.equal(actual.edits[e.node].dy, 31);
     assert.ok(actual.edits[e.copyId].copy);
-    assert.equal(actual.annotations[e.node], 'native persisted comment');
-    assert.equal(actual.note, 'native persisted note');
+    assert.equal(
+      actual.annotations[e.node],
+      '제목과 정렬하고 모바일에서는 전체 너비로 배치해 주세요.',
+    );
+    assert.equal(actual.note, '버튼과 검색 영역의 간격을 정리해 주세요.');
     assert.equal(actual.ticket.status, 'queued');
+    assert.equal(actual.ticket.needs_reconfirmation, false);
+    assert.equal(actual.ticket.goal.id, e.goal_id);
     assert.ok(actual.ticket.records.length >= 4);
-    await evaluate(editor, "document.querySelector('#tickets-button').click()");
+    await evaluate(shell, "window.ConsoleCanvasShell.workspace({action:'tickets'})");
     await until(
-      () => evaluate(editor, "!!document.querySelector('#ticket-list .ticket-row')"),
+      () =>
+        evaluate(editor, "!!document.querySelector('.ticket-compact-list .ticket-compact-row')"),
       'Reopened ticket list missing',
     );
     await fs.writeFile(

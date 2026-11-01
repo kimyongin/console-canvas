@@ -98,6 +98,9 @@ class Broker:
         meta = {k: meta[k] for k in ('editor_id', 'document_id', 'title', 'url', 'revision', 'element_count', 'comment_count')}
         if workspace:
             meta.update(workspace=True,project_ids=projects)
+            versions=body.get('screen',{}).get('project_versions',{})
+            if isinstance(versions,dict):
+                meta['project_versions']={k:v for k,v in versions.items() if k in projects and isinstance(v,str) and len(v)<2000000}
         if ticket_revision is not None:
             meta['ticket_revision'] = ticket_revision
         project_id = body.get('screen', {}).get('project_id')
@@ -141,7 +144,7 @@ class Broker:
             self.condition.notify_all()
         return {'ok': True}
 
-    def call(self, name, arguments):
+    def call(self, name, arguments, repository_context=None):
         rules = {item[0]: item[2] for item in TOOLS}
         if name not in rules:
             return error('unknown_tool', 'Unknown Console Canvas tool')
@@ -149,6 +152,15 @@ class Broker:
             validate(arguments, rules[name])
         except ValueError as exc:
             return error('invalid_arguments', str(exc))
+        if arguments.get('repository_path'):
+            # The agent-side stdio adapter verifies Git under its own filesystem permissions.
+            # The GUI broker needs access only to the paired canvas workspace.
+            context = repository_context
+            if (not isinstance(context, dict) or set(context) != {'identity', 'root', 'common_dir'} or
+                    not isinstance(context['identity'], str) or len(context['identity']) != 64 or any(c not in '0123456789abcdef' for c in context['identity']) or
+                    any(not isinstance(context[k], str) or not context[k].startswith('/') or len(context[k]) > 4096 for k in ('root', 'common_dir'))):
+                return error('repository_context_required', 'Use the app-bundled stdio adapter to verify the current repository')
+            arguments = {**arguments, 'repository': context}
         if name == 'get_agent_guide':
             try:
                 return {'ok': True, 'name': 'console-canvas', 'version': VERSION,
@@ -298,7 +310,7 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == '/bridge/disconnect':
                 value = self.server.broker.disconnect(body.get('editor_id'))
             elif self.path == '/agent/call':
-                value = self.server.broker.call(body.get('name'), body.get('arguments', {}))
+                value = self.server.broker.call(body.get('name'), body.get('arguments', {}), body.get('repository_context'))
             elif self.path == '/admin/stop':
                 self.send_json({'ok': True})
                 threading.Thread(target=self.server.shutdown, daemon=True).start()

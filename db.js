@@ -1,77 +1,22 @@
+import { semanticState } from './semantic-state.js';
 // Captures are immutable; edits and lightweight recent-document metadata are separate.
 export const DATABASE_NAME = 'console-canvas-workspace';
 export let workspaceReset = false;
 export async function database() {
   return await new Promise((resolve, reject) => {
-    const request = indexedDB.open(DATABASE_NAME, 3);
+    const request = indexedDB.open(DATABASE_NAME, 4);
     request.onupgradeneeded = (event) => {
-      const db = request.result,
-        tx = request.transaction;
-      if (event.oldVersion < 2) {
-        workspaceReset = event.oldVersion > 0;
-        for (const name of [...db.objectStoreNames]) db.deleteObjectStore(name);
-        db.createObjectStore('tickets', { keyPath: 'id' }).createIndex('project_id', 'project_id');
-        db.createObjectStore('operations', { keyPath: 'id' });
-        db.createObjectStore('captures', { keyPath: 'id' });
-        db.createObjectStore('sessions', { keyPath: 'id' });
-        db.createObjectStore('documents', { keyPath: 'id' }).createIndex('updatedAt', 'updatedAt');
-      }
+      const db = request.result;
+      // #190: one-time approved business-data reset. Browser login and OS credentials live elsewhere.
+      workspaceReset = event.oldVersion > 0;
+      for (const name of [...db.objectStoreNames]) db.deleteObjectStore(name);
+      db.createObjectStore('projects', { keyPath: 'id' });
+      db.createObjectStore('tickets', { keyPath: 'id' }).createIndex('project_id', 'project_id');
+      db.createObjectStore('operations', { keyPath: 'id' });
+      db.createObjectStore('captures', { keyPath: 'id' });
+      db.createObjectStore('sessions', { keyPath: 'id' });
+      db.createObjectStore('documents', { keyPath: 'id' }).createIndex('updatedAt', 'updatedAt');
       db.createObjectStore('settings', { keyPath: 'id' });
-      if (event.oldVersion === 2) {
-        const values = {};
-        for (const name of ['tickets', 'documents', 'captures', 'sessions']) {
-          const r = tx.objectStore(name).getAll();
-          r.onsuccess = () => {
-            values[name] = r.result;
-            if (Object.keys(values).length !== 4) return;
-            let sequence = 0;
-            for (const ticket of values.tickets) {
-              const original = values.captures.find((c) => c.id === ticket.goal.document_id);
-              const session = values.sessions.find((c) => c.id === ticket.goal.document_id);
-              const meta = values.documents.find((c) => c.id === ticket.goal.document_id);
-              const t = {
-                ...ticket,
-                title: ticket.goal.title,
-                display_id: 'CC-' + ++sequence,
-                document_id: ticket.id,
-                goal: { ...ticket.goal, id: crypto.randomUUID() },
-                legacy_workspace: true,
-                deletedAt: meta?.deletedAt || null,
-              };
-              tx.objectStore('tickets').put(t);
-              if (original) {
-                tx.objectStore('captures').put({ ...original, id: t.id });
-                tx.objectStore('sessions').put({ ...session, id: t.id, storage_revision: 0 });
-                tx.objectStore('documents').put({
-                  ...meta,
-                  id: t.id,
-                  title: t.title,
-                  project_id: t.project_id,
-                });
-              }
-            }
-            for (const meta of values.documents) {
-              const session = values.sessions.find((c) => c.id === meta.id);
-              const t = {
-                id: meta.id,
-                display_id: 'CC-' + ++sequence,
-                title: meta.title,
-                document_id: meta.id,
-                project_id: session?.project_id || meta.project_id || 'local-project',
-                status: 'draft',
-                revision: 0,
-                goal: null,
-                records: [],
-                created_at: meta.capturedAt || meta.updatedAt,
-                updated_at: meta.updatedAt,
-                deletedAt: meta.deletedAt || null,
-              };
-              tx.objectStore('tickets').put(t);
-            }
-            tx.objectStore('settings').put({ id: 'ticket-sequence', value: sequence });
-          };
-        }
-      }
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -126,50 +71,79 @@ export function captureFromDocument(value) {
 }
 export async function saveCapture(value) {
   const capture = captureFromDocument(value);
-  return transact(['captures', 'documents', 'tickets', 'settings'], 'readwrite', (tx, done) => {
-    const store = tx.objectStore('captures');
-    const request = store.getKey(capture.id);
-    request.onsuccess = () => {
-      if (request.result !== undefined) {
-        const read = store.get(capture.id);
-        read.onsuccess = () => {
-          if (read.result.source?.empty && !capture.source.empty) {
-            store.put(capture);
-            done(true);
-          } else done(false);
+  if (capture.source.empty) throw Error('실제 화면을 가져와 티켓을 만들어 주세요.');
+  return transact(
+    ['captures', 'sessions', 'documents', 'tickets', 'settings', 'projects'],
+    'readwrite',
+    (tx, done) => {
+      const store = tx.objectStore('captures');
+      const request = store.getKey(capture.id);
+      request.onsuccess = () => {
+        if (request.result !== undefined) {
+          const read = store.get(capture.id);
+          read.onsuccess = () => {
+            if (read.result.source?.empty && !capture.source.empty) {
+              store.put(capture);
+              done(true);
+            } else done(false);
+          };
+          return;
+        }
+        if (!value.project_id) {
+          tx.failure = Error('프로젝트를 먼저 선택해 주세요.');
+          tx.abort();
+          return;
+        }
+        const projectRead = tx.objectStore('projects').get(value.project_id);
+        projectRead.onsuccess = () => {
+          if (!projectRead.result) {
+            tx.failure = Error('프로젝트를 찾을 수 없습니다.');
+            tx.abort();
+            return;
+          }
+          tx.objectStore('projects').put({ ...projectRead.result, last_ticket_id: capture.id });
         };
-        return;
-      }
-      store.add(capture);
-      const seq = tx.objectStore('settings').get('ticket-sequence');
-      seq.onsuccess = () => {
-        const n = (seq.result?.value || 0) + 1;
-        tx.objectStore('settings').put({ id: 'ticket-sequence', value: n });
-        tx.objectStore('tickets').put({
+        store.add(capture);
+        tx.objectStore('sessions').add({
           id: capture.id,
-          display_id: 'CC-' + n,
-          document_id: capture.id,
-          title: value.documentName || capture.source.title,
-          project_id: value.project_id || sourceProject(capture.source.url),
-          goal: null,
-          status: 'draft',
-          revision: 0,
-          records: [],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          project_id: value.project_id,
+          edits: value.edits || {},
+          annotations: value.annotations || {},
+          note: value.note || '',
+          storage_revision: 0,
+          edit_revision: value.edit_revision || 0,
         });
+        const seq = tx.objectStore('settings').get('ticket-sequence');
+        seq.onsuccess = () => {
+          const n = (seq.result?.value || 0) + 1;
+          tx.objectStore('settings').put({ id: 'ticket-sequence', value: n });
+          tx.objectStore('tickets').put({
+            id: capture.id,
+            display_id: 'CC-' + n,
+            document_id: capture.id,
+            title: value.documentName || capture.source.title,
+            project_id: value.project_id,
+            goal: null,
+            status: 'draft',
+            revision: 0,
+            records: [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        };
+        tx.objectStore('documents').add({
+          id: capture.id,
+          title: value.documentName || capture.source.title,
+          project_id: value.project_id,
+          url: capture.source.url,
+          capturedAt: capture.capturedAt,
+          viewport: capture.source.viewport,
+          updatedAt: new Date().toISOString(),
+        });
+        done(true);
       };
-      tx.objectStore('documents').add({
-        id: capture.id,
-        title: value.documentName || capture.source.title,
-        url: capture.source.url,
-        capturedAt: capture.capturedAt,
-        viewport: capture.source.viewport,
-        updatedAt: new Date().toISOString(),
-      });
-      done(true);
-    };
-  });
+    },
+  );
 }
 export async function saveSession(id, value) {
   const {
@@ -208,8 +182,7 @@ export async function saveSession(id, value) {
         const old = readSession.result;
         if (
           value.expected_storage_revision !== undefined &&
-          (old?.storage_revision || 0) !== value.expected_storage_revision &&
-          old?.writer_id !== value.writer_id
+          (old?.storage_revision || 0) !== value.expected_storage_revision
         ) {
           tx.failure = Object.assign(
             new Error('다른 편집기에서 변경했습니다. 최신 티켓을 다시 열어 주세요.'),
@@ -218,6 +191,16 @@ export async function saveSession(id, value) {
           tx.abort();
           return;
         }
+        if (request.result.project_id && project_id && request.result.project_id !== project_id) {
+          tx.failure = Object.assign(Error('티켓의 프로젝트는 변경할 수 없습니다.'), {
+            code: 'project_mismatch',
+          });
+          tx.abort();
+          return;
+        }
+        const meaningful =
+          semanticState(old || {}) !== semanticState(session) ||
+          (typeof documentName === 'string' && request.result.title !== documentName);
         const storage_revision = (old?.storage_revision || 0) + 1;
         tx.objectStore('sessions').put({
           ...session,
@@ -240,26 +223,33 @@ export async function saveSession(id, value) {
               screen: { document_id: id, revision: value.edit_revision, project_id },
             },
           });
+        metadata.put({
+          ...request.result,
+          ...(typeof documentName === 'string' ? { title: documentName } : {}),
+          ...documentSummary(session),
+          updatedAt: meaningful ? updatedAt : request.result.updatedAt,
+        });
         done(storage_revision);
         const tr = tx.objectStore('tickets').get(id);
         tr.onsuccess = () => {
-          if (tr.result)
+          if (tr.result) {
+            const t = tr.result,
+              changed = !!t.goal && t.goal.semantic_state !== semanticState(session);
+            const active = ['working', 'review', 'done'].includes(t.status);
             tx.objectStore('tickets').put({
-              ...tr.result,
+              ...t,
+              needs_reconfirmation: !!t.goal && (changed || !!t.confirmation_held),
+              revision_requested: active && changed,
+              ...(!active && t.goal
+                ? { status: t.confirmation_held ? t.status : changed ? 'draft' : 'queued' }
+                : {}),
               title: documentName || tr.result.title,
-              project_id: tr.result.goal
-                ? tr.result.project_id
-                : project_id || tr.result.project_id,
-              updated_at: updatedAt,
+              project_id: tr.result.project_id,
+              updated_at: meaningful ? updatedAt : tr.result.updated_at,
             });
+          }
         };
       };
-      metadata.put({
-        ...request.result,
-        ...(typeof documentName === 'string' ? { title: documentName } : {}),
-        ...documentSummary(session),
-        updatedAt,
-      });
     };
   });
 }
@@ -365,14 +355,6 @@ export function documentSummary(value) {
   };
 }
 
-export function sourceProject(url) {
-  try {
-    const u = new URL(url);
-    return u.origin === 'null' ? 'local-project' : u.origin;
-  } catch {
-    return 'local-project';
-  }
-}
 export async function editReceipt(id, hash) {
   return transact(['operations'], 'readonly', (tx, done) => {
     const r = tx.objectStore('operations').get(id);

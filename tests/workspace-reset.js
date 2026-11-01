@@ -33,11 +33,19 @@ try {
     await new Promise((r) => setTimeout(r, 50));
   }
   const db = await (await import('../db.js')).database();
-  check('Disposable v1 becomes current v3', db.version === 3);
+  check('Disposable v1 becomes current v4', db.version === 4);
   check(
     'Only current stores exist',
     JSON.stringify([...db.objectStoreNames]) ===
-      JSON.stringify(['captures', 'documents', 'operations', 'sessions', 'settings', 'tickets']),
+      JSON.stringify([
+        'captures',
+        'documents',
+        'operations',
+        'projects',
+        'sessions',
+        'settings',
+        'tickets',
+      ]),
   );
   const old = await new Promise((ok, no) => {
     const r = db.transaction(['captures']).objectStore('captures').get('disposable-legacy');

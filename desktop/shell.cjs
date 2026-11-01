@@ -4,7 +4,7 @@ let info,
   currentState,
   returnView = 'source';
 function showState(value) {
-  if (['source', 'editor'].includes(value.view)) returnView = value.view;
+  if (['source', 'editor', 'tickets'].includes(value.view)) returnView = value.view;
   currentState = value;
   document.body.dataset.view = value.view;
   document.documentElement.style.setProperty('--shell-height', value.header_height + 'px');
@@ -16,9 +16,9 @@ function showState(value) {
   $('#capture-menu-button').disabled = !!value.busy;
   updateCaptureLabel();
   $('#capture-picker').hidden = value.view !== 'capture';
-  $('#capture').disabled = !!value.busy;
-  $('#capture-app').disabled = !!value.busy || value.view === 'capture';
-  for (const view of ['source', 'editor', 'settings', 'agent', 'update'])
+  $('#capture').disabled = !!value.busy || !value.url;
+  updateWorkspaceVisibility();
+  for (const view of ['source', 'editor', 'tickets', 'settings', 'agent', 'update'])
     $('#show-' + view).classList.toggle('active', value.view === view);
   $('#back').disabled = !value.can_go_back;
   $('#forward').disabled = !value.can_go_forward;
@@ -48,13 +48,20 @@ async function captureCurrent() {
   try {
     localStorage.setItem('capture-scope', captureMode);
     if (captureMode === 'region') {
+      if (!workspace?.project) {
+        await ensureProject(() => captureCurrent());
+        return;
+      }
       regionPreview = await api.previewCapture();
       regionRect = null;
       $('#capture-photo').src = regionPreview.data;
       $('#capture-selection').hidden = true;
       $('#capture-region-confirm').disabled = true;
       $('#capture-region-size').textContent = '아직 선택하지 않았습니다.';
-    } else await api.capture({ mode: captureMode });
+    } else
+      await ensureProject(() =>
+        api.capture({ mode: captureMode, project_id: workspace?.project?.id }),
+      );
   } catch (error) {
     $('#status').textContent = error.message;
     $('#capture').hidden = currentState.view !== 'source';
@@ -62,23 +69,19 @@ async function captureCurrent() {
   }
 }
 $('#capture').addEventListener('click', captureCurrent);
-let appCapturePending = false;
-$('#capture-app').addEventListener('click', async () => {
-  if (appCapturePending) return;
-  appCapturePending = true;
-  try {
-    await api.captureApp();
-  } catch (error) {
-    $('#status').textContent = error.message;
-  } finally {
-    appCapturePending = false;
-  }
-});
 $('#capture-menu-button').addEventListener('click', async () => {
   try {
     const r = $('#capture-menu-button').getBoundingClientRect();
     const mode = await api.chooseCaptureMode({ x: r.left, y: r.bottom });
     if (!mode) return;
+    if (mode === 'app') {
+      await ensureProject(() => api.captureApp());
+      return;
+    }
+    if (mode === 'file') {
+      await ensureProject(() => api.workspace({ action: 'open-file' }));
+      return;
+    }
     captureMode = mode;
     updateCaptureLabel();
     await captureCurrent();
@@ -104,7 +107,18 @@ $('#settings-return').addEventListener('click', () => api.show(returnView));
 for (const button of document.querySelectorAll('.settings-back'))
   button.addEventListener('click', () => api.show('settings'));
 $('#show-source').addEventListener('click', () => api.show('source'));
-$('#show-editor').addEventListener('click', () => api.show('editor'));
+$('#show-editor').addEventListener('click', () =>
+  api.workspace({ action: 'editor' }).catch(showError),
+);
+$('#show-tickets').addEventListener('click', () =>
+  api.workspace({ action: 'tickets' }).catch(showError),
+);
+$('#shell-confirm').addEventListener('click', () =>
+  api.workspace({ action: 'confirm' }).catch(showError),
+);
+$('#shell-ticket-menu').addEventListener('click', () =>
+  api.workspace({ action: 'ticket-menu' }).catch(showError),
+);
 $('#back').addEventListener('click', () => api.back());
 $('#forward').addEventListener('click', () => api.forward());
 $('#reload').addEventListener('click', () => api.reload());
@@ -353,7 +367,12 @@ $('#capture-region-confirm').addEventListener('click', async () => {
   if (!regionRect) return;
   $('#capture-region-confirm').disabled = true;
   try {
-    await api.capture({ mode: 'region', rect: regionRect, expectedView: regionPreview.view });
+    await api.capture({
+      mode: 'region',
+      project_id: workspace?.project?.id,
+      rect: regionRect,
+      expectedView: regionPreview.view,
+    });
   } catch (error) {
     await api.show('source');
     $('#status').textContent = error.message;
@@ -391,3 +410,174 @@ $('#auto-download-updates').addEventListener('change', () =>
     String($('#auto-download-updates').checked),
   ),
 );
+
+let workspace = null,
+  afterProject = null;
+function showError(error) {
+  $('#status').textContent = error.message;
+}
+function updateWorkspaceVisibility() {
+  const editing = currentState?.view === 'editor',
+    ticket = workspace?.ticket;
+  $('#shell-ticket').hidden = !editing || !ticket;
+  $('#shell-ticket-status').hidden = !editing || !ticket;
+  $('#shell-confirm').hidden = !editing || !ticket;
+  $('#shell-ticket-menu').hidden = !editing || !ticket;
+  $('#show-editor').disabled = !workspace?.ready;
+  $('#show-tickets').disabled = !workspace?.project;
+  $('#shell-confirm').disabled =
+    !workspace?.ready ||
+    ['working', 'review', 'done'].includes(ticket?.status) ||
+    (ticket?.status === 'queued' && !ticket?.needs_reconfirmation);
+  $('#shell-confirm').textContent = ticket?.needs_reconfirmation ? '재확정' : '확정';
+  $('#shell-ticket').title = ticket ? ticket.display_id + ' · ' + ticket.title : '';
+  $('#shell-ticket').textContent = ticket ? ticket.display_id + ' · ' + ticket.title : '';
+  $('#shell-ticket-status').textContent = ticket?.revision_requested
+    ? '변경 요청'
+    : ticket?.needs_reconfirmation
+      ? '재확정 필요'
+      : {
+          draft: '편집 중',
+          queued: '확정',
+          working: '작업 중',
+          review: '검토 대기',
+          done: '완료',
+          blocked: '확인 필요',
+        }[ticket?.status] || '';
+}
+function showWorkspace(value) {
+  workspace = value;
+  if (value.project?.repository) $('#project-connect-hint').hidden = true;
+  const select = $('#shell-project');
+  select.replaceChildren(new Option('프로젝트 선택', ''));
+  for (const p of value.projects) select.add(new Option(p.name, p.id));
+  select.add(new Option('+ 새 프로젝트', 'new'));
+  select.value = value.project?.id || '';
+  select.title = value.project?.name || '프로젝트 선택';
+  $('#project-menu-button').disabled = !value.project;
+  $('#project-connection-state').textContent = value.project?.repository
+    ? '저장소 연결됨 · ' + value.project.repository.root
+    : '저장소 미연결 · 편집과 확정은 바로 할 수 있습니다.';
+  if (document.activeElement !== $('#rename-project-name'))
+    $('#rename-project-name').value = value.project?.name || '';
+  updateWorkspaceVisibility();
+}
+api.onWorkspace(showWorkspace);
+function projectSetup(callback = null) {
+  afterProject = callback;
+  $('#project-setup').hidden = false;
+  $('#create-project-submit').textContent = callback ? '만들고 가져오기' : '만들기';
+  $('#new-project-name').value = currentState?.url
+    ? new URL(currentState.url).hostname
+    : '새 프로젝트';
+  $('#new-project-name').focus();
+  $('#new-project-name').select();
+}
+async function ensureProject(callback) {
+  if (workspace?.project) return callback();
+  if (workspace?.projects.length) {
+    $('#status').textContent = '프로젝트를 선택한 뒤 가져와 주세요.';
+    $('#shell-project').focus();
+    return;
+  }
+  projectSetup(callback);
+}
+$('#shell-project').addEventListener('change', async (e) => {
+  if (e.target.value === 'new') projectSetup();
+  else if (e.target.value) {
+    try {
+      showWorkspace(await api.workspace({ action: 'select', id: e.target.value }));
+    } catch (error) {
+      showError(error);
+    }
+  }
+});
+$('#create-project-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('#create-project-submit').disabled = true;
+  try {
+    showWorkspace(
+      await api.workspace({
+        action: 'create',
+        name: $('#new-project-name').value,
+        url: currentState?.url,
+      }),
+    );
+    $('#project-setup').hidden = true;
+    $('#project-created-name').textContent = '프로젝트를 만들었습니다.';
+    $('#project-connect-hint').hidden = false;
+    const callback = afterProject;
+    afterProject = null;
+    if (callback) await callback();
+  } catch (error) {
+    $('#project-setup-error').textContent = error.message;
+  } finally {
+    $('#create-project-submit').disabled = false;
+  }
+});
+$('#cancel-project').onclick = () => {
+  afterProject = null;
+  $('#project-setup').hidden = true;
+  showWorkspace(workspace);
+};
+for (const id of ['#copy-project-connection', '#copy-project-created'])
+  $(id).onclick = async () => {
+    try {
+      await api.workspace({ action: 'copy-connection' });
+      $('#status').textContent =
+        '연결 요청을 복사했습니다. 현재 저장소의 에이전트 대화에 붙여 넣으세요.';
+      $('#project-connect-hint').hidden = true;
+      $('#project-menu').hidden = true;
+    } catch (error) {
+      showError(error);
+    }
+  };
+$('#dismiss-project-hint').onclick = () => ($('#project-connect-hint').hidden = true);
+$('#rename-project').onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    showWorkspace(await api.workspace({ action: 'rename', name: $('#rename-project-name').value }));
+    $('#project-menu').hidden = true;
+  } catch (error) {
+    showError(error);
+  }
+};
+
+$('#project-menu-button').onclick = async () => {
+  const rect = $('#project-menu-button').getBoundingClientRect();
+  const action = await api.projectMenu({ x: rect.left });
+  if (action === 'copy-connection') {
+    try {
+      await api.workspace({ action });
+      $('#status').textContent = '연결 요청을 복사했습니다.';
+    } catch (error) {
+      showError(error);
+    }
+  }
+  if (action === 'rename') {
+    $('#project-menu').hidden = false;
+    $('#rename-project-name').focus();
+    $('#rename-project-name').select();
+  }
+};
+
+$('#shell-ticket').onclick = () =>
+  api
+    .workspace({ action: 'copy-ticket-id' })
+    .then(() => {
+      $('#status').textContent = '티켓 ID를 복사했습니다.';
+    })
+    .catch(showError);
+$('#cancel-project-rename').onclick = () => ($('#project-menu').hidden = true);
+$('#project-setup').addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    $('#cancel-project').click();
+  }
+});
+$('#project-menu').addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    $('#cancel-project-rename').click();
+  }
+});

@@ -3,6 +3,7 @@ export interface EditorView {
   ticketDisplayId: string;
   ticketStatus: string;
   goalConfirmed: boolean;
+  needsReconfirmation: boolean;
   emptyCapture: boolean;
   generation: number;
   revision: number;
@@ -14,9 +15,8 @@ export interface EditorView {
   save: { pending: boolean; error: string | null; message: string };
 }
 export type EditorCommand =
-  | 'create-ticket'
   | 'tickets'
-  | 'new-ticket'
+  | 'confirm-ticket'
   | 'capture-back'
   | 'layer-search-clear'
   | 'undo'

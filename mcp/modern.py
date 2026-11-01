@@ -32,22 +32,22 @@ class ModernProtocol:
         return self.call('list_screens', {}).get('screens', [])
 
     @staticmethod
-    def uri(editor):
-        return 'console-canvas://editors/' + editor + '/tickets'
+    def uri(editor, project):
+        return 'console-canvas://editors/' + editor + '/projects/' + project + '/tickets'
 
     def resources(self):
-        return [{'uri': self.uri(s['editor_id']), 'name': s['title'] + ' · Work tickets',
-                 'mimeType': 'application/json'} for s in self.screens()]
+        return [{'uri': self.uri(s['editor_id'], p), 'name': p + ' · Work tickets',
+                 'mimeType': 'application/json'} for s in self.screens() for p in s.get('project_ids', [])]
 
     def notify(self, method, request_id, values):
         self.emit({'jsonrpc': '2.0', 'method': method, 'params': {
             **values, '_meta': {SUB_KEY: request_id}}})
 
     def read(self, uri):
-        match = re.fullmatch(r'console-canvas://editors/([\w-]{1,100})/tickets', uri or '')
-        if not match or not any(s['editor_id'] == match[1] for s in self.screens()):
+        match = re.fullmatch(r'console-canvas://editors/([\w-]{1,100})/projects/([\w-]{1,100})/tickets', uri or '')
+        if not match or not any(s['editor_id'] == match[1] and match[2] in s.get('project_ids', []) for s in self.screens()):
             raise ValueError('Resource is not connected')
-        value = self.call('list_tickets', {'editor_id': match[1]})
+        value = self.call('list_tickets', {'editor_id': match[1], 'project_id': match[2], 'status': 'all'})
         if not value.get('ok'):
             raise ValueError('Resource read failed')
         return {'contents': [{'uri': uri, 'mimeType': 'application/json',
@@ -80,8 +80,8 @@ class ModernProtocol:
                 if not self.subscriptions:
                     continue
             try:
-                stamps = {self.uri(s['editor_id']): (s['document_id'], s.get('ticket_revision', 0),s.get('revision',0),tuple(s.get('project_ids',[])))
-                          for s in self.screens()}
+                stamps = {self.uri(s['editor_id'], p): s.get('project_versions', {}).get(p, '')
+                          for s in self.screens() for p in s.get('project_ids', [])}
                 with self.lock:
                     for request_id, subscription in list(self.subscriptions.items()):
                         previous = subscription['stamps']

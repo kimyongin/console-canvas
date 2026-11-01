@@ -11,7 +11,12 @@ const ticket = {
 };
 test('ticket CAS and authorization/evidence guard a fixed goal', () => {
   const write = (patch, base = ticket) =>
-    applyTicketUpdate(base, { expected_revision: base.revision, summary: 'work', ...patch });
+    applyTicketUpdate(base, {
+      expected_revision: base.revision,
+      summary: 'work',
+      claim_token: 'test-agent',
+      ...patch,
+    });
   assert.throws(
     () => write({ status: 'done' }),
     (e) => e.code === 'invalid_transition',

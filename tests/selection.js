@@ -368,12 +368,13 @@ try {
   doc.querySelector('#tickets-button').click();
   await until(
     () =>
-      doc.querySelector('#tickets-dialog').open && doc.querySelectorAll('.ticket-row').length >= 2,
+      doc.querySelector('#tickets-dialog').open &&
+      doc.querySelectorAll('.ticket-compact-row').length >= 2,
   );
   check(
     'Unified ticket list includes current and saved work',
-    !!doc.querySelector('.ticket-row [aria-current]') &&
-      doc.querySelector('#ticket-list').textContent.includes('전환 테스트 두 번째 화면'),
+    !!doc.querySelector('.ticket-open[aria-current]') &&
+      doc.querySelector('.ticket-compact-list').textContent.includes('전환 테스트 두 번째 화면'),
   );
   const search = doc.querySelector('[aria-label="티켓 검색"]');
   function searchTickets(value) {
@@ -384,17 +385,18 @@ try {
     search.dispatchEvent(new frame.contentWindow.Event('input', { bubbles: true }));
   }
   searchTickets('검색 결과 없음 928372');
-  await until(() => !doc.querySelectorAll('.ticket-row').length);
+  await until(() => !doc.querySelectorAll('.ticket-compact-row').length);
   check(
     'Ticket search has an explicit empty result',
-    doc.querySelector('#ticket-list').textContent.includes('티켓이 없습니다'),
+    doc.querySelector('.ticket-compact-list').textContent.includes('티켓이 없습니다'),
   );
   searchTickets('');
   await until(
     () =>
-      doc.querySelector('#tickets-dialog').open && doc.querySelectorAll('.ticket-row').length >= 2,
+      doc.querySelector('#tickets-dialog').open &&
+      doc.querySelectorAll('.ticket-compact-row').length >= 2,
   );
-  doc.querySelector('[data-ticket-id="' + savedId + '"] > button').click();
+  doc.querySelector('[data-document-id="' + savedId + '"] > button').click();
   await until(
     () =>
       app.state.ready &&
@@ -408,9 +410,10 @@ try {
   doc.querySelector('#tickets-button').click();
   await until(
     () =>
-      doc.querySelector('#tickets-dialog').open && doc.querySelectorAll('.ticket-row').length >= 2,
+      doc.querySelector('#tickets-dialog').open &&
+      doc.querySelectorAll('.ticket-compact-row').length >= 2,
   );
-  doc.querySelector('[data-ticket-id="' + otherId + '"] > button').click();
+  doc.querySelector('[data-document-id="' + otherId + '"] > button').click();
   await until(
     () =>
       app.state.ready &&

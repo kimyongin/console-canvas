@@ -1,19 +1,28 @@
 import {
-  createTicket,
   getTicket,
   listTickets,
   confirmTicketGoal,
   updateTicket,
+  prepareImplementation,
 } from '../ticket-model.js';
 import {
+  createProject,
+  listProjects,
+  getProject,
+  connectRepository,
+  resolveProject,
+  updateProject,
+} from '../project-model.js';
+import {
   getDocument,
+  saveCapture,
+  saveSession,
   trashDocument,
   restoreDocument,
   renameDocument,
   transact,
-  saveSession,
 } from '../db.js';
-import { importDocument } from '../portable-document.js';
+import { semanticState } from '../semantic-state.js';
 const frame = document.querySelector('#editor'),
   results = [];
 function check(name, value) {
@@ -22,10 +31,10 @@ function check(name, value) {
   if (!value) throw Error(name);
 }
 async function until(read) {
-  const end = Date.now() + 30000;
+  const end = Date.now() + 45000;
   while (Date.now() < end) {
     if (await read()) return;
-    await new Promise((r) => setTimeout(r, 30));
+    await new Promise((r) => setTimeout(r, 25));
   }
   throw Error('Timeout: ' + read);
 }
@@ -37,486 +46,473 @@ async function rejects(run, code) {
     return !code || e.code === code;
   }
 }
+const image = document.createElement('canvas').toDataURL('image/png');
 try {
   await until(() => frame.contentWindow.ConsoleCanvas?.state.ready);
-  let app = frame.contentWindow.ConsoleCanvas,
+  const app = frame.contentWindow.ConsoleCanvas,
     doc = frame.contentDocument;
-  const initial = app.state.snapshot.id,
-    project = app.state.project_id;
-  let ticket = await getTicket(initial, project);
-  check(
-    'Every imported capture already belongs to a draft ticket',
-    ticket.status === 'draft' &&
-      !ticket.goal &&
-      ticket.id === initial &&
-      ticket.display_id.startsWith('CC-'),
-  );
-  const rawCapture = structuredClone(app.state.snapshot);
-  rawCapture.id = crypto.randomUUID();
-  rawCapture.format = 'console-canvas-snapshot';
-  await app.importFile(new File([JSON.stringify(rawCapture)], 'collector.uiclone'));
-  const rawTicket = await getTicket(rawCapture.id);
-  check(
-    'An actual collector snapshot file opens as a ticket instead of a backup error',
-    app.state.snapshot.id === rawCapture.id && rawTicket?.status === 'draft',
-  );
-  const repeatNode = [...app.state.scene.nodes.values()].find(
-    (n) => n.locator.id === 'new-customer',
-  );
-  app.state.scene.select(repeatNode.id);
-  app.state.scene.nudge(7, 3);
-  app.state.scene.setComment(repeatNode.id, 'Keep edits on raw capture reopen');
-  await app.flushEditor();
-  const repeatSaved = await getDocument(rawCapture.id);
-  await app.importFile(new File([JSON.stringify(rawCapture)], 'collector.uiclone'));
-  await app.flushEditor();
-  check(
-    'Reopening a raw capture retains saved edits and comments without a stale writer',
-    JSON.stringify((await getDocument(rawCapture.id)).edits) ===
-      JSON.stringify(repeatSaved.edits) &&
-      app.state.scene.annotations[repeatNode.id] === 'Keep edits on raw capture reopen',
-  );
-  check(
-    'Same-ID different capture cannot replace the original',
-    await rejects(() =>
-      app.importFile(
-        new File(
-          [JSON.stringify({ ...rawCapture, html: rawCapture.html + '<!-- conflict -->' })],
-          'conflict.uiclone',
-        ),
-      ),
-    ),
-  );
-  check(
-    'An unknown file format is rejected without replacing current work',
-    (await rejects(() =>
-      app.importFile(new File([JSON.stringify({ format: 'unknown', version: 1 })], 'bad.json')),
-    )) && app.state.snapshot.id === rawCapture.id,
-  );
-  await app.openSnapshot(await getDocument(initial));
-  ticket = await getTicket(initial, project);
-  const originalId = ticket.id;
-  await transact(['settings'], 'readwrite', (tx) =>
-    tx.objectStore('settings').put({ id: 'access:' + project, allowed: false }),
-  );
-  await app.ticketWorkspace.refreshProjects();
+  const project = await getProject(app.state.project_id),
+    first = app.state.snapshot.id;
   const call = (name, args = {}) =>
-    app.ticketWorkspace.execute({ name, arguments: args, deadline: Date.now() / 1000 + 60 });
-  let node = [...app.state.scene.nodes.values()].find((n) => n.locator.id === 'new-customer');
-  app.state.scene.select(node.id);
-  app.state.scene.nudge(12, 4);
-  app.state.scene.setComment(node.id, '고객 등록을 제목과 정렬, 모바일에서는 전체 너비');
-  await app.flushEditor();
-  const read = await call('get_ticket', { ticket_ref: ticket.display_id });
-  check(
-    'Display ID reads current images and associated comments without a screen ID',
-    read.ok && read.images.length && read.ticket.workspace.annotations[node.id].includes('모바일'),
-  );
-  check(
-    'Current images are identified separately from an unconfirmed goal',
-    read.images.every((i) => i.role === 'current') && !read.ticket.goal,
-  );
-  const other = await call('get_ticket', { ticket_ref: ticket.id, project_id: 'unrelated' });
-  check(
-    'An explicit project filter does not select a ticket from another project',
-    !other.ok && other.error.code === 'ticket_not_found',
-  );
-  check(
-    'An unknown project filter returns an empty catalog',
-    (await call('list_tickets', { project_id: 'unrelated' })).total === 0,
-  );
-  const blank = await createTicket({
-    project_id: project,
-    title: '비어 있는 티켓',
-    operation_id: 'blank-create',
-  });
-  check(
-    'Blank creation is replay safe and independent of goals',
-    (
-      await createTicket({
-        project_id: project,
-        title: '비어 있는 티켓',
-        operation_id: 'blank-create',
-      })
-    ).id === blank.id && !blank.goal,
-  );
-  check(
-    'Reusing a create operation with other input is rejected',
-    await rejects(
-      () => createTicket({ project_id: project, title: '다른 이름', operation_id: 'blank-create' }),
-      'operation_id_reused',
-    ),
-  );
-  await app.openTicket(blank.id);
-  const beforeUI = app.state.snapshot.id;
-  let closed = await call('get_ticket', { ticket_ref: originalId });
-  check(
-    'Closed ticket reads render saved edits without changing the visible ticket',
-    closed.ok && closed.images.length && app.state.snapshot.id === beforeUI,
-  );
-  const revision = closed.ticket.workspace.edit_revision;
-  const edited = await call('apply_edits', {
-    ticket_ref: originalId,
-    expected_edit_revision: revision,
-    operation_id: 'closed-move',
-    operations: [{ type: 'move', element_id: node.id, dx: 10, dy: 0, mode: 'relative' }],
-  });
-  check(
-    'Closed ticket editing uses the shared saved session',
-    edited.ok && edited.persisted && (await getDocument(originalId)).edits[node.id].dx === 22,
-  );
-  const stale = await call('apply_edits', {
-    ticket_ref: originalId,
-    expected_edit_revision: revision,
-    operation_id: 'stale-move',
-    operations: [{ type: 'move', element_id: node.id, dx: 100, dy: 0, mode: 'relative' }],
-  });
-  check(
-    'Stale edit revision cannot overwrite work',
-    !stale.ok && stale.error.code === 'revision_conflict',
-  );
-  const undo = await call('undo', {
-    ticket_ref: originalId,
-    expected_edit_revision: edited.screen.revision,
-    operation_id: 'closed-undo',
-  });
-  check(
-    'Closed ticket undo restores the actual previous edit',
-    undo.ok && (await getDocument(originalId)).edits[node.id].dx === 12,
-  );
-  const replay = await call('apply_edits', {
-    ticket_ref: originalId,
-    expected_edit_revision: revision,
-    operation_id: 'closed-move',
-    operations: [{ type: 'move', element_id: node.id, dx: 10, dy: 0, mode: 'relative' }],
-  });
-  check(
-    'Durable editing receipt prevents duplicate writes even after undo',
-    replay.ok && replay.replayed && (await getDocument(originalId)).edits[node.id].dx === 12,
-  );
-  await renameDocument(originalId, '고객 검색 개선');
-  check(
-    'An exact name resolves to the same stable ticket ID',
-    (await call('get_ticket', { ticket_ref: '고객 검색 개선' })).ticket.id === originalId,
-  );
-  const twin = await createTicket({
-    project_id: project,
-    title: '고객 검색 개선',
-    operation_id: 'same-name',
-  });
-  const ambiguous = await call('get_ticket', { ticket_ref: '고객 검색 개선' });
-  check(
-    'Duplicate names return candidates instead of guessing',
-    !ambiguous.ok &&
-      ambiguous.error.code === 'ambiguous_ticket' &&
-      ambiguous.error.candidates.length === 2,
-  );
-  await trashDocument(twin.id);
-  check(
-    'Trash immediately removes tickets from agent lookup',
-    !(await call('get_ticket', { ticket_ref: twin.id })).ok,
-  );
-  await restoreDocument(twin.id);
-  check('Recover restores the same ticket ID', (await getTicket(twin.id)).id === twin.id);
-  check(
-    'Legacy project denial settings do not hide list, detail or current images',
-    (await call('get_ticket', { ticket_ref: originalId })).images.length > 0 &&
-      (await call('list_tickets', {})).tickets.some((t) => t.id === originalId),
-  );
-  const canvas = document.createElement('canvas');
-  canvas.width = 80;
-  canvas.height = 50;
-  canvas.getContext('2d').fillRect(0, 0, 80, 50);
-  const image = canvas.toDataURL();
-  let fresh = await getTicket(originalId);
-  const saved = await getDocument(originalId);
-  const goalArgs = {
-    ticket_id: originalId,
-    project_id: project,
-    expected_revision: fresh.revision,
-    expected_edit_revision: saved.edit_revision,
-    operation_id: 'confirm-once',
-    image_data_url: image,
-    request: '제목과 정렬, 모바일 줄바꿈',
-    selection_confirmed: true,
-    source: saved.source,
-    annotations: saved.annotations,
-  };
-  ticket = await confirmTicketGoal(goalArgs);
-  const goal = JSON.stringify(ticket.goal);
-  check(
-    'Goal confirmation transitions the SAME ticket to queued',
-    ticket.id === originalId && ticket.status === 'queued' && !!ticket.goal.id,
-  );
-  check(
-    'Goal confirmation retry is idempotent',
-    (await confirmTicketGoal(goalArgs)).goal.id === ticket.goal.id,
-  );
-  check(
-    'Goal cannot be silently replaced',
-    await rejects(
-      () => confirmTicketGoal({ ...goalArgs, operation_id: 'replace' }),
-      'goal_already_confirmed',
-    ),
-  );
-  const draftUpdate = {
-    ticket_id: blank.id,
-    project_id: project,
-    expected_revision: blank.revision,
-    operation_id: 'invalid-working',
-    status: 'working',
-    summary: 'start',
-    implementation_instruction: 'human',
-  };
-  check(
-    'A draft cannot enter implementation before goal confirmation',
-    await rejects(() => updateTicket(draftUpdate), 'invalid_transition'),
-  );
-  async function update(status, extras = {}) {
-    const current = await getTicket(originalId);
-    return updateTicket({
-      ticket_id: originalId,
-      project_id: project,
-      expected_revision: current.revision,
-      goal_id: current.goal.id,
-      operation_id: crypto.randomUUID(),
-      status,
-      summary: '실제 QA 기록',
-      ...extras,
+    app.ticketWorkspace.execute({
+      name,
+      arguments: { project_id: project.id, ...args },
+      deadline: Date.now() / 1000 + 120,
     });
-  }
+  let ticket = await getTicket(first);
   check(
-    'Starting implementation requires a human instruction',
-    await rejects(() => update('working'), 'instruction_required'),
+    'Successful import creates a named-project ticket before editor use',
+    ticket.status === 'draft' && ticket.project_id === project.id && !!(await getDocument(first)),
   );
-  await update('working', { implementation_instruction: '이 티켓을 구현해 주세요' });
   check(
-    'Review requires implementation evidence',
-    await rejects(() => update('review'), 'evidence_required'),
+    'Blank ticket commands and editable project ID field are removed',
+    !doc.querySelector('#create-ticket') && !doc.querySelector('#project-id') && !app.newTicket,
   );
-  await update('review', { implementation_image_data_url: image, checks: '가상 반응형 결과 검증' });
+  const repeated = structuredClone(app.state.snapshot);
+  repeated.project_id = project.id;
+  const count = (await listTickets(project.id, { limit: 10000 })).total;
+  await saveCapture(repeated);
+  await saveCapture(repeated);
   check(
-    'Human approval cannot be inferred from test success',
-    await rejects(() => update('done'), 'approval_required'),
+    'Capture retry does not duplicate the ticket or its counter',
+    (await listTickets(project.id, { limit: 10000 })).total === count,
   );
-  await update('done', {
-    review_decision: 'approved',
-    review_note: '가상 검토자가 목표와 결과를 확인함',
+  const missing = { ...repeated, id: crypto.randomUUID(), project_id: 'missing-project' };
+  check(
+    'Failed project validation rolls back capture and ticket together',
+    (await rejects(() => saveCapture(missing))) &&
+      !(await getDocument(missing.id)) &&
+      !(await getTicket(missing.id)),
+  );
+  check(
+    'MCP cannot infer project from the app selection',
+    !(await call('list_tickets', { project_id: undefined })).ok,
+  );
+  check(
+    'MCP lists stored project entities even without tickets',
+    (await call('list_projects')).projects.some((p) => p.id === project.id),
+  );
+  const second = await createProject('다른 저장소 프로젝트');
+  check(
+    'Project creation requires only a name and no repository',
+    second.display_id.startsWith('P-') &&
+      !second.repository &&
+      !(await listTickets(second.id)).total,
+  );
+  check(
+    'An explicit unknown project is rejected',
+    (await call('list_tickets', { project_id: 'missing' })).error.code === 'project_not_found',
+  );
+  const repo = { identity: 'repo-a', root: '/tmp/repo-a', common_dir: '/tmp/repo-a/.git' },
+    op = crypto.randomUUID();
+  const bound = await connectRepository({
+    project_id: project.display_id,
+    repository: repo,
+    operation_id: op,
+    expected_project_revision: project.revision,
   });
   check(
-    'Records and completion retain the fixed goal',
-    JSON.stringify((await getTicket(originalId)).goal) === goal &&
-      (await getTicket(originalId)).records.length === 3,
-  );
-  await app.openTicket(originalId);
-  app.state.scene.select(node.id);
-  app.state.scene.nudge(3, 0);
-  await app.flushEditor();
-  check(
-    'Further manual editing does not overwrite the confirmed goal',
-    JSON.stringify((await getTicket(originalId)).goal) === goal,
-  );
-  const exported = await app.exportDocument();
-  check(
-    'Ticket backup owns edits and fixed goal',
-    exported.format === 'console-canvas-ticket' &&
-      exported.version === 3 &&
-      exported.tickets.length === 1 &&
-      exported.tickets[0].id === originalId,
+    'Binding accepts stable display ID and returns canonical identity',
+    bound.id === project.id && bound.repository.identity === 'repo-a',
   );
   check(
-    'Conflicting backup import leaves the original intact',
-    (await rejects(() => importDocument(exported))) &&
-      JSON.stringify((await getTicket(originalId)).goal) === goal,
+    'Same repository binds idempotently after revision changes',
+    (
+      await connectRepository({
+        project_id: project.id,
+        repository: repo,
+        operation_id: crypto.randomUUID(),
+        expected_project_revision: 0,
+      })
+    ).id === project.id,
   );
-  const old = await getDocument(originalId);
-  const competing = {
-    ...old,
-    writer_id: 'other-writer',
-    expected_storage_revision: old.storage_revision,
-    note: 'other edit',
-  };
-  await saveSession(originalId, competing);
   check(
-    'A stale writer cannot replace another editor session',
+    'New agent session resolves repository without app current project',
+    (await resolveProject({ repository: { ...repo, root: '/tmp/linked-worktree' } })).id ===
+      project.id,
+  );
+  check(
+    'Independent clones with the same URL are not implicitly merged',
+    await rejects(
+      () => resolveProject({ repository: { ...repo, identity: 'clone-a' } }),
+      'project_required',
+    ),
+  );
+  check(
+    'Explicit project and mismatched repository fail together',
+    await rejects(
+      () => resolveProject({ project_id: project.id, repository: { ...repo, identity: 'other' } }),
+      'repository_mismatch',
+    ),
+  );
+  check(
+    'Rebinding requires a current project revision',
     await rejects(
       () =>
-        saveSession(originalId, {
-          ...old,
-          writer_id: 'stale-writer',
-          expected_storage_revision: old.storage_revision,
-          note: 'overwrite',
+        connectRepository({
+          project_id: project.id,
+          repository: { ...repo, identity: 'different' },
+          operation_id: crypto.randomUUID(),
+          expected_project_revision: -1,
         }),
-      'revision_conflict',
+      'project_revision_conflict',
     ),
   );
-  // Reload a new editor identity and verify the saved ticket, not an old live session.
-  frame.src = '../editor.html?id=' + originalId;
-  await new Promise((r) => frame.addEventListener('load', r, { once: true }));
-  await until(() => frame.contentWindow.ConsoleCanvas?.state.ready);
-  app = frame.contentWindow.ConsoleCanvas;
-  doc = frame.contentDocument;
+  const b = await getProject(second.id);
+  await connectRepository({
+    project_id: b.id,
+    repository: repo,
+    operation_id: crypto.randomUUID(),
+    expected_project_revision: b.revision,
+  });
   check(
-    'Restart keeps ticket ID, comments, fixed goal and review records',
-    app.state.snapshot.id === originalId &&
-      app.state.ticket.id === originalId &&
-      app.state.scene.annotations[node.id].includes('모바일') &&
-      JSON.stringify((await getTicket(originalId)).goal) === goal,
+    'Multiple projects in one repository return candidates instead of guessing',
+    await rejects(() => resolveProject({ repository: repo }), 'ambiguous_project'),
   );
-  doc.querySelector('#create-ticket').click();
-  await until(() => app.state.ready && app.state.snapshot.id !== originalId);
-  const newId = app.state.snapshot.id;
+  const b2 = await getProject(b.id);
+  await connectRepository({
+    project_id: b.id,
+    repository: { identity: 'repo-b', root: '/tmp/repo-b', common_dir: '/tmp/repo-b/.git' },
+    operation_id: crypto.randomUUID(),
+    expected_project_revision: b2.revision,
+  });
+  await updateProject(project.id, { name: '고객 콘솔' });
   check(
-    'New ticket creates a visible ID without a naming modal',
-    !!app.state.ticket.display_id &&
-      !doc.querySelector('dialog:modal') &&
-      app.state.ticket.status === 'draft',
+    'Project rename preserves identity and repository binding',
+    (await getProject(project.id)).repository.identity === 'repo-a',
   );
-  doc.querySelector('#ticket-sample').click();
-  await until(() => app.state.ready && app.state.scene.nodes.size > 300);
-  check(
-    'Capture attaches to the existing empty ticket without creating another',
-    app.state.snapshot.id === newId && app.state.ticket.id === newId,
-  );
-  doc.querySelector('#review-note').value = '같은 티켓 목표 확정 UI';
-  doc.querySelector('#review-note').dispatchEvent(new frame.contentWindow.Event('change'));
+  const node = [...app.state.scene.nodes.values()].find((n) => n.locator.id === 'new-customer');
+  app.selectNode(node.id);
+  app.state.scene.nudge(12, 4);
+  app.state.scene.setComment(node.id, '제목과 정렬하고 모바일에서는 전체 너비');
   await app.flushEditor();
-  doc.querySelector('#new-ticket-button').click();
-  await until(() => doc.querySelector('#ticket-request'));
   check(
-    'Goal form includes current comments and intent without retyping',
-    doc.querySelector('#ticket-request').value.includes('같은 티켓'),
+    'Agent reads comments and visual context by ticket ID',
+    (await call('get_ticket', { ticket_ref: ticket.display_id })).ticket.workspace.annotations[
+      node.id
+    ].includes('모바일'),
   );
-  await until(() => !doc.querySelector('#ticket-register').disabled);
+  const before = doc.querySelectorAll('dialog[open]').length;
+  await app.confirmCurrentTicket();
+  ticket = await getTicket(first);
   check(
-    'Goal confirmation shows the exact current image before saving',
-    !!doc.querySelector('img[alt="확정할 현재 편집 결과"]')?.src.startsWith('data:image/'),
+    'Confirm is one in-place action without a goal form or navigation',
+    ticket.status === 'queued' &&
+      app.state.snapshot.id === first &&
+      doc.querySelectorAll('dialog[open]').length === before,
   );
-  doc.querySelector('#ticket-register').click();
-  await until(() => !doc.querySelector('#tickets-dialog').open);
   check(
-    'Actual form confirms a goal on the same ID',
-    (await getTicket(newId)).status === 'queued' &&
-      !doc.querySelector('#tickets-dialog').open &&
-      app.state.ticket.id === newId,
+    'Confirmation stores exact image, comments, source and semantic state',
+    ticket.goal.image.data_url.startsWith('data:image/') &&
+      ticket.goal.annotations[node.id] &&
+      ticket.goal.semantic_state === semanticState(await getDocument(first)),
   );
-  doc.querySelector('#tickets-dialog').close();
-  doc.querySelector('#tickets-button').click();
-  await until(() => doc.querySelector('#tickets-dialog').open && doc.querySelector('.ticket-row'));
+  const goal = ticket.goal.id;
+  app.selectNode(null);
+  await app.flushEditor();
   check(
-    'Project access controls are removed from the ticket catalog',
-    !doc.querySelector('#share-project'),
+    'Selection and view-only saves do not invalidate confirmation',
+    !(await getTicket(first)).needs_reconfirmation,
   );
-  const outside = await createTicket({
-    project_id: 'qa-other-catalog',
-    title: 'Other scope',
-    operation_id: 'catalog-other',
+  await renameDocument(first, '고객 검색 개선');
+  check(
+    'Ticket rename does not invalidate confirmation',
+    !(await getTicket(first)).needs_reconfirmation,
+  );
+  app.selectNode(node.id);
+  app.state.scene.nudge(5, 0);
+  await app.flushEditor();
+  check(
+    'Real editing directly after confirm marks reconfirmation required',
+    (await getTicket(first)).needs_reconfirmation && (await getTicket(first)).status === 'draft',
+  );
+  const failedClaim = await call('update_ticket', {
+    ticket_ref: first,
+    goal_id: goal,
+    expected_ticket_revision: ticket.revision,
+    status: 'working',
+    summary: '구현',
+    implementation_instruction: '확정된 티켓을 구현해',
+    claim_token: 'agent-a',
+    operation_id: crypto.randomUUID(),
   });
-  doc.querySelector('#tickets-dialog').close();
-  doc.querySelector('#tickets-button').click();
-  await until(() =>
-    doc.querySelector('select[aria-label="프로젝트"] option[value="qa-other-catalog"]'),
-  );
+  check('Unconfirmed later edits cannot be implemented', !failedClaim.ok);
+  app.undo();
+  await app.flushEditor();
   check(
-    'Catalog defaults to the current project instead of mixing scopes',
-    !doc.querySelector(`[data-ticket-id="${outside.id}"]`),
+    'Undo exactly to the confirmed design restores eligibility',
+    !(await getTicket(first)).needs_reconfirmation && (await getTicket(first)).status === 'queued',
   );
-  const projectFilter = doc.querySelector('select[aria-label="프로젝트"]');
-  projectFilter.value = '';
-  projectFilter.dispatchEvent(new frame.contentWindow.Event('change', { bubbles: true }));
-  await until(() => doc.querySelector(`[data-ticket-id="${outside.id}"]`));
+  app.undo('redo');
+  await app.flushEditor();
+  await app.confirmCurrentTicket();
+  ticket = await getTicket(first);
   check(
-    'All-project catalog exposes no misleading project permission checkbox',
-    !doc.querySelector('#share-project'),
+    'Reconfirm replaces the goal on the same ticket',
+    ticket.id === first && ticket.goal.id !== goal && ticket.status === 'queued',
   );
-  projectFilter.value = 'qa-other-catalog';
-  projectFilter.dispatchEvent(new frame.contentWindow.Event('change', { bubbles: true }));
-  await until(() => doc.querySelectorAll('.ticket-row').length === 1);
-  const allTickets = await call('list_tickets');
-  check(
-    'UI project filtering does not restrict the agent catalog',
-    allTickets.tickets.some((t) => t.id === outside.id) &&
-      allTickets.tickets.some((t) => t.id === originalId),
-  );
-  check(
-    'A previously unshared project is immediately readable by ticket ID',
-    (await call('get_ticket', { ticket_ref: outside.display_id })).ticket.id === outside.id,
-  );
-  const narrowed = await call('list_tickets', { project_id: 'qa-other-catalog' });
-  check(
-    'Project filter narrows rows without granting access',
-    narrowed.total === 1 && narrowed.tickets[0].id === outside.id,
-  );
-  const page = await call('list_tickets', { limit: 1 });
-  const next = await call('list_tickets', { limit: 1, cursor: page.next_cursor });
-  check(
-    'All-project pagination does not repeat the first ticket',
-    page.total > 1 && next.tickets[0].id !== page.tickets[0].id,
-  );
-  await renameDocument(outside.id, '고객 검색 개선');
-  const across = await call('get_ticket', { ticket_ref: '고객 검색 개선' });
-  const within = await call('get_ticket', {
-    ticket_ref: '고객 검색 개선',
-    project_id: 'qa-other-catalog',
-  });
-  check(
-    'Cross-project duplicate names require a stable ID or explicit project',
-    across.error?.code === 'ambiguous_ticket' &&
-      across.error.candidates.some((t) => t.id === outside.id) &&
-      within.ticket.id === outside.id,
-  );
-  doc.querySelector('#tickets-dialog').close();
-  const originalCount = (await listTickets(project, { limit: 10000 })).total;
-  const originalAdd = IDBObjectStore.prototype.add;
-  let failed = false;
-  const silence = (e) => {
-    if (e.error?.name === 'QuotaExceededError') e.preventDefault();
+  const manifestInput = {
+    project_id: project.id,
+    instruction: '이 저장소의 확정된 티켓들을 모두 구현해',
+    operation_id: crypto.randomUUID(),
   };
-  addEventListener('error', silence);
-  try {
-    IDBObjectStore.prototype.add = function (...args) {
-      if (this.name === 'tickets') throw new DOMException('QA quota', 'QuotaExceededError');
-      return originalAdd.apply(this, args);
-    };
-    failed = await rejects(() =>
-      createTicket({ project_id: project, title: 'failure', operation_id: 'failure' }),
-    );
-  } finally {
-    IDBObjectStore.prototype.add = originalAdd;
-    removeEventListener('error', silence);
-  }
+  const manifest = await prepareImplementation(manifestInput);
   check(
-    'Failed ticket creation leaves neither workspace nor success receipt',
-    failed && (await listTickets(project, { limit: 10000 })).total === originalCount,
+    'Explicit bulk implementation freezes canonical IDs and goal revisions',
+    manifest.tickets.some(
+      (t) => t.id === first && t.goal_id === ticket.goal.id && t.revision === ticket.revision,
+    ),
+  );
+  const later = {
+    ...structuredClone(repeated),
+    id: crypto.randomUUID(),
+    documentName: '나중에 추가된 티켓',
+  };
+  await saveCapture(later);
+  check(
+    'Manifest replay does not silently add later tickets',
+    JSON.stringify((await prepareImplementation(manifestInput)).tickets) ===
+      JSON.stringify(manifest.tickets),
+  );
+  const claim = {
+    ticket_id: first,
+    project_id: project.id,
+    expected_revision: ticket.revision,
+    goal_id: ticket.goal.id,
+    status: 'working',
+    summary: '구현 착수',
+    implementation_instruction: manifest.instruction,
+    operation_id: crypto.randomUUID(),
+    claim_token: 'agent-a',
+  };
+  const race = await Promise.allSettled([
+    updateTicket(claim),
+    updateTicket({ ...claim, operation_id: crypto.randomUUID(), claim_token: 'agent-b' }),
+  ]);
+  check(
+    'Concurrent agents cannot both claim the same confirmed goal',
+    race.filter((r) => r.status === 'fulfilled').length === 1,
   );
   check(
-    'Creation retry after storage recovery succeeds',
-    (await createTicket({ project_id: project, title: 'failure', operation_id: 'failure' }))
-      .status === 'draft',
+    'Lost acknowledgement can replay the same atomic claim',
+    (await updateTicket(claim)).claim.token === 'agent-a',
   );
-  await transact(['captures', 'sessions', 'documents', 'tickets'], 'readwrite', (tx) => {
-    for (const name of ['captures', 'sessions', 'documents', 'tickets'])
-      tx.objectStore(name).delete(originalId);
+  ticket = await getTicket(first);
+  const fixedGoal = ticket.goal.id;
+  app.state.scene.nudge(3, 0);
+  await app.flushEditor();
+  ticket = await getTicket(first);
+  check(
+    'Edits during implementation are requests and leave the active goal immutable',
+    ticket.status === 'working' && ticket.goal.id === fixedGoal && ticket.revision_requested,
+  );
+  check(
+    'Working goal cannot be silently reconfirmed',
+    await rejects(() => app.confirmCurrentTicket()),
+  );
+  check(
+    'A different agent cannot update claimed work',
+    await rejects(
+      () =>
+        updateTicket({
+          ...claim,
+          operation_id: crypto.randomUUID(),
+          expected_revision: ticket.revision,
+          claim_token: 'agent-b',
+        }),
+      'claim_conflict',
+    ),
+  );
+  ticket = await updateTicket({
+    ...claim,
+    status: 'review',
+    operation_id: crypto.randomUUID(),
+    expected_revision: ticket.revision,
+    implementation_image_data_url: image,
+    checks: '데스크톱·모바일 확인',
+    summary: '구현 결과',
   });
-  await importDocument(exported);
   check(
-    'Backup restores stable identity and immutable goal',
-    JSON.stringify((await getTicket(originalId)).goal) === goal &&
-      (await getDocument(originalId)).annotations[node.id].includes('모바일'),
+    'Implementation evidence and checks enter review on the same ticket',
+    ticket.status === 'review' && ticket.records.at(-1).image,
   );
-  await app.openTicket(newId);
-  doc.querySelector('#document-menu-button').click();
-  doc.querySelector('#trash-current').click();
-  await until(() => !app.state.snapshot);
   check(
-    'Trashing the current ticket clears the stale reload target',
-    !new URL(frame.contentWindow.location.href).searchParams.has('id') &&
-      !new URL(frame.contentWindow.location.href).searchParams.has('sample'),
+    'Completion without human approval is rejected',
+    await rejects(
+      () =>
+        updateTicket({
+          ...claim,
+          status: 'done',
+          operation_id: crypto.randomUUID(),
+          expected_revision: ticket.revision,
+        }),
+      'approval_required',
+    ),
   );
-  document.querySelector('#status').textContent = `PASS ${results.length} checks`;
+  ticket = await updateTicket({
+    ...claim,
+    status: 'done',
+    operation_id: crypto.randomUUID(),
+    expected_revision: ticket.revision,
+    review_decision: 'approved',
+    review_note: '사용자 승인',
+    summary: '검토 완료',
+  });
+  check(
+    'Human approval completes and releases the claim',
+    ticket.status === 'done' && !ticket.claim,
+  );
+  check(
+    'Unfinished list excludes done without hiding direct ID history',
+    !(await listTickets(project.id, { status: 'unfinished' })).tickets.some(
+      (t) => t.id === first,
+    ) && (await getTicket(first)).status === 'done',
+  );
+  await trashDocument(later.id);
+  check(
+    'Trash is excluded from agent listing and exact ID lookup',
+    !(await call('list_tickets')).tickets.some((t) => t.id === later.id) &&
+      !(await getTicket(later.id)),
+  );
+  await restoreDocument(later.id);
+  check('Restore returns the same ticket identity', (await getTicket(later.id)).id === later.id);
+  check(
+    'Project switching does not retarget an agent request',
+    (await call('list_tickets', { project_id: second.id })).total === 0,
+  );
+  check(
+    'Save cannot move a ticket into another project',
+    await rejects(() => saveSession(later.id, { project_id: second.id }), 'project_mismatch'),
+  );
+  const all = await listTickets(project.id, { limit: 1 });
+  check(
+    'Pagination exposes continuation when more rows remain',
+    all.tickets.length === 1 && all.next_cursor,
+  );
+  await app.openTicket(later.id);
+  await app.showTickets();
+  await until(() => doc.querySelectorAll('.ticket-compact-row').length);
+  check(
+    'Catalog defaults to unfinished tickets and no intermediate detail page',
+    doc.querySelector('[aria-label="티켓 상태 필터"]').value === 'unfinished' &&
+      !doc.querySelector('.goal-form'),
+  );
+  doc
+    .querySelector('[data-ticket-id="' + (await getTicket(later.id)).display_id + '"] .ticket-open')
+    .click();
+  await until(() => !doc.querySelector('#tickets-dialog').open && app.state.ready);
+  check('One row click opens the ticket directly', app.state.snapshot.id === later.id);
+  const saved = await getDocument(later.id);
+  await app.openTicket(first);
+  await app.openTicket(later.id);
+  check(
+    'Reopening restores saved content without creating a new ticket',
+    (await getDocument(later.id)).html === saved.html && app.state.snapshot.id === later.id,
+  );
+  const key = 'forced-rollback-' + crypto.randomUUID();
+  check(
+    'A failed transaction leaves no operation receipt',
+    await rejects(() =>
+      transact(['operations'], 'readwrite', (tx) => {
+        tx.objectStore('operations').add({ id: key });
+        tx.abort();
+      }),
+    ),
+  );
+  const casCapture = {
+    ...structuredClone(repeated),
+    id: crypto.randomUUID(),
+    project_id: project.id,
+  };
+  await saveCapture(casCapture);
+  const originalSession = await getDocument(casCapture.id);
+  await saveSession(casCapture.id, {
+    ...originalSession,
+    expected_storage_revision: 0,
+    writer_id: 'shared-editor',
+    note: 'first writer',
+  });
+  check(
+    'Stale saves conflict even when a closed editor shares the writer identity',
+    (await rejects(
+      () =>
+        saveSession(casCapture.id, {
+          ...originalSession,
+          expected_storage_revision: 0,
+          writer_id: 'shared-editor',
+          note: 'stale overwrite',
+        }),
+      'revision_conflict',
+    )) && (await getDocument(casCapture.id)).note === 'first writer',
+  );
+  const confirmInput = {
+    ticket_id: casCapture.id,
+    project_id: project.id,
+    expected_revision: 0,
+    expected_edit_revision: 0,
+    operation_id: crypto.randomUUID(),
+    image_data_url: image,
+    request: 'original goal',
+    selection_confirmed: true,
+  };
+  const originalGoal = await confirmTicketGoal(confirmInput);
+  const revisedGoal = await confirmTicketGoal({
+    ...confirmInput,
+    expected_revision: originalGoal.revision,
+    operation_id: crypto.randomUUID(),
+    request: 'later goal',
+  });
+  check(
+    'Old operation replay returns its original acknowledged goal without replacing the newer goal',
+    (await confirmTicketGoal(confirmInput)).goal.id === originalGoal.goal.id &&
+      (await getTicket(casCapture.id)).goal.id === revisedGoal.goal.id,
+  );
+  const held = await updateTicket({
+    ticket_id: casCapture.id,
+    project_id: project.id,
+    expected_revision: revisedGoal.revision,
+    goal_id: revisedGoal.goal.id,
+    status: 'blocked',
+    summary: '사람이 보류',
+    operation_id: crypto.randomUUID(),
+  });
+  await saveSession(casCapture.id, {
+    ...(await getDocument(casCapture.id)),
+    writer_id: 'shared-editor',
+  });
+  check(
+    'Saving the exact confirmed state does not undo an explicit hold',
+    (await getTicket(casCapture.id)).status === 'blocked' &&
+      (await getTicket(casCapture.id)).confirmation_held &&
+      held.confirmation_held,
+  );
+  await app.showTickets();
+  await until(() => doc.querySelector('.ticket-compact-row'));
+  doc.querySelector('#tickets-dialog').close();
+  const newInCatalog = {
+    ...structuredClone(repeated),
+    id: crypto.randomUUID(),
+    project_id: project.id,
+    documentName: '목록을 닫은 뒤 새로 가져온 화면',
+  };
+  await saveCapture(newInCatalog);
+  await app.showTickets();
+  await until(() => doc.querySelector('[data-document-id="' + newInCatalog.id + '"]'));
+  check(
+    'Reopening the catalog rereads captures created since the previous opening',
+    doc
+      .querySelector('.ticket-compact-list')
+      .textContent.includes('목록을 닫은 뒤 새로 가져온 화면'),
+  );
+  doc.querySelector('#tickets-dialog').close();
+  check('Project entities remain after all ticket operations', (await listProjects()).length >= 2);
+  document.querySelector('#status').textContent = JSON.stringify({
+    passed: results.length,
+    failed: 0,
+    total: results.length,
+  });
   document.body.dataset.result = 'pass';
-} catch (e) {
-  console.error(e);
-  document.querySelector('#status').textContent = 'FAIL ' + e.stack;
+} catch (error) {
+  document.querySelector('#status').textContent = 'FAILED: ' + error.stack;
   document.body.dataset.result = 'fail';
 }

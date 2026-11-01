@@ -1,3 +1,4 @@
+import { getProject } from './project-model.js';
 import { captureFromDocument, transact } from './db.js';
 import { validateDocumentInput } from './document-input.js';
 import { listTickets, getTicket, projectKey, validateStoredTicket } from './ticket-model.js';
@@ -13,7 +14,8 @@ export async function exportDocument(snapshot, point, project_id, { allowPartial
   }
   return {
     format: 'console-canvas-ticket',
-    version: 3,
+    version: 4,
+    project_name: (await getProject(project_id))?.name,
     capture: captureFromDocument(snapshot),
     session: {
       ...point,
@@ -25,13 +27,12 @@ export async function exportDocument(snapshot, point, project_id, { allowPartial
     ...(backupWarnings.length ? { backupWarnings } : {}),
   };
 }
-export async function importDocument(value) {
-  if (!(
-    (value.format === 'console-canvas-ticket' && value.version === 3) ||
-    (value.format === 'console-canvas-document' && value.version === 2)
-  ))
-    throw Error('지원하지 않는 편집 파일입니다.');
-  const { capture, session, tickets = [] } = value;
+export async function importDocument(value, project_id) {
+  if (value.format !== 'console-canvas-ticket' || value.version !== 4)
+    throw Error('현재 버전에서 저장한 편집 파일을 사용해 주세요.');
+  if (!(await getProject(project_id))) throw Error('파일을 가져올 프로젝트를 선택해 주세요.');
+  const { capture, tickets = [] } = value;
+  const session = { ...value.session, project_id };
   if (!session) throw Error('편집 내용이 없습니다.');
   validateDocumentInput(
     { ...capture, resourceRepairs: session.resourceRepairs },
@@ -53,7 +54,7 @@ export async function importDocument(value) {
       session.documentName.length > 120)
   )
     throw Error('티켓 이름을 확인해 주세요.');
-  for (const t of tickets) await validateStoredTicket(t, session.project_id, capture.id);
+  for (const t of tickets) await validateStoredTicket(t, t.project_id, capture.id);
   await transact(
     ['captures', 'documents', 'sessions', 'tickets', 'settings'],
     'readwrite',
@@ -70,10 +71,11 @@ export async function importDocument(value) {
           let n = sequence.result?.value || 0;
           const rows = tickets.map((t) => ({
             ...t,
+            project_id,
             title: t.title || t.goal?.title,
             document_id: t.document_id || t.id,
             goal: t.goal ? { ...t.goal, id: t.goal.id || crypto.randomUUID() } : null,
-            display_id: t.display_id || 'CC-' + ++n,
+            display_id: 'CC-' + ++n,
           }));
           if (!rows.some((t) => t.id === capture.id))
             rows.push({

@@ -1,6 +1,6 @@
 {
   "name": "console-canvas",
-  "version": "0.51.4",
+  "version": "0.52.1",
   "license": "MIT",
   "private": true,
   "description": "Embedded Chromium console UI editor with MCP control",

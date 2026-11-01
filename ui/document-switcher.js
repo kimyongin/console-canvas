@@ -1,5 +1,4 @@
 import { trashDocument, cleanDocumentName } from '../db.js';
-import { getTicket, projectKey } from '../ticket-model.js';
 export function createDocumentSwitcher({ $, state, flushEditor, closeDocument, refresh, toast }) {
   const menu = $('#document-menu-content'),
     form = $('#ticket-settings-form');
@@ -7,22 +6,23 @@ export function createDocumentSwitcher({ $, state, flushEditor, closeDocument, r
   menu.addEventListener('toggle', () => {
     if (!menu.matches(':popover-open')) return;
     $('#ticket-name').value = state.snapshot?.documentName || state.snapshot?.source.title || '';
-    $('#project-id').value = state.project_id || '';
-    $('#project-id').disabled = !!state.ticket?.goal;
-    $('#project-id').title = state.ticket?.goal ? '확정 목표의 프로젝트는 바꿀 수 없습니다.' : '';
     $('#ticket-settings-error').hidden = true;
   });
   menu.addEventListener('beforetoggle', (e) => {
     if (e.newState !== 'open') return;
     const r = $('#document-menu-button').getBoundingClientRect();
+    if (window.ConsoleCanvasDesktop) {
+      menu.style.left = Math.max(8, innerWidth - 388) + 'px';
+      menu.style.top = '4px';
+      return;
+    }
     menu.style.left = Math.max(8, Math.min(innerWidth - 388, r.left)) + 'px';
     menu.style.top = r.bottom + 4 + 'px';
   });
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (busy || !state.snapshot) return;
-    const inputName = $('#ticket-name').value,
-      inputProject = $('#project-id').value;
+    const inputName = $('#ticket-name').value;
     const previous = {
       name: state.snapshot.documentName,
       project: state.project_id,
@@ -31,15 +31,10 @@ export function createDocumentSwitcher({ $, state, flushEditor, closeDocument, r
     busy = true;
     $('#save-ticket-settings').disabled = true;
     try {
-      const name = cleanDocumentName(inputName),
-        project = projectKey(inputProject);
+      const name = cleanDocumentName(inputName);
       await flushEditor();
-      const current = await getTicket(state.snapshot.id);
-      if (current?.goal && current.project_id !== project)
-        throw Error('확정 목표의 프로젝트는 바꿀 수 없습니다.');
       state.snapshot.documentName = name;
-      state.project_id = project;
-      state.revision++;
+
       await flushEditor();
       await refresh();
       menu.hidePopover();

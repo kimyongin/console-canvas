@@ -29,7 +29,7 @@ class ModernTests(unittest.TestCase):
         self.assertEqual(results[1]['result']['resultType'], 'complete')
         self.assertEqual(results[1]['result']['ttlMs'], 0)
         self.assertEqual(results[1]['result']['cacheScope'], 'private')
-        self.assertEqual(len(results[1]['result']['tools']), 16)
+        self.assertEqual(len(results[1]['result']['tools']), 19)
         self.assertEqual(results[2]['error']['code'], -32602)
 
     def test_invalid_versions_and_missing_capabilities_fail_before_tools(self):
@@ -39,28 +39,40 @@ class ModernTests(unittest.TestCase):
         self.assertIn(MODERN, results[0]['error']['data']['supported'])
         self.assertEqual(results[1]['error']['code'], -32602)
 
-    def test_empty_connected_workspace_has_readable_resource_without_shared_projects(self):
-        connected = True
+    def test_empty_workspace_has_no_cross_project_resource(self):
         def call(name, args):
             if name == 'list_screens':
-                return {'ok':True,'screens':[{'editor_id':'empty-workspace','title':'Empty','workspace':True,'project_ids':[]}] if connected else []}
-            return {'ok':True,'tickets':[],'total':0}
-        protocol = ModernProtocol(call, 'test', lambda value:None)
+                return {'screens': [{'editor_id':'empty','title':'Empty','project_ids':[]}]}
+            raise AssertionError('No implicit global ticket listing')
+        protocol = ModernProtocol(call, 'test', lambda message: None)
         try:
-            uri = protocol.resources()[0]['uri']
-            self.assertEqual(json.loads(protocol.read(uri)['contents'][0]['text'])['tickets'], [])
-            connected = False
             self.assertEqual(protocol.resources(), [])
             with self.assertRaises(ValueError):
-                protocol.read(uri)
+                protocol.read('console-canvas://editors/empty/tickets')
         finally:
             protocol.close()
+
+    def test_resources_are_project_scoped_even_when_app_selection_changes(self):
+        seen=[]
+        screen={'editor_id':'workspace','title':'Editor','project_id':'a','project_ids':['a','b'],'project_versions':{'a':'one','b':'two'}}
+        def call(name,args):
+            if name=='list_screens': return {'screens':[screen]}
+            seen.append(args); return {'ok':True,'tickets':[]}
+        protocol=ModernProtocol(call,'test',lambda m:None)
+        try:
+            resources=protocol.resources()
+            self.assertEqual(len(resources),2)
+            screen['project_id']='b'
+            protocol.read(resources[0]['uri'])
+            self.assertEqual(seen[-1]['project_id'],'a')
+            with self.assertRaises(ValueError): protocol.read('console-canvas://editors/workspace/tickets')
+        finally: protocol.close()
 
     def test_legacy_handshake_retains_legacy_wire_results(self):
         results = invoke([rpc(1, 'initialize', {'protocolVersion': '2025-11-25'}), rpc(2, 'tools/list')])
         self.assertEqual(results[0]['result']['protocolVersion'], '2025-11-25')
         self.assertNotIn('resultType', results[1]['result'])
-        self.assertEqual(len(results[1]['result']['tools']), 16)
+        self.assertEqual(len(results[1]['result']['tools']), 19)
 
 
 if __name__ == '__main__':

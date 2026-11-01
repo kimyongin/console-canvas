@@ -1,14 +1,14 @@
+import { listProjects, resolveProject, connectRepository } from './project-model.js';
+import { prepareImplementation } from './ticket-model.js';
 import {
-  createTicket,
   listTickets,
-  listTicketProjects,
   getTicket,
   confirmTicketGoal,
   updateTicket,
   ticketReceipt,
   fingerprint,
 } from './ticket-model.js';
-import { getDocument, editReceipt } from './db.js';
+import { getDocument, editReceipt, transact } from './db.js';
 import { withSceneCopy } from './scene-preview.js';
 import { createEditorController } from './editor-controller.js';
 import { createEditorSession } from './editor-session.js';
@@ -24,9 +24,29 @@ const dataUrl = (blob) =>
   });
 const failure = (code, message, extra = {}) => ({ ok: false, error: { code, message, ...extra } });
 export function createTicketWorkspace({ state, editorId, controller, flushEditor, refresh }) {
-  let projects = [];
+  let projects = [],
+    projectVersions = {};
   async function refreshProjects() {
-    projects = await listTicketProjects();
+    const rows = await listProjects();
+    projects = rows.map((p) => p.id);
+    const documents = await transact(['documents'], 'readonly', (tx, done) => {
+      const r = tx.objectStore('documents').getAll();
+      r.onsuccess = () => done(r.result);
+    });
+    projectVersions = Object.fromEntries(
+      await Promise.all(
+        rows.map(async (p) => [
+          p.id,
+          await fingerprint([
+            p.revision,
+            ...documents
+              .filter((d) => d.project_id === p.id)
+              .map((d) => d.id + ':' + d.updatedAt + ':' + (d.deletedAt || ''))
+              .sort(),
+          ]),
+        ]),
+      ),
+    );
     return projects;
   }
   void refreshProjects();
@@ -42,6 +62,7 @@ export function createTicketWorkspace({ state, editorId, controller, flushEditor
     }),
     workspace: true,
     project_ids: projects.slice(0, 1000),
+    project_versions: projectVersions,
   });
   async function resolve(args) {
     const ticket = await getTicket(args.ticket_ref, args.project_id);
@@ -111,6 +132,18 @@ export function createTicketWorkspace({ state, editorId, controller, flushEditor
     if (Date.now() > command.deadline * 1000) return failure('expired', '명령이 만료됐습니다.');
     try {
       await refreshProjects();
+      if (name === 'list_projects') return { ok: true, projects: await listProjects() };
+      if (name === 'connect_repository') {
+        const project = await connectRepository(args);
+        refresh?.();
+        return { ok: true, project, persisted: true };
+      }
+      const project = await resolveProject(args);
+      args.project_id = project.id;
+      if (name === 'resolve_project')
+        return { ok: true, project, repository_context: args.repository || project.repository };
+      if (name === 'prepare_implementation')
+        return { ok: true, manifest: await prepareImplementation(args), persisted: true };
       if (name === 'list_tickets') {
         if (state.ready) await flushEditor();
         const offset = Number(args.cursor || 0),
@@ -121,21 +154,12 @@ export function createTicketWorkspace({ state, editorId, controller, flushEditor
           ok: true,
           projects,
           ...(await listTickets(args.project_id, {
-            status: args.status,
+            status: args.status || 'unfinished',
             query: args.query,
             offset,
             limit,
           })),
         };
-      }
-      if (name === 'create_ticket') {
-        const project =
-          args.project_id || state.project_id || (projects.length === 1 ? projects[0] : null);
-        if (!project) return failure('project_required', '프로젝트를 지정해 주세요.', { projects });
-        const t = await createTicket({ ...args, project_id: project });
-        await refreshProjects();
-        refresh?.();
-        return { ok: true, ticket: t, persisted: true };
       }
       const ticket = await resolve(args);
       if (name === 'update_ticket') {

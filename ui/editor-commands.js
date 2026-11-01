@@ -93,7 +93,10 @@ export function createEditorCommands({
       alt: false,
       label: mod + '+O',
       ready: () => true,
-      run: () => $('#import-button').click(),
+      run: () =>
+        window.ConsoleCanvasDesktop?.openFile
+          ? window.ConsoleCanvasDesktop.openFile()
+          : $('#file-input').click(),
     },
     {
       id: 'save',

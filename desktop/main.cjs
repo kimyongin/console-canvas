@@ -57,11 +57,7 @@ function state(message) {
     busy,
     can_go_back: !!source?.webContents.navigationHistory.canGoBack(),
     can_go_forward: !!source?.webContents.navigationHistory.canGoForward(),
-    message:
-      message ||
-      (current === 'source'
-        ? '로그인한 뒤 원하는 화면에서 가져오기를 누르세요.'
-        : '복제본 편집 · 원본 사이트에는 적용되지 않습니다.'),
+    message: message || '',
     demo_url: connection.url + '/fixtures/console.html',
   };
 }
@@ -78,11 +74,11 @@ function layout() {
     view?.setBounds({ x: 0, y: top, width, height: Math.max(1, height - top) });
 }
 function show(which) {
-  if (!['source', 'editor', 'settings', 'agent', 'update', 'capture'].includes(which))
+  if (!['source', 'editor', 'tickets', 'settings', 'agent', 'update', 'capture'].includes(which))
     throw new Error('알 수 없는 화면');
   current = which;
-  source.setVisible(which === 'source');
-  editor.setVisible(which === 'editor');
+  source.setVisible(which === 'source' && !!source.webContents.getURL());
+  editor.setVisible(which === 'editor' || which === 'tickets');
   layout();
   notify(
     which === 'settings'
@@ -96,6 +92,59 @@ function show(which) {
 }
 function trusted(event, kind) {
   trustFrame(event, kind === 'editor' ? editor?.webContents : win?.webContents);
+}
+let workspaceState = null;
+async function requestEditor(command) {
+  if (!editorReady) throw Error('작업 공간을 준비하고 있습니다. 잠시 후 다시 시도해 주세요.');
+  const id = require('node:crypto').randomUUID();
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(Error('작업 공간 응답이 없습니다. 다시 시도해 주세요.'));
+    }, 30000);
+    function cleanup() {
+      clearTimeout(timer);
+      ipcMain.removeListener('canvas:workspace-result', reply);
+    }
+    function reply(event, receipt, result) {
+      try {
+        trusted(event, 'editor');
+      } catch {
+        return;
+      }
+      if (receipt !== id) return;
+      cleanup();
+      result?.ok ? resolve(result.value) : reject(Error(result?.message || '작업 공간 요청 실패'));
+    }
+    ipcMain.on('canvas:workspace-result', reply);
+    editor.webContents.send('canvas:workspace-command', id, command);
+  });
+}
+async function deliverCapture(snapshot) {
+  if (!editorReady) throw Error('작업 공간을 준비하고 있습니다.');
+  const receipt = require('node:crypto').randomUUID();
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(Error('가져온 화면의 저장 응답이 없습니다.'));
+    }, 60000);
+    function cleanup() {
+      clearTimeout(timer);
+      ipcMain.removeListener('canvas:snapshot-result', saved);
+    }
+    function saved(event, id, result) {
+      try {
+        trusted(event, 'editor');
+      } catch {
+        return;
+      }
+      if (id !== receipt) return;
+      cleanup();
+      result?.ok ? resolve() : reject(Error(result?.message || '화면을 저장하지 못했습니다.'));
+    }
+    ipcMain.on('canvas:snapshot-result', saved);
+    editor.webContents.send('canvas:snapshot', snapshot, null, receipt);
+  });
 }
 async function start() {
   // Expose WebContentsView controls to native assistive technology on first launch.
@@ -200,6 +249,64 @@ async function start() {
     getWindow: () => win,
     downloads: app.getPath('downloads'),
   });
+  ipcMain.on('canvas:workspace-state', (event, value) => {
+    trusted(event, 'editor');
+    if (
+      !value ||
+      !Array.isArray(value.projects) ||
+      value.projects.length > 1000 ||
+      JSON.stringify(value).length > 2000000
+    )
+      return;
+    workspaceState = value;
+    win.webContents.send('canvas:workspace-state', value);
+  });
+  ipcMain.handle('canvas:project-menu', (event, position) => {
+    trusted(event);
+    return new Promise((resolve) => {
+      const menu = Menu.buildFromTemplate([
+        { label: '연결 요청 복사', click: () => resolve('copy-connection') },
+        { label: '프로젝트 이름 변경', click: () => resolve('rename') },
+      ]);
+      menu.popup({
+        window: win,
+        x: Math.max(0, Math.round(Number(position?.x) || 0)),
+        y: 48,
+        callback: () => resolve(null),
+      });
+    });
+  });
+  ipcMain.handle('canvas:workspace-command', async (event, command) => {
+    trusted(event);
+    if (
+      !command ||
+      ![
+        'state',
+        'create',
+        'select',
+        'rename',
+        'copy-connection',
+        'copy-ticket-id',
+        'open-file',
+        'tickets',
+        'confirm',
+        'editor',
+        'ticket-menu',
+      ].includes(command.action) ||
+      JSON.stringify(command).length > 5000
+    )
+      throw Error('허용되지 않은 작업 공간 명령');
+    if (command.action === 'open-file') return openFile();
+    if (['tickets', 'confirm', 'editor', 'ticket-menu'].includes(command.action))
+      show(command.action === 'tickets' ? 'tickets' : 'editor');
+    const previous = workspaceState?.project?.id;
+    const result = await requestEditor(command);
+    if (['copy-connection', 'copy-ticket-id'].includes(command.action))
+      clipboard.writeText(result.connection_request);
+    if (command.action === 'select' && previous !== result.project?.id && result.project?.last_url)
+      await source.webContents.loadURL(require('./security.cjs').webUrl(result.project.last_url));
+    return result;
+  });
   ipcMain.handle('canvas:retry-assets', async (event, urls) => {
     trusted(event, 'editor');
     return require('./repair-resources.cjs')(urls, require('electron').net.fetch);
@@ -214,7 +321,9 @@ async function start() {
   });
   ipcMain.handle('canvas:open-source', async (event, url) => {
     trusted(event, 'editor');
-    const ownView = /^console-canvas:\/\/app\/(editor|source|settings|agent|update)$/.exec(url);
+    const ownView = /^console-canvas:\/\/app\/(editor|source|tickets|settings|agent|update)$/.exec(
+      url,
+    );
     if (ownView) {
       show(ownView[1]);
       return;
@@ -222,6 +331,10 @@ async function start() {
     const target = require('./security.cjs').webUrl(url);
     show('source');
     await source.webContents.loadURL(target);
+  });
+  ipcMain.handle('canvas:show-editor', (event) => {
+    trusted(event, 'editor');
+    show('editor');
   });
   ipcMain.handle('canvas:show-source', (event) => {
     trusted(event, 'editor');
@@ -243,6 +356,15 @@ async function start() {
       editor.webContents.send('canvas:snapshot', pendingCapture);
       pendingCapture = null;
     }
+  });
+  source.webContents.on('did-start-navigation', () => {
+    if (current === 'source') source.setVisible(true);
+  });
+  source.webContents.on('did-navigate', (_event, url) => {
+    if (editorReady) requestEditor({ action: 'save-url', url }).catch(() => {});
+  });
+  source.webContents.on('did-navigate-in-page', (_event, url) => {
+    if (editorReady) requestEditor({ action: 'save-url', url }).catch(() => {});
   });
   const lifecycle = createEditorLifecycle({
     ipcMain,
@@ -267,17 +389,41 @@ async function start() {
     flush: lifecycle.flush,
     quit: () => lifecycle.quitSaved(app),
   });
-  async function capture(options) {
+  ipcMain.handle('canvas:open-file', (event) => {
+    trusted(event, 'editor');
+    return openFile();
+  });
+  async function openFile() {
+    if (!workspaceState?.project) throw Error('파일을 가져올 프로젝트를 먼저 선택해 주세요.');
+    await lifecycle.flush();
+    const result = await dialog.showOpenDialog(win, {
+      title: '편집 파일 열기',
+      properties: ['openFile'],
+      filters: [{ name: 'Console Canvas', extensions: ['json', 'uiclone'] }],
+    });
+    if (result.canceled || !result.filePaths[0]) return { canceled: true };
+    const file = result.filePaths[0],
+      stat = await fs.promises.stat(file);
+    if (stat.size > 85000000) throw Error('85MB 이하 편집 파일을 선택해 주세요.');
+    await requestEditor({
+      action: 'import-file',
+      name: path.basename(file),
+      content: await fs.promises.readFile(file, 'utf8'),
+    });
+    show('editor');
+    return { canceled: false };
+  }
+  async function capture(options = {}) {
+    options = { ...options, project_id: options.project_id || workspaceState?.project?.id };
+    if (!options.project_id) throw Error('프로젝트를 먼저 선택하거나 만들어 주세요.');
     if (busy) throw new Error('화면을 가져오는 중입니다.');
     busy = true;
     notify('원본 화면을 복제하고 있어요…');
     try {
       show('source');
       const snapshot = await captureWebsite(source.webContents, ROOT, { scope: options });
-      if (editorReady) editor.webContents.send('canvas:snapshot', snapshot);
-      else {
-        pendingCapture = snapshot;
-      }
+      snapshot.project_id = options.project_id;
+      await deliverCapture(snapshot);
       show('editor');
       notify('화면을 가져왔어요. 요소를 옮기거나 주석을 남겨 보세요.');
       return { id: snapshot.id, nodes: snapshot.nodes.length };
@@ -287,11 +433,13 @@ async function start() {
     }
   }
   async function captureApp() {
+    const projectId = workspaceState?.project?.id;
+    if (!projectId) throw Error('프로젝트를 먼저 만들어 주세요.');
     if (busy || current === 'capture') throw Error('화면 가져오기를 마친 뒤 다시 시도해 주세요.');
     if (!editorReady) throw Error('편집기를 준비 중입니다. 잠시 후 다시 시도해 주세요.');
     const view = current,
       [width, height] = win.getContentSize();
-    const child = view === 'editor' ? editor : view === 'source' ? source : null;
+    const child = ['editor', 'tickets'].includes(view) ? editor : view === 'source' ? source : null;
     busy = true;
     let message;
     try {
@@ -312,33 +460,8 @@ async function start() {
       )
         throw Error('앱 화면이 바뀌었습니다. 다시 가져와 주세요.');
       notify('앱 디자인을 새 문서로 저장하고 있어요…');
-      const receipt = require('node:crypto').randomUUID();
-      await new Promise((resolve, reject) => {
-        const timer = setTimeout(() => {
-          cleanup();
-          reject(
-            Error('앱 디자인 저장 응답이 없습니다. 기존 작업을 확인한 뒤 다시 시도해 주세요.'),
-          );
-        }, 30000);
-        const cleanup = () => {
-          clearTimeout(timer);
-          ipcMain.removeListener('canvas:snapshot-result', saved);
-        };
-        function saved(event, id, result) {
-          try {
-            trusted(event, 'editor');
-          } catch {
-            return;
-          }
-          if (id !== receipt) return;
-          cleanup();
-          result?.ok
-            ? resolve()
-            : reject(Error(result?.message || '앱 디자인을 저장하지 못했습니다.'));
-        }
-        ipcMain.on('canvas:snapshot-result', saved);
-        editor.webContents.send('canvas:snapshot', snapshot, null, receipt);
-      });
+      snapshot.project_id = projectId;
+      await deliverCapture(snapshot);
       show('editor');
       message =
         '앱 디자인 복제본을 열었어요. 헤더·패널·버튼을 편집하고 주석이나 작업 티켓으로 목표를 남겨 보세요.';
@@ -372,6 +495,8 @@ async function start() {
           ['viewport', '현재 보이는 화면 가져오기'],
           ['document', '전체 페이지 가져오기'],
           ['region', '영역 지정하여 가져오기'],
+          ['app', '앱 디자인 화면 가져오기'],
+          ['file', '편집 파일 열기…'],
         ];
         const menu = Menu.buildFromTemplate(
           modes.map(([mode, label]) => ({ label, click: () => resolve(mode) })),
@@ -434,8 +559,14 @@ async function start() {
       '/editor.html' +
       (reopen?.document_id ? '?id=' + encodeURIComponent(reopen.document_id) : ''),
   );
-  await source.webContents.loadURL(connection.url + '/fixtures/console.html');
-  show('editor');
+  for (let n = 0; !editorReady && n < 100; n++)
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  await requestEditor({ action: 'state' });
+  if (workspaceState?.project?.last_url)
+    await source.webContents.loadURL(
+      require('./security.cjs').webUrl(workspaceState.project.last_url),
+    );
+  show('source');
   notify();
 }
 if (!app.requestSingleInstanceLock()) app.quit();

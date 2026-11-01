@@ -177,6 +177,8 @@ try {
   check('Truncated PNG is rejected before preview/apply', brokenRejected);
   await app.openSnapshot(repair);
   win.ConsoleCanvasDesktop = {
+    publishWorkspace: () => {},
+    showEditor: () => {},
     retryAssets: async (urls) => urls.map((url) => ({ url, data: png })),
   };
   doc.querySelector('#capture-status-button').click();

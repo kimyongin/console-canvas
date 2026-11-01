@@ -1,5 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('ConsoleCanvasShell', {
+  projectMenu: (position) => ipcRenderer.invoke('canvas:project-menu', position),
+  workspace: (command) => ipcRenderer.invoke('canvas:workspace-command', command),
+  onWorkspace: (callback) =>
+    ipcRenderer.on('canvas:workspace-state', (_event, value) => callback(value)),
   chooseCaptureMode: (position) => ipcRenderer.invoke('canvas:capture-menu', position),
   onFocusAddress: (callback) => ipcRenderer.on('canvas:focus-address', () => callback()),
   navigate: (url) => ipcRenderer.invoke('canvas:navigate', url),
