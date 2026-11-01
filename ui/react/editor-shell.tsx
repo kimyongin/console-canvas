@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { Copy } from 'lucide-react';
+import { Copy, ChevronUp, MessageSquarePlus, SlidersHorizontal, Trash2 } from 'lucide-react';
 import type { EditorAdapter } from './store';
 import { dispatchEditorCommand } from './commands';
 import { Button } from './components/button';
@@ -414,9 +414,8 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           <div id="selection-actions" role="toolbar" aria-label="선택 요소 작업" hidden={true}>
             <div className="selection-identity">
               <strong id="selection-name"></strong>
-              <small id="selection-path"></small>
-              <Button id="selection-parent" variant="ghost">
-                상위 요소 선택
+              <Button id="selection-parent" variant="ghost" aria-label="상위 요소 선택">
+                <ChevronUp size={15} aria-hidden="true" />
               </Button>
             </div>
             <Button
@@ -434,33 +433,37 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
               variant="outline"
               aria-label="선택 요소 주석 편집"
             >
-              {'주석'}
+              <MessageSquarePlus size={15} aria-hidden="true" />
             </Button>
             <Button
               id="edit-properties"
               onClick={() => dispatchEditorCommand('properties')}
               disabled={!view?.selected}
               title="선택 요소의 위치·정렬 편집"
+              aria-label="요소 편집"
               variant="outline"
             >
-              {'\n                요소 편집\n              '}
+              <SlidersHorizontal size={15} aria-hidden="true" />
             </Button>
             <Button
               id="copy"
               onClick={() => dispatchEditorCommand('copy')}
               title="선택 요소 복사 · ⌘/Ctrl+C"
+              aria-label="복사"
               disabled={!view?.selected || !!view?.selectedHidden}
               variant="outline"
             >
-              {'복사'}
+              <Copy size={15} aria-hidden="true" />
             </Button>
             <Button
               id="delete"
+              aria-label="삭제"
+              title="선택 요소 삭제"
               onClick={() => dispatchEditorCommand('delete')}
               disabled={!view?.selected || !!view?.selectedHidden}
               variant="outline"
             >
-              {'삭제'}
+              <Trash2 size={15} aria-hidden="true" />
             </Button>
           </div>
           <div className="canvas-footer">

@@ -498,31 +498,33 @@
   }
 }
 #editor-root #selection-actions {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   max-width: calc(100vw - 24px);
   box-sizing: border-box;
 }
 .selection-identity {
-  flex-basis: 100%;
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
   max-width: 100%;
 }
-.selection-identity strong,
-.selection-identity small {
+.selection-identity strong {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 180px;
+  min-width: 0;
   font-size: 11px;
-}
-.selection-identity small {
-  color: var(--muted);
 }
 #selection-parent {
   margin-left: auto;
+  flex-shrink: 0;
+}
+#selection-actions > button,
+#selection-parent {
+  padding: 4px 6px;
+  flex-shrink: 0;
 }
 .result-visual-row {
   display: flex;

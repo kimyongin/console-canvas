@@ -16,7 +16,7 @@ export function createSelectionToolbar({ $, state, selectNode }) {
     $('#context-comment').title = count > 1 ? count + '개 대상에 차례로 주석 작성' : '주석 편집';
     host.hidden = !r || scene.hidden(scene.selected) || !state.ready;
     if (host.hidden) return;
-    host.style.width = Math.min(420, Math.max(100, viewport.clientWidth - 16)) + 'px';
+    host.style.width = Math.min(340, Math.max(100, viewport.clientWidth - 16)) + 'px';
     host.style.maxWidth = Math.max(100, viewport.clientWidth - 16) + 'px';
     const node = scene.nodes.get(scene.selected),
       path = [];
@@ -31,8 +31,9 @@ export function createSelectionToolbar({ $, state, selectNode }) {
       count > 1
         ? count + '개 선택 · ' + elementLabel(node, state.snapshot.layerNames)
         : elementLabel(node, state.snapshot.layerNames);
-    $('#selection-path').textContent = path.join(' › ');
-    $('#selection-path').title = path.join(' › ');
+    $('#selection-name').title = [...path, elementLabel(node, state.snapshot.layerNames)].join(
+      ' › ',
+    );
     $('#selection-parent').hidden = !node?.parentId;
     $('#selection-parent').title = '상위 요소 선택 · ' + (path.at(-1) || '');
     if (documentId !== state.snapshot?.id) {
