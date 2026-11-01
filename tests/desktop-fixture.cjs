@@ -128,6 +128,33 @@ async function main() {
       editor,
       `(async()=>{const a=window.ConsoleCanvas,n=[...a.state.scene.nodes.values()].find(n=>n.locator.id==='new-customer');a.selectNode(n.id);a.state.scene.setComment(n.id,'제목과 정렬하고 모바일에서는 전체 너비로 보여주세요.');await a.flushEditor();})()`,
     );
+    const normalSize = window.getSize();
+    const originalTitle = await evaluate(editor, 'window.ConsoleCanvas.state.ticket.title');
+    await evaluate(
+      shell,
+      `window.ConsoleCanvasShell.workspace({action:'rename',name:${JSON.stringify('긴 프로젝트 이름 · '.repeat(7))}})`,
+    );
+    await evaluate(
+      editor,
+      `(async()=>{window.ConsoleCanvas.state.snapshot.documentName=${JSON.stringify('고객 등록과 검색 배치 개선 · '.repeat(5))};await window.ConsoleCanvas.flushEditor();})()`,
+    );
+    window.setSize(1000, 780);
+    await until(() => evaluate(shell, 'innerWidth===1000'), 'Narrow window layout missing');
+    const narrow = await evaluate(
+      shell,
+      `(()=>{const elements=[...document.querySelectorAll('.top button,.top select,.top nav')].filter(e=>!e.hidden&&e.getClientRects().length);return {overflow:document.documentElement.scrollWidth>innerWidth,controlsFit:elements.every(e=>e.getBoundingClientRect().left>=0&&e.getBoundingClientRect().right<=innerWidth)};})()`,
+    );
+    assert.equal(narrow.overflow, false);
+    assert.equal(narrow.controlsFit, true);
+    window.setSize(...normalSize);
+    await evaluate(
+      shell,
+      "window.ConsoleCanvasShell.workspace({action:'rename',name:'QA 고객 콘솔'})",
+    );
+    await evaluate(
+      editor,
+      `(async()=>{window.ConsoleCanvas.state.snapshot.documentName=${JSON.stringify(originalTitle)};await window.ConsoleCanvas.flushEditor();})()`,
+    );
     await screenshot(window, '03-edit');
     if (process.env.CONSOLE_CANVAS_GUIDE_CAPTURE_DIR) {
       await evaluate(editor, 'window.ConsoleCanvas.confirmCurrentTicket()');
@@ -235,6 +262,7 @@ async function main() {
     await fs.writeFile(
       path.join(directory, 'prepare-ready.json'),
       JSON.stringify({
+        narrowHeader: true,
         firstImportCancel: true,
         sourceRoundTrip: true,
         fileOpenCancel: true,
