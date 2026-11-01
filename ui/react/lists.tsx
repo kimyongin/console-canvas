@@ -5,6 +5,7 @@ import { renderReact } from './mount';
 import { Button } from './components/button';
 import { Input } from './components/input';
 import { ActionMenu, type MenuAction } from './components/action-menu';
+import { isComposingKey } from '../keyboard.js';
 export interface LayerRow {
   id: string;
   depth: number;
@@ -206,7 +207,7 @@ function DocumentCard({
           noValidate
           onSubmit={submit}
           onKeyDown={(e) => {
-            if (e.key === 'Escape') {
+            if (e.key === 'Escape' && !isComposingKey(e)) {
               e.preventDefault();
               e.stopPropagation();
               if (!busy) changeDraft(null);

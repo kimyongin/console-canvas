@@ -1,0 +1,110 @@
+<!doctype html><meta charset="utf-8" /><title>Live media with editable overlays</title>
+<style>
+  body {
+    margin: 0;
+    font-family: Arial;
+    background: #f7f8fb;
+    color: #152235;
+  }
+  header {
+    padding: 30px;
+    background: white;
+    border-bottom: 1px solid #ddd;
+  }
+  .hero {
+    margin: 36px;
+    position: relative;
+    width: 1100px;
+    height: 600px;
+    background: #12233b;
+  }
+  .hero video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .overlay {
+    position: absolute;
+    left: 30px;
+    bottom: 30px;
+    color: white;
+    background: #17223dcc;
+    padding: 20px;
+  }
+  button {
+    padding: 12px;
+    font: inherit;
+  }
+  section {
+    padding: 30px;
+    height: 500px;
+  }
+</style>
+<header>
+  <h1>Shipping workspace</h1>
+  <p>Live activity, ticket workflow and responsive detail</p>
+</header>
+<div class="hero">
+  <video autoplay muted playsinline></video>
+  <div class="overlay">
+    <h2 id="overlay-title">Editable HTML heading</h2>
+    <button id="overlay-button" onclick="globalThis.actions++">Create shipment</button>
+  </div>
+</div>
+<section>
+  Independent content below the video.
+  <ul>
+    <li>Shipment 1 · preparing · warehouse A</li>
+    <li>Shipment 2 · preparing · warehouse A</li>
+    <li>Shipment 3 · preparing · warehouse A</li>
+    <li>Shipment 4 · preparing · warehouse A</li>
+    <li>Shipment 5 · preparing · warehouse A</li>
+    <li>Shipment 6 · preparing · warehouse A</li>
+    <li>Shipment 7 · preparing · warehouse A</li>
+    <li>Shipment 8 · preparing · warehouse A</li>
+    <li>Shipment 9 · preparing · warehouse A</li>
+    <li>Shipment 10 · preparing · warehouse A</li>
+    <li>Shipment 11 · preparing · warehouse A</li>
+    <li>Shipment 12 · preparing · warehouse A</li>
+    <li>Shipment 13 · preparing · warehouse A</li>
+    <li>Shipment 14 · preparing · warehouse A</li>
+    <li>Shipment 15 · preparing · warehouse A</li>
+    <li>Shipment 16 · preparing · warehouse A</li>
+    <li>Shipment 17 · preparing · warehouse A</li>
+    <li>Shipment 18 · preparing · warehouse A</li>
+    <li>Shipment 19 · preparing · warehouse A</li>
+    <li>Shipment 20 · preparing · warehouse A</li>
+    <li>Shipment 21 · preparing · warehouse A</li>
+    <li>Shipment 22 · preparing · warehouse A</li>
+    <li>Shipment 23 · preparing · warehouse A</li>
+    <li>Shipment 24 · preparing · warehouse A</li>
+    <li>Shipment 25 · preparing · warehouse A</li>
+    <li>Shipment 26 · preparing · warehouse A</li>
+    <li>Shipment 27 · preparing · warehouse A</li>
+    <li>Shipment 28 · preparing · warehouse A</li>
+    <li>Shipment 29 · preparing · warehouse A</li>
+    <li>Shipment 30 · preparing · warehouse A</li>
+  </ul>
+</section>
+<script>
+  globalThis.actions = 0;
+  const c = document.createElement('canvas');
+  c.width = 1100;
+  c.height = 600;
+  const x = c.getContext('2d');
+  let n = 0;
+  function draw() {
+    n++;
+    x.fillStyle = `hsl(${n % 360} 60% 35%)`;
+    x.fillRect(0, 0, 1100, 600);
+    x.fillStyle = '#fff';
+    x.fillRect((n * 11) % 1000, 40, 100, 420);
+    x.font = '72px Arial';
+    x.fillText('Frame ' + n, 40, 550);
+    requestAnimationFrame(draw);
+  }
+  draw();
+  const v = document.querySelector('video');
+  v.srcObject = c.captureStream(30);
+  v.play();
+</script>

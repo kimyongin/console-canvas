@@ -231,7 +231,64 @@ try {
     'Comment opens a modal independent of side-panel visibility',
     doc.querySelector('#comment-dialog').open && doc.activeElement.id === 'component-comment',
   );
-  doc.querySelector('#close-comment-dialog').click();
+  const commentField = doc.querySelector('#component-comment');
+  const stableComment = app.state.scene.annotations[node.id];
+  commentField.dispatchEvent(
+    new frame.contentWindow.CompositionEvent('compositionstart', { bubbles: true }),
+  );
+  commentField.value = 'ㅎ';
+  commentField.dispatchEvent(
+    new frame.contentWindow.InputEvent('input', { bubbles: true, isComposing: true }),
+  );
+  for (const options of [
+    { key: 'Escape', isComposing: true },
+    { key: 'Enter', isComposing: true, metaKey: true },
+    { key: 'Escape', keyCode: 229 },
+    { key: 'Escape' },
+  ]) {
+    const event = new frame.contentWindow.KeyboardEvent('keydown', {
+      ...options,
+      bubbles: true,
+      cancelable: true,
+    });
+    commentField.dispatchEvent(event);
+    check(
+      'IME does not dismiss/submit dialog: ' + JSON.stringify(options),
+      doc.querySelector('#comment-dialog').open && event.defaultPrevented,
+    );
+  }
+  await new Promise((r) => setTimeout(r, 750));
+  check(
+    'Uncommitted IME preedit never overwrites the saved comment',
+    app.state.scene.annotations[node.id] === stableComment,
+  );
+  commentField.value = '한글 조합 완료';
+  commentField.dispatchEvent(
+    new frame.contentWindow.CompositionEvent('compositionend', {
+      bubbles: true,
+      data: commentField.value,
+    }),
+  );
+  commentField.dispatchEvent(
+    new frame.contentWindow.InputEvent('input', { bubbles: true, isComposing: false }),
+  );
+  await new Promise((r) => setTimeout(r, 750));
+  await app.state.saving;
+  check(
+    'Committed IME text saves after composition ends',
+    app.state.scene.annotations[node.id] === '한글 조합 완료',
+  );
+  commentField.dispatchEvent(
+    new frame.contentWindow.KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  check(
+    'Escape closes the dialog normally after composition',
+    !doc.querySelector('#comment-dialog').open,
+  );
   await app.state.saving;
   const hiddenSnapshot = structuredClone(app.state.snapshot);
   hiddenSnapshot.id = crypto.randomUUID();

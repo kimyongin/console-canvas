@@ -23,6 +23,8 @@ IndexedDB v3는 0.45의 현재 문서와 확정 티켓을 보존해 티켓 중�
 
 **편집 파일 저장**은 현재 티켓의 편집·주석·출처·목표·작업 기록을 담은 `console-canvas-ticket` v3 백업입니다. 0.45의 문서 v2 파일도 읽으며 충돌은 덮어쓰지 않습니다. **전달 이미지**는 화면 위 번호/하이라이트와 하단 요청 카드가 포함된 PNG 한 장입니다. MCP 없는 대화에 첨부할 수 있습니다.
 
+한글 등 IME 조합 중에는 Esc/Enter가 주석 창을 닫거나 제출하지 않으며, 조합이 확정된 뒤 주석을 자동 저장합니다.
+
 ## 라이선스
 
 Console Canvas는 [MIT 라이선스](LICENSE)로 제공합니다. 배포에는 프로젝트 라이선스와 [제3자 고지](THIRD_PARTY_NOTICES.txt)를 함께 포함합니다. Electron/Chromium 고지는 앱의 `Resources/licenses/`에 있습니다.

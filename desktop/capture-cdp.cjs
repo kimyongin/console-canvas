@@ -10,9 +10,32 @@ async function captureWithProtocol({
   readResource,
   scope = null,
 }) {
+  const videoMatching = { captures: 0, matched: 0 };
   const screenshot = async (params) => {
     await beforeScreenshot();
-    return send('Page.captureScreenshot', params);
+    const sampling = await evaluate(
+      root,
+      'globalThis.UICloneCapture.startVideoSamples(document,' + JSON.stringify(params.clip) + ')',
+    ).catch(() => 0);
+    try {
+      const result = await send('Page.captureScreenshot', params);
+      if (sampling) {
+        const clip = params.clip;
+        const report = await evaluate(
+          root,
+          'globalThis.UICloneCapture.selectVideoSamples(' +
+            JSON.stringify(result.data) +
+            ',' +
+            JSON.stringify(clip) +
+            ')',
+        ).catch(() => null);
+        videoMatching.captures++;
+        videoMatching.matched += report?.length || 0;
+      }
+      return result;
+    } finally {
+      await evaluate(root, 'globalThis.UICloneCapture.stopVideoSamples()').catch(() => {});
+    }
   };
   await send('Target.setAutoAttach', {
     autoAttach: true,
@@ -202,262 +225,260 @@ async function captureWithProtocol({
     }
   }
   if (root.error) throw Error(root.error.message);
-  // Paint first so entrance animations have actually started before settling.
-  await beforeScreenshot();
-  await evaluate(
-    root,
-    `Promise.race([Promise.all(document.getAnimations({subtree:true}).filter(a=>Number.isFinite(a.effect?.getComputedTiming().endTime)).map(a=>a.finished.catch(()=>{}))),new Promise(r=>setTimeout(r,2000))])`,
-  );
-  await beforeScreenshot();
-  const assetData = {},
-    fontCss = [];
-  let assetBytes = 0,
-    resourceCount = 0;
-  const resourceDeadline = Date.now() + 12000;
-  for (const frame of frames.filter((f) => !f.error)) {
-    if (Date.now() > resourceDeadline || resourceCount >= 400) break;
-    let resources;
-    try {
-      const tree = (await call(frame, 'Page.getResourceTree')).frameTree;
-      const find = (item) =>
-        item.frame.id === frame.id ? item : (item.childFrames || []).map(find).find(Boolean);
-      resources = (find(tree)?.resources || []).sort(
-        (a, b) =>
-          (({ Font: 0, Stylesheet: 1, Image: 2 })[a.type] ?? 3) -
-          ({ Font: 0, Stylesheet: 1, Image: 2 }[b.type] ?? 3),
-      );
-    } catch {
-      continue;
-    }
-    for (
-      let i = 0;
-      i < Math.min(resources.length, 250) && Date.now() < resourceDeadline && resourceCount < 400;
-      i += 8
-    ) {
-      await Promise.all(
-        resources.slice(i, i + 8).map(async (resource) => {
-          if (assetData[resource.url] || !['Image', 'Font', 'Stylesheet'].includes(resource.type))
-            return;
-          try {
-            if (resourceCount++ >= 400) return;
-            const value = await resourceContent(frame, resource);
-            const bytes = value.base64Encoded
-              ? Buffer.from(value.content, 'base64')
-              : Buffer.from(value.content);
-            if (bytes.length > 5_000_000 || assetBytes + bytes.length > 25_000_000) return;
-            if (resource.type === 'Stylesheet') {
-              for (const match of bytes
-                .toString()
-                .matchAll(
-                  /@font-(?:face|feature-values|palette-values)\b[^{}]*\{(?:[^{}]|\{[^{}]*\})*\}/gi,
-                ))
-                fontCss.push(
-                  match[0].replace(/url\(\s*['"]?([^)'"\s]+)['"]?\s*\)/g, (all, url) => {
-                    try {
-                      return (
-                        'url("' + new URL(url, resource.url).href.replaceAll('"', '%22') + '")'
-                      );
-                    } catch {
-                      return all;
-                    }
-                  }),
-                );
-            } else {
-              const mime =
-                resource.type === 'Font'
-                  ? bytes.toString('ascii', 0, 4) === 'wOF2'
-                    ? 'font/woff2'
-                    : bytes.toString('ascii', 0, 4) === 'wOFF'
-                      ? 'font/woff'
-                      : 'font/ttf'
-                  : resource.mimeType === 'binary/octet-stream'
-                    ? 'application/octet-stream'
-                    : resource.mimeType || 'application/octet-stream';
-              if (!/^(image\/|font\/|application\/(font|x-font|octet-stream))/.test(mime)) return;
-              assetData[resource.url] = `data:${mime};base64,${bytes.toString('base64')}`;
-              assetBytes += bytes.length;
-            }
-          } catch {}
-        }),
-      );
-    }
-  }
-  const missingFonts = [
-    ...new Set(
-      fontCss.flatMap((css) =>
-        [...css.matchAll(/url\(\s*["']?([^)'"\s]+)["']?\s*\)/g)].map((m) => m[1]),
-      ),
-    ),
-  ]
-    .filter((url) => /^https?:/.test(url) && !assetData[url])
-    .slice(0, 80);
-  for (const url of await evaluate(root, 'globalThis.UICloneCapture.collectAssets(document)'))
-    if (!assetData[url] && !missingFonts.includes(url) && missingFonts.length < 180)
-      missingFonts.push(url);
-  if (missingFonts.length) {
-    const fetched = await evaluate(
+  try {
+    // Paint first so entrance animations have actually started before settling.
+    await beforeScreenshot();
+    await evaluate(
       root,
-      `(async()=>Promise.all(${JSON.stringify(missingFonts)}.map(async url=>{try{const response=await fetch(url,{credentials:'same-origin',signal:AbortSignal.timeout(2000)});if(!response.ok)return null;const blob=await response.blob();if(blob.size>5000000||!(blob.type.startsWith('image/')||blob.type.startsWith('font/')||['application/font','application/x-font','application/octet-stream','binary/octet-stream'].some(m=>blob.type.startsWith(m))))return null;const data=await new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>resolve(null);reader.readAsDataURL(blob.type==='binary/octet-stream'?new Blob([blob],{type:new URL(url).pathname.endsWith('.woff2')?'font/woff2':new URL(url).pathname.endsWith('.woff')?'font/woff':'application/octet-stream'}):blob)});return data?{url,data}:null}catch{return null}})))()`,
+      `Promise.race([Promise.all(document.getAnimations({subtree:true}).filter(a=>Number.isFinite(a.effect?.getComputedTiming().endTime)).map(a=>a.finished.catch(()=>{}))),new Promise(r=>setTimeout(r,2000))])`,
     );
-    for (const item of fetched || []) if (item) assetData[item.url] = item.data;
-  }
-  async function capturePictures(snapshot) {
-    await evaluate(root, 'globalThis.UICloneCapture.watchSurface(document)');
-    try {
-      const { cssContentSize } = await send('Page.getLayoutMetrics', {});
-      const width = Math.min(
-        6000,
-        Math.max(snapshot.source.viewport.width, Math.ceil(cssContentSize.width)),
-      );
-      let height = Math.min(
-        40000,
-        Math.max(snapshot.source.viewport.height, Math.ceil(cssContentSize.height)),
-      );
-      const ratio = await evaluate(root, 'devicePixelRatio || 1');
-      const current = {
-        x: snapshot.source.scroll.x,
-        y: snapshot.source.scroll.y,
-        ...snapshot.source.viewport,
-      };
-      const matches = () =>
-        evaluate(
-          root,
-          'globalThis.UICloneCapture.matchesView(document,' + JSON.stringify(snapshot.source) + ')',
+    await beforeScreenshot();
+    const assetData = {},
+      fontCss = [];
+    let assetBytes = 0,
+      resourceCount = 0;
+    const resourceDeadline = Date.now() + 12000;
+    for (const frame of frames.filter((f) => !f.error)) {
+      if (Date.now() > resourceDeadline || resourceCount >= 400) break;
+      let resources;
+      try {
+        const tree = (await call(frame, 'Page.getResourceTree')).frameTree;
+        const find = (item) =>
+          item.frame.id === frame.id ? item : (item.childFrames || []).map(find).find(Boolean);
+        resources = (find(tree)?.resources || []).sort(
+          (a, b) =>
+            (({ Font: 0, Stylesheet: 1, Image: 2 })[a.type] ?? 3) -
+            ({ Font: 0, Stylesheet: 1, Image: 2 }[b.type] ?? 3),
         );
-      if (scope && scope.mode !== 'document') {
-        if (!(await matches())) throw Error('가져오는 동안 원본 화면이 변경되었습니다.');
-        const view = await screenshot({
-          format: 'png',
-          fromSurface: true,
-          captureBeyondViewport: false,
-          clip: { ...current, scale: 1 / ratio },
-        });
-        snapshot.screenshot = 'data:image/png;base64,' + view.data;
-        snapshot.screenshotTiles = [{ rect: current, clip: scope.rect, data: snapshot.screenshot }];
-        snapshot.captureReport = {
-          contentSize: { width, height },
-          frameCount: frames.length,
-          domFrames: frames.filter((f) => f.snapshot && !f.error).length,
-          failedFrames: frames.filter((f) => f.error).map((f) => ({ url: f.url, error: f.error })),
-          embeddedResourceCount: Object.keys(assetData).length,
-          screenshotMode: 'viewport-only',
-          scope,
-        };
-        return snapshot;
+      } catch {
+        continue;
       }
-      let viewportCapture = false;
-      const scrollbarGutter = await evaluate(
+      for (
+        let i = 0;
+        i < Math.min(resources.length, 250) && Date.now() < resourceDeadline && resourceCount < 400;
+        i += 8
+      ) {
+        await Promise.all(
+          resources.slice(i, i + 8).map(async (resource) => {
+            if (assetData[resource.url] || !['Image', 'Font', 'Stylesheet'].includes(resource.type))
+              return;
+            try {
+              if (resourceCount++ >= 400) return;
+              const value = await resourceContent(frame, resource);
+              const bytes = value.base64Encoded
+                ? Buffer.from(value.content, 'base64')
+                : Buffer.from(value.content);
+              if (bytes.length > 5_000_000 || assetBytes + bytes.length > 25_000_000) return;
+              if (resource.type === 'Stylesheet') {
+                for (const match of bytes
+                  .toString()
+                  .matchAll(
+                    /@font-(?:face|feature-values|palette-values)\b[^{}]*\{(?:[^{}]|\{[^{}]*\})*\}/gi,
+                  ))
+                  fontCss.push(
+                    match[0].replace(/url\(\s*['"]?([^)'"\s]+)['"]?\s*\)/g, (all, url) => {
+                      try {
+                        return (
+                          'url("' + new URL(url, resource.url).href.replaceAll('"', '%22') + '")'
+                        );
+                      } catch {
+                        return all;
+                      }
+                    }),
+                  );
+              } else {
+                const mime =
+                  resource.type === 'Font'
+                    ? bytes.toString('ascii', 0, 4) === 'wOF2'
+                      ? 'font/woff2'
+                      : bytes.toString('ascii', 0, 4) === 'wOFF'
+                        ? 'font/woff'
+                        : 'font/ttf'
+                    : resource.mimeType === 'binary/octet-stream'
+                      ? 'application/octet-stream'
+                      : resource.mimeType || 'application/octet-stream';
+                if (!/^(image\/|font\/|application\/(font|x-font|octet-stream))/.test(mime)) return;
+                assetData[resource.url] = `data:${mime};base64,${bytes.toString('base64')}`;
+                assetBytes += bytes.length;
+              }
+            } catch {}
+          }),
+        );
+      }
+    }
+    const missingFonts = [
+      ...new Set(
+        fontCss.flatMap((css) =>
+          [...css.matchAll(/url\(\s*["']?([^)'"\s]+)["']?\s*\)/g)].map((m) => m[1]),
+        ),
+      ),
+    ]
+      .filter((url) => /^https?:/.test(url) && !assetData[url])
+      .slice(0, 80);
+    for (const url of await evaluate(root, 'globalThis.UICloneCapture.collectAssets(document)'))
+      if (!assetData[url] && !missingFonts.includes(url) && missingFonts.length < 180)
+        missingFonts.push(url);
+    if (missingFonts.length) {
+      const fetched = await evaluate(
         root,
-        'Math.max(0, innerWidth - document.documentElement.clientWidth)',
+        `(async()=>Promise.all(${JSON.stringify(missingFonts)}.map(async url=>{try{const response=await fetch(url,{credentials:'same-origin',signal:AbortSignal.timeout(2000)});if(!response.ok)return null;const blob=await response.blob();if(blob.size>5000000||!(blob.type.startsWith('image/')||blob.type.startsWith('font/')||['application/font','application/x-font','application/octet-stream','binary/octet-stream'].some(m=>blob.type.startsWith(m))))return null;const data=await new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>resolve(null);reader.readAsDataURL(blob.type==='binary/octet-stream'?new Blob([blob],{type:new URL(url).pathname.endsWith('.woff2')?'font/woff2':new URL(url).pathname.endsWith('.woff')?'font/woff':'application/octet-stream'}):blob)});return data?{url,data}:null}catch{return null}})))()`,
       );
-      if (await matches()) {
-        const view = await screenshot({
-          format: 'png',
-          fromSurface: true,
-          captureBeyondViewport: false,
-          clip: { ...current, scale: 1 / ratio },
-        });
-        snapshot.screenshot = 'data:image/png;base64,' + view.data;
-        snapshot.screenshotTiles = [];
-        let pixels = 0,
-          budgetTruncated = false;
-        const hasSurfaceAnimation = () =>
+      for (const item of fetched || []) if (item) assetData[item.url] = item.data;
+    }
+    async function capturePictures(snapshot) {
+      await evaluate(root, 'globalThis.UICloneCapture.watchSurface(document)');
+      try {
+        const { cssContentSize } = await send('Page.getLayoutMetrics', {});
+        const width = Math.min(
+          6000,
+          Math.max(snapshot.source.viewport.width, Math.ceil(cssContentSize.width)),
+        );
+        let height = Math.min(
+          40000,
+          Math.max(snapshot.source.viewport.height, Math.ceil(cssContentSize.height)),
+        );
+        const ratio = await evaluate(root, 'devicePixelRatio || 1');
+        const current = {
+          x: snapshot.source.scroll.x,
+          y: snapshot.source.scroll.y,
+          ...snapshot.source.viewport,
+        };
+        const matches = () =>
           evaluate(
             root,
-            `document.getAnimations({subtree:true}).some(a=>{const r=a.effect?.target?.getBoundingClientRect();return r && r.width*r.height>innerWidth*innerHeight*.6 && a.effect.getKeyframes().some(k=>k.opacity!==undefined)}) || globalThis.UICloneCapture.surfaceChanged()`,
+            'globalThis.UICloneCapture.matchesView(document,' +
+              JSON.stringify(snapshot.source) +
+              ')',
           );
-        // Beyond-viewport screenshots can temporarily remove a classic/custom
-        // scrollbar and reflow a wider page. Actual viewport tiles retain the
-        // same layout width as the collected DOM, without changing source CSS.
-        viewportCapture = scrollbarGutter > 0 || (await hasSurfaceAnimation());
-        if (!viewportCapture) {
-          const tileHeight = Math.max(1, Math.min(height, Math.floor(40_000_000 / width)));
-          for (let y = 0; y < height && snapshot.screenshotTiles.length < 32; y += tileHeight) {
-            const rect = { x: 0, y, width, height: Math.min(tileHeight, height - y) };
-            if (pixels + rect.width * rect.height > 40_000_000) {
-              budgetTruncated = true;
-              break;
-            }
-            const tile = await screenshot({
-              format: 'png',
-              fromSurface: true,
-              captureBeyondViewport: true,
-              clip: { ...rect, scale: 1 / ratio },
-            });
-            snapshot.screenshotTiles.push({ rect, data: 'data:image/png;base64,' + tile.data });
-            pixels += rect.width * rect.height;
-            if (await hasSurfaceAnimation()) {
-              viewportCapture = true;
-              break;
-            }
-          }
+        if (scope && scope.mode !== 'document') {
+          if (!(await matches())) throw Error('가져오는 동안 원본 화면이 변경되었습니다.');
+          const view = await screenshot({
+            format: 'png',
+            fromSurface: true,
+            captureBeyondViewport: false,
+            clip: { ...current, scale: 1 / ratio },
+          });
+          snapshot.screenshot = 'data:image/png;base64,' + view.data;
+          snapshot.screenshotTiles = [
+            { rect: current, clip: scope.rect, data: snapshot.screenshot },
+          ];
+          snapshot.captureReport = {
+            contentSize: { width, height },
+            frameCount: frames.length,
+            domFrames: frames.filter((f) => f.snapshot && !f.error).length,
+            failedFrames: frames
+              .filter((f) => f.error)
+              .map((f) => ({ url: f.url, error: f.error })),
+            embeddedResourceCount: Object.keys(assetData).length,
+            screenshotMode: 'viewport-only',
+            scope,
+          };
+          return snapshot;
         }
-        if (viewportCapture) {
-          await evaluate(
-            root,
-            `Promise.race([Promise.all(document.getAnimations({subtree:true}).map(a=>a.finished.catch(()=>{}))),new Promise(r=>setTimeout(r,1200))])`,
-          );
+        let viewportCapture = false;
+        const scrollbarGutter = await evaluate(
+          root,
+          'Math.max(0, innerWidth - document.documentElement.clientWidth)',
+        );
+        if (await matches()) {
+          const view = await screenshot({
+            format: 'png',
+            fromSurface: true,
+            captureBeyondViewport: false,
+            clip: { ...current, scale: 1 / ratio },
+          });
+          snapshot.screenshot = 'data:image/png;base64,' + view.data;
           snapshot.screenshotTiles = [];
-          pixels = 0;
-          try {
-            for (
-              let y = 0;
-              y < height && snapshot.screenshotTiles.length < 32;
-              y += Math.max(300, current.height - 400) / (y === 0 ? 2 : 1)
-            ) {
-              if (pixels + current.width * current.height > 40_000_000) {
+          let pixels = 0,
+            budgetTruncated = false;
+          const hasSurfaceAnimation = () =>
+            evaluate(
+              root,
+              `document.getAnimations({subtree:true}).some(a=>{const r=a.effect?.target?.getBoundingClientRect();return r && r.width*r.height>innerWidth*innerHeight*.6 && a.effect.getKeyframes().some(k=>k.opacity!==undefined)}) || globalThis.UICloneCapture.surfaceChanged()`,
+            );
+          // Beyond-viewport screenshots can temporarily remove a classic/custom
+          // scrollbar and reflow a wider page. Actual viewport tiles retain the
+          // same layout width as the collected DOM, without changing source CSS.
+          viewportCapture = scrollbarGutter > 0 || (await hasSurfaceAnimation());
+          if (!viewportCapture) {
+            const tileHeight = Math.max(1, Math.min(height, Math.floor(40_000_000 / width)));
+            for (let y = 0; y < height && snapshot.screenshotTiles.length < 32; y += tileHeight) {
+              const rect = { x: 0, y, width, height: Math.min(tileHeight, height - y) };
+              if (pixels + rect.width * rect.height > 40_000_000) {
                 budgetTruncated = true;
                 break;
               }
-              let scroll, tile;
-              for (let attempt = 0; attempt < 4; attempt++) {
-                scroll = await evaluate(
-                  root,
-                  `(async()=>{if(location.href!==${JSON.stringify(snapshot.source.url)})throw Error('Source navigated');scrollTo({left:0,top:${y},behavior:'instant'});await new Promise(r=>setTimeout(r,200));scrollTo({left:0,top:${y},behavior:'instant'});await Promise.race([new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(r)))),new Promise(r=>setTimeout(r,250))]);return {x:scrollX,y:scrollY}})()`,
-                );
-                tile = await screenshot({
-                  format: 'png',
-                  fromSurface: true,
-                  captureBeyondViewport: false,
-                  clip: {
-                    ...scroll,
-                    width: current.width,
-                    height: current.height,
-                    scale: 1 / ratio,
-                  },
-                });
-                const after = await evaluate(root, '({x:scrollX,y:scrollY})');
-                if (after.x === scroll.x && after.y === scroll.y && scroll.y <= y + 1) break;
-                if (attempt === 3)
-                  throw Error(
-                    '페이지의 자동 스크롤이 안정되지 않아 전체 촬영을 완료하지 못했습니다.',
-                  );
-              }
-              const rect = { ...scroll, width: current.width, height: current.height };
-              const inset = y
-                ? await evaluate(root, 'globalThis.UICloneCapture.headerInset(document)')
-                : 0;
-              snapshot.screenshotTiles.push({
-                rect,
-                anchors: await evaluate(root, 'globalThis.UICloneCapture.anchors(document)'),
-                clip: {
-                  x: rect.x,
-                  y: rect.y + inset,
-                  width: rect.width,
-                  height: rect.height - inset,
-                },
-                data: 'data:image/png;base64,' + tile.data,
+              const tile = await screenshot({
+                format: 'png',
+                fromSurface: true,
+                captureBeyondViewport: true,
+                clip: { ...rect, scale: 1 / ratio },
               });
+              snapshot.screenshotTiles.push({ rect, data: 'data:image/png;base64,' + tile.data });
               pixels += rect.width * rect.height;
-              height = Math.min(
-                40000,
-                Math.max(
-                  height,
-                  Math.ceil((await send('Page.getLayoutMetrics', {})).cssContentSize.height),
-                ),
-              );
-              if (scroll.y + rect.height >= height) {
-                await evaluate(root, 'new Promise(r=>setTimeout(r,700))');
+              if (await hasSurfaceAnimation()) {
+                viewportCapture = true;
+                break;
+              }
+            }
+          }
+          if (viewportCapture) {
+            await evaluate(
+              root,
+              `Promise.race([Promise.all(document.getAnimations({subtree:true}).map(a=>a.finished.catch(()=>{}))),new Promise(r=>setTimeout(r,1200))])`,
+            );
+            snapshot.screenshotTiles = [];
+            pixels = 0;
+            try {
+              for (
+                let y = 0;
+                y < height && snapshot.screenshotTiles.length < 32;
+                y += Math.max(300, current.height - 400) / (y === 0 ? 2 : 1)
+              ) {
+                if (pixels + current.width * current.height > 40_000_000) {
+                  budgetTruncated = true;
+                  break;
+                }
+                let scroll, tile;
+                for (let attempt = 0; attempt < 4; attempt++) {
+                  scroll = await evaluate(
+                    root,
+                    `(async()=>{if(location.href!==${JSON.stringify(snapshot.source.url)})throw Error('Source navigated');scrollTo({left:0,top:${y},behavior:'instant'});await new Promise(r=>setTimeout(r,200));scrollTo({left:0,top:${y},behavior:'instant'});await Promise.race([new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(r)))),new Promise(r=>setTimeout(r,250))]);return {x:scrollX,y:scrollY}})()`,
+                  );
+                  tile = await screenshot({
+                    format: 'png',
+                    fromSurface: true,
+                    captureBeyondViewport: false,
+                    clip: {
+                      ...scroll,
+                      width: current.width,
+                      height: current.height,
+                      scale: 1 / ratio,
+                    },
+                  });
+                  const after = await evaluate(root, '({x:scrollX,y:scrollY})');
+                  if (after.x === scroll.x && after.y === scroll.y && scroll.y <= y + 1) break;
+                  if (attempt === 3)
+                    throw Error(
+                      '페이지의 자동 스크롤이 안정되지 않아 전체 촬영을 완료하지 못했습니다.',
+                    );
+                }
+                const rect = { ...scroll, width: current.width, height: current.height };
+                const inset = y
+                  ? await evaluate(root, 'globalThis.UICloneCapture.headerInset(document)')
+                  : 0;
+                snapshot.screenshotTiles.push({
+                  rect,
+                  anchors: await evaluate(root, 'globalThis.UICloneCapture.anchors(document)'),
+                  clip: {
+                    x: rect.x,
+                    y: rect.y + inset,
+                    width: rect.width,
+                    height: rect.height - inset,
+                  },
+                  data: 'data:image/png;base64,' + tile.data,
+                });
+                pixels += rect.width * rect.height;
                 height = Math.min(
                   40000,
                   Math.max(
@@ -465,8 +486,84 @@ async function captureWithProtocol({
                     Math.ceil((await send('Page.getLayoutMetrics', {})).cssContentSize.height),
                   ),
                 );
-                if (scroll.y + rect.height >= height) break;
+                if (scroll.y + rect.height >= height) {
+                  await evaluate(root, 'new Promise(r=>setTimeout(r,700))');
+                  height = Math.min(
+                    40000,
+                    Math.max(
+                      height,
+                      Math.ceil((await send('Page.getLayoutMetrics', {})).cssContentSize.height),
+                    ),
+                  );
+                  if (scroll.y + rect.height >= height) break;
+                }
               }
+            } finally {
+              await evaluate(
+                root,
+                `(async()=>{if(location.href!==${JSON.stringify(snapshot.source.url)})return;scrollTo({left:${current.x},top:${current.y},behavior:'instant'});await new Promise(r=>setTimeout(r,250));await Promise.race([new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))),new Promise(r=>setTimeout(r,250))]);})()`,
+              );
+            }
+          }
+          // Scrollbars/layout clamping can leave a short strip beyond the final
+          // scroll position. Photograph that strip rather than assuming coverage.
+          const coveredBottom = Math.max(
+            0,
+            ...snapshot.screenshotTiles.map((t) => t.rect.y + t.rect.height),
+          );
+          if (
+            coveredBottom < height &&
+            snapshot.screenshotTiles.length < 32 &&
+            pixels + width * (height - coveredBottom) <= 40_000_000
+          ) {
+            const rect = { x: 0, y: coveredBottom, width, height: height - coveredBottom };
+            const tail = await screenshot({
+              format: 'png',
+              fromSurface: true,
+              captureBeyondViewport: true,
+              clip: { ...rect, scale: 1 / ratio },
+            });
+            snapshot.screenshotTiles.push({ rect, data: 'data:image/png;base64,' + tail.data });
+            pixels += rect.width * rect.height;
+          }
+          // Offscreen OOPIF surfaces can remain blank in beyond-viewport captures.
+          // Paint them in the real viewport, and overlay only the frame rectangle.
+          let correctedFrames = 0;
+          try {
+            const candidates = viewportCapture
+              ? []
+              : snapshot.nodes.filter((n) => n.tag === 'iframe' && n.visible);
+            for (const node of candidates.slice(0, 16)) {
+              const area = node.frame?.contentRect || node.rect;
+              for (
+                let y = area.y;
+                y < area.y + area.height;
+                y += Math.max(100, current.height - 200)
+              ) {
+                if (snapshot.screenshotTiles.length >= 32) break;
+                const view = await evaluate(
+                  root,
+                  `(async()=>{scrollTo({left:${Math.max(0, area.x - 20)},top:${Math.max(0, y - 50)},behavior:'instant'});await Promise.race([new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(r)))),new Promise(r=>setTimeout(r,250))]);return {x:scrollX,y:scrollY,width:innerWidth,height:innerHeight};})()`,
+                );
+                const x = Math.max(area.x, view.x),
+                  top = Math.max(area.y, view.y),
+                  right = Math.min(area.x + area.width, view.x + view.width),
+                  bottom = Math.min(area.y + area.height, view.y + view.height);
+                if (right <= x || bottom <= top) continue;
+                const tile = await screenshot({
+                  format: 'png',
+                  fromSurface: true,
+                  captureBeyondViewport: false,
+                  clip: { ...view, scale: 1 / ratio },
+                });
+                snapshot.screenshotTiles.push({
+                  rect: view,
+                  clip: { x, y: top, width: right - x, height: bottom - top },
+                  data: 'data:image/png;base64,' + tile.data,
+                });
+                if (bottom >= area.y + area.height) break;
+              }
+              correctedFrames++;
             }
           } finally {
             await evaluate(
@@ -474,201 +571,75 @@ async function captureWithProtocol({
               `(async()=>{if(location.href!==${JSON.stringify(snapshot.source.url)})return;scrollTo({left:${current.x},top:${current.y},behavior:'instant'});await new Promise(r=>setTimeout(r,250));await Promise.race([new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))),new Promise(r=>setTimeout(r,250))]);})()`,
             );
           }
+          snapshot.captureCorrections = correctedFrames;
+          if (!(await matches())) {
+            snapshot.screenshot = null;
+            snapshot.screenshotTiles = [];
+            snapshot.warnings.push({
+              type: 'screenshot',
+              message: '가져오는 동안 주소·화면 크기·스크롤이 변경되어 이미지 캡처를 생략했습니다.',
+            });
+          }
+          if (
+            budgetTruncated ||
+            (snapshot.screenshotTiles.length >= 32 &&
+              Math.max(0, ...snapshot.screenshotTiles.map((t) => t.rect.y + t.rect.height)) <
+                height) ||
+            cssContentSize.height > height ||
+            cssContentSize.width > width
+          )
+            snapshot.warnings.push({
+              type: 'capture_limit',
+              message: '화면 캡처 한도로 일부 영역의 이미지 보완을 하지 못했습니다.',
+            });
         }
-        // Scrollbars/layout clamping can leave a short strip beyond the final
-        // scroll position. Photograph that strip rather than assuming coverage.
-        const coveredBottom = Math.max(
-          0,
-          ...snapshot.screenshotTiles.map((t) => t.rect.y + t.rect.height),
+        await evaluate(
+          root,
+          `Promise.race([Promise.all(document.getAnimations({subtree:true}).filter(a=>Number.isFinite(a.effect?.getComputedTiming().endTime)).map(a=>a.finished.catch(()=>{}))),new Promise(r=>setTimeout(r,1200))])`,
         );
-        if (
-          coveredBottom < height &&
-          snapshot.screenshotTiles.length < 32 &&
-          pixels + width * (height - coveredBottom) <= 40_000_000
-        ) {
-          const rect = { x: 0, y: coveredBottom, width, height: height - coveredBottom };
-          const tail = await screenshot({
+        snapshot.captureReport = {
+          contentSize: { width, height },
+          frameCount: frames.length,
+          domFrames: frames.filter((f) => f.snapshot && !f.error).length,
+          failedFrames: frames.filter((f) => f.error).map((f) => ({ url: f.url, error: f.error })),
+          embeddedResourceCount: Object.keys(assetData).length,
+          screenshotMode: viewportCapture ? 'viewport-scroll' : 'document-surface',
+          scrollbarGutter,
+        };
+        if (await matches()) {
+          const view = await screenshot({
             format: 'png',
             fromSurface: true,
-            captureBeyondViewport: true,
-            clip: { ...rect, scale: 1 / ratio },
+            captureBeyondViewport: false,
+            clip: { ...current, scale: 1 / ratio },
           });
-          snapshot.screenshotTiles.push({ rect, data: 'data:image/png;base64,' + tail.data });
-          pixels += rect.width * rect.height;
+          snapshot.screenshot = 'data:image/png;base64,' + view.data;
         }
-        // Offscreen OOPIF surfaces can remain blank in beyond-viewport captures.
-        // Paint them in the real viewport, and overlay only the frame rectangle.
-        let correctedFrames = 0;
-        try {
-          const candidates = viewportCapture
-            ? []
-            : snapshot.nodes.filter((n) => n.tag === 'iframe' && n.visible);
-          for (const node of candidates.slice(0, 16)) {
-            const area = node.frame?.contentRect || node.rect;
-            for (
-              let y = area.y;
-              y < area.y + area.height;
-              y += Math.max(100, current.height - 200)
-            ) {
-              if (snapshot.screenshotTiles.length >= 32) break;
-              const view = await evaluate(
-                root,
-                `(async()=>{scrollTo({left:${Math.max(0, area.x - 20)},top:${Math.max(0, y - 50)},behavior:'instant'});await Promise.race([new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(r)))),new Promise(r=>setTimeout(r,250))]);return {x:scrollX,y:scrollY,width:innerWidth,height:innerHeight};})()`,
-              );
-              const x = Math.max(area.x, view.x),
-                top = Math.max(area.y, view.y),
-                right = Math.min(area.x + area.width, view.x + view.width),
-                bottom = Math.min(area.y + area.height, view.y + view.height);
-              if (right <= x || bottom <= top) continue;
-              const tile = await screenshot({
-                format: 'png',
-                fromSurface: true,
-                captureBeyondViewport: false,
-                clip: { ...view, scale: 1 / ratio },
-              });
-              snapshot.screenshotTiles.push({
-                rect: view,
-                clip: { x, y: top, width: right - x, height: bottom - top },
-                data: 'data:image/png;base64,' + tile.data,
-              });
-              if (bottom >= area.y + area.height) break;
-            }
-            correctedFrames++;
-          }
-        } finally {
-          await evaluate(
-            root,
-            `(async()=>{if(location.href!==${JSON.stringify(snapshot.source.url)})return;scrollTo({left:${current.x},top:${current.y},behavior:'instant'});await new Promise(r=>setTimeout(r,250));await Promise.race([new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))),new Promise(r=>setTimeout(r,250))]);})()`,
-          );
-        }
-        snapshot.captureCorrections = correctedFrames;
-        if (!(await matches())) {
-          snapshot.screenshot = null;
-          snapshot.screenshotTiles = [];
-          snapshot.warnings.push({
-            type: 'screenshot',
-            message: '가져오는 동안 주소·화면 크기·스크롤이 변경되어 이미지 캡처를 생략했습니다.',
-          });
-        }
-        if (
-          budgetTruncated ||
-          (snapshot.screenshotTiles.length >= 32 &&
-            Math.max(0, ...snapshot.screenshotTiles.map((t) => t.rect.y + t.rect.height)) <
-              height) ||
-          cssContentSize.height > height ||
-          cssContentSize.width > width
-        )
-          snapshot.warnings.push({
-            type: 'capture_limit',
-            message: '화면 캡처 한도로 일부 영역의 이미지 보완을 하지 못했습니다.',
-          });
+        return snapshot;
+      } finally {
+        await evaluate(root, 'globalThis.UICloneCapture.stopSurfaceWatch()').catch(() => {});
       }
-      await evaluate(
-        root,
-        `Promise.race([Promise.all(document.getAnimations({subtree:true}).filter(a=>Number.isFinite(a.effect?.getComputedTiming().endTime)).map(a=>a.finished.catch(()=>{}))),new Promise(r=>setTimeout(r,1200))])`,
-      );
-      snapshot.captureReport = {
-        contentSize: { width, height },
-        frameCount: frames.length,
-        domFrames: frames.filter((f) => f.snapshot && !f.error).length,
-        failedFrames: frames.filter((f) => f.error).map((f) => ({ url: f.url, error: f.error })),
-        embeddedResourceCount: Object.keys(assetData).length,
-        screenshotMode: viewportCapture ? 'viewport-scroll' : 'document-surface',
-        scrollbarGutter,
-      };
-      if (await matches()) {
-        const view = await screenshot({
-          format: 'png',
-          fromSurface: true,
-          captureBeyondViewport: false,
-          clip: { ...current, scale: 1 / ratio },
-        });
-        snapshot.screenshot = 'data:image/png;base64,' + view.data;
-      }
-      return snapshot;
-    } finally {
-      await evaluate(root, 'globalThis.UICloneCapture.stopSurfaceWatch()').catch(() => {});
     }
-  }
-  for (let depth = Math.max(...frames.map((f) => f.depth)); depth >= 0; depth--) {
-    await Promise.all(
-      frames
-        .filter((f) => f.depth === depth && !f.error)
-        .map(async (frame) => {
-          try {
-            const children = frames
-              .filter((child) => child.parent === frame && child.index >= 0)
-              .map((child) => ({
-                index: child.index,
-                ...(child.snapshot
-                  ? { snapshot: child.snapshot }
-                  : {
-                      error: child.error || {
-                        code: 'frame_capture_unavailable',
-                        message: 'Frame did not finish loading',
-                      },
-                    }),
-              }));
-            let expression =
-              'globalThis.UICloneCapture.capture(document,' +
-              JSON.stringify({
-                includeFrames: false,
-                fetchAssets: false,
-                frames: children,
-                assetData,
-                fontCss,
-              }) +
-              ')';
-            if (frame === root) {
-              // Reading/decoding a lazy page can itself finish deferred image
-              // paint. Prime the tree before photographs, then serialize the
-              // final tree below so screenshots do not contain stale blanks.
-              await evaluate(
-                root,
-                `(async()=>{await ${expression};await Promise.race([new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))),new Promise(r=>setTimeout(r,250))]);return true})()`,
-              );
-              const source = await evaluate(
-                root,
-                '({url:location.href,viewport:{width:innerWidth,height:innerHeight},scroll:{x:scrollX,y:scrollY}})',
-              );
-              const nodes = await evaluate(
-                root,
-                `globalThis.UICloneCapture.frames(document).map(e=>{const r=e.getBoundingClientRect(),sx=r.width/(e.offsetWidth||r.width||1),sy=r.height/(e.offsetHeight||r.height||1);return {tag:'iframe',visible:r.width>0&&r.height>0,rect:{x:r.left+scrollX,y:r.top+scrollY,width:r.width,height:r.height},frame:{contentRect:{x:r.left+scrollX+e.clientLeft*sx,y:r.top+scrollY+e.clientTop*sy,width:e.clientWidth*sx,height:e.clientHeight*sy}}}})`,
-              );
-              try {
-                root.layoutBeforePictures = await evaluate(
-                  root,
-                  'globalThis.UICloneCapture.layoutFingerprint(document)',
-                );
-                root.pictures = await capturePictures({ source, nodes, warnings: [] });
-              } catch (error) {
-                root.pictureError = error.message;
-              }
-            }
-            if (frame === root) {
-              for (const child of frames.filter((f) => f !== root && f.snapshot && f.fingerprint)) {
-                let changed = false;
-                try {
-                  changed =
-                    child.fingerprint !==
-                    (await evaluate(child, 'globalThis.UICloneCapture.fingerprint(document)'));
-                } catch {
-                  changed = true;
-                }
-                if (!changed) continue;
-                let owner = child;
-                while (owner.parent && owner.parent !== root) owner = owner.parent;
-                owner.error = {
-                  code: 'frame_changed_during_capture',
-                  message: '수집 중 프레임 내용이 바뀌어 촬영한 이미지로 보존합니다.',
-                };
-                const entry = children.find((c) => c.index === owner.index);
-                if (entry) {
-                  delete entry.snapshot;
-                  entry.error = owner.error;
-                }
-              }
-              expression =
+    for (let depth = Math.max(...frames.map((f) => f.depth)); depth >= 0; depth--) {
+      await Promise.all(
+        frames
+          .filter((f) => f.depth === depth && !f.error)
+          .map(async (frame) => {
+            try {
+              const children = frames
+                .filter((child) => child.parent === frame && child.index >= 0)
+                .map((child) => ({
+                  index: child.index,
+                  ...(child.snapshot
+                    ? { snapshot: child.snapshot }
+                    : {
+                        error: child.error || {
+                          code: 'frame_capture_unavailable',
+                          message: 'Frame did not finish loading',
+                        },
+                      }),
+                }));
+              let expression =
                 'globalThis.UICloneCapture.capture(document,' +
                 JSON.stringify({
                   includeFrames: false,
@@ -678,137 +649,203 @@ async function captureWithProtocol({
                   fontCss,
                 }) +
                 ')';
-            }
-            await evaluate(
-              frame,
-              `Promise.race([Promise.all([document.fonts.ready,...[...document.images].filter(i=>{const r=i.getBoundingClientRect();return r.bottom>0&&r.top<innerHeight}).map(i=>i.decode().catch(()=>{}))]),new Promise(r=>setTimeout(r,1000))])`,
-            );
-            await registerShadows(frame);
-            if (frame !== root)
-              frame.fingerprint = await evaluate(
-                frame,
-                'globalThis.UICloneCapture.fingerprint(document)',
-              );
-            frame.snapshot = await evaluate(frame, expression);
-            if (frame === root && root.pictures?.captureReport) {
-              let after = await evaluate(
-                root,
-                'globalThis.UICloneCapture.layoutFingerprint(document)',
-              );
-              let changed = root.layoutBeforePictures?.key !== after.key;
-              for (
-                let retry = 0;
-                retry < 2 &&
-                (changed ||
-                  frame.snapshot.source.height >
-                    root.pictures.captureReport.contentSize.height + 1);
-                retry++
-              ) {
-                root.layoutBeforePictures = await evaluate(
+              if (frame === root) {
+                // Reading/decoding a lazy page can itself finish deferred image
+                // paint. Prime the tree before photographs, then serialize the
+                // final tree below so screenshots do not contain stale blanks.
+                await evaluate(
                   root,
-                  'globalThis.UICloneCapture.layoutFingerprint(document)',
+                  `(async()=>{await ${expression};await Promise.race([new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))),new Promise(r=>setTimeout(r,250))]);return true})()`,
                 );
-                root.pictures = await capturePictures({
-                  source: frame.snapshot.source,
-                  nodes: frame.snapshot.nodes,
-                  warnings: [],
-                });
-                frame.snapshot = await evaluate(frame, expression);
-                after = await evaluate(
+                const source = await evaluate(
                   root,
-                  'globalThis.UICloneCapture.layoutFingerprint(document)',
+                  '({url:location.href,viewport:{width:innerWidth,height:innerHeight},scroll:{x:scrollX,y:scrollY}})',
                 );
-                changed = root.layoutBeforePictures.key !== after.key;
-                root.pictures.captureReport.layoutRetries = retry + 1;
+                const nodes = await evaluate(
+                  root,
+                  `globalThis.UICloneCapture.frames(document).map(e=>{const r=e.getBoundingClientRect(),sx=r.width/(e.offsetWidth||r.width||1),sy=r.height/(e.offsetHeight||r.height||1);return {tag:'iframe',visible:r.width>0&&r.height>0,rect:{x:r.left+scrollX,y:r.top+scrollY,width:r.width,height:r.height},frame:{contentRect:{x:r.left+scrollX+e.clientLeft*sx,y:r.top+scrollY+e.clientTop*sy,width:e.clientWidth*sx,height:e.clientHeight*sy}}}})`,
+                );
+                try {
+                  root.layoutBeforePictures = await evaluate(
+                    root,
+                    'globalThis.UICloneCapture.layoutFingerprint(document)',
+                  );
+                  root.pictures = await capturePictures({ source, nodes, warnings: [] });
+                } catch (error) {
+                  root.pictureError = error.message;
+                }
               }
-              root.pictures.captureReport.sourceChangedDuringCapture = changed;
-              root.pictures.captureReport.layoutSamplingLimited = !!(
-                root.layoutBeforePictures?.limited || after.limited
+              if (frame === root) {
+                for (const child of frames.filter(
+                  (f) => f !== root && f.snapshot && f.fingerprint,
+                )) {
+                  let changed = false;
+                  try {
+                    changed =
+                      child.fingerprint !==
+                      (await evaluate(child, 'globalThis.UICloneCapture.fingerprint(document)'));
+                  } catch {
+                    changed = true;
+                  }
+                  if (!changed) continue;
+                  let owner = child;
+                  while (owner.parent && owner.parent !== root) owner = owner.parent;
+                  owner.error = {
+                    code: 'frame_changed_during_capture',
+                    message: '수집 중 프레임 내용이 바뀌어 촬영한 이미지로 보존합니다.',
+                  };
+                  const entry = children.find((c) => c.index === owner.index);
+                  if (entry) {
+                    delete entry.snapshot;
+                    entry.error = owner.error;
+                  }
+                }
+                expression =
+                  'globalThis.UICloneCapture.capture(document,' +
+                  JSON.stringify({
+                    includeFrames: false,
+                    fetchAssets: false,
+                    frames: children,
+                    assetData,
+                    fontCss,
+                  }) +
+                  ')';
+              }
+              await evaluate(
+                frame,
+                `Promise.race([Promise.all([document.fonts.ready,...[...document.images].filter(i=>{const r=i.getBoundingClientRect();return r.bottom>0&&r.top<innerHeight}).map(i=>i.decode().catch(()=>{}))]),new Promise(r=>setTimeout(r,1000))])`,
               );
-              if (changed)
-                frame.snapshot.warnings.push({
-                  type: 'dynamic',
-                  message:
-                    '촬영과 요소 수집 사이에 화면 배치 또는 내용이 바뀌었습니다. 슬라이더·배너 등은 원본과 다를 수 있으니 확인하거나 다시 가져오세요.',
-                });
-              if (root.pictures.captureReport.layoutSamplingLimited)
-                frame.snapshot.warnings.push({
-                  type: 'capture_limit',
-                  message:
-                    '화면 변경 감지의 요소 한도에 도달했습니다. 모든 영역의 상태 일관성을 확인하지 못했습니다.',
-                });
+              await registerShadows(frame);
+              if (frame !== root)
+                frame.fingerprint = await evaluate(
+                  frame,
+                  'globalThis.UICloneCapture.fingerprint(document)',
+                );
+              frame.snapshot = await evaluate(frame, expression);
+              if (frame === root && root.pictures?.captureReport) {
+                let after = await evaluate(
+                  root,
+                  'globalThis.UICloneCapture.layoutFingerprint(document)',
+                );
+                let changed = root.layoutBeforePictures?.key !== after.key;
+                for (
+                  let retry = 0;
+                  retry < 2 &&
+                  (changed ||
+                    frame.snapshot.source.height >
+                      root.pictures.captureReport.contentSize.height + 1);
+                  retry++
+                ) {
+                  root.layoutBeforePictures = await evaluate(
+                    root,
+                    'globalThis.UICloneCapture.layoutFingerprint(document)',
+                  );
+                  root.pictures = await capturePictures({
+                    source: frame.snapshot.source,
+                    nodes: frame.snapshot.nodes,
+                    warnings: [],
+                  });
+                  frame.snapshot = await evaluate(frame, expression);
+                  after = await evaluate(
+                    root,
+                    'globalThis.UICloneCapture.layoutFingerprint(document)',
+                  );
+                  changed = root.layoutBeforePictures.key !== after.key;
+                  root.pictures.captureReport.layoutRetries = retry + 1;
+                }
+                root.pictures.captureReport.sourceChangedDuringCapture = changed;
+                root.pictures.captureReport.layoutSamplingLimited = !!(
+                  root.layoutBeforePictures?.limited || after.limited
+                );
+                if (changed)
+                  frame.snapshot.warnings.push({
+                    type: 'dynamic',
+                    message:
+                      '촬영과 요소 수집 사이에 화면 배치 또는 내용이 바뀌었습니다. 슬라이더·배너 등은 원본과 다를 수 있으니 확인하거나 다시 가져오세요.',
+                  });
+                if (root.pictures.captureReport.layoutSamplingLimited)
+                  frame.snapshot.warnings.push({
+                    type: 'capture_limit',
+                    message:
+                      '화면 변경 감지의 요소 한도에 도달했습니다. 모든 영역의 상태 일관성을 확인하지 못했습니다.',
+                  });
+              }
+            } catch (error) {
+              frame.error = { code: 'frame_capture_failed', message: error.message };
             }
-          } catch (error) {
-            frame.error = { code: 'frame_capture_failed', message: error.message };
-          }
-        }),
-    );
-    onProgress({
-      phase: 'frames',
-      depth,
-      completed: frames.filter((f) => f.snapshot && !f.error).length,
-      total: frames.length,
-    });
-  }
-  const snapshot = root.snapshot;
-  if (!snapshot?.html) throw Error(root.error?.message || '화면을 가져오지 못했습니다.');
-  snapshot.captureReport = {
-    ...snapshot.captureReport,
-    frameCount: frames.length,
-    domFrames: frames.filter((f) => f.snapshot && !f.error).length,
-    failedFrames: frames.filter((f) => f.error).map((f) => ({ url: f.url, error: f.error })),
-  };
-  if (root.pictureError) snapshot.warnings.push({ type: 'screenshot', message: root.pictureError });
-  const pictures = root.pictures;
-  if (pictures) {
-    const shifts = await evaluate(
-      root,
-      'globalThis.UICloneCapture.alignAnchors(document,' +
-        JSON.stringify((pictures.screenshotTiles || []).map((t) => t.anchors || [])) +
-        ')',
-    );
-    for (let i = 0; i < (pictures.screenshotTiles || []).length; i++) {
-      const tile = pictures.screenshotTiles[i],
-        shift = shifts[i];
-      if (
-        !shift ||
-        Math.abs(shift.dx) > snapshot.source.viewport.width ||
-        Math.abs(shift.dy) > snapshot.source.viewport.height ||
-        Math.abs(shift.dx) + Math.abs(shift.dy) < 0.5
-      )
-        continue;
-      tile.sourceRect = { ...tile.rect };
-      tile.layoutShift = shift;
-      tile.rect = { ...tile.rect, x: tile.rect.x + shift.dx, y: tile.rect.y + shift.dy };
-      if (tile.clip)
-        tile.clip = { ...tile.clip, x: tile.clip.x + shift.dx, y: tile.clip.y + shift.dy };
+          }),
+      );
+      onProgress({
+        phase: 'frames',
+        depth,
+        completed: frames.filter((f) => f.snapshot && !f.error).length,
+        total: frames.length,
+      });
     }
-    snapshot.screenshot = pictures.screenshot;
-    snapshot.screenshotTiles = pictures.screenshotTiles;
-    snapshot.captureCorrections = pictures.captureCorrections;
-    snapshot.captureReport = { ...snapshot.captureReport, ...pictures.captureReport };
-    snapshot.captureReport.layoutAlignedTiles = pictures.screenshotTiles.filter(
-      (t) => t.layoutShift,
-    ).length;
-    snapshot.captureReport.closedShadowRoots = frames.reduce(
-      (total, f) => total + (f.closedShadowRoots || 0),
-      0,
+    const snapshot = root.snapshot;
+    if (!snapshot?.html) throw Error(root.error?.message || '화면을 가져오지 못했습니다.');
+    snapshot.captureReport = {
+      ...snapshot.captureReport,
+      frameCount: frames.length,
+      domFrames: frames.filter((f) => f.snapshot && !f.error).length,
+      failedFrames: frames.filter((f) => f.error).map((f) => ({ url: f.url, error: f.error })),
+    };
+    if (root.pictureError)
+      snapshot.warnings.push({ type: 'screenshot', message: root.pictureError });
+    const pictures = root.pictures;
+    if (pictures) {
+      const shifts = await evaluate(
+        root,
+        'globalThis.UICloneCapture.alignAnchors(document,' +
+          JSON.stringify((pictures.screenshotTiles || []).map((t) => t.anchors || [])) +
+          ')',
+      );
+      for (let i = 0; i < (pictures.screenshotTiles || []).length; i++) {
+        const tile = pictures.screenshotTiles[i],
+          shift = shifts[i];
+        if (
+          !shift ||
+          Math.abs(shift.dx) > snapshot.source.viewport.width ||
+          Math.abs(shift.dy) > snapshot.source.viewport.height ||
+          Math.abs(shift.dx) + Math.abs(shift.dy) < 0.5
+        )
+          continue;
+        tile.sourceRect = { ...tile.rect };
+        tile.layoutShift = shift;
+        tile.rect = { ...tile.rect, x: tile.rect.x + shift.dx, y: tile.rect.y + shift.dy };
+        if (tile.clip)
+          tile.clip = { ...tile.clip, x: tile.clip.x + shift.dx, y: tile.clip.y + shift.dy };
+      }
+      snapshot.screenshot = pictures.screenshot;
+      snapshot.screenshotTiles = pictures.screenshotTiles;
+      snapshot.captureCorrections = pictures.captureCorrections;
+      snapshot.captureReport = { ...snapshot.captureReport, ...pictures.captureReport };
+      snapshot.captureReport.layoutAlignedTiles = pictures.screenshotTiles.filter(
+        (t) => t.layoutShift,
+      ).length;
+      snapshot.captureReport.closedShadowRoots = frames.reduce(
+        (total, f) => total + (f.closedShadowRoots || 0),
+        0,
+      );
+      snapshot.captureReport.frameCount = frames.length;
+      snapshot.captureReport.domFrames = frames.filter((f) => f.snapshot && !f.error).length;
+      snapshot.captureReport.failedFrames = frames
+        .filter((f) => f.error)
+        .map((f) => ({ url: f.url, error: f.error }));
+      snapshot.warnings.push(...pictures.warnings);
+    }
+    snapshot.captureReport.finalContentSize = (
+      await send('Page.getLayoutMetrics', {})
+    ).cssContentSize;
+    snapshot.captureReport.finalDocumentSize = await evaluate(
+      root,
+      '({html:document.documentElement.scrollHeight,body:document.body.scrollHeight,overflow:getComputedStyle(document.body).overflowY})',
     );
-    snapshot.captureReport.frameCount = frames.length;
-    snapshot.captureReport.domFrames = frames.filter((f) => f.snapshot && !f.error).length;
-    snapshot.captureReport.failedFrames = frames
-      .filter((f) => f.error)
-      .map((f) => ({ url: f.url, error: f.error }));
-    snapshot.warnings.push(...pictures.warnings);
+    snapshot.captureReport.elapsedMs = Date.now() - started;
+    snapshot.captureReport.videoFrameMatching = videoMatching;
+    return snapshot;
+  } finally {
+    await evaluate(root, 'globalThis.UICloneCapture.releaseVideoSamples()').catch(() => {});
   }
-  snapshot.captureReport.finalContentSize = (
-    await send('Page.getLayoutMetrics', {})
-  ).cssContentSize;
-  snapshot.captureReport.finalDocumentSize = await evaluate(
-    root,
-    '({html:document.documentElement.scrollHeight,body:document.body.scrollHeight,overflow:getComputedStyle(document.body).overflowY})',
-  );
-  snapshot.captureReport.elapsedMs = Date.now() - started;
-  return snapshot;
 }
 module.exports = { captureWithProtocol };

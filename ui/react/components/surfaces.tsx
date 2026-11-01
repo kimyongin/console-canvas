@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useId, type ComponentProps, type ReactNode } from 'react';
+import { isComposingKey } from '../../keyboard.js';
 export function TaskHeader({
   title,
   titleId,
@@ -42,21 +43,37 @@ export function DialogSurface(props: ComponentProps<'dialog'>) {
         trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       return showModal.call(dialog);
     };
+    let composing = false;
     const close = () => {
+      if (dialog.open) return;
+      composing = false;
       if (trigger?.isConnected && !trigger.closest('dialog:not([open])')) trigger.focus();
     };
+    const startComposition = () => {
+      composing = true;
+    };
+    const endComposition = () => {
+      composing = false;
+    };
     const composition = (event: KeyboardEvent) => {
-      if ((event.isComposing || event.keyCode === 229) && event.key === 'Enter') {
+      if (
+        (composing || isComposingKey(event)) &&
+        (event.key === 'Enter' || event.key === 'Escape')
+      ) {
         event.preventDefault();
         event.stopImmediatePropagation();
       }
     };
-    dialog.addEventListener('keydown', composition);
+    dialog.addEventListener('compositionstart', startComposition);
+    dialog.addEventListener('compositionend', endComposition);
+    dialog.addEventListener('keydown', composition, true);
     dialog.addEventListener('close', close);
     return () => {
       dialog.showModal = showModal;
       dialog.removeEventListener('close', close);
-      dialog.removeEventListener('keydown', composition);
+      dialog.removeEventListener('compositionstart', startComposition);
+      dialog.removeEventListener('compositionend', endComposition);
+      dialog.removeEventListener('keydown', composition, true);
     };
   }, []);
   return <dialog {...props} ref={ref} data-slot="dialog" />;

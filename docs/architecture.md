@@ -1,4 +1,4 @@
-# Console Canvas 구조 · 0.46
+# Console Canvas 구조 · 0.51.3
 
 [PRD](PRD.md) · [MCP·스킬 계약](ticket-first-mcp-skill.md) · [0.46 검증](ticket-first-0.46.md)
 
@@ -23,3 +23,5 @@
 MCP list_tickets/get_ticket은 열린 화면 목록과 독립적이다. UI가 허용한 프로젝트만 공개하고 이름 후보·이미지·resource에도 같은 범위를 적용한다. Navigator Locks로 workspace 명령을 직렬화하고 DB CAS/operation receipt로 재시도·다른 편집기 충돌을 처리한다. 닫힌 티켓 쓰기는 저장된 undo/redo를 복원해 같은 모델을 사용한다. 앱이 꺼졌거나 작업 저장이 실패한 경우 성공으로 표시하지 않는다.
 
 수동 스냅샷/분기, 앱 AI 로그인·직접 호출·후보 적용, Chrome 확장은 없다. 일반 수집 품질 비교·자산 복구·내부 undo·반응형 구현용 원본 식별 정보는 유지한다.
+
+0.51.3: 읽기 전용 수집은 촬영 전후의 실제 VIDEO 프레임을 유한 보관해 사진에 가까운 원시 프레임을 선택한다. 후보·콜백은 종료 경로에서 해제하며 HTML 오버레이는 그대로 둔다. UI 조합 상태 판정은 ui/keyboard.js를 공유하고 주석 저장은 compositionend 이후 진행한다. [검증·한계](remaining-0.51.3.md).

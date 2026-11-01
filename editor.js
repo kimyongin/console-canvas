@@ -1,4 +1,5 @@
 import { createTicketWorkspace } from './ticket-workspace.js';
+import { isComposingKey } from './ui/keyboard.js';
 import { createTicket, getTicket } from './ticket-model.js';
 import { createEditorCommands } from './ui/editor-commands.js';
 import { createResourceRepair } from './ui/resource-repair.js';
@@ -378,7 +379,7 @@ createResourceRepair({
 });
 const activityPanel = createRequestsPanel({ $, state, selectNode, focusComment });
 function onKey(event) {
-  if (event.defaultPrevented) return;
+  if (event.defaultPrevented || isComposingKey(event)) return;
   if (editorCommands.handle(event)) return;
   if (!state.scene || document.querySelector('dialog:modal')) return;
   if (state.scene.areaSelecting) return;
@@ -724,7 +725,7 @@ $('#save-layer-alias').addEventListener('click', () => setLayerAlias());
 $('#clear-layer-alias').addEventListener('click', () => setLayerAlias(true));
 $('#close-properties').addEventListener('click', () => $('#properties-dialog').close());
 $('#properties-dialog').addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !e.isComposing) {
+  if (e.key === 'Escape' && !isComposingKey(e)) {
     e.preventDefault();
     e.stopPropagation();
     $('#properties-dialog').close();

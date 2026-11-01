@@ -69,3 +69,35 @@ test('native PNG save uses the image filter and atomically writes actual PNG byt
     save({ name: 'console-canvas-test.png', bytes: new ArrayBuffer(120_000_001) }),
   );
 });
+
+test('actual OS write denial preserves an existing export and retry succeeds', async (t) => {
+  if (process.platform === 'win32' || process.getuid?.() === 0) {
+    t.skip('Requires non-root POSIX file permissions');
+    return;
+  }
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'canvas-denied-save-'));
+  t.after(async () => {
+    await fs.chmod(directory, 0o700);
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+  const target = path.join(directory, 'review.json');
+  const previous = '{"previous":true}';
+  await fs.writeFile(target, previous);
+  const save = createFileSaver({
+    dialog: { showSaveDialog: async () => ({ canceled: false, filePath: target }) },
+    getWindow: () => null,
+    downloads: directory,
+  });
+  const value = {
+    name: 'console-canvas-test.json',
+    bytes: new TextEncoder().encode('{"retry":true}').buffer,
+  };
+  await fs.chmod(directory, 0o500);
+  await assert.rejects(save(value), { code: 'EACCES' });
+  assert.equal(await fs.readFile(target, 'utf8'), previous);
+  assert.deepEqual(await fs.readdir(directory), ['review.json']);
+  await fs.chmod(directory, 0o700);
+  assert.deepEqual(await save(value), { path: target });
+  assert.equal(await fs.readFile(target, 'utf8'), '{"retry":true}');
+  assert.deepEqual(await fs.readdir(directory), ['review.json']);
+});

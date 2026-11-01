@@ -152,6 +152,68 @@ app.on('window-all-closed', () => {});
     }
     results.push({ scope: scope.mode, size, sourceUnchanged: true, matchedPixels });
   }
+  // A live MediaStream is independent of any production site's selectors/assets.
+  // Its HTML overlay must stay editable, with the original stream still playing.
+  await source.loadURL(base + '/tests/fixtures/video-overlay.html');
+  const mediaState = () =>
+    source.webContents.executeJavaScript(`({
+    html:document.documentElement.outerHTML, actions:globalThis.actions,
+    time:document.querySelector('video').currentTime,
+    paused:document.querySelector('video').paused,
+    track:document.querySelector('video').srcObject.getVideoTracks()[0].readyState
+  })`);
+  const mediaBefore = await mediaState();
+  snapshot = await require(path.join(root, 'desktop/capture.cjs')).captureWebsite(
+    source.webContents,
+    root,
+    { scope: { mode: 'viewport' } },
+  );
+  const mediaAfter = await mediaState();
+  assert.equal(mediaAfter.html, mediaBefore.html);
+  assert.equal(mediaAfter.actions, 0);
+  assert.equal(mediaAfter.paused, false);
+  assert.equal(mediaAfter.track, 'live');
+  assert.ok(mediaAfter.time > mediaBefore.time, 'Capture must not pause source playback');
+  assert.ok(snapshot.captureReport.videoFrameMatching.matched > 0);
+  await renderer.loadURL(base + '/tests/capture-render.html');
+  const videoDeadline = Date.now() + 15000;
+  while (
+    Date.now() < videoDeadline &&
+    (await renderer.webContents.executeJavaScript('document.body.dataset.result')) !== 'ready'
+  )
+    await new Promise((r) => setTimeout(r, 50));
+  const videoRequest = await renderer.webContents.executeJavaScript(
+    '({html:captureScene.serialize(),...captureScene.contentSize()})',
+  );
+  const videoPNG = await require(path.join(root, 'desktop/render-image.cjs'))(videoRequest);
+  const videoExpected = nativeImage.createFromDataURL(snapshot.screenshot).toBitmap();
+  const videoActual = nativeImage.createFromBuffer(videoPNG).toBitmap();
+  assert.equal(videoActual.length, videoExpected.length);
+  let videoSame = 0;
+  for (let i = 0; i < videoActual.length; i += 4)
+    if (
+      Math.max(...[0, 1, 2].map((k) => Math.abs(videoExpected[i + k] - videoActual[i + k]))) <= 16
+    )
+      videoSame++;
+  const videoMatchedPixels = (100 * videoSame) / (videoActual.length / 4);
+  assert.ok(videoMatchedPixels >= 95, 'Live video pixel match ' + videoMatchedPixels);
+  const overlay = await renderer.webContents.executeJavaScript(`(()=>{
+    const scene=captureScene;
+    const button=[...scene.nodes.values()].find(n=>n.locator?.id==='overlay-button');
+    const title=[...scene.nodes.values()].find(n=>n.locator?.id==='overlay-title');
+    if(!button||!title)throw Error('HTML overlays were flattened');
+    const before=scene.rect(button.id);scene.setEdits({[button.id]:{dx:17,dy:11}});
+    const moved=scene.rect(button.id);scene.setEdits({[title.id]:{deleted:true}});
+    return {moved:Math.abs(moved.x-before.x-17)<1, deleted:scene.hidden(title.id)};
+  })()`);
+  assert.deepEqual(overlay, { moved: true, deleted: true });
+  results.push({
+    scope: 'live-video-overlays',
+    matchedPixels: videoMatchedPixels,
+    sourceUnchanged: true,
+    playbackContinues: true,
+    ...overlay,
+  });
   await assert.rejects(() =>
     require(path.join(root, 'desktop/capture.cjs')).captureWebsite(source.webContents, root, {
       scope: {
@@ -174,7 +236,7 @@ app.on('window-all-closed', () => {});
     'Long-document crop must contain actual target pixels',
   );
   results.push({ scope: 'long-document-region', size: tallImage.getSize(), actualPixels: true });
-  console.log(JSON.stringify({ passed: 5, results, staleSelectionRejected: true }));
+  console.log(JSON.stringify({ passed: 6, results, staleSelectionRejected: true }));
   source.destroy();
   renderer.destroy();
   server.closeAllConnections();

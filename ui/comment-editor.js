@@ -3,15 +3,18 @@ import { renderTargetPreview, renderSelectOptions } from './react/scene-preview.
 import { clearReact } from './react/mount.tsx';
 import { elementLabel } from './element-labels.js';
 import { pointTarget } from '../edit-commands.js';
+import { isComposingKey } from './keyboard.js';
 export function createCommentEditor({ $, state, commit, flushEditor }) {
   const dialog = $('#comment-dialog'),
     field = $('#component-comment');
   let timer,
     requests = [],
     queueMode = false,
-    documentId = null;
+    documentId = null,
+    composing = false;
   function close() {
     clearTimeout(timer);
+    composing = false;
     if (dialog.open) dialog.close();
   }
   function open({ id = state.scene?.selected, navigating = false, ids = null } = {}) {
@@ -93,10 +96,11 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
     );
     field.focus();
   }
-  field.addEventListener('input', () => {
+  function scheduleSave() {
     $('#clear-comment').disabled = !field.value.trim();
     clearTimeout(timer);
     $('#comment-status').textContent = '입력 중 · 자동 저장됩니다.';
+    if (composing) return;
     const target = state.commentTarget,
       generation = state.generation;
     timer = setTimeout(async () => {
@@ -111,9 +115,18 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
             '자동 저장 실패 · 편집 파일로 백업해 주세요: ' + error.message;
       }
     }, 650);
+  }
+  field.addEventListener('compositionstart', () => {
+    composing = true;
+    clearTimeout(timer);
   });
+  field.addEventListener('compositionend', () => {
+    composing = false;
+    scheduleSave();
+  });
+  field.addEventListener('input', scheduleSave);
   field.addEventListener('keydown', (e) => {
-    if (!e.isComposing && e.keyCode !== 229 && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    if (!composing && !isComposingKey(e) && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
       commit();
       close();
@@ -121,7 +134,7 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
   });
   dialog.addEventListener('cancel', () => commit());
   field.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
+    if (e.key === 'Escape' && !composing && !isComposingKey(e)) {
       e.preventDefault();
       e.stopPropagation();
       commit();
@@ -130,6 +143,7 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
   });
   dialog.addEventListener('close', () => {
     if (dialog.open) return;
+    composing = false;
     clearTimeout(timer);
     state.commentTarget = null;
     ((requests = []), (queueMode = false), (documentId = null));

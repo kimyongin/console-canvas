@@ -1,5 +1,6 @@
 import { elementLabel, isMajorElement } from './element-labels.js';
 import { renderLayerRows } from './react/lists.tsx';
+import { isComposingKey } from './keyboard.js';
 export function createDocumentLists({ $, state, adapter, selectNode, renameLayer }) {
   const key = 'console-canvas-layer-navigation-v1';
   let cache = new Map(),
@@ -148,7 +149,7 @@ export function createDocumentLists({ $, state, adapter, selectNode, renameLayer
   }
   adapter.register('layer-search-clear', clearSearch);
   $('#layer-search').addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape' || !e.currentTarget.value) return;
+    if (isComposingKey(e) || e.key !== 'Escape' || !e.currentTarget.value) return;
     e.preventDefault();
     e.stopPropagation();
     clearSearch();

@@ -25,6 +25,136 @@
     if (owner.documentElement) visit(owner.documentElement);
     return [...new Set(frames)];
   }
+  // Keep real decoded frames around each photograph. No source media control,
+  // DOM mutation or composited HTML is written into these detached canvases.
+  let videoFrames = new WeakMap();
+  let videoSampling = [];
+  async function startVideoSamples(doc, clip) {
+    stopVideoSamples();
+    let budget = 40_000_000;
+    for (const video of doc.querySelectorAll('video')) {
+      const rect = video.getBoundingClientRect();
+      if (
+        !video.videoWidth ||
+        !video.videoHeight ||
+        rect.bottom + scrollY <= clip.y ||
+        rect.right + scrollX <= clip.x ||
+        rect.top + scrollY >= clip.y + clip.height ||
+        rect.left + scrollX >= clip.x + clip.width
+      )
+        continue;
+      const size = video.videoWidth * video.videoHeight;
+      if (size > 4_000_000 || size * 8 > budget) continue;
+      budget -= size * 8;
+      const item = { video, frames: [], stopped: false, callback: null };
+      const read = (callback = true) => {
+        if (item.stopped) return;
+        try {
+          const canvas = doc.createElement('canvas');
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          canvas.getContext('2d').drawImage(video, 0, 0);
+          canvas.getContext('2d').getImageData(0, 0, 1, 1);
+          item.frames.push(canvas);
+          if (item.frames.length > 8) item.frames.shift();
+        } catch {}
+        if (callback && video.requestVideoFrameCallback)
+          item.callback = video.requestVideoFrameCallback(() => read());
+      };
+      item.read = read;
+      videoSampling.push(item);
+      read();
+    }
+    if (videoSampling.length) await new Promise((r) => setTimeout(r, 150));
+    return videoSampling.length;
+  }
+  function stopVideoSamples() {
+    for (const item of videoSampling) {
+      item.stopped = true;
+      if (item.callback !== null) item.video.cancelVideoFrameCallback?.(item.callback);
+    }
+    videoSampling = [];
+  }
+  async function selectVideoSamples(data, clip) {
+    if (!videoSampling.length) return [];
+    await new Promise((r) => setTimeout(r, 65));
+    const items = videoSampling;
+    for (const item of items) item.read(false);
+    stopVideoSamples();
+    const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+    const picture = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+    const report = [];
+    try {
+      for (const { video, frames } of items) {
+        if (!frames.length) continue;
+        const rect = video.getBoundingClientRect(),
+          style = getComputedStyle(video);
+        if (rect.width < 1 || rect.height < 1 || style.transform !== 'none') continue;
+        const x = rect.left + scrollX - clip.x,
+          y = rect.top + scrollY - clip.y;
+        const left = Math.max(0, -x),
+          top = Math.max(0, -y);
+        const visibleWidth = Math.min(rect.width, clip.width - x) - left;
+        const visibleHeight = Math.min(rect.height, clip.height - y) - top;
+        if (visibleWidth <= 0 || visibleHeight <= 0) continue;
+        const target = document.createElement('canvas');
+        target.width = 64;
+        target.height = 64;
+        const ctx = target.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(
+          picture,
+          ((x + left) * picture.width) / clip.width,
+          ((y + top) * picture.height) / clip.height,
+          (visibleWidth * picture.width) / clip.width,
+          (visibleHeight * picture.height) / clip.height,
+          0,
+          0,
+          64,
+          64,
+        );
+        const pixels = ctx.getImageData(0, 0, 64, 64).data;
+        const fit = style.objectFit;
+        const position = style.objectPosition.split(' ');
+        if (position.length !== 2 || position.some((v) => !/^-?[\d.]+(?:%|px)$/.test(v))) continue;
+        const offset = (v, space) => parseFloat(v) * (v.endsWith('%') ? space / 100 : 1);
+        let best = frames[0],
+          score = Infinity;
+        for (const frame of frames) {
+          let scale =
+            fit === 'cover'
+              ? Math.max(rect.width / frame.width, rect.height / frame.height)
+              : Math.min(rect.width / frame.width, rect.height / frame.height);
+          if (fit === 'none') scale = 1;
+          if (fit === 'scale-down') scale = Math.min(1, scale);
+          const w = fit === 'fill' ? rect.width : frame.width * scale;
+          const h = fit === 'fill' ? rect.height : frame.height * scale;
+          ctx.clearRect(0, 0, 64, 64);
+          ctx.filter = style.filter;
+          ctx.drawImage(
+            frame,
+            ((offset(position[0], rect.width - w) - left) * 64) / visibleWidth,
+            ((offset(position[1], rect.height - h) - top) * 64) / visibleHeight,
+            (w * 64) / visibleWidth,
+            (h * 64) / visibleHeight,
+          );
+          ctx.filter = 'none';
+          const candidate = ctx.getImageData(0, 0, 64, 64).data;
+          let error = 0;
+          for (let i = 0; i < pixels.length; i++)
+            if (i % 4 !== 3) error += Math.abs(pixels[i] - candidate[i]);
+          if (error < score) {
+            score = error;
+            best = frame;
+          }
+        }
+        videoFrames.set(video, best);
+        report.push({ samples: frames.length, error: score / (64 * 64 * 3) });
+      }
+      return report;
+    } finally {
+      picture.close();
+    }
+  }
   const PROPS =
     `display position top right bottom left z-index float clear box-sizing width height min-width min-height max-width max-height
     margin-top margin-right margin-bottom margin-left padding-top padding-right padding-bottom padding-left
@@ -694,10 +824,12 @@
       if (raster) {
         let data;
         try {
-          const canvas = source.tagName === 'CANVAS' ? source : doc.createElement('canvas');
+          const frozen = videoFrames.get(source);
+          const canvas =
+            source.tagName === 'CANVAS' ? source : frozen || doc.createElement('canvas');
           // Prefer the raw frame: a composited screenshot can bake HTML text
           // and gradients over the video and duplicate those editable overlays.
-          if (source.tagName === 'VIDEO') {
+          if (source.tagName === 'VIDEO' && !frozen) {
             canvas.width = source.videoWidth;
             canvas.height = source.videoHeight;
             canvas.getContext('2d').drawImage(source, 0, 0);
@@ -1383,6 +1515,13 @@
   }
   globalThis.UICloneCapture = {
     capture,
+    startVideoSamples,
+    selectVideoSamples,
+    stopVideoSamples,
+    releaseVideoSamples: () => {
+      stopVideoSamples();
+      videoFrames = new WeakMap();
+    },
     matchesView,
     settleVisibleMedia,
     fingerprint,
