@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Morrow Shop · Canvas Study</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body style="--accent: #237962">
+    <div class="app">
+      <aside>
+        <div class="brand"><i>◆</i> Morrow Shop</div>
+        <nav class="nav">
+          <a href="#0" class="active">상품</a><a href="#1" class="">주문</a
+          ><a href="#2" class="">고객</a><a href="#3" class="">프로모션</a>
+        </nav>
+        <div class="account">가상 프로젝트<br />실제 사용자 정보 없음</div>
+      </aside>
+      <div class="content">
+        <header>
+          <span>Morrow Shop / 상품</span>
+          <div class="actions">
+            <span class="chip">WORKSPACE</span
+            ><button data-notice="새 알림이 없습니다.">알림</button><span>윤서</span>
+          </div>
+        </header>
+        <main>
+          <div class="page-head" id="page-heading">
+            <div>
+              <h1>상품 관리</h1>
+              <p class="muted">상품 정보와 판매 상태를 관리하세요.</p>
+            </div>
+            <div class="actions" id="primary-actions">
+              <button data-notice="목록을 내보냈습니다.">목록 내보내기</button
+              ><button id="add-product" class="primary" data-dialog="product-edit">
+                상품 등록
+              </button>
+            </div>
+          </div>
+          <div class="banner" id="repeat-summary">
+            상품을 수정하려면 카드의 수정 버튼을 누르세요. 이미 공개된 상품도 공개 버튼으로 확인할
+            수 있습니다.
+          </div>
+          <form class="filters" onsubmit="return false;">
+            <label>검색<input id="query" placeholder="상품명 검색" /></label
+            ><label
+              >분류<select>
+                <option>전체 분류</option>
+                <option>운영</option>
+                <option>콘텐츠</option>
+              </select></label
+            ><label
+              >기간<select>
+                <option>최근 30일</option>
+                <option>최근 7일</option>
+              </select></label
+            ><button type="button" data-filter>적용</button
+            ><button type="button" data-reset>초기화</button>
+          </form>
+          <p id="result-count" class="muted">전체 결과</p>
+          <div class="product-grid" id="product-grid">
+            <article class="card product" data-row id="product-0">
+              <div class="product-art" style="background: #e7dbc8"><span>▱</span></div>
+              <div class="product-meta">
+                <span class="muted">라이프스타일</span><span class="pill">판매 중</span>
+              </div>
+              <h2>클래식 캔버스 백</h2>
+              <p>₩39,000</p>
+              <div class="actions">
+                <button data-dialog="product-edit">수정</button
+                ><button data-notice="이미 공개된 상품입니다.">공개</button>
+              </div>
+            </article>
+            <article class="card product" data-row id="product-1">
+              <div class="product-art" style="background: #d5e4da"><span>▤</span></div>
+              <div class="product-meta">
+                <span class="muted">리빙</span><span class="pill">판매 중</span>
+              </div>
+              <h2>데스크 오거나이저</h2>
+              <p>₩28,000</p>
+              <div class="actions">
+                <button data-dialog="product-edit">수정</button
+                ><button data-notice="이미 공개된 상품입니다.">공개</button>
+              </div>
+            </article>
+            <article class="card product" data-row id="product-2">
+              <div class="product-art" style="background: #e4d9ee"><span>◉</span></div>
+              <div class="product-meta">
+                <span class="muted">조명</span><span class="pill">판매 중</span>
+              </div>
+              <h2>미니 테이블 램프</h2>
+              <p>₩64,000</p>
+              <div class="actions">
+                <button data-dialog="product-edit">수정</button
+                ><button data-notice="이미 공개된 상품입니다.">공개</button>
+              </div>
+            </article>
+            <article class="card product" data-row id="product-3">
+              <div class="product-art" style="background: #d6e0ed"><span>▯</span></div>
+              <div class="product-meta">
+                <span class="muted">라이프스타일</span><span class="pill">판매 중</span>
+              </div>
+              <h2>스테인리스 텀블러</h2>
+              <p>₩32,000</p>
+              <div class="actions">
+                <button data-dialog="product-edit">수정</button
+                ><button data-notice="이미 공개된 상품입니다.">공개</button>
+              </div>
+            </article>
+            <article class="card product" data-row id="product-4">
+              <div class="product-art" style="background: #ead7ce"><span>▱</span></div>
+              <div class="product-meta">
+                <span class="muted">리빙</span><span class="pill">판매 중</span>
+              </div>
+              <h2>코튼 쿠션</h2>
+              <p>₩24,000</p>
+              <div class="actions">
+                <button data-dialog="product-edit">수정</button
+                ><button data-notice="이미 공개된 상품입니다.">공개</button>
+              </div>
+            </article>
+            <article class="card product" data-row id="product-5">
+              <div class="product-art" style="background: #dcded8"><span>▤</span></div>
+              <div class="product-meta">
+                <span class="muted">리빙</span><span class="pill">판매 중</span>
+              </div>
+              <h2>아날로그 시계</h2>
+              <p>₩48,000</p>
+              <div class="actions">
+                <button data-dialog="product-edit">수정</button
+                ><button data-notice="이미 공개된 상품입니다.">공개</button>
+              </div>
+            </article>
+            <article class="card product" data-row id="product-6">
+              <div class="product-art" style="background: #d9d5ed"><span>◉</span></div>
+              <div class="product-meta">
+                <span class="muted">문구</span><span class="pill">판매 중</span>
+              </div>
+              <h2>데일리 노트</h2>
+              <p>₩12,000</p>
+              <div class="actions">
+                <button data-dialog="product-edit">수정</button
+                ><button data-notice="이미 공개된 상품입니다.">공개</button>
+              </div>
+            </article>
+            <article class="card product" data-row id="product-7">
+              <div class="product-art" style="background: #e5dbca"><span>▯</span></div>
+              <div class="product-meta">
+                <span class="muted">리빙</span><span class="pill">판매 중</span>
+              </div>
+              <h2>우드 트레이</h2>
+              <p>₩29,000</p>
+              <div class="actions">
+                <button data-dialog="product-edit">수정</button
+                ><button data-notice="이미 공개된 상품입니다.">공개</button>
+              </div>
+            </article>
+          </div>
+          <div id="status" class="status" role="status"></div>
+        </main>
+      </div>
+    </div>
+    <dialog id="product-edit">
+      <div class="modal-title">
+        <h2>상품 편집</h2>
+        <button data-close aria-label="닫기">×</button>
+      </div>
+      <form data-message="저장했습니다.">
+        <label>상품명<input required value="클래식 캔버스 백" /></label>
+        <div class="field-grid">
+          <label>가격<input type="number" required min="0" value="39000" /></label
+          ><label>재고<input type="number" min="0" value="24" /></label>
+        </div>
+        <label>상품 설명<textarea rows="4">가볍고 튼튼한 데일리 캔버스 백</textarea></label
+        ><label
+          >공개 상태<select>
+            <option>판매 중</option>
+            <option>판매 중지</option>
+          </select></label
+        >
+        <div class="form-actions">
+          <button type="button" data-close>취소</button
+          ><button class="primary" type="submit">저장</button>
+        </div>
+        <p role="status" class="status"></p>
+      </form>
+    </dialog>
+    <script src="app.js"></script>
+  </body>
+</html>

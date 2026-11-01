@@ -1,0 +1,8 @@
+{
+  "name": "canvas-study-booking",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "start": "python3 -m http.server 59033 --bind 127.0.0.1"
+  }
+}

@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Orbit Analytics · Canvas Study</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body style="--accent: #456be4">
+    <div class="app">
+      <aside>
+        <div class="brand"><i>◆</i> Orbit Analytics</div>
+        <nav class="nav">
+          <a href="#0" class="active">대시보드</a><a href="#1" class="">캠페인</a
+          ><a href="#2" class="">고객</a><a href="#3" class="">설정</a>
+        </nav>
+        <div class="account">가상 프로젝트<br />실제 사용자 정보 없음</div>
+      </aside>
+      <div class="content">
+        <header>
+          <span>Orbit Analytics / 대시보드</span>
+          <div class="actions">
+            <span class="chip">WORKSPACE</span
+            ><button data-notice="새 알림이 없습니다.">알림</button><span>윤서</span>
+          </div>
+        </header>
+        <main>
+          <div class="page-head" id="page-heading">
+            <div>
+              <h1>성과 대시보드</h1>
+              <p class="muted">팀의 성과와 캠페인 흐름을 확인하세요.</p>
+            </div>
+            <div class="actions" id="primary-actions">
+              <button id="export" data-notice="보고서 내보내기를 준비했습니다.">
+                보고서 내보내기</button
+              ><button id="create-report" class="primary" data-dialog="report">
+                보고서 만들기
+              </button>
+            </div>
+          </div>
+          <div id="repeat-summary" class="banner">
+            이번 달 성과 요약입니다. 아래 지표에서 이번 달 성과를 확인하세요.
+          </div>
+          <section id="metrics" class="grid metrics">
+            <article class="card metric" id="metric-0">
+              <span class="muted">월 매출</span><strong>₩42,810,000</strong
+              ><span class="delta">지난달 대비 +12.4%</span>
+            </article>
+            <article class="card metric" id="metric-1">
+              <span class="muted">주문 수</span><strong>1,284</strong
+              ><span class="delta">지난달 대비 +8.2%</span>
+            </article>
+            <article class="card metric" id="metric-2">
+              <span class="muted">전환율</span><strong>3.8%</strong
+              ><span class="delta">지난달 대비 +0.6%</span>
+            </article>
+            <article class="card metric" id="metric-3">
+              <span class="muted">활성 고객</span><strong>8,420</strong
+              ><span class="delta">지난달 대비 +16.1%</span>
+            </article>
+          </section>
+          <section class="panel" id="trend">
+            <h2>매출 추이</h2>
+            <svg viewBox="0 0 680 180" width="100%" height="180" aria-label="최근 4주 매출 추이">
+              <path d="M10 150H670 M10 105H670 M10 60H670" stroke="#e8edf4" fill="none" />
+              <path
+                d="M10 135L70 112L130 120L190 82L250 91L310 54L370 70L430 35L490 55L550 23L610 37L670 12"
+                stroke="#456be4"
+                stroke-width="3"
+                fill="none"
+              />
+              <text x="10" y="176" fill="#8893a4" font-size="12">1주차</text>
+              <text x="610" y="176" fill="#8893a4" font-size="12">4주차</text>
+            </svg>
+          </section>
+          <form class="filters" onsubmit="return false;">
+            <label>검색<input id="query" placeholder="캠페인 이름 검색" /></label
+            ><label
+              >분류<select>
+                <option>전체 분류</option>
+                <option>운영</option>
+                <option>콘텐츠</option>
+              </select></label
+            ><label
+              >기간<select>
+                <option>최근 30일</option>
+                <option>최근 7일</option>
+              </select></label
+            ><button type="button" data-filter>적용</button
+            ><button type="button" data-reset>초기화</button>
+          </form>
+          <p id="result-count" class="muted">전체 결과</p>
+          <section class="table-scroll" id="campaign-list">
+            <table>
+              <thead>
+                <tr>
+                  <th>캠페인</th>
+                  <th>채널</th>
+                  <th>방문</th>
+                  <th>주문</th>
+                  <th>상태</th>
+                  <th>관리</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr data-row>
+                  <td>캠페인 01</td>
+                  <td>검색 광고</td>
+                  <td>1,200</td>
+                  <td>32</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 02</td>
+                  <td>뉴스레터</td>
+                  <td>1,337</td>
+                  <td>39</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 03</td>
+                  <td>직접 방문</td>
+                  <td>1,474</td>
+                  <td>46</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 04</td>
+                  <td>검색 광고</td>
+                  <td>1,611</td>
+                  <td>53</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 05</td>
+                  <td>뉴스레터</td>
+                  <td>1,748</td>
+                  <td>60</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 06</td>
+                  <td>직접 방문</td>
+                  <td>1,885</td>
+                  <td>67</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 07</td>
+                  <td>검색 광고</td>
+                  <td>2,022</td>
+                  <td>74</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 08</td>
+                  <td>뉴스레터</td>
+                  <td>2,159</td>
+                  <td>81</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 09</td>
+                  <td>직접 방문</td>
+                  <td>2,296</td>
+                  <td>88</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 10</td>
+                  <td>검색 광고</td>
+                  <td>2,433</td>
+                  <td>95</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 11</td>
+                  <td>뉴스레터</td>
+                  <td>2,570</td>
+                  <td>102</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 12</td>
+                  <td>직접 방문</td>
+                  <td>2,707</td>
+                  <td>109</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 13</td>
+                  <td>검색 광고</td>
+                  <td>2,844</td>
+                  <td>116</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 14</td>
+                  <td>뉴스레터</td>
+                  <td>2,981</td>
+                  <td>123</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 15</td>
+                  <td>직접 방문</td>
+                  <td>3,118</td>
+                  <td>130</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 16</td>
+                  <td>검색 광고</td>
+                  <td>3,255</td>
+                  <td>137</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 17</td>
+                  <td>뉴스레터</td>
+                  <td>3,392</td>
+                  <td>144</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 18</td>
+                  <td>직접 방문</td>
+                  <td>3,529</td>
+                  <td>151</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 19</td>
+                  <td>검색 광고</td>
+                  <td>3,666</td>
+                  <td>158</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 20</td>
+                  <td>뉴스레터</td>
+                  <td>3,803</td>
+                  <td>165</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 21</td>
+                  <td>직접 방문</td>
+                  <td>3,940</td>
+                  <td>172</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+                <tr data-row>
+                  <td>캠페인 22</td>
+                  <td>검색 광고</td>
+                  <td>4,077</td>
+                  <td>179</td>
+                  <td><span class="pill">운영 중</span></td>
+                  <td><button data-dialog="report">상세</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+          <div id="status" class="status" role="status"></div>
+        </main>
+      </div>
+    </div>
+    <dialog id="report">
+      <div class="modal-title">
+        <h2>보고서 설정</h2>
+        <button data-close aria-label="닫기">×</button>
+      </div>
+      <form data-message="저장했습니다.">
+        <label>이름<input required placeholder="보고서 이름" /></label
+        ><label
+          >기간<select>
+            <option>최근 30일</option>
+            <option>이번 분기</option>
+          </select></label
+        ><label>설명<textarea rows="3"></textarea></label>
+        <div class="form-actions">
+          <button type="button" data-close>취소</button
+          ><button class="primary" type="submit">저장</button>
+        </div>
+        <p role="status" class="status"></p>
+      </form>
+    </dialog>
+    <script src="app.js"></script>
+  </body>
+</html>

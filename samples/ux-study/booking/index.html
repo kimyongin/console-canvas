@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Daylight Booking · Canvas Study</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body style="--accent: #a77350">
+    <div class="app">
+      <aside>
+        <div class="brand"><i>◆</i> Daylight Booking</div>
+        <nav class="nav">
+          <a href="#0" class="active">예약</a><a href="#1" class="">리소스</a
+          ><a href="#2" class="">고객</a><a href="#3" class="">설정</a>
+        </nav>
+        <div class="account">가상 프로젝트<br />실제 사용자 정보 없음</div>
+      </aside>
+      <div class="content">
+        <header>
+          <span>Daylight Booking / 예약</span>
+          <div class="actions">
+            <span class="chip">WORKSPACE</span
+            ><button data-notice="새 알림이 없습니다.">알림</button><span>윤서</span>
+          </div>
+        </header>
+        <main>
+          <div class="page-head" id="page-heading">
+            <div>
+              <h1>예약 관리</h1>
+              <p class="muted">일정과 예약 가능 시간을 확인하세요.</p>
+            </div>
+            <div class="actions" id="primary-actions">
+              <button data-notice="일정을 내보냈습니다.">일정 내보내기</button
+              ><button id="create-booking" class="primary" data-dialog="booking-form">
+                새 예약
+              </button>
+            </div>
+          </div>
+          <div class="banner" id="repeat-summary">
+            예약할 날짜를 선택하고 예약 버튼을 눌러 주세요. 새 예약에서도 예약을 만들 수 있습니다.
+          </div>
+          <div class="split">
+            <section class="panel" id="calendar">
+              <div class="calendar-head">
+                <button id="previous-month" aria-label="이전 달">←</button>
+                <h2 id="month-title">2026년 11월</h2>
+                <button id="next-month" aria-label="다음 달">→</button>
+              </div>
+              <div class="weekdays">
+                <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span
+                ><span>금</span><span>토</span>
+              </div>
+              <div class="calendar-grid">
+                <button class="day" data-day="1"><span>1</span></button
+                ><button class="day" data-day="2"><span>2</span></button
+                ><button class="day" data-day="3"><span>3</span><i>예약 3</i></button
+                ><button class="day" data-day="4"><span>4</span></button
+                ><button class="day" data-day="5"><span>5</span></button
+                ><button class="day" data-day="6"><span>6</span><i>예약 3</i></button
+                ><button class="day" data-day="7"><span>7</span></button
+                ><button class="day" data-day="8"><span>8</span></button
+                ><button class="day" data-day="9"><span>9</span><i>예약 3</i></button
+                ><button class="day" data-day="10"><span>10</span></button
+                ><button class="day" data-day="11"><span>11</span></button
+                ><button class="day selected" data-day="12"><span>12</span><i>예약 3</i></button
+                ><button class="day" data-day="13"><span>13</span></button
+                ><button class="day" data-day="14"><span>14</span></button
+                ><button class="day" data-day="15"><span>15</span><i>예약 3</i></button
+                ><button class="day" data-day="16"><span>16</span></button
+                ><button class="day" data-day="17"><span>17</span></button
+                ><button class="day" data-day="18"><span>18</span><i>예약 3</i></button
+                ><button class="day" data-day="19"><span>19</span></button
+                ><button class="day" data-day="20"><span>20</span></button
+                ><button class="day" data-day="21"><span>21</span><i>예약 3</i></button
+                ><button class="day" data-day="22"><span>22</span></button
+                ><button class="day" data-day="23"><span>23</span></button
+                ><button class="day" data-day="24"><span>24</span><i>예약 3</i></button
+                ><button class="day" data-day="25"><span>25</span></button
+                ><button class="day" data-day="26"><span>26</span></button
+                ><button class="day" data-day="27"><span>27</span><i>예약 3</i></button
+                ><button class="day" data-day="28"><span>28</span></button
+                ><button class="day" data-day="29"><span>29</span></button
+                ><button class="day" data-day="30"><span>30</span><i>예약 3</i></button>
+              </div>
+            </section>
+            <section class="panel" id="availability">
+              <h2 id="selected-date">11월 12일 예약 가능 시간</h2>
+              <div class="scroll-inner">
+                <div class="slot">
+                  <span><b>9:00</b><br /><small class="muted">30분 · 미팅룸 A</small></span
+                  ><button data-dialog="booking-form">예약</button>
+                </div>
+                <div class="slot">
+                  <span><b>10:00</b><br /><small class="muted">30분 · 미팅룸 A</small></span
+                  ><button data-dialog="booking-form">예약</button>
+                </div>
+                <div class="slot">
+                  <span><b>11:00</b><br /><small class="muted">30분 · 미팅룸 A</small></span
+                  ><button data-dialog="booking-form">예약</button>
+                </div>
+                <div class="slot">
+                  <span><b>12:00</b><br /><small class="muted">30분 · 미팅룸 A</small></span
+                  ><button data-dialog="booking-form">예약</button>
+                </div>
+                <div class="slot">
+                  <span><b>13:00</b><br /><small class="muted">30분 · 미팅룸 A</small></span
+                  ><button data-dialog="booking-form">예약</button>
+                </div>
+                <div class="slot">
+                  <span><b>14:00</b><br /><small class="muted">30분 · 미팅룸 A</small></span
+                  ><button data-dialog="booking-form">예약</button>
+                </div>
+                <div class="slot">
+                  <span><b>15:00</b><br /><small class="muted">30분 · 미팅룸 A</small></span
+                  ><button data-dialog="booking-form">예약</button>
+                </div>
+                <div class="slot">
+                  <span><b>16:00</b><br /><small class="muted">30분 · 미팅룸 A</small></span
+                  ><button data-dialog="booking-form">예약</button>
+                </div>
+                <div class="slot">
+                  <span><b>17:00</b><br /><small class="muted">30분 · 미팅룸 A</small></span
+                  ><button data-dialog="booking-form">예약</button>
+                </div>
+                <div class="slot">
+                  <span><b>18:00</b><br /><small class="muted">30분 · 미팅룸 A</small></span
+                  ><button data-dialog="booking-form">예약</button>
+                </div>
+              </div>
+            </section>
+          </div>
+          <div id="status" class="status" role="status"></div>
+        </main>
+      </div>
+    </div>
+    <dialog id="booking-form">
+      <div class="modal-title">
+        <h2>새 예약</h2>
+        <button data-close aria-label="닫기">×</button>
+      </div>
+      <form data-message="저장했습니다.">
+        <label>예약자 이름<input required placeholder="이름" /></label
+        ><label>이메일<input type="email" required placeholder="name@example.com" /></label>
+        <div class="field-grid">
+          <label>날짜<input type="date" required value="2026-11-12" /></label
+          ><label
+            >시간<select>
+              <option>09:00</option>
+              <option>10:00</option>
+              <option>11:00</option>
+            </select></label
+          >
+        </div>
+        <label>인원<input type="number" required min="1" max="20" value="2" /></label
+        ><label
+          >예약 목적<select>
+            <option>팀 미팅</option>
+            <option>고객 미팅</option>
+          </select></label
+        ><label
+          >추가 요청<textarea rows="5" placeholder="필요한 장비 등을 알려 주세요."></textarea>
+        </label>
+        <p class="muted" style="margin-top: 20px">일정 변경은 예약 상세에서 가능합니다.</p>
+        <div class="form-actions">
+          <button type="button" data-close>취소</button
+          ><button class="primary" type="submit">저장</button>
+        </div>
+        <p role="status" class="status"></p>
+      </form>
+    </dialog>
+    <script src="app.js"></script>
+  </body>
+</html>

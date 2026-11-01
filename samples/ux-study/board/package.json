@@ -1,0 +1,8 @@
+{
+  "name": "canvas-study-board",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "start": "python3 -m http.server 59032 --bind 127.0.0.1"
+  }
+}

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Draftroom CMS · Canvas Study</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body style="--accent: #34748c">
+    <div class="app">
+      <aside>
+        <div class="brand"><i>◆</i> Draftroom CMS</div>
+        <nav class="nav">
+          <a href="#0" class="active">문서</a><a href="#1" class="">미디어</a
+          ><a href="#2" class="">게시 기록</a><a href="#3" class="">설정</a>
+        </nav>
+        <div class="account">가상 프로젝트<br />실제 사용자 정보 없음</div>
+      </aside>
+      <div class="content">
+        <header>
+          <span>Draftroom CMS / 문서</span>
+          <div class="actions">
+            <span class="chip">WORKSPACE</span
+            ><button data-notice="새 알림이 없습니다.">알림</button><span>윤서</span>
+          </div>
+        </header>
+        <main>
+          <div class="page-head" id="page-heading">
+            <div>
+              <h1>콘텐츠 편집</h1>
+              <p class="muted">문서를 정리하고 게시 상태를 관리하세요.</p>
+            </div>
+            <div class="actions" id="primary-actions">
+              <button id="save-draft" data-notice="초안을 저장했습니다.">초안 저장</button
+              ><button id="publish" class="primary" data-dialog="publish-dialog">게시</button>
+            </div>
+          </div>
+          <div class="banner" id="repeat-summary">
+            콘텐츠는 초안 저장으로 보관하고 게시 버튼으로 게시하세요. 아래 편집 영역에서 내용을
+            수정할 수 있습니다.
+          </div>
+          <div class="cms-layout">
+            <section class="panel document-tree" id="document-tree">
+              <h2>문서</h2>
+              <details open>
+                <summary>콘텐츠 라이브러리</summary>
+                <button data-document="0">▾ 시작하기 01</button
+                ><button data-document="1">　제품 업데이트 02</button
+                ><button data-document="2">　사용 가이드 03</button
+                ><button data-document="3">　팀 소식 04</button
+                ><button data-document="4">▾ 시작하기 05</button
+                ><button data-document="5">　제품 업데이트 06</button
+                ><button data-document="6">　사용 가이드 07</button
+                ><button data-document="7">　팀 소식 08</button
+                ><button data-document="8">▾ 시작하기 09</button
+                ><button data-document="9">　제품 업데이트 10</button
+                ><button data-document="10">　사용 가이드 11</button
+                ><button data-document="11">　팀 소식 12</button
+                ><button data-document="12">▾ 시작하기 13</button
+                ><button data-document="13">　제품 업데이트 14</button
+                ><button data-document="14">　사용 가이드 15</button
+                ><button data-document="15">　팀 소식 16</button
+                ><button data-document="16">▾ 시작하기 17</button
+                ><button data-document="17">　제품 업데이트 18</button>
+              </details>
+            </section>
+            <section class="panel" id="content-editor">
+              <div class="editor-tools">
+                <button data-notice="강조를 적용했습니다.">굵게</button
+                ><button data-notice="링크 설정을 준비했습니다.">링크</button
+                ><button data-notice="미리보기가 오른쪽에 표시됩니다.">미리보기</button>
+              </div>
+              <form id="article-form" data-message="변경 사항을 저장했습니다.">
+                <label
+                  >제목<input
+                    id="article-title"
+                    required
+                    value="새로운 작업 공간을 소개합니다" /></label
+                ><label
+                  >요약<textarea rows="3">
+팀의 작업을 한곳에서 관리하는 새로운 방법입니다.</textarea></label
+                ><label
+                  >본문<textarea id="article-body" rows="13">
+이번 업데이트에서는 더 편리한 작업 환경을 제공합니다.
+
+필요한 내용을 빠르게 찾고 작업에 집중해 보세요.</textarea></label
+                ><label
+                  >게시 상태<select>
+                    <option>초안</option>
+                    <option>게시됨</option>
+                  </select></label
+                >
+                <div class="form-actions"><button type="submit">변경 저장</button></div>
+                <p class="status" role="status"></p>
+              </form>
+            </section>
+            <section class="panel" id="article-preview">
+              <h2>미리보기</h2>
+              <div class="scroll-inner">
+                <h2 id="preview-title">새로운 작업 공간을 소개합니다</h2>
+                <h3>더 편리한 작업 환경</h3>
+                <p>
+                  이번 업데이트에서는 필요한 내용을 더 빠르게 찾고, 작업에 집중할 수 있는 환경을
+                  제공합니다. 복잡한 과정을 간소화하고 사용자의 흐름을 이어갑니다.
+                </p>
+                <h3>더 편리한 작업 환경</h3>
+                <p>
+                  이번 업데이트에서는 필요한 내용을 더 빠르게 찾고, 작업에 집중할 수 있는 환경을
+                  제공합니다. 복잡한 과정을 간소화하고 사용자의 흐름을 이어갑니다.
+                </p>
+                <h3>더 편리한 작업 환경</h3>
+                <p>
+                  이번 업데이트에서는 필요한 내용을 더 빠르게 찾고, 작업에 집중할 수 있는 환경을
+                  제공합니다. 복잡한 과정을 간소화하고 사용자의 흐름을 이어갑니다.
+                </p>
+                <h3>더 편리한 작업 환경</h3>
+                <p>
+                  이번 업데이트에서는 필요한 내용을 더 빠르게 찾고, 작업에 집중할 수 있는 환경을
+                  제공합니다. 복잡한 과정을 간소화하고 사용자의 흐름을 이어갑니다.
+                </p>
+                <h3>더 편리한 작업 환경</h3>
+                <p>
+                  이번 업데이트에서는 필요한 내용을 더 빠르게 찾고, 작업에 집중할 수 있는 환경을
+                  제공합니다. 복잡한 과정을 간소화하고 사용자의 흐름을 이어갑니다.
+                </p>
+                <h3>더 편리한 작업 환경</h3>
+                <p>
+                  이번 업데이트에서는 필요한 내용을 더 빠르게 찾고, 작업에 집중할 수 있는 환경을
+                  제공합니다. 복잡한 과정을 간소화하고 사용자의 흐름을 이어갑니다.
+                </p>
+                <h3>더 편리한 작업 환경</h3>
+                <p>
+                  이번 업데이트에서는 필요한 내용을 더 빠르게 찾고, 작업에 집중할 수 있는 환경을
+                  제공합니다. 복잡한 과정을 간소화하고 사용자의 흐름을 이어갑니다.
+                </p>
+                <h3>더 편리한 작업 환경</h3>
+                <p>
+                  이번 업데이트에서는 필요한 내용을 더 빠르게 찾고, 작업에 집중할 수 있는 환경을
+                  제공합니다. 복잡한 과정을 간소화하고 사용자의 흐름을 이어갑니다.
+                </p>
+              </div>
+            </section>
+          </div>
+          <div id="status" class="status" role="status"></div>
+        </main>
+      </div>
+    </div>
+    <dialog id="publish-dialog">
+      <div class="modal-title">
+        <h2>콘텐츠 게시</h2>
+        <button data-close aria-label="닫기">×</button>
+      </div>
+      <form data-message="저장했습니다.">
+        <p>미리보기와 내용을 확인한 뒤 게시합니다.</p>
+        <label
+          >게시 범위<select>
+            <option>전체 공개</option>
+            <option>팀 내부</option>
+          </select></label
+        >
+        <div class="form-actions">
+          <button type="button" data-close>취소</button
+          ><button class="primary" type="submit">저장</button>
+        </div>
+        <p role="status" class="status"></p>
+      </form>
+    </dialog>
+    <script src="app.js"></script>
+  </body>
+</html>
