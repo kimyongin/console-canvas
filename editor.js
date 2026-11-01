@@ -193,6 +193,10 @@ function closeDocument(id) {
       commentEditor.reset();
       state.snapshot = null;
       state.ticket = null;
+      const route = new URL(location.href);
+      route.searchParams.delete('id');
+      route.searchParams.delete('sample');
+      history.replaceState(null, '', route);
       editorCommands.reset();
       state.scene = null;
       state.activity = [];

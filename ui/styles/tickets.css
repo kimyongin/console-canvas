@@ -58,6 +58,36 @@
   margin: 8px 0;
   white-space: normal;
 }
+.goal-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(270px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.goal-preview {
+  min-width: 0;
+  max-height: 64dvh;
+  overflow: auto;
+}
+.goal-fields {
+  min-width: 0;
+}
+.goal-fields .ticket-actions {
+  justify-content: flex-end;
+  position: sticky;
+  bottom: 0;
+  background: var(--panel, white);
+  padding-block: 12px;
+}
+@media (max-width: 700px) {
+  .goal-form {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .goal-preview {
+    max-height: 180px;
+  }
+}
 .ticket-row small {
   grid-column: 1/-1;
   overflow-wrap: anywhere;

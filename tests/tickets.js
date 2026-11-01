@@ -355,6 +355,11 @@ try {
     'Goal form includes current comments and intent without retyping',
     doc.querySelector('#ticket-request').value.includes('같은 티켓'),
   );
+  await until(() => !doc.querySelector('#ticket-register').disabled);
+  check(
+    'Goal confirmation shows the exact current image before saving',
+    !!doc.querySelector('img[alt="확정할 현재 편집 결과"]')?.src.startsWith('data:image/'),
+  );
   doc.querySelector('#ticket-register').click();
   await until(() => !doc.querySelector('#tickets-dialog').open);
   check(
@@ -446,6 +451,15 @@ try {
     'Backup restores stable identity and immutable goal',
     JSON.stringify((await getTicket(originalId)).goal) === goal &&
       (await getDocument(originalId)).annotations[node.id].includes('모바일'),
+  );
+  await app.openTicket(newId);
+  doc.querySelector('#document-menu-button').click();
+  doc.querySelector('#trash-current').click();
+  await until(() => !app.state.snapshot);
+  check(
+    'Trashing the current ticket clears the stale reload target',
+    !new URL(frame.contentWindow.location.href).searchParams.has('id') &&
+      !new URL(frame.contentWindow.location.href).searchParams.has('sample'),
   );
   document.querySelector('#status').textContent = `PASS ${results.length} checks`;
   document.body.dataset.result = 'pass';

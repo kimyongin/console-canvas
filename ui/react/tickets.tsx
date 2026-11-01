@@ -46,6 +46,8 @@ function Tickets({ options }: { options: TicketUIOptions }) {
     [query, setQuery] = useState(''),
     [deleted, setDeleted] = useState(false),
     [request, setRequest] = useState(options.note || ''),
+    [preview, setPreview] = useState(''),
+    [preparing, setPreparing] = useState(!!options.confirm),
     [image, setImage] = useState(''),
     [selected, setSelected] = useState(false),
     [summary, setSummary] = useState(''),
@@ -69,6 +71,25 @@ function Tickets({ options }: { options: TicketUIOptions }) {
       active = false;
     };
   }, [accessProject]);
+  useEffect(() => {
+    if (!confirming || !options.capture) return;
+    let active = true;
+    setPreparing(true);
+    options
+      .capture()
+      .then((value) => {
+        if (active) setPreview(value);
+      })
+      .catch((e) => {
+        if (active) setError(e.message);
+      })
+      .finally(() => {
+        if (active) setPreparing(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [confirming]);
   const visibleRows = rows.filter(
     (t) =>
       (!accessProject || t.project_id === accessProject) &&
@@ -132,7 +153,9 @@ function Tickets({ options }: { options: TicketUIOptions }) {
                 ? ticket.display_id + ' · ' + ticket.title
                 : '작업 티켓'}
           </h2>
-          <p>같은 티켓에서 편집·시안·구현·검토를 이어갑니다. 구현은 에이전트에게 요청하세요.</p>
+          {!confirming && (
+            <p>같은 티켓에서 편집·시안·구현·검토를 이어갑니다. 구현은 에이전트에게 요청하세요.</p>
+          )}
         </div>
         <Button variant="ghost" disabled={busy} onClick={options.close} aria-label="작업 티켓 닫기">
           ×
@@ -145,6 +168,7 @@ function Tickets({ options }: { options: TicketUIOptions }) {
       )}
       {confirming && ticket ? (
         <form
+          className="goal-form"
           onSubmit={(e) => {
             e.preventDefault();
             run(async () => {
@@ -155,7 +179,7 @@ function Tickets({ options }: { options: TicketUIOptions }) {
                 expected_edit_revision: options.editRevision,
                 operation_id: crypto.randomUUID(),
                 request,
-                image_data_url: image || (await options.capture!()),
+                image_data_url: image || preview,
                 selection_confirmed: !image || selected,
                 source: options.source,
                 annotations: options.annotations,
@@ -168,55 +192,65 @@ function Tickets({ options }: { options: TicketUIOptions }) {
             });
           }}
         >
-          <p>
-            <strong>{ticket.display_id}</strong>의 현재 편집 또는 대화에서 선택한 시안을 구현 목표로
-            고정합니다. 새 티켓은 만들지 않습니다.
-          </p>
-          <label>
-            반영할 의도·완료 조건
-            <Textarea
-              id="ticket-request"
-              required
-              maxLength={12000}
-              value={request}
-              onChange={(e) => setRequest(e.target.value)}
-            />
-          </label>
-          <label>
-            선택한 시안 이미지 (선택)
-            <Input
-              id="ticket-image"
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              onChange={(e) => {
-                file(e.target.files?.[0], setImage);
-                setSelected(false);
-              }}
-            />
-          </label>
-          {image && (
-            <>
+          <div className="goal-preview">
+            {image ? (
               <img className="ticket-image" src={image} alt="선택한 목표 시안" />
-              <label>
-                <input
-                  type="checkbox"
-                  checked={selected}
-                  onChange={(e) => setSelected(e.target.checked)}
-                />{' '}
-                이 시안을 구현 목표로 선택했습니다.
-              </label>
-              <Button type="button" variant="ghost" onClick={() => setImage('')}>
-                현재 편집 화면 사용
+            ) : preparing ? (
+              <p role="status">목표 이미지 준비 중…</p>
+            ) : (
+              preview && <img className="ticket-image" src={preview} alt="확정할 현재 편집 결과" />
+            )}
+          </div>
+          <div className="goal-fields">
+            <label>
+              반영할 의도·완료 조건
+              <Textarea
+                id="ticket-request"
+                required
+                maxLength={12000}
+                value={request}
+                onChange={(e) => setRequest(e.target.value)}
+              />
+            </label>
+            <label>
+              선택한 시안 이미지 (선택)
+              <Input
+                id="ticket-image"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => {
+                  file(e.target.files?.[0], setImage);
+                  setSelected(false);
+                }}
+              />
+            </label>
+            {image && (
+              <>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    onChange={(e) => setSelected(e.target.checked)}
+                  />{' '}
+                  이 시안을 구현 목표로 선택했습니다.
+                </label>
+                <Button type="button" variant="ghost" onClick={() => setImage('')}>
+                  현재 편집 화면 사용
+                </Button>
+              </>
+            )}
+            <div className="ticket-actions">
+              <Button type="button" variant="outline" disabled={busy} onClick={options.close}>
+                취소
               </Button>
-            </>
-          )}
-          <div className="ticket-actions">
-            <Button type="button" variant="outline" disabled={busy} onClick={options.close}>
-              취소
-            </Button>
-            <Button id="ticket-register" type="submit" disabled={busy || (!!image && !selected)}>
-              {busy ? '저장 중…' : '이 티켓의 목표 확정'}
-            </Button>
+              <Button
+                id="ticket-register"
+                type="submit"
+                disabled={busy || (!image && (preparing || !preview)) || (!!image && !selected)}
+              >
+                {busy ? '저장 중…' : '이 티켓의 목표 확정'}
+              </Button>
+            </div>
           </div>
         </form>
       ) : ticket ? (

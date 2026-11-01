@@ -52,6 +52,59 @@ try {
       if (!listed.some((x) => x.id === t.id)) throw Error('Missing queued study ticket ' + t.id);
   }
   const summaries = [];
+  if (mode === 'audit') {
+    const first = (await call('get_ticket', { project_id: project, ticket_ref: tickets[0].id }))
+      .structuredContent.ticket;
+    const negative = await client.callTool({
+      name: 'update_ticket',
+      arguments: {
+        project_id: project,
+        ticket_ref: first.id,
+        expected_ticket_revision: first.revision - 1,
+        goal_id: first.goal.id,
+        operation_id: 'study-' + round + '-intentional-stale',
+        status: 'working',
+        implementation_instruction: '가상 샘플 검증의 의도적 stale 요청',
+        summary: '의도적 충돌 검사',
+      },
+    });
+    if (negative.structuredContent?.error?.code !== 'ticket_revision_conflict')
+      throw Error('Unexpected stale response: ' + JSON.stringify(negative.structuredContent));
+    const other = await client.callTool({
+      name: 'get_ticket',
+      arguments: { project_id: 'http://127.0.0.1:59032', ticket_ref: first.id },
+    });
+    if (other.structuredContent?.ok !== false) throw Error('Cross-project ID exposed');
+    const fresh = (await call('get_ticket', { project_id: project, ticket_ref: tickets[1].id }))
+      .structuredContent.ticket;
+    await call('update_ticket', {
+      project_id: project,
+      ticket_ref: fresh.id,
+      expected_ticket_revision: fresh.revision,
+      goal_id: fresh.goal.id,
+      operation_id: 'study-' + round + '-independent-continue',
+      status: 'working',
+      implementation_instruction: '사용자가 요청한 가상 샘플 프로젝트 구현 검증을 계속합니다.',
+      summary: '다른 티켓의 의도적인 오래된 revision 거부 후 이 독립 작업을 계속합니다.',
+    });
+    const after = (await call('get_ticket', { project_id: project, ticket_ref: first.id }))
+      .structuredContent.ticket;
+    if (after.revision !== first.revision) throw Error('Rejected write changed ticket');
+    await fs.writeFile(
+      path.join(dir, 'audit.json'),
+      JSON.stringify(
+        {
+          staleRejected: true,
+          unchangedRevision: true,
+          crossProjectRejected: true,
+          independentContinued: tickets[1].id,
+        },
+        null,
+        2,
+      ),
+    );
+    console.log('Actual saved-ticket stale-write rejection and independent continuation verified');
+  }
   await fs.mkdir(path.join(dir, 'contexts'), { recursive: true });
   for (const t of tickets) {
     const result = await call('get_ticket', { project_id: project, ticket_ref: t.id });

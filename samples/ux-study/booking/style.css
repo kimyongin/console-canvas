@@ -421,3 +421,80 @@ details summary {
     font-size: 8px;
   }
 }
+
+/* BOOK-1..5: keep native validation and independent slot scroll. */
+.slot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 8px 0;
+  min-height: 58px;
+}
+.slot button {
+  min-height: 40px;
+}
+#availability .scroll-inner {
+  max-height: 350px;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+#selected-date {
+  font-size: 15px;
+}
+#booking-form form {
+  display: grid;
+  gap: 12px;
+}
+#booking-form label {
+  margin-top: 0;
+}
+#booking-form .form-actions {
+  position: sticky;
+  bottom: -24px;
+  background: white;
+  padding: 14px 0;
+  border-top: 1px solid #dce2e9;
+  margin-top: 4px;
+}
+#booking-form .form-actions button {
+  min-height: 42px;
+}
+@media (max-width: 800px) {
+  .page-head {
+    flex-direction: column;
+    gap: 14px;
+  }
+  #primary-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 500px) {
+  #calendar {
+    padding: 10px;
+  }
+  .calendar-grid,
+  .weekdays {
+    gap: 3px;
+  }
+  .day {
+    padding: 6px 2px;
+    height: 58px;
+  }
+  .day i {
+    font-size: 8px;
+    white-space: nowrap;
+    padding: 1px;
+    margin-top: 6px;
+  }
+  #availability {
+    padding: 14px;
+  }
+  .calendar-head {
+    gap: 6px;
+  }
+  .calendar-head button {
+    padding: 7px 10px;
+  }
+}
