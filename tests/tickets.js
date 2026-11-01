@@ -408,6 +408,22 @@ try {
     doc.querySelector('[aria-label="티켓 상태 필터"]').value === 'unfinished' &&
       !doc.querySelector('.goal-form'),
   );
+  check(
+    'Active catalog rows have one open action and no repeated trash actions',
+    [...doc.querySelectorAll('.ticket-compact-row')].every(
+      (row) => row.querySelectorAll('button').length === 1,
+    ),
+  );
+  check(
+    'Project handoff exposes two direct actions without a one-item disclosure',
+    !doc.querySelector('.ticket-handoff details') &&
+      doc.querySelectorAll('.ticket-handoff button').length === 2,
+  );
+  check(
+    'No ready tickets disables bulk implementation while read remains available',
+    !doc.querySelector('.ticket-handoff button').disabled &&
+      doc.querySelectorAll('.ticket-handoff button')[1].disabled,
+  );
   doc
     .querySelector('[data-ticket-id="' + (await getTicket(later.id)).display_id + '"] .ticket-open')
     .click();
@@ -574,6 +590,33 @@ try {
     agentRequest(project, { intent: 'implement' }).includes('요청 시점') &&
       !(await getTicket(reference.id)).claim,
   );
+  const previousTicket = app.state.snapshot.id;
+  await app.openTicket(reference.id);
+  doc.querySelector('#document-menu-content').showPopover();
+  doc.querySelector('#trash-current').click();
+  await until(async () => !app.state.snapshot && !(await getTicket(reference.id)));
+  check('Menu trash closes the current document without another deletion entry', !app.state.ready);
+  await app.showTickets();
+  await until(() => doc.querySelector('[aria-label="티켓 상태 필터"]'));
+  const filterControl = doc.querySelector('[aria-label="티켓 상태 필터"]');
+  filterControl.value = 'trash';
+  filterControl.dispatchEvent(new frame.contentWindow.Event('change', { bubbles: true }));
+  await until(() => doc.querySelector('[aria-label="' + reference.display_id + ' 복구"]'));
+  const trashRow = doc.querySelector('[data-document-id="' + reference.id + '"]');
+  check(
+    'Trash rows retain direct restore and cannot open deleted content',
+    trashRow.querySelector('.ticket-open').disabled,
+  );
+  doc.querySelector('[aria-label="' + reference.display_id + ' 복구"]').click();
+  await until(async () => !!(await getTicket(reference.id)));
+  const restoredReference = await getTicket(reference.id);
+  check(
+    'UI restore preserves ticket identity and fixed goal',
+    restoredReference.id === reference.id &&
+      JSON.stringify(restoredReference.goal) === JSON.stringify(frozenReference.goal),
+  );
+  doc.querySelector('#tickets-dialog').close();
+  await app.openTicket(previousTicket);
   const beforeNoteUndo = app.state.undo.length;
   const beforeNoteAnnotations = JSON.stringify(app.state.scene.annotations);
   doc.querySelector('#review-note').value = '추가 설명 독립 실행 취소';

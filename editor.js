@@ -954,9 +954,6 @@ async function showTickets() {
         window.ConsoleCanvasDesktop?.showEditor();
       },
       close: () => $('#tickets-dialog').close(),
-      removed: async (id) => {
-        if (state.snapshot?.id === id) await closeDocument(id);
-      },
       changed: () => {
         state.ticketRevision = (state.ticketRevision || 0) + 1;
         void refreshTicket();

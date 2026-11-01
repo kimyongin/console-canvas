@@ -3,7 +3,7 @@ import { renderReact } from './mount';
 import { Button } from './components/button';
 import { Input } from './components/input';
 import { listTickets, TICKET_STATES } from '../../ticket-model.js';
-import { restoreDocument, trashDocument } from '../../db.js';
+import { restoreDocument } from '../../db.js';
 import { ticketSummary, ticketSource } from '../../ticket-presentation.js';
 export interface TicketUIOptions {
   project?: string;
@@ -12,7 +12,6 @@ export interface TicketUIOptions {
   close(): void;
   changed(): void;
   handoff?(intent: 'read' | 'implement'): Promise<void>;
-  removed?(id: string): Promise<void>;
 }
 function Tickets({ options }: { options: TicketUIOptions }) {
   const [rows, setRows] = useState<any[]>([]),
@@ -144,22 +143,16 @@ function Tickets({ options }: { options: TicketUIOptions }) {
                       : (TICKET_STATES as Record<string, string>)[t.status]}
               </span>
             </button>
-            <Button
-              variant="ghost"
-              disabled={busy}
-              aria-label={t.display_id + (filter === 'trash' ? ' 복구' : ' 휴지통으로 이동')}
-              onClick={() =>
-                run(async () => {
-                  if (filter === 'trash') await restoreDocument(t.id);
-                  else {
-                    await trashDocument(t.id);
-                    await options.removed?.(t.id);
-                  }
-                })
-              }
-            >
-              {filter === 'trash' ? '복구' : '휴지통'}
-            </Button>
+            {filter === 'trash' && (
+              <Button
+                variant="ghost"
+                disabled={busy}
+                aria-label={t.display_id + ' 복구'}
+                onClick={() => run(() => restoreDocument(t.id))}
+              >
+                복구
+              </Button>
+            )}
           </div>
         ))}
       </div>
@@ -168,16 +161,13 @@ function Tickets({ options }: { options: TicketUIOptions }) {
           <Button disabled={busy} onClick={() => options.handoff?.('read')}>
             에이전트 조회 요청 복사
           </Button>
-          <details>
-            <summary>다른 요청</summary>
-            <Button
-              disabled={busy || !readyCount}
-              title="현재 프로젝트 전체 · 구현 요청 시점에 대상을 확정합니다"
-              onClick={() => options.handoff?.('implement')}
-            >
-              확정 티켓 {readyCount}개 구현 요청 복사
-            </Button>
-          </details>
+          <Button
+            disabled={busy || !readyCount}
+            title="현재 프로젝트 전체 · 구현 요청 시점에 대상을 확정합니다"
+            onClick={() => options.handoff?.('implement')}
+          >
+            확정 티켓 {readyCount}개 구현 요청 복사
+          </Button>
         </footer>
       )}
     </>
