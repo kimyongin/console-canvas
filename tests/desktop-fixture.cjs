@@ -155,6 +155,10 @@ async function main() {
       editor,
       `(async()=>{window.ConsoleCanvas.state.snapshot.documentName=${JSON.stringify(originalTitle)};await window.ConsoleCanvas.flushEditor();})()`,
     );
+    assert.equal(
+      await evaluate(shell, 'document.querySelector(\'#shell-project option[value=""]\').disabled'),
+      true,
+    );
     await screenshot(window, '03-edit');
     if (process.env.CONSOLE_CANVAS_GUIDE_CAPTURE_DIR) {
       await evaluate(editor, 'window.ConsoleCanvas.confirmCurrentTicket()');

@@ -65,6 +65,10 @@ try {
     ticket.status === 'draft' && ticket.project_id === project.id && !!(await getDocument(first)),
   );
   check(
+    'The project placeholder cannot clear the visible project while keeping a hidden active target',
+    doc.querySelector('#project-control option[value=""]').disabled,
+  );
+  check(
     'Blank ticket commands and editable project ID field are removed',
     !doc.querySelector('#create-ticket') && !doc.querySelector('#project-id') && !app.newTicket,
   );

@@ -450,6 +450,7 @@ function showWorkspace(value) {
   if (value.project?.repository) $('#project-connect-hint').hidden = true;
   const select = $('#shell-project');
   select.replaceChildren(new Option('프로젝트 선택', ''));
+  select.options[0].disabled = true;
   for (const p of value.projects) select.add(new Option(p.name, p.id));
   select.add(new Option('+ 새 프로젝트', 'new'));
   select.value = value.project?.id || '';

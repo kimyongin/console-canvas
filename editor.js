@@ -1115,6 +1115,7 @@ function renderProjectControl(value) {
   const select = document.createElement('select');
   select.setAttribute('aria-label', '프로젝트');
   const placeholder = new Option('프로젝트 선택', '');
+  placeholder.disabled = true;
   select.add(placeholder);
   for (const p of value.projects) select.add(new Option(p.name, p.id));
   select.add(new Option('+ 새 프로젝트', 'new'));
