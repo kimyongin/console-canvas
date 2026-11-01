@@ -88,3 +88,5 @@ I5 최종 수집 RGB16 99.922%, RGB8 99.914%, 완전 일치99.904%. 처음 추�
 0.47→0.48→0.49→0.50→0.51 각 회차마다 앱/자료/설치 스킬 백업·정상 종료·같은 Apple Development 서명으로 교체·재실행했다. 최종0.51에서는 코드 서명 strict 검증, 소스와 설치본 editor.js/editor-runtime.js/runtime-manifest SHA, source SKILL=app agent-guide=번들 ZIP=개인 설치 스킬의 바이트 일치, 설치 앱 메인 프로세스1개를 확인했다. 실제 AX의 소수 요청 검색칸 제거와 최신SDK16도구·version0.51·기존 guide-console CC-5 ID/이름/주석1/이미지3·queued 목표·이름 조회가 유지된다. 로그와 백업은 local/ux-study/I1~I5에 보관한다. OS 본문 직접 클릭 성공이나 키체인 승인 전 조합 전체 검증으로 확대하지 않는다.
 
 최종 검사: Python47, Node41, 티켓47 및 모든 공통 Chromium suite 통과. Electron 격리 저장/파일/스킬/정상 종료와 재실행·공식 SDK16/최신 SDK6·시각 입력8·native 범위5 검사를 통과했다. 실제 원본·클론 결과는 I1 99.949%, I2 99.972%, I3/I4 99.996%, I5 99.922%(RGB16)로 모두95% 기준을 넘었다. 절대 픽셀 완전일치나 모든 웹사이트 보장은 아니다.
+
+최종 가이드 소스04637eb8ec1caf01cca2f16088d1c04904d29557를 https://console-canvas-guide.yonginkim.chatgpt.site/ 에 기존 소유자 전용 범위로 발행했다. 실제 공통 편집기 사진5장, 실측390 CSS px의 가로 넘침 없음·이미지1280px 로딩/확대/닫기·요청 복사를 확인했다. 사용하지 않는 이전 가이드 사진은 현재 배포에서 제거하고 Git 이력에 보존했다. 최종 제품/검증 소스effa69e와 별도 가이드 커밋을 구별한다.
