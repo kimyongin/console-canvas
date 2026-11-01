@@ -535,7 +535,6 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             />
             <div id="requests-list" />
           </section>
-          <div className="history-foot">항목을 누르면 대상을 확인하고 주석을 수정합니다.</div>
         </aside>
         <aside
           id="properties-rail"

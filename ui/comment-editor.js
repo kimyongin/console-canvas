@@ -81,11 +81,8 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
         ? { x: point.x, y: point.y, width: 0, height: 0 }
         : scene.rect(id) || scene.nodes.get(id).rect);
     const reference = scene.hidden(id) ? scene.referenceFrame() : null;
-    $('#comment-preview-label').textContent = reference
-      ? '삭제 전 참고 · 테두리가 주석 대상입니다.'
-      : point
-        ? '지정 위치 주변 화면'
-        : '대상 주변 화면 · 보라색 테두리가 주석 대상입니다.';
+    $('#comment-preview-label').textContent = reference ? '삭제 전 참고' : '';
+    $('#comment-preview-label').hidden = !reference;
     renderTargetPreview(
       $('#comment-target-preview'),
       reference?.html || scene.serialize(),

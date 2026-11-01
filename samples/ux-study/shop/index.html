@@ -37,10 +37,6 @@
               </button>
             </div>
           </div>
-          <div class="banner" id="repeat-summary">
-            상품을 수정하려면 카드의 수정 버튼을 누르세요. 이미 공개된 상품도 공개 버튼으로 확인할
-            수 있습니다.
-          </div>
           <form class="filters" onsubmit="return false;">
             <label>검색<input id="query" placeholder="상품명 검색" /></label
             ><label
@@ -57,7 +53,10 @@
             ><button type="button" data-filter>적용</button
             ><button type="button" data-reset>초기화</button>
           </form>
-          <p id="result-count" class="muted">전체 결과</p>
+          <p id="result-count" class="muted" aria-live="polite">전체 결과</p>
+          <p id="empty-results" class="empty" hidden>
+            일치하는 상품이 없습니다. 검색어를 바꿔 보세요.
+          </p>
           <div class="product-grid" id="product-grid">
             <article class="card product" data-row id="product-0">
               <div class="product-art" style="background: #e7dbc8"><span>▱</span></div>
@@ -67,8 +66,7 @@
               <h2>클래식 캔버스 백</h2>
               <p>₩39,000</p>
               <div class="actions">
-                <button data-dialog="product-edit">수정</button
-                ><button data-notice="이미 공개된 상품입니다.">공개</button>
+                <button data-dialog="product-edit">수정</button>
               </div>
             </article>
             <article class="card product" data-row id="product-1">
@@ -79,8 +77,7 @@
               <h2>데스크 오거나이저</h2>
               <p>₩28,000</p>
               <div class="actions">
-                <button data-dialog="product-edit">수정</button
-                ><button data-notice="이미 공개된 상품입니다.">공개</button>
+                <button data-dialog="product-edit">수정</button>
               </div>
             </article>
             <article class="card product" data-row id="product-2">
@@ -91,8 +88,7 @@
               <h2>미니 테이블 램프</h2>
               <p>₩64,000</p>
               <div class="actions">
-                <button data-dialog="product-edit">수정</button
-                ><button data-notice="이미 공개된 상품입니다.">공개</button>
+                <button data-dialog="product-edit">수정</button>
               </div>
             </article>
             <article class="card product" data-row id="product-3">
@@ -103,8 +99,7 @@
               <h2>스테인리스 텀블러</h2>
               <p>₩32,000</p>
               <div class="actions">
-                <button data-dialog="product-edit">수정</button
-                ><button data-notice="이미 공개된 상품입니다.">공개</button>
+                <button data-dialog="product-edit">수정</button>
               </div>
             </article>
             <article class="card product" data-row id="product-4">
@@ -115,8 +110,7 @@
               <h2>코튼 쿠션</h2>
               <p>₩24,000</p>
               <div class="actions">
-                <button data-dialog="product-edit">수정</button
-                ><button data-notice="이미 공개된 상품입니다.">공개</button>
+                <button data-dialog="product-edit">수정</button>
               </div>
             </article>
             <article class="card product" data-row id="product-5">
@@ -127,8 +121,7 @@
               <h2>아날로그 시계</h2>
               <p>₩48,000</p>
               <div class="actions">
-                <button data-dialog="product-edit">수정</button
-                ><button data-notice="이미 공개된 상품입니다.">공개</button>
+                <button data-dialog="product-edit">수정</button>
               </div>
             </article>
             <article class="card product" data-row id="product-6">
@@ -139,8 +132,7 @@
               <h2>데일리 노트</h2>
               <p>₩12,000</p>
               <div class="actions">
-                <button data-dialog="product-edit">수정</button
-                ><button data-notice="이미 공개된 상품입니다.">공개</button>
+                <button data-dialog="product-edit">수정</button>
               </div>
             </article>
             <article class="card product" data-row id="product-7">
@@ -151,8 +143,7 @@
               <h2>우드 트레이</h2>
               <p>₩29,000</p>
               <div class="actions">
-                <button data-dialog="product-edit">수정</button
-                ><button data-notice="이미 공개된 상품입니다.">공개</button>
+                <button data-dialog="product-edit">수정</button>
               </div>
             </article>
           </div>

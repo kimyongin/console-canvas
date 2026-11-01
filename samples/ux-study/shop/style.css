@@ -410,3 +410,59 @@ details summary {
     grid-template-columns: 1fr;
   }
 }
+
+/* SHOP-1..5: responsive layout intent, no absolute offsets. */
+.product-grid {
+  gap: 16px;
+}
+.product {
+  display: flex;
+  flex-direction: column;
+}
+.product-art {
+  height: 112px;
+  flex-shrink: 0;
+  margin-bottom: 10px;
+}
+.product h2 {
+  min-height: 48px;
+  overflow-wrap: anywhere;
+}
+.product .actions {
+  margin-top: auto;
+  padding-top: 12px;
+}
+.filters {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto auto auto auto;
+  gap: 10px;
+}
+.filters button[data-reset] {
+  background: transparent;
+  border-color: transparent;
+  color: #59677b;
+}
+#primary-actions {
+  flex-shrink: 0;
+}
+@media (max-width: 800px) {
+  .page-head {
+    flex-direction: column;
+    gap: 14px;
+  }
+  #primary-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .filters {
+    grid-template-columns: 1fr 1fr;
+  }
+  .filters label:first-child {
+    grid-column: 1/-1;
+  }
+  .filters input,
+  .filters select {
+    width: 100%;
+  }
+}

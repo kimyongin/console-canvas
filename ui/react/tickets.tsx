@@ -55,16 +55,30 @@ function Tickets({ options }: { options: TicketUIOptions }) {
     [shared, setShared] = useState(false),
     [accessProject, setAccessProject] = useState(options.project || 'local-project');
   const refresh = async () =>
-    setRows(
-      (await listTickets(undefined, { status: filter || undefined, query, deleted, limit: 10000 }))
-        .tickets,
-    );
+    setRows((await listTickets(undefined, { deleted, limit: 10000 })).tickets);
   useEffect(() => {
     refresh().catch((e) => setError(e.message));
-  }, [filter, query, deleted]);
+  }, [deleted]);
   useEffect(() => {
-    sharedProjects().then((p) => setShared(p.includes(accessProject)));
+    let active = true;
+    setShared(false);
+    sharedProjects().then((p) => {
+      if (active) setShared(p.includes(accessProject));
+    });
+    return () => {
+      active = false;
+    };
   }, [accessProject]);
+  const visibleRows = rows.filter(
+    (t) =>
+      (!accessProject || t.project_id === accessProject) &&
+      (!filter || t.status === filter) &&
+      (!query ||
+        [t.display_id, t.title, t.request]
+          .join(' ')
+          .toLocaleLowerCase()
+          .includes(query.toLocaleLowerCase())),
+  );
   async function run(action: () => Promise<void>) {
     if (busy) return;
     setBusy(true);
@@ -407,17 +421,19 @@ function Tickets({ options }: { options: TicketUIOptions }) {
               {deleted ? '티켓 목록' : '휴지통'}
             </Button>
           </div>
-          {true && (
-            <label className="ticket-share">
-              공개 프로젝트
+          <div className="ticket-share">
+            <label>
+              프로젝트
               <select
-                aria-label="공개 프로젝트"
+                aria-label="프로젝트"
                 value={accessProject}
                 onChange={(e) => setAccessProject(e.target.value)}
               >
+                <option value="">모든 프로젝트</option>
                 {[
                   ...new Set([
                     options.project || 'local-project',
+                    ...(accessProject ? [accessProject] : []),
                     ...rows.map((t) => t.project_id),
                   ]),
                 ].map((p) => (
@@ -426,24 +442,28 @@ function Tickets({ options }: { options: TicketUIOptions }) {
                   </option>
                 ))}
               </select>
-              <input
-                id="share-project"
-                type="checkbox"
-                checked={shared}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  void run(async () => {
-                    await setProjectAccess(accessProject, checked);
-                    setShared(checked);
-                  });
-                }}
-              />{' '}
-              이 프로젝트의 저장된 티켓을 에이전트에 공개 · {accessProject}
             </label>
-          )}
+            {accessProject && (
+              <label>
+                <input
+                  id="share-project"
+                  type="checkbox"
+                  checked={shared}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    void run(async () => {
+                      await setProjectAccess(accessProject, checked);
+                      setShared(checked);
+                    });
+                  }}
+                />{' '}
+                이 프로젝트의 저장 티켓을 에이전트에 공개
+              </label>
+            )}
+          </div>
           <div id="ticket-list">
-            {rows.length ? (
-              rows.map((t) => (
+            {visibleRows.length ? (
+              visibleRows.map((t) => (
                 <article className="ticket-row" key={t.id} data-ticket-id={t.id}>
                   <Button
                     variant="ghost"
@@ -509,7 +529,9 @@ function Tickets({ options }: { options: TicketUIOptions }) {
               <p>
                 {deleted
                   ? '휴지통이 비어 있습니다.'
-                  : '티켓이 없습니다. 새 티켓을 만들어 편집을 시작하세요.'}
+                  : query || filter
+                    ? '조건에 맞는 티켓이 없습니다.'
+                    : '티켓이 없습니다. 새 티켓을 만들어 편집을 시작하세요.'}
               </p>
             )}
           </div>

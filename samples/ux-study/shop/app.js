@@ -36,3 +36,13 @@ document.querySelectorAll('[data-notice]').forEach((b) =>
     document.querySelector('#status').textContent = b.dataset.notice;
   }),
 );
+
+document.querySelector('.filters').addEventListener('submit', (e) => {
+  e.preventDefault();
+  document.querySelector('[data-filter]').click();
+});
+document.querySelector('[data-filter]').addEventListener('click', () => {
+  document.querySelector('#empty-results').hidden = !!document.querySelector(
+    '[data-row]:not([hidden])',
+  );
+});

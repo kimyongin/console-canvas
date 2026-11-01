@@ -146,12 +146,22 @@
 }
 .ticket-share {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 12px;
   background: #f4f3fc;
   border-radius: 8px;
   margin-bottom: 14px;
+}
+.ticket-share > label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.ticket-share select {
+  max-width: min(360px, 65vw);
 }
 .ticket-empty {
   position: absolute;

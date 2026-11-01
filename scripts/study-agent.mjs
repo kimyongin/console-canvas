@@ -95,7 +95,7 @@ try {
           operation_id: 'study-' + round + '-review-' + t.id,
           status: 'review',
           implementation_image_data_url: 'data:' + mime + ';base64,' + bytes.toString('base64'),
-          checks: report.checks,
+          checks: Array.isArray(report.checks) ? report.checks.join('\n') : report.checks,
           summary:
             t.case +
             ' 실제 샘플 소스 반영·검증 완료. 전체 페이지 결과는 같은 프로젝트의5개 요청을 함께 반영한 실제 화면입니다. 사람 승인은 받지 않았으므로 검토 대기로 둡니다.',

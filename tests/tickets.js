@@ -376,6 +376,38 @@ try {
   share.click();
   await until(async () => (await sharedProjects()).includes(project) && share.checked);
   check('Public-access switch stays on and reflects the real permission', share.checked);
+  const outside = await createTicket({
+    project_id: 'qa-other-catalog',
+    title: 'Other scope',
+    operation_id: 'catalog-other',
+  });
+  doc.querySelector('#tickets-dialog').close();
+  doc.querySelector('#tickets-button').click();
+  await until(() =>
+    doc.querySelector('select[aria-label="프로젝트"] option[value="qa-other-catalog"]'),
+  );
+  check(
+    'Catalog defaults to the current project instead of mixing scopes',
+    !doc.querySelector(`[data-ticket-id="${outside.id}"]`),
+  );
+  const projectFilter = doc.querySelector('select[aria-label="프로젝트"]');
+  projectFilter.value = '';
+  projectFilter.dispatchEvent(new frame.contentWindow.Event('change', { bubbles: true }));
+  await until(() => doc.querySelector(`[data-ticket-id="${outside.id}"]`));
+  check(
+    'All-project catalog exposes no misleading project permission checkbox',
+    !doc.querySelector('#share-project'),
+  );
+  projectFilter.value = 'qa-other-catalog';
+  projectFilter.dispatchEvent(new frame.contentWindow.Event('change', { bubbles: true }));
+  await until(
+    () => doc.querySelectorAll('.ticket-row').length === 1 && doc.querySelector('#share-project'),
+  );
+  check(
+    'Filtering another project does not grant it agent access',
+    !doc.querySelector('#share-project').checked &&
+      !(await sharedProjects()).includes('qa-other-catalog'),
+  );
   doc.querySelector('#tickets-dialog').close();
   const originalCount = (await listTickets(project, { limit: 10000 })).total;
   const originalAdd = IDBObjectStore.prototype.add;
