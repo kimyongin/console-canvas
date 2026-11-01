@@ -439,35 +439,3 @@ export function DocumentVisual({
     </div>
   );
 }
-
-export function renderQuickDocuments(host: Element, rows: DocumentRow[], loading: boolean) {
-  renderReact(
-    host,
-    <>
-      {loading && <p role="status">저장된 화면을 불러오는 중…</p>}
-      {!loading && !rows.length && <p role="status">일치하는 화면이 없습니다.</p>}
-      {rows.map((row) => (
-        <div key={row.id} className="quick-document">
-          <Button
-            className="quick-document-open"
-            variant="ghost"
-            disabled={row.disabled}
-            onClick={row.open}
-            title={row.url + ' · ' + row.captured}
-            aria-current={row.current ? 'true' : undefined}
-          >
-            <strong>
-              {row.title}
-              {row.current ? ' · 현재 작업' : ''}
-            </strong>
-            <small>주석 {row.summary?.commentCount || 0}개</small>
-            <small>
-              {row.date} · {row.url}
-            </small>
-          </Button>
-          <ActionMenu label={row.title} actions={row.actions} />
-        </div>
-      ))}
-    </>,
-  );
-}

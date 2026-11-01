@@ -150,6 +150,7 @@ function Tickets({ options }: { options: TicketUIOptions }) {
               setTicket(saved);
               setConfirming(false);
               await refresh();
+              options.close();
             });
           }}
         >

@@ -53,6 +53,23 @@ try {
       ticket.id === initial &&
       ticket.display_id.startsWith('CC-'),
   );
+  const rawCapture = structuredClone(app.state.snapshot);
+  rawCapture.id = crypto.randomUUID();
+  rawCapture.format = 'console-canvas-snapshot';
+  await app.importFile(new File([JSON.stringify(rawCapture)], 'collector.uiclone'));
+  const rawTicket = await getTicket(rawCapture.id);
+  check(
+    'An actual collector snapshot file opens as a ticket instead of a backup error',
+    app.state.snapshot.id === rawCapture.id && rawTicket?.status === 'draft',
+  );
+  check(
+    'An unknown file format is rejected without replacing current work',
+    (await rejects(() =>
+      app.importFile(new File([JSON.stringify({ format: 'unknown', version: 1 })], 'bad.json')),
+    )) && app.state.snapshot.id === rawCapture.id,
+  );
+  await app.openSnapshot(await getDocument(initial));
+  ticket = await getTicket(initial, project);
   const originalId = ticket.id;
   await setProjectAccess(project, true);
   await app.ticketWorkspace.permissions();
@@ -339,11 +356,12 @@ try {
     doc.querySelector('#ticket-request').value.includes('같은 티켓'),
   );
   doc.querySelector('#ticket-register').click();
-  await until(() => doc.querySelector('.ticket-image'));
+  await until(() => !doc.querySelector('#tickets-dialog').open);
   check(
     'Actual form confirms a goal on the same ID',
     (await getTicket(newId)).status === 'queued' &&
-      doc.querySelector('#tickets-content').textContent.includes(app.state.ticket.display_id),
+      !doc.querySelector('#tickets-dialog').open &&
+      app.state.ticket.id === newId,
   );
   doc.querySelector('#tickets-dialog').close();
   doc.querySelector('#tickets-button').click();

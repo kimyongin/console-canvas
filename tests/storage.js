@@ -125,8 +125,8 @@ try {
     'Concurrent document-open requests are serialized',
     app.state.ready && app.state.snapshot.id === b.id,
   );
-  // Exercise the retained document-name UI against current v2 storage.
-  doc.querySelector('#rename-current').click();
+  // Name and project use one form and one atomic session save.
+  doc.querySelector('#document-menu-button').click();
   const until = async (read) => {
     const end = Date.now() + 15000;
     while (!(await read())) {
@@ -134,16 +134,18 @@ try {
       await new Promise((r) => setTimeout(r, 30));
     }
   };
-  await until(() => doc.querySelector('#rename-dialog').open);
-  doc.querySelector('#rename-name').value = 'UI 이름 변경';
+  await until(() => doc.querySelector('#document-menu-content').matches(':popover-open'));
+  doc.querySelector('#ticket-name').value = 'UI 이름 변경';
+  doc.querySelector('#project-id').value = 'ui-project';
   doc
-    .querySelector('#rename-form')
+    .querySelector('#ticket-settings-form')
     .dispatchEvent(new doc.defaultView.Event('submit', { cancelable: true, bubbles: true }));
-  await until(() => !doc.querySelector('#rename-dialog').open);
+  await until(() => !doc.querySelector('#document-menu-content').matches(':popover-open'));
   await app.flushEditor();
   check(
     'Document rename UI saves the intended title',
-    (await getDocument(app.state.snapshot.id)).documentName === 'UI 이름 변경',
+    (await getDocument(app.state.snapshot.id)).documentName === 'UI 이름 변경' &&
+      (await getDocument(app.state.snapshot.id)).project_id === 'ui-project',
   );
   await saveSession(capture.id, { ...joined, updatedAt: '2000-01-01T00:00:00.000Z' });
   document.querySelector('#status').textContent = JSON.stringify({

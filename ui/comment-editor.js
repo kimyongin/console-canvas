@@ -54,8 +54,8 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
     }
     $('#comment-request').value = id;
     const index = requests.findIndex((r) => r.id === id);
-    $('#comment-progress').textContent =
-      `${queueMode ? '선택 대상' : '요청'} ${index + 1} / ${requests.length}`;
+    $('.comment-navigation').hidden = requests.length <= 1;
+    $('#comment-target-title').hidden = requests.length > 1;
     $('#comment-previous').disabled = index <= 0;
     $('#comment-next').disabled = index < 0 || index >= requests.length - 1;
     const point = pointTarget(id);

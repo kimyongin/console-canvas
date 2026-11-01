@@ -8,6 +8,8 @@ const fs = require('node:fs/promises'),
   assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..'),
   names = ['dashboard', 'shop', 'board', 'booking', 'cms'];
+const stage = process.argv[3];
+if (stage && !/^[a-z0-9_-]{1,32}$/i.test(stage)) throw Error('Invalid capture stage');
 const name = process.argv[2],
   index = names.indexOf(name);
 if (index < 0) throw Error('Choose dashboard/shop/board/booking/cms');
@@ -67,7 +69,7 @@ app.on('window-all-closed', () => {});
       await source.webContents.executeJavaScript('document.documentElement.outerHTML'),
       before,
     );
-    const out = path.join(root, 'local/ux-study', name);
+    const out = path.join(root, 'local/ux-study', name, ...(stage ? [stage] : []));
     await fs.mkdir(out, { recursive: true });
     await fs.writeFile(path.join(out, 'capture.uiclone'), JSON.stringify(snapshot));
     const width = snapshot.source.width,

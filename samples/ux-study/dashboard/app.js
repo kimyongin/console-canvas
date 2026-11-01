@@ -36,3 +36,8 @@ document.querySelectorAll('[data-notice]').forEach((b) =>
     document.querySelector('#status').textContent = b.dataset.notice;
   }),
 );
+
+document.querySelector('.filters').addEventListener('submit', (event) => {
+  event.preventDefault();
+  document.querySelector('[data-filter]').click();
+});

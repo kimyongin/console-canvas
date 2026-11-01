@@ -167,38 +167,18 @@ function commitCommentDraft() {
 }
 const { sizeChanged, zoomTo, fit, fitSelection } = createCanvasViewport({ $, state });
 const renameDialog = createRenameDialog({ $ });
-createDocumentSwitcher({
-  $,
-  state,
-  openTicket,
-  showTickets,
-  flushEditor,
-  closeDocument,
-  renameCurrent,
-  renameDialog,
-  toast,
-});
-function renameCurrent(name) {
-  state.snapshot.documentName = name;
-  renderDocumentName();
-  save();
-  getTicket(state.snapshot.id).then((t) => {
-    state.ticket = t;
-    renderTicketIdentity();
-  });
-}
+createDocumentSwitcher({ $, state, flushEditor, closeDocument, refresh: refreshTicket, toast });
 function renderDocumentName() {
   const name = state.ticket
     ? state.ticket.display_id + ' · ' + (state.snapshot?.documentName || state.ticket.title)
     : '티켓을 만들어 시작하세요';
   $('#source-title').textContent = name;
-  $('#document-title').textContent = name;
   $('#document-menu-button').title = name;
   renderTicketIdentity();
   for (const button of document.querySelectorAll('[data-current-document]'))
     button.disabled = !state.snapshot;
   $('#artboard-label').textContent = state.snapshot
-    ? name + ' / ' + state.snapshot.source.viewport.width + ' px'
+    ? '원본 · ' + state.snapshot.source.title + ' · ' + state.snapshot.source.viewport.width + ' px'
     : '';
 }
 function closeDocument(id) {
@@ -639,7 +619,7 @@ async function importFile(file) {
   if (file.size > 85_000_000)
     throw new Error('파일이 너무 큽니다. 85MB 이하의 화면 파일을 선택해 주세요.');
   const data = JSON.parse(await file.text());
-  if (data.format) {
+  if (data.format && data.format !== 'console-canvas-snapshot') {
     const doc = await importDocument(data);
     await openSnapshot(doc, doc.edits, doc.note || '', doc.annotations || {});
   } else await openSnapshot(data, data.edits || {}, data.note || '', data.annotations || {});
@@ -812,7 +792,6 @@ function renderTicketIdentity() {
         blocked: '확인 필요',
       }[ticket.status] || ''
     : '';
-  $('#ticket-id').textContent = ticket?.display_id || '';
   $('#ticket-id').hidden = !ticket;
   $('#new-ticket-button').disabled =
     !state.ready || !!ticket?.goal || !!state.snapshot?.source.empty;
@@ -911,22 +890,6 @@ $('#ticket-id').addEventListener('click', async () => {
 });
 $('#ticket-source').addEventListener('click', () => window.ConsoleCanvasDesktop?.showSource());
 $('#ticket-sample').addEventListener('click', loadSample);
-$('#project-id').addEventListener('change', async () => {
-  const key = $('#project-id').value.trim();
-  if (!key) {
-    $('#project-id').value = state.project_id;
-    return;
-  }
-  if (state.ticket?.goal) {
-    $('#project-id').value = state.project_id;
-    toast('목표를 확정한 티켓의 프로젝트는 바꿀 수 없습니다.');
-    return;
-  }
-  state.project_id = key;
-  state.revision++;
-  await flushEditor();
-  toast('이 티켓의 프로젝트를 설정했습니다.');
-});
 $('#duplicate-document').addEventListener('click', async () => {
   try {
     await flushEditor();

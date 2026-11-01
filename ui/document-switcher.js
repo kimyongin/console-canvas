@@ -1,70 +1,16 @@
-import { listDocuments, renameDocument, trashDocument } from '../db.js';
-import { renderQuickDocuments } from './react/lists.tsx';
-export function createDocumentSwitcher({
-  $,
-  state,
-  openTicket,
-  showTickets,
-  flushEditor,
-  closeDocument,
-  renameCurrent,
-  renameDialog,
-  toast,
-}) {
-  const menu = $('#document-menu-content');
-  let values = [];
-  const open = async (id) => {
-    menu.hidePopover();
-    await openTicket(id);
-  };
-  const rename = (value) => {
-    menu.hidePopover();
-    renameDialog.open('티켓 이름 변경', value.title, async (name) => {
-      await flushEditor();
-      await renameDocument(value.id, name);
-      if (value.id === state.snapshot?.id) renameCurrent(name);
-      toast('티켓 이름을 변경했습니다.');
-    });
-  };
-  async function trash(id) {
-    menu.hidePopover();
-    await flushEditor();
-    await trashDocument(id);
-    if (state.snapshot?.id === id) await closeDocument(id);
-    toast('티켓 휴지통에서 복구할 수 있습니다.');
-  }
-  function render() {
-    const query = $('#quick-document-search').value.toLocaleLowerCase();
-    const matches = values.filter((v) =>
-      (v.title + ' ' + v.url).toLocaleLowerCase().includes(query),
-    );
-    renderQuickDocuments(
-      $('#quick-documents'),
-      matches.slice(0, 10).map((v) => ({
-        id: v.id,
-        title: v.title,
-        url: v.url,
-        current: v.id === state.snapshot?.id,
-        summary: v,
-        date: '최근 편집 ' + new Date(v.updatedAt).toLocaleString(),
-        captured: '',
-        open: () => open(v.id),
-        rename: (name) => renameDocument(v.id, name),
-        actions: [
-          { label: '이름 변경', run: () => rename(v) },
-          { label: '휴지통으로 이동', run: () => trash(v.id) },
-        ],
-      })),
-      false,
-    );
-    $('#quick-document-status').textContent = matches.length + '개 티켓';
-  }
-  $('#quick-document-search').addEventListener('input', render);
-  menu.addEventListener('toggle', async (e) => {
-    if (e.newState !== 'open') return;
-    values = await listDocuments(10000);
-    render();
-    $('#quick-document-search').focus();
+import { trashDocument, cleanDocumentName } from '../db.js';
+import { getTicket, projectKey } from '../ticket-model.js';
+export function createDocumentSwitcher({ $, state, flushEditor, closeDocument, refresh, toast }) {
+  const menu = $('#document-menu-content'),
+    form = $('#ticket-settings-form');
+  let busy = false;
+  menu.addEventListener('toggle', () => {
+    if (!menu.matches(':popover-open')) return;
+    $('#ticket-name').value = state.snapshot?.documentName || state.snapshot?.source.title || '';
+    $('#project-id').value = state.project_id || '';
+    $('#project-id').disabled = !!state.ticket?.goal;
+    $('#project-id').title = state.ticket?.goal ? '확정 목표의 프로젝트는 바꿀 수 없습니다.' : '';
+    $('#ticket-settings-error').hidden = true;
   });
   menu.addEventListener('beforetoggle', (e) => {
     if (e.newState !== 'open') return;
@@ -72,19 +18,54 @@ export function createDocumentSwitcher({
     menu.style.left = Math.max(8, Math.min(innerWidth - 388, r.left)) + 'px';
     menu.style.top = r.bottom + 4 + 'px';
   });
-  for (const id of ['#documents-button', '#documents-trash-button'])
-    $(id).addEventListener('click', () => {
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (busy || !state.snapshot) return;
+    const inputName = $('#ticket-name').value,
+      inputProject = $('#project-id').value;
+    const previous = {
+      name: state.snapshot.documentName,
+      project: state.project_id,
+      revision: state.revision,
+    };
+    busy = true;
+    $('#save-ticket-settings').disabled = true;
+    try {
+      const name = cleanDocumentName(inputName),
+        project = projectKey(inputProject);
+      await flushEditor();
+      const current = await getTicket(state.snapshot.id);
+      if (current?.goal && current.project_id !== project)
+        throw Error('확정 목표의 프로젝트는 바꿀 수 없습니다.');
+      state.snapshot.documentName = name;
+      state.project_id = project;
+      state.revision++;
+      await flushEditor();
+      await refresh();
       menu.hidePopover();
-      showTickets();
-    });
-  $('#rename-current').addEventListener('click', () => {
-    if (state.snapshot)
-      rename({
-        id: state.snapshot.id,
-        title: state.snapshot.documentName || state.snapshot.source.title,
-      });
+      toast('티켓 설정을 저장했습니다.');
+    } catch (error) {
+      state.snapshot.documentName = previous.name;
+      state.project_id = previous.project;
+      state.revision = previous.revision;
+      $('#ticket-settings-error').textContent = error.message;
+      $('#ticket-settings-error').hidden = false;
+    } finally {
+      busy = false;
+      $('#save-ticket-settings').disabled = !state.snapshot;
+    }
   });
-  $('#trash-current').addEventListener('click', () => {
-    if (state.snapshot) trash(state.snapshot.id);
+  $('#trash-current').addEventListener('click', async () => {
+    if (!state.snapshot) return;
+    const id = state.snapshot.id;
+    try {
+      await flushEditor();
+      await trashDocument(id);
+      menu.hidePopover();
+      await closeDocument(id);
+      toast('티켓 휴지통에서 복구할 수 있습니다.');
+    } catch (error) {
+      toast(error.message);
+    }
   });
 }

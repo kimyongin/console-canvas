@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { Copy } from 'lucide-react';
 import type { EditorAdapter } from './store';
 import { dispatchEditorCommand } from './commands';
 import { Button } from './components/button';
@@ -39,13 +40,8 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           <span>
             {'Console '}
             <strong>{'Canvas'}</strong>
-            <small>{'PROTOTYPE'}</small>
           </span>
         </a>
-        <div className="document-title">
-          <span className="status-dot"></span>
-          <span id="document-title">{'화면을 가져와 편집 방향을 보여주세요'}</span>
-        </div>
         <div className="header-actions">
           <Button
             id="create-ticket"
@@ -60,7 +56,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             aria-label="티켓 ID 복사"
             hidden={!view?.ticketDisplayId}
           >
-            {view?.ticketDisplayId}
+            <Copy size={14} aria-hidden="true" />
           </Button>
           <span id="ticket-stage" aria-live="polite">
             {
@@ -213,14 +209,26 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                 <span aria-hidden="true">{'⌄'}</span>
               </Button>
               <div id="document-menu-content" className="document-menu-content" popover="auto">
-                <Input
-                  id="quick-document-search"
-                  type="search"
-                  aria-label="티켓 바로 검색"
-                  placeholder="문서 이름·주소로 검색"
-                />
-                <div id="quick-documents" className="quick-documents"></div>
-                <small id="quick-document-status" role="status"></small>
+                <form id="ticket-settings-form" className="ticket-settings-form">
+                  <label htmlFor="ticket-name">티켓 이름</label>
+                  <Input id="ticket-name" maxLength={120} required />
+                  <label htmlFor="project-id">프로젝트</label>
+                  <Input
+                    id="project-id"
+                    placeholder="레포지터리 이름 또는 로컬 경로"
+                    maxLength={300}
+                    required
+                  />
+                  <Button
+                    id="save-ticket-settings"
+                    type="submit"
+                    data-current-document=""
+                    disabled={true}
+                  >
+                    저장
+                  </Button>
+                  <p id="ticket-settings-error" role="alert" hidden></p>
+                </form>
                 <div className="document-management">
                   <Button
                     id="show-commands"
@@ -228,17 +236,6 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                     onClick={() => dispatchEditorCommand('commands')}
                   >
                     명령과 단축키…
-                  </Button>
-                  <Button id="documents-button" variant="outline">
-                    {'전체 티켓 목록…'}
-                  </Button>
-                  <Button
-                    id="rename-current"
-                    data-current-document=""
-                    disabled={true}
-                    variant="outline"
-                  >
-                    {'이름 변경…'}
                   </Button>
                   <Button id="import-button" variant="outline">
                     {'편집 파일 열기…'}
@@ -251,11 +248,14 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                   >
                     {'편집 파일 저장…'}
                   </Button>
-                  <p className="document-save-help">
-                    {
-                      '\n                작업은 자동 저장됩니다. 티켓 안의 편집·주석·목표·작업 기록이 함께 저장됩니다.\n              '
-                    }
-                  </p>
+                  <Button
+                    id="duplicate-document"
+                    variant="outline"
+                    data-current-document=""
+                    disabled={true}
+                  >
+                    새 티켓으로 복제
+                  </Button>
                   <Button
                     id="direct-open-source"
                     data-current-document=""
@@ -265,17 +265,6 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                     원본 사이트 열기
                   </Button>
                   <details id="source-details">
-                    <label>
-                      프로젝트
-                      <Input
-                        id="project-id"
-                        placeholder="레포지터리 이름 또는 로컬 경로"
-                        maxLength={300}
-                      />
-                    </label>
-                    <Button id="duplicate-document" variant="outline">
-                      새 티켓으로 복제
-                    </Button>
                     <summary>{'원본 정보'}</summary>
                     <a id="source-url" target="_blank" rel="noreferrer" hidden={true}></a>
                     <div id="source-meta" className="source-meta">
@@ -285,9 +274,6 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                       {'원본에서 다시 가져오기'}
                     </Button>
                   </details>
-                  <Button id="documents-trash-button" variant="outline">
-                    {'티켓 휴지통…'}
-                  </Button>
                   <Button
                     id="trash-current"
                     data-current-document=""
@@ -839,7 +825,6 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             <Button id="comment-next" variant="outline" aria-label="다음 요청">
               다음 →
             </Button>
-            <span id="comment-progress" role="status"></span>
           </div>
           <strong id="comment-target-title"></strong>
           <div
@@ -912,7 +897,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           <h2>{'에이전트와 함께 편집'}</h2>
           <h3>로컬 MCP 서버 연결</h3>
           <p>
-            {'\n        연결한 이 화면의 복제본만 에이전트가 읽고 편집합니다.'}
+            {'허용한 프로젝트의 저장 티켓만 에이전트가 읽고 편집합니다.'}
             <br />
             {'독립 앱에서는 자동으로\n        연결됩니다.\n      '}
           </p>

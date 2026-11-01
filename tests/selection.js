@@ -365,7 +365,7 @@ try {
   app.selectNode(first.id);
   doc.querySelector('#component-comment').value = '전환 전에 남긴 미저장 주석';
   doc.querySelector('#review-note').value = '전환 전에 남긴 추가 설명';
-  doc.querySelector('#documents-button').click();
+  doc.querySelector('#tickets-button').click();
   await until(
     () =>
       doc.querySelector('#tickets-dialog').open && doc.querySelectorAll('.ticket-row').length >= 2,
@@ -405,7 +405,7 @@ try {
     'Switching saved documents restores copy geometry, comments',
     app.state.scene.nodes.has(copyRoot) && app.state.scene.annotations[copyRoot] === '복사한 주석',
   );
-  doc.querySelector('#documents-button').click();
+  doc.querySelector('#tickets-button').click();
   await until(
     () =>
       doc.querySelector('#tickets-dialog').open && doc.querySelectorAll('.ticket-row').length >= 2,
