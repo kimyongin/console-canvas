@@ -22,6 +22,7 @@ export function createEditorSession({
     };
   }
   function applyCheckpoint(point) {
+    state.resetComment?.();
     state.commentTarget = null;
     state.activityHead = point.activityHead || null;
     state.scene.setResourceRepairs(point.resourceRepairs || [], point.edits, point.annotations);

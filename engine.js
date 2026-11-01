@@ -401,6 +401,7 @@ export class CanvasScene {
     };
   }
   select(id, { additive = false, ids = null } = {}) {
+    if (this.callbacks.onBeforeSelect?.(id) === false) return;
     if (ids) this.selection = new Set(ids.filter((key) => this.elements.has(key)).slice(0, 100));
     else if (additive && this.elements.has(id)) {
       if (this.selection.has(id)) this.selection.delete(id);
@@ -943,7 +944,7 @@ export class CanvasScene {
     const r = this.selected ? this.rect(this.selected) : this.pointComment;
     button.style.cssText =
       'all:initial!important;position:absolute!important;z-index:2147483647!important;cursor:pointer!important;background:#6557dc!important;color:white!important;border-radius:7px!important;box-shadow:0 2px 8px #31236e55!important;text-align:center!important;';
-    if (!r || this.drag?.started || this.areaSelecting) {
+    if (this.selected || !r || this.drag?.started || this.areaSelecting) {
       button.style.setProperty('display', 'none', 'important');
       return;
     }

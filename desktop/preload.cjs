@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('ConsoleCanvasDesktop', {
   renderImage: (value) => ipcRenderer.invoke('canvas:render-image', value),
   saveFile: (value) => ipcRenderer.invoke('canvas:save-file', value),
   getConnection: () => ipcRenderer.invoke('canvas:connection'),
+  copyMcpCommand: () => ipcRenderer.invoke('canvas:editor-mcp-copy'),
+  copyRequest: (text) => ipcRenderer.invoke('canvas:editor-copy-request', text),
   onHistory: (callback) =>
     ipcRenderer.on('canvas:history', (_event, command) => {
       if (['undo', 'redo'].includes(command)) callback(command);

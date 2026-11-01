@@ -124,6 +124,32 @@ async function main() {
       'Capture/MCP missing',
     );
     assert.equal(await evaluate(source, 'document.documentElement.outerHTML'), before);
+    const clipboard = require('electron').clipboard;
+    const originalCopy = clipboard.writeText,
+      copies = [];
+    clipboard.writeText = (text) => {
+      assert.equal(typeof text, 'string');
+      copies.push(text);
+    };
+    try {
+      await evaluate(
+        shell,
+        "window.ConsoleCanvasShell.workspace({action:'copy-handoff',intent:'read'})",
+      );
+      const projectId = await evaluate(editor, 'window.ConsoleCanvas.state.project_id');
+      assert.ok(copies.at(-1).includes(projectId) && copies.at(-1).includes('조회만'));
+      await evaluate(
+        editor,
+        "window.ConsoleCanvas.projectWorkflow.execute({action:'copy-handoff',intent:'implement',scope:'project'})",
+      );
+      assert.ok(copies.at(-1).includes('요청 시점'));
+      await evaluate(editor, 'window.ConsoleCanvasDesktop.copyMcpCommand()');
+      assert.ok(copies.at(-1).includes('mcp/server.py'));
+      assert.equal(await evaluate(source, 'typeof window.ConsoleCanvasDesktop'), 'undefined');
+    } finally {
+      clipboard.writeText = originalCopy;
+    }
+
     await evaluate(
       editor,
       `(async()=>{const a=window.ConsoleCanvas,n=[...a.state.scene.nodes.values()].find(n=>n.locator.id==='new-customer');a.selectNode(n.id);a.state.scene.setComment(n.id,'제목과 정렬하고 모바일에서는 전체 너비로 보여주세요.');await a.flushEditor();})()`,
@@ -163,8 +189,7 @@ async function main() {
     if (process.env.CONSOLE_CANVAS_GUIDE_CAPTURE_DIR) {
       await evaluate(editor, 'window.ConsoleCanvas.confirmCurrentTicket()');
       await until(
-        () =>
-          evaluate(shell, "document.querySelector('#shell-ticket-status').textContent==='확정'"),
+        () => evaluate(shell, "document.querySelector('#shell-confirm').textContent==='확정됨'"),
         'Guide confirmation missing',
       );
       await screenshot(window, '04-confirmed');
@@ -266,6 +291,7 @@ async function main() {
     await fs.writeFile(
       path.join(directory, 'prepare-ready.json'),
       JSON.stringify({
+        scopedRequestClipboard: true,
         narrowHeader: true,
         firstImportCancel: true,
         sourceRoundTrip: true,
@@ -292,7 +318,7 @@ async function main() {
       `(async()=>{const a=window.ConsoleCanvas,n=[...a.state.scene.nodes.values()].find(n=>n.locator.id==='new-customer');a.selectNode(n.id);a.state.scene.setPosition(23,31);a.state.scene.setComment(n.id,'제목과 정렬하고 모바일에서는 전체 너비로 배치해 주세요.');const copy=a.state.scene.pasteSelection(a.state.scene.copySelection())[0];document.querySelector('#review-note').value='버튼과 검색 영역의 간격을 정리해 주세요.';a.state.snapshot.documentName='고객 검색 개선';await a.flushEditor();await a.confirmCurrentTicket();const current=await(await import('/ticket-model.js')).getTicket(a.state.snapshot.id);const tickets=await(await import('/ticket-model.js')).listTickets(a.state.project_id);return {document_id:a.state.snapshot.id,node:n.id,copyId:copy,ticketId:tickets.tickets.find(t=>t.document_id===a.state.snapshot.id).id,project_id:a.state.project_id,goal_id:current.goal.id};})()`,
     );
     await until(
-      () => evaluate(shell, "document.querySelector('#shell-ticket-status').textContent==='확정'"),
+      () => evaluate(shell, "document.querySelector('#shell-confirm').textContent==='확정됨'"),
       'Confirmed header missing',
     );
     await evaluate(shell, "window.ConsoleCanvasShell.workspace({action:'tickets'})");

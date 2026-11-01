@@ -4,7 +4,14 @@ import { clearReact } from './react/mount.tsx';
 import { elementLabel } from './element-labels.js';
 import { pointTarget } from '../edit-commands.js';
 import { isComposingKey } from './keyboard.js';
-export function createCommentEditor({ $, state, commit, flushEditor }) {
+export function createCommentEditor({
+  $,
+  state,
+  commit,
+  flushEditor,
+  revealPanel,
+  renderRequests,
+}) {
   const dialog = $('#comment-dialog'),
     field = $('#component-comment');
   let timer,
@@ -13,13 +20,26 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
     documentId = null,
     composing = false;
   function close() {
+    if (composing) throw Error('한글 입력을 마친 뒤 다시 시도해 주세요.');
     clearTimeout(timer);
+    state.commentEditing = false;
+    state.commentTarget = null;
+    $('#inline-comment-editor').hidden = true;
+    dialog.append($('#comment-composer'));
+    clearReact($('#comment-target-preview'));
     composing = false;
     if (dialog.open) dialog.close();
+    renderRequests();
   }
-  function open({ id = state.scene?.selected, navigating = false, ids = null } = {}) {
+  function open({
+    id = state.scene?.selected,
+    navigating = false,
+    ids = null,
+    expanded = false,
+  } = {}) {
     if (!state.scene || !id) return;
     if (navigating && documentId !== state.snapshot?.id) return;
+    if (composing) throw Error('한글 입력을 마친 뒤 다시 시도해 주세요.');
     clearTimeout(timer);
     commit();
     if (!navigating) {
@@ -64,6 +84,7 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
     const point = pointTarget(id);
     if (!point && !state.scene.nodes.has(id)) return;
     state.commentTarget = id;
+    state.commentEditing = true;
     $('#comment-dialog-title').textContent = point
       ? '위치에 주석 남기기'
       : '컴포넌트에 주석 남기기';
@@ -72,7 +93,18 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
       : elementLabel(state.scene.nodes.get(id), state.snapshot.layerNames);
     field.value = state.scene.annotations[id] || '';
     $('#clear-comment').disabled = !field.value;
-    if (!dialog.open) dialog.showModal();
+    $('#inline-comment-heading').hidden = expanded;
+    $('#save-comment').hidden = !expanded;
+    $('#comment-target-preview').hidden = !expanded;
+    $('#inline-comment-editor').hidden = expanded;
+    if (expanded) {
+      dialog.append($('#comment-composer'));
+      if (!dialog.open) dialog.showModal();
+    } else {
+      revealPanel();
+      $('#inline-comment-editor').append($('#comment-composer'));
+    }
+
     $('#comment-status').textContent = state.lastSaveError
       ? '자동 저장 실패 · 파일로 백업해 주세요: ' + state.lastSaveError
       : '입력 내용은 자동 저장됩니다.';
@@ -86,14 +118,16 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
     const reference = scene.hidden(id) ? scene.referenceFrame() : null;
     $('#comment-preview-label').textContent = reference ? '삭제 전 참고' : '';
     $('#comment-preview-label').hidden = !reference;
-    renderTargetPreview(
-      $('#comment-target-preview'),
-      reference?.html || scene.serialize(),
-      reference?.size || scene.contentSize(),
-      rect,
-      100,
-      id,
-    );
+    if (expanded)
+      renderTargetPreview(
+        $('#comment-target-preview'),
+        reference?.html || scene.serialize(),
+        reference?.size || scene.contentSize(),
+        rect,
+        100,
+        id,
+      );
+    renderRequests();
     field.focus();
   }
   function scheduleSave() {
@@ -126,6 +160,11 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
   });
   field.addEventListener('input', scheduleSave);
   field.addEventListener('keydown', (e) => {
+    if ((composing || isComposingKey(e)) && ['Enter', 'Escape'].includes(e.key)) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      return;
+    }
     if (!composing && !isComposingKey(e) && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
       commit();
@@ -142,18 +181,28 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
     }
   });
   dialog.addEventListener('close', () => {
-    if (dialog.open) return;
+    if (dialog.open || (!$('#inline-comment-editor').hidden && state.commentEditing)) return;
+    state.commentEditing = false;
+    $('#inline-comment-editor').hidden = true;
     composing = false;
     clearTimeout(timer);
     state.commentTarget = null;
     ((requests = []), (queueMode = false), (documentId = null));
     clearReact($('#comment-target-preview'));
   });
+  $('#expand-comment-editor').onclick = () => open({ id: state.commentTarget, expanded: true });
+  $('#close-inline-comment').onclick = () => {
+    if (composing) return;
+    commit();
+    close();
+  };
   $('#close-comment-dialog').addEventListener('click', () => {
+    if (composing) return;
     commit();
     close();
   });
   $('#save-comment').addEventListener('click', () => {
+    if (composing) return;
     commit();
     close();
   });
@@ -169,5 +218,5 @@ export function createCommentEditor({ $, state, commit, flushEditor }) {
   $('#comment-request').addEventListener('change', () =>
     open({ id: $('#comment-request').value, navigating: true }),
   );
-  return { open, reset: close, position() {} };
+  return { open, reset: close, isComposing: () => composing, position() {} };
 }

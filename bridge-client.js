@@ -1,5 +1,5 @@
 // HTTP is only the authenticated loopback link. MCP itself runs over stdio.
-export function createMcpBridge({ metadata, execute, onStatus }) {
+export function createMcpBridge({ metadata, execute, onStatus, refreshConnection }) {
   let current = null,
     generation = 0;
   async function call(connection, path, body) {
@@ -54,11 +54,19 @@ export function createMcpBridge({ metadata, execute, onStatus }) {
       } catch (error) {
         if (current !== connection || generation !== version) return;
         if (error.permanent) {
+          // Only a rejected authentication request may be retried. The native
+          // preload returns this same app's credential; never follow a new origin.
+          const fresh = await Promise.resolve(refreshConnection?.()).catch(() => null);
+          if (fresh?.url === connection.url && fresh.token && fresh.token !== connection.token) {
+            connection.token = fresh.token;
+            continue;
+          }
           current = null;
           generation++;
           connection.controller.abort();
           onStatus({
             connected: false,
+            authenticationError: true,
             message: 'MCP 인증이 변경되었습니다. 다시 연결하거나 앱을 다시 열어 주세요.',
           });
           return;

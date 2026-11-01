@@ -105,3 +105,132 @@
   border-radius: 5px;
   white-space: nowrap;
 }
+/* Workflow feedback and controls stay inside the header at narrow widths. */
+.app-header {
+  padding-inline: 16px;
+  gap: 8px;
+}
+.app-header .brand {
+  flex: none;
+  font-size: 14px;
+}
+#project-control {
+  min-width: 0;
+  flex: 0 1 180px;
+}
+#project-control select {
+  width: 100%;
+  min-width: 90px;
+}
+#header-ticket-identity {
+  flex: 1 1 80px;
+  max-width: none;
+}
+.app-header .header-actions {
+  flex: none;
+  gap: 6px;
+}
+
+.workflow-nav button,
+.app-header .header-actions button {
+  padding-inline: 10px;
+}
+.connection-facts {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 12px;
+}
+.connection-facts dt {
+  color: #747a90;
+}
+.connection-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+#connection-recovery {
+  color: #747a90;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.ticket-source {
+  font-size: 10px;
+  color: #858b9b;
+}
+.ticket-handoff {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 14px;
+}
+.ticket-handoff details {
+  position: relative;
+}
+.ticket-handoff summary {
+  cursor: pointer;
+  color: #747a90;
+}
+.ticket-handoff details button {
+  display: block;
+  margin-top: 8px;
+}
+#inline-comment-editor {
+  border: 1px solid #d9d4f8;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 12px 0;
+  background: #faf9ff;
+}
+#inline-comment-heading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+#inline-comment-heading strong {
+  flex: 1;
+}
+#inline-comment-heading button {
+  padding: 3px 7px;
+}
+#inline-comment-editor #component-comment {
+  min-height: 120px;
+  width: 100%;
+  resize: vertical;
+}
+#inline-comment-editor .comment-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+#inline-comment-editor .comment-navigation select {
+  width: 100%;
+}
+#inline-comment-editor .comment-dialog-footer {
+  display: block;
+  padding: 10px 0 0;
+}
+#inline-comment-editor #comment-status {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+}
+#inline-comment-editor #clear-comment {
+  padding: 3px 6px;
+  font-size: 11px;
+}
+@media (max-width: 1100px) {
+  .app-header .brand {
+    font-size: 0;
+  }
+  .app-header .brand::before {
+    content: '▧';
+    font-size: 22px;
+    color: #5a55d9;
+  }
+  #project-control {
+    flex-basis: 140px;
+  }
+  .workflow-nav button {
+    padding-inline: 6px;
+  }
+}

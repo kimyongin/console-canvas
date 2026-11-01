@@ -411,6 +411,14 @@ $('#auto-download-updates').addEventListener('change', () =>
   ),
 );
 
+let statusTimer;
+function flashStatus(message) {
+  clearTimeout(statusTimer);
+  $('#status').textContent = message;
+  statusTimer = setTimeout(() => {
+    if ($('#status').textContent === message) $('#status').textContent = '';
+  }, 4500);
+}
 let workspace = null,
   afterProject = null;
 function showError(error) {
@@ -420,30 +428,39 @@ function updateWorkspaceVisibility() {
   const editing = currentState?.view === 'editor',
     ticket = workspace?.ticket;
   $('#shell-ticket').hidden = !editing || !ticket;
-  $('#shell-ticket-status').hidden = !editing || !ticket;
   $('#shell-confirm').hidden = !editing || !ticket;
   $('#shell-ticket-menu').hidden = !editing || !ticket;
+  $('#shell-handoff').hidden = !editing || !ticket;
   $('#show-editor').disabled = !workspace?.ready;
   $('#show-tickets').disabled = !workspace?.project;
   $('#shell-confirm').disabled =
     !workspace?.ready ||
+    workspace?.confirming ||
+    workspace?.save?.pending ||
     ['working', 'review', 'done'].includes(ticket?.status) ||
     (ticket?.status === 'queued' && !ticket?.needs_reconfirmation);
-  $('#shell-confirm').textContent = ticket?.needs_reconfirmation ? '재확정' : '확정';
+  $('#shell-confirm').textContent = workspace?.confirming
+    ? '확정 중…'
+    : workspace?.save?.error
+      ? '저장 재시도·확정'
+      : workspace?.save?.pending
+        ? '저장 중…'
+        : ticket?.revision_requested
+          ? '변경 요청'
+          : ticket?.needs_reconfirmation
+            ? '재확정'
+            : {
+                queued: '확정됨',
+                working: '작업 중',
+                review: '검토 대기',
+                done: '완료',
+                blocked: '확인·재확정',
+              }[ticket?.status] || '확정';
+  $('#show-editor').title = workspace?.ready
+    ? '최근 편집 티켓으로 돌아가기'
+    : '화면을 가져오면 열 수 있습니다';
   $('#shell-ticket').title = ticket ? ticket.display_id + ' · ' + ticket.title : '';
   $('#shell-ticket').textContent = ticket ? ticket.display_id + ' · ' + ticket.title : '';
-  $('#shell-ticket-status').textContent = ticket?.revision_requested
-    ? '변경 요청'
-    : ticket?.needs_reconfirmation
-      ? '재확정 필요'
-      : {
-          draft: '편집 중',
-          queued: '확정',
-          working: '작업 중',
-          review: '검토 대기',
-          done: '완료',
-          blocked: '확인 필요',
-        }[ticket?.status] || '';
 }
 function showWorkspace(value) {
   workspace = value;
@@ -525,8 +542,7 @@ for (const id of ['#copy-project-connection', '#copy-project-created'])
   $(id).onclick = async () => {
     try {
       await api.workspace({ action: 'copy-connection' });
-      $('#status').textContent =
-        '연결 요청을 복사했습니다. 현재 저장소의 에이전트 대화에 붙여 넣으세요.';
+      flashStatus('연결 요청을 복사했습니다. 현재 저장소의 에이전트 대화에 붙여 넣으세요.');
       $('#project-connect-hint').hidden = true;
       $('#project-menu').hidden = true;
     } catch (error) {
@@ -550,7 +566,7 @@ $('#project-menu-button').onclick = async () => {
   if (action === 'copy-connection') {
     try {
       await api.workspace({ action });
-      $('#status').textContent = '연결 요청을 복사했습니다.';
+      flashStatus('연결 요청을 복사했습니다.');
     } catch (error) {
       showError(error);
     }
@@ -566,7 +582,7 @@ $('#shell-ticket').onclick = () =>
   api
     .workspace({ action: 'copy-ticket-id' })
     .then(() => {
-      $('#status').textContent = '티켓 ID를 복사했습니다.';
+      flashStatus('티켓 ID를 복사했습니다.');
     })
     .catch(showError);
 $('#cancel-project-rename').onclick = () => ($('#project-menu').hidden = true);
@@ -582,3 +598,11 @@ $('#project-menu').addEventListener('keydown', (event) => {
     $('#cancel-project-rename').click();
   }
 });
+
+$('#shell-handoff').onclick = () =>
+  api
+    .workspace({ action: 'copy-handoff', intent: 'read', scope: 'ticket' })
+    .then(() => {
+      flashStatus('조회 요청을 복사했습니다.');
+    })
+    .catch(showError);

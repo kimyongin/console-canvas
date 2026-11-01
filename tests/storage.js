@@ -107,6 +107,7 @@ try {
     oldId = app.state.snapshot.id;
   const node = [...app.state.scene.nodes.values()].find((n) => n.tag === 'button');
   app.selectNode(node.id);
+  doc.querySelector('#context-comment').click();
   doc.querySelector('#component-comment').value = 'unfinished comment before switching';
   doc.querySelector('#review-note').value = 'unfinished note';
   const next = structuredClone(app.state.snapshot);

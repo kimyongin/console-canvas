@@ -3,6 +3,8 @@ export interface EditorView {
   ticketDisplayId: string;
   ticketStatus: string;
   goalConfirmed: boolean;
+  confirming: boolean;
+  revisionRequested: boolean;
   needsReconfirmation: boolean;
   emptyCapture: boolean;
   generation: number;
@@ -15,6 +17,9 @@ export interface EditorView {
   save: { pending: boolean; error: string | null; message: string };
 }
 export type EditorCommand =
+  | 'handoff-read'
+  | 'handoff-design'
+  | 'handoff-implement'
   | 'tickets'
   | 'confirm-ticket'
   | 'capture-back'

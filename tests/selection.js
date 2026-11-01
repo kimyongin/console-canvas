@@ -257,7 +257,7 @@ try {
   );
   check(
     'Selection shows a contextual comment action without changing editing modes',
-    scene.addCommentButton.style.display !== 'none' && !doc.querySelector('#comment-mode'),
+    scene.addCommentButton.style.display === 'none' && !doc.querySelector('#comment-mode'),
   );
   root.setPointerCapture = oldSet;
   root.hasPointerCapture = oldHas;
@@ -363,6 +363,7 @@ try {
   await app.openSnapshot(other);
   const otherId = app.state.snapshot.id;
   app.selectNode(first.id);
+  doc.querySelector('#context-comment').click();
   doc.querySelector('#component-comment').value = '전환 전에 남긴 미저장 주석';
   doc.querySelector('#review-note').value = '전환 전에 남긴 추가 설명';
   doc.querySelector('#tickets-button').click();

@@ -225,6 +225,13 @@ def stdio(connection, connection_file=None):
                         result = {'content': [{'type': 'image', 'mimeType': 'image/png', 'data': image}, {'type': 'text', 'text': json.dumps(value, ensure_ascii=False)}], 'structuredContent': value, 'isError': False}
                     else:
                         result = {'content': [{'type': 'text', 'text': json.dumps(value, ensure_ascii=False)}], 'structuredContent': value, 'isError': not value.get('ok', False)}
+                except urllib.error.HTTPError as error:
+                    value = {'ok': False, 'error': {
+                        'code': 'connection_authentication_failed' if error.code in (401, 403) else 'connection_failed',
+                        'message': 'Console Canvas connection was rejected. Reconnect this MCP client using the installed app connection command. Do not disable authentication.',
+                        'http_status': error.code,
+                        'recovery': 'Open the canvas connection status, copy the current MCP command if the configured path changed, then reconnect the MCP client. A running local server does not prove this client is authenticated.'}}
+                    result = {'content': [{'type': 'text', 'text': json.dumps(value)}], 'structuredContent': value, 'isError': True}
                 except (ValueError, OSError) as error:
                     result = {'content': [{'type': 'text', 'text': str(error)}], 'isError': True}
             else:

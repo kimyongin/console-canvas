@@ -95,8 +95,3 @@
 #tickets-content > p {
   margin: 0;
 }
-#ticket-stage {
-  font-size: 12px;
-  white-space: nowrap;
-  color: #5b5670;
-}

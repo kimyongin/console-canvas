@@ -37,6 +37,13 @@ export function createRequestsPanel({ $, state, selectNode, focusComment }) {
     $('#requests-search').hidden = rows.length < 6 && !query;
     $('#activity-count').textContent = String(rows.length);
     for (const r of rows.filter((r) => (r.name + ' ' + r.text).toLowerCase().includes(query))) {
+      if (
+        r.comment &&
+        state.commentEditing &&
+        r.id === state.commentTarget &&
+        !$('#inline-comment-editor').hidden
+      )
+        continue;
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'request-row';
@@ -53,7 +60,7 @@ export function createRequestsPanel({ $, state, selectNode, focusComment }) {
       };
       host.append(b);
     }
-    if (!host.childElementCount) {
+    if (!host.childElementCount && !state.commentEditing) {
       const p = document.createElement('p');
       p.className = 'empty-small';
       p.textContent = query

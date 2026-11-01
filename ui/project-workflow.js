@@ -6,6 +6,7 @@ import {
   updateProject,
   connectionRequest,
 } from '../project-model.js';
+import { agentRequest } from '../handoff-request.js';
 // Project state belongs to storage, never to the agent transport's global context.
 export function createProjectWorkflow({
   state,
@@ -17,6 +18,7 @@ export function createProjectWorkflow({
   publish,
   leave,
   importFile,
+  copyRequest,
 }) {
   let selected = null;
   async function initialize() {
@@ -42,6 +44,8 @@ export function createProjectWorkflow({
           }
         : null,
       ready: state.ready,
+      confirming: !!state.confirming,
+      save: { pending: !!state.savePending, error: state.lastSaveError || null },
     };
   }
   async function emit() {
@@ -49,7 +53,16 @@ export function createProjectWorkflow({
     publish(value);
     return value;
   }
-  async function execute({ action, id, name, url, content }) {
+  async function execute({
+    action,
+    id,
+    name,
+    url,
+    content,
+    intent = 'read',
+    scope = 'ticket',
+    viaShell = false,
+  }) {
     if (action === 'state') return emit();
     if (action === 'create') {
       await flush();
@@ -80,12 +93,24 @@ export function createProjectWorkflow({
     } else if (action === 'rename') await updateProject(state.project_id, { name });
     else if (action === 'save-url') {
       if (state.project_id) await updateProject(state.project_id, { last_url: url });
+    } else if (action === 'copy-handoff') {
+      await flush();
+      const project = await getProject(state.project_id);
+      const request = agentRequest(project, {
+        ticket: scope === 'ticket' ? state.ticket : null,
+        intent,
+      });
+      if (window.ConsoleCanvasDesktop && viaShell)
+        return { ...(await view()), connection_request: request };
+      await (copyRequest ? copyRequest(request) : navigator.clipboard.writeText(request));
     } else if (action === 'copy-connection') {
       const project = await getProject(state.project_id);
       if (!project) throw Error('프로젝트를 먼저 만들어 주세요.');
-      if (window.ConsoleCanvasDesktop)
+      if (window.ConsoleCanvasDesktop && viaShell)
         return { ...(await view()), connection_request: connectionRequest(project) };
-      await navigator.clipboard.writeText(connectionRequest(project));
+      await (copyRequest
+        ? copyRequest(connectionRequest(project))
+        : navigator.clipboard.writeText(connectionRequest(project)));
     } else if (action === 'copy-ticket-id')
       return { ...(await view()), connection_request: state.ticket?.display_id || '' };
     else if (action === 'tickets') await showTickets();

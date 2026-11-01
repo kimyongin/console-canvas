@@ -1,5 +1,5 @@
 import { createProjectWorkflow } from './ui/project-workflow.js';
-import { updateProject, listProjects, activeProject } from './project-model.js';
+import { updateProject, getProject, listProjects, activeProject } from './project-model.js';
 import { createTicketWorkspace } from './ticket-workspace.js';
 import { isComposingKey } from './ui/keyboard.js';
 import { getTicket, confirmTicketGoal } from './ticket-model.js';
@@ -96,6 +96,8 @@ const adapter = createEditorAdapter(() => ({
   selectedHidden: !!(state.scene?.selected && state.scene.hidden(state.scene.selected)),
   undoCount: state.undo.length,
   redoCount: state.redo.length,
+  confirming: !!state.confirming,
+  revisionRequested: !!state.ticket?.revision_requested,
   save: {
     pending: !!state.savePending,
     error: state.lastSaveError,
@@ -113,6 +115,10 @@ const kinds = {
   element: '요소',
 };
 const toast = createToast({ $ });
+let noteBaseline = '',
+  noteTimer,
+  noteComposing = false;
+let commentEditor = null;
 const {
   checkpoint,
   applyCheckpoint,
@@ -128,6 +134,7 @@ const {
   getNote: () => $('#review-note').value,
   setNote: (value) => {
     $('#review-note').value = value;
+    noteBaseline = value;
   },
   status: (message) => {
     state.saveMessage = message;
@@ -135,6 +142,7 @@ const {
     state.savePending = message === '저장 중…';
     if (message === '자동 저장 완료') void refreshTicket();
     adapter.publish();
+    state.publishWorkspace?.();
   },
   commitCommentDraft,
   render: () => {
@@ -167,7 +175,10 @@ function renderHistory() {
   $('#redo').disabled = !state.redo.length;
 }
 function commitCommentDraft() {
-  if (state.scene && state.commentTarget)
+  if (noteComposing || commentEditor?.isComposing())
+    throw Error('한글 입력을 마친 뒤 다시 시도해 주세요.');
+  commitNoteDraft();
+  if (state.scene && state.commentEditing && state.commentTarget)
     state.scene.setComment(state.commentTarget, $('#component-comment').value);
 }
 const { sizeChanged, zoomTo, fit, fitSelection } = createCanvasViewport({ $, state });
@@ -361,14 +372,21 @@ const { renderLayers, restoreNavigation } = createDocumentLists({
     $('#layer-alias').select();
   },
 });
-const commentEditor = createCommentEditor({
+commentEditor = createCommentEditor({
   $,
   state,
   commit: commitCommentDraft,
   flushEditor,
+  revealPanel: () => setPanelVisibility('properties', true),
+  renderRequests: () => activityPanel.render(),
 });
+state.resetComment = commentEditor.reset;
 function focusComment(options = {}) {
-  commentEditor.open(options);
+  try {
+    commentEditor.open(options);
+  } catch (e) {
+    toast(e.message);
+  }
 }
 createSourceComparison({ $, state, adapter, commitCommentDraft, workspace: captureWorkspace });
 createResourceRepair({
@@ -517,10 +535,12 @@ async function openDocument(snapshot, edits = {}, note = '', annotations = {}) {
     snapshot.nodes.length.toLocaleString() +
     '개 요소';
   $('#review-note').value = note;
+  noteBaseline = note;
   const scene = new CanvasScene($('#scene-frame'), snapshot, {
     smartSelection: true,
     onAreaStart: areaSelection.beginScene,
     onMessage: toast,
+    onBeforeSelect: () => !noteComposing && !commentEditor?.isComposing(),
     onSelect: (id) => {
       $('#document-menu-content').hidePopover();
       if (id !== state.commentTarget) {
@@ -689,6 +709,7 @@ $('#zoom-selection').addEventListener('click', fitSelection);
 $('#component-comment').addEventListener('change', commitCommentDraft);
 $('#save-comment').addEventListener('click', renderInspector);
 $('#clear-comment').addEventListener('click', () => {
+  if (commentEditor.isComposing()) return;
   $('#component-comment').value = '';
   $('#clear-comment').disabled = true;
   commitCommentDraft();
@@ -710,7 +731,7 @@ $('#edit-selected-comment').addEventListener('click', () => {
 });
 adapter.register('comment', () => {
   const ids = [...(state.scene?.selection || [])];
-  if (ids.length > 1) commentEditor.open({ ids });
+  if (ids.length > 1) focusComment({ ids });
   else focusComment();
 });
 adapter.register('properties', () => {
@@ -749,8 +770,14 @@ $('#properties-dialog').addEventListener('keydown', (e) => {
     $('#properties-dialog').close();
   }
 });
-adapter.register('undo', () => undo());
-adapter.register('redo', () => undo('redo'));
+adapter.register('undo', () => {
+  commitCommentDraft();
+  undo();
+});
+adapter.register('redo', () => {
+  commitCommentDraft();
+  undo('redo');
+});
 $('#select-parent').addEventListener('click', () =>
   selectNode(state.scene.parent(state.scene.selected)),
 );
@@ -793,7 +820,34 @@ $('#viewport').addEventListener(
   { passive: false },
 );
 document.addEventListener('keydown', onKey);
-$('#review-note').addEventListener('change', () => changeCommitted({ label: '추가 설명 수정' }));
+function commitNoteDraft() {
+  clearTimeout(noteTimer);
+  if (!state.ready || !state.scene || noteComposing || $('#review-note').value === noteBaseline)
+    return;
+  const before = checkpoint();
+  before.note = noteBaseline;
+  state.undo.push(before);
+  state.pendingBefore = before;
+  state.redo = [];
+  noteBaseline = $('#review-note').value;
+  changeCommitted({ label: '추가 설명 수정' });
+}
+$('#review-note').addEventListener('compositionstart', () => {
+  noteComposing = true;
+  clearTimeout(noteTimer);
+});
+$('#review-note').addEventListener('compositionend', () => {
+  noteComposing = false;
+  scheduleNote();
+});
+function scheduleNote() {
+  clearTimeout(noteTimer);
+  if (!noteComposing) noteTimer = setTimeout(commitNoteDraft, 650);
+}
+$('#review-note').addEventListener('input', scheduleNote);
+$('#review-note').addEventListener('change', () => {
+  if (!noteComposing) commitNoteDraft();
+});
 async function imageResult() {
   return withSceneCopy(state.snapshot, checkpoint(), (scene) =>
     buildHandoffImage(state.snapshot, scene, $('#review-note').value),
@@ -809,18 +863,6 @@ async function blobUrl(blob) {
 }
 function renderTicketIdentity() {
   const ticket = state.ticket;
-  $('#ticket-stage').textContent = ticket?.revision_requested
-    ? '변경 요청 있음'
-    : ticket?.needs_reconfirmation
-      ? '재확정 필요'
-      : {
-          draft: '편집 중',
-          queued: '확정',
-          working: '작업 중',
-          review: '검토 대기',
-          done: '완료',
-          blocked: '확인 필요',
-        }[ticket?.status] || '';
   $('#header-ticket-identity').textContent = ticket ? ticket.display_id + ' · ' + ticket.title : '';
   $('#artboard-label').dataset.confirmed = String(!!ticket?.goal && !ticket.needs_reconfirmation);
   void projectWorkflow?.emit();
@@ -845,31 +887,40 @@ async function receiveCapture(value) {
   await refreshTicket();
 }
 async function confirmCurrentTicket() {
-  if (!state.ready) return;
-  await flushEditor();
-  const ticket = await getTicket(state.snapshot.id);
-  const revision = state.revision,
-    generation = state.generation;
-  const image = await blobUrl((await imageResult()).blob);
-  if (revision !== state.revision || generation !== state.generation)
-    throw Error('편집이 바뀌었습니다. 다시 확정해 주세요.');
-  await confirmTicketGoal({
-    ticket_id: ticket.id,
-    project_id: ticket.project_id,
-    expected_revision: ticket.revision,
-    expected_edit_revision: revision,
-    operation_id: crypto.randomUUID(),
-    image_data_url: image,
-    selection_confirmed: true,
-    source: state.snapshot.source,
-    annotations: copy(state.scene.annotations),
-    selection: [...state.scene.selection],
-    request: [$('#review-note').value, ...state.scene.comments().map((c) => c.text)]
-      .filter(Boolean)
-      .join('\n\n'),
-  });
-  await refreshTicket();
-  toast('확정했습니다. 에이전트에게 확정된 티켓 구현을 요청하세요.');
+  if (!state.ready || state.confirming) return;
+  state.confirming = true;
+  adapter.publish();
+  await projectWorkflow.emit();
+  try {
+    await flushEditor();
+    const ticket = await getTicket(state.snapshot.id);
+    const revision = state.revision,
+      generation = state.generation;
+    const image = await blobUrl((await imageResult()).blob);
+    if (revision !== state.revision || generation !== state.generation)
+      throw Error('편집이 바뀌었습니다. 다시 확정해 주세요.');
+    await confirmTicketGoal({
+      ticket_id: ticket.id,
+      project_id: ticket.project_id,
+      expected_revision: ticket.revision,
+      expected_edit_revision: revision,
+      operation_id: crypto.randomUUID(),
+      image_data_url: image,
+      selection_confirmed: true,
+      source: state.snapshot.source,
+      annotations: copy(state.scene.annotations),
+      selection: [...state.scene.selection],
+      request: [$('#review-note').value, ...state.scene.comments().map((c) => c.text)]
+        .filter(Boolean)
+        .join('\n\n'),
+    });
+    await refreshTicket();
+    toast('확정했습니다. 에이전트 대화에서 조회하거나 구현을 요청할 수 있습니다.');
+  } finally {
+    state.confirming = false;
+    adapter.publish();
+    await projectWorkflow.emit();
+  }
 }
 async function showTickets() {
   try {
@@ -881,6 +932,7 @@ async function showTickets() {
     for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
     renderTickets($('#tickets-content'), {
       project: state.project_id,
+      handoff: (intent) => copyHandoff(intent, 'project'),
       documentId: state.snapshot?.id,
       open: async (id) => {
         $('#tickets-dialog').close();
@@ -988,13 +1040,25 @@ function renderMcpStatus() {
   $('#mcp-disconnect').title = status.connected
     ? '이 복제본의 연결 끊기'
     : '연결된 로컬 서버가 없습니다.';
-  $('#mcp-button').textContent = status.connected ? '● 로컬 서버 연결됨' : '○ 에이전트 연결';
+  $('#mcp-button').textContent = status.connected
+    ? '연결 상태'
+    : status.retrying
+      ? '서버 재연결 중'
+      : '연결 확인';
   $('#mcp-button').title =
     '서버 연결과 에이전트 인증은 다릅니다.' +
     (state.lastAgentCommand
       ? ' 최근 에이전트 통신: ' + state.lastAgentCommand
       : ' 이 실행에서 에이전트 명령 수신 기록 없음');
   $('#mcp-button').classList.toggle('connected', !!status.connected);
+  $('#connection-server').textContent = status.connected
+    ? '연결됨'
+    : status.message || '연결 안 됨';
+  $('#connection-agent').textContent = state.lastAgentCommand || '이 실행에서 수신 기록 없음';
+  $('#manual-connection').hidden = !!window.ConsoleCanvasDesktop;
+  $('#connection-retry').hidden = !window.ConsoleCanvasDesktop || !!status.connected;
+  $('#connection-copy-command').hidden = !window.ConsoleCanvasDesktop;
+  void activeConnectionProject();
   $('#mcp-state').textContent =
     (status.connected
       ? '로컬 서버 연결됨 · r' + state.revision
@@ -1048,6 +1112,7 @@ const ticketWorkspace = createTicketWorkspace({
   },
 });
 const mcpBridge = createMcpBridge({
+  refreshConnection: () => window.ConsoleCanvasDesktop?.getConnection(),
   metadata: ticketWorkspace.metadata,
   execute: ticketWorkspace.execute,
   onStatus: (status) => {
@@ -1062,6 +1127,41 @@ $('#mcp-button').addEventListener('click', () => {
   $('#mcp-dialog').showModal();
   if (!state.mcpStatus.connected) $('#mcp-code').focus();
 });
+async function activeConnectionProject() {
+  const projectId = state.project_id;
+  const project = projectId ? await getProject(projectId) : null;
+  if (projectId !== state.project_id) return;
+  $('#connection-repository').textContent =
+    project?.repository?.root || '미연결 · 편집·확정은 사용할 수 있습니다.';
+  $('#connection-copy-project').hidden = !project || !!project.repository;
+}
+$('#connection-copy-command').onclick = async () => {
+  try {
+    await window.ConsoleCanvasDesktop.copyMcpCommand();
+    $('#mcp-message').textContent =
+      '연결 명령을 복사했습니다. 설정 경로가 다르면 등록한 뒤 MCP 클라이언트를 다시 연결하세요.';
+  } catch (e) {
+    $('#mcp-message').textContent = e.message;
+  }
+};
+$('#connection-copy-project').onclick = () =>
+  projectWorkflow
+    .execute({ action: 'copy-connection' })
+    .then(() => {
+      $('#mcp-message').textContent = '저장소 연결 요청을 복사했습니다.';
+    })
+    .catch((e) => {
+      $('#mcp-message').textContent = e.message;
+    });
+$('#connection-retry').onclick = async () => {
+  try {
+    const c = await window.ConsoleCanvasDesktop.getConnection();
+    await mcpBridge.connect(c.url, c.token);
+    $('#mcp-message').textContent = '앱과 로컬 서버를 다시 연결했습니다.';
+  } catch (e) {
+    $('#mcp-message').textContent = e.message;
+  }
+};
 $('#direct-open-source').addEventListener('click', () => {
   $('#document-menu-content').hidePopover();
   if (!state.snapshot) return;
@@ -1098,6 +1198,7 @@ const projectWorkflow = createProjectWorkflow({
   showTickets,
   confirm: confirmCurrentTicket,
   importFile,
+  copyRequest: window.ConsoleCanvasDesktop?.copyRequest,
   leave: () => {
     for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
     for (const popover of document.querySelectorAll(':popover-open')) popover.hidePopover();
@@ -1108,6 +1209,23 @@ const projectWorkflow = createProjectWorkflow({
     renderProjectControl(value);
   },
 });
+state.publishWorkspace = () => {
+  void projectWorkflow.emit();
+};
+async function copyHandoff(intent = 'read', scope = 'ticket') {
+  try {
+    await projectWorkflow.execute({ action: 'copy-handoff', intent, scope });
+    $('#document-menu-content').hidePopover();
+    toast(
+      (intent === 'implement' ? '구현' : intent === 'design' ? '시안' : '조회') +
+        ' 요청을 복사했습니다. 에이전트 대화에 붙여 넣으세요.',
+    );
+  } catch (e) {
+    toast(e.message);
+  }
+}
+for (const intent of ['read', 'design', 'implement'])
+  adapter.register('handoff-' + intent, () => copyHandoff(intent));
 function renderProjectControl(value) {
   const host = $('#project-control');
   if (host.contains(document.activeElement)) return;
@@ -1127,17 +1245,6 @@ function renderProjectControl(value) {
     else await projectWorkflow.execute({ action: 'select', id: select.value });
   };
   host.append(select);
-  if (value.project) {
-    const copy = document.createElement('button');
-    copy.textContent = value.project.repository ? '저장소 연결됨' : '연결 요청 복사';
-    copy.title = value.project.repository?.root || '현재 저장소의 에이전트 대화에 붙여 넣으세요.';
-    copy.onclick = () =>
-      projectWorkflow
-        .execute({ action: 'copy-connection' })
-        .then(() => toast('연결 요청을 복사했습니다.'))
-        .catch((e) => toast(e.message));
-    host.append(copy);
-  }
 }
 function showProjectName(project = null) {
   const host = $('#project-control');

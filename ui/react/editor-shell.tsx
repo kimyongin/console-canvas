@@ -22,6 +22,10 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           v.emptyCapture,
           v.goalConfirmed,
           v.needsReconfirmation,
+          v.revisionRequested,
+          v.confirming,
+          v.save.pending,
+          v.save.error,
         ].join('/')
       : 'initial';
   });
@@ -56,19 +60,47 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
           aria-label="티켓 ID 복사"
           disabled={!view?.ready}
         />
-        <span id="ticket-stage" aria-live="polite" />
         <div className="header-actions">
           <Button
+            id="copy-ticket-request"
+            disabled={!view?.ready}
+            variant="outline"
+            onClick={() => dispatchEditorCommand('handoff-read')}
+          >
+            에이전트 요청 복사
+          </Button>
+          <Button
             id="new-ticket-button"
+            aria-live="polite"
             disabled={
               !view?.ready ||
+              view?.confirming ||
+              view?.save.pending ||
               view?.emptyCapture ||
               (view?.goalConfirmed && !view?.needsReconfirmation) ||
               ['working', 'review', 'done'].includes(view?.ticketStatus || '')
             }
             onClick={() => dispatchEditorCommand('confirm-ticket')}
           >
-            {view?.needsReconfirmation ? '재확정' : '확정'}
+            {view?.confirming
+              ? '확정 중…'
+              : view?.save.error
+                ? '저장 재시도·확정'
+                : view?.save.pending
+                  ? '저장 중…'
+                  : view?.revisionRequested
+                    ? '변경 요청'
+                    : view?.needsReconfirmation
+                      ? '재확정'
+                      : (
+                          {
+                            queued: '확정됨',
+                            working: '작업 중',
+                            review: '검토 대기',
+                            done: '완료',
+                            blocked: '확인·재확정',
+                          } as Record<string, string>
+                        )[view?.ticketStatus || ''] || '확정'}
           </Button>
           <Button
             id="document-menu-button"
@@ -212,6 +244,20 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                   onClick={() => dispatchEditorCommand('commands')}
                 >
                   명령과 단축키…
+                </Button>
+                <Button
+                  id="handoff-design"
+                  onClick={() => dispatchEditorCommand('handoff-design')}
+                  variant="ghost"
+                >
+                  시안 3개 요청 복사
+                </Button>
+                <Button
+                  id="handoff-implement"
+                  onClick={() => dispatchEditorCommand('handoff-implement')}
+                  variant="ghost"
+                >
+                  이 티켓 구현 요청 복사
                 </Button>
                 <Button
                   id="save-document"
@@ -495,6 +541,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
               placeholder="요청·주석 찾기"
               aria-label="요청과 주석 검색"
             />
+            <section id="inline-comment-editor" aria-label="주석 바로 편집" hidden />
             <div id="requests-list" />
           </section>
         </aside>
@@ -777,43 +824,54 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             {'×'}
           </Button>
         </div>
-        <div id="comment-editor-host">
-          <div className="comment-navigation">
-            <Button id="comment-previous" variant="outline" aria-label="이전 요청">
-              ← 이전
+        <div id="comment-composer">
+          <div id="inline-comment-heading">
+            <strong>주석 편집</strong>
+            <Button id="expand-comment-editor" variant="ghost" aria-label="주석 크게 보기">
+              ↗
             </Button>
-            <NativeSelect id="comment-request" aria-label="검토할 요청"></NativeSelect>
-            <Button id="comment-next" variant="outline" aria-label="다음 요청">
-              다음 →
-            </Button>
-          </div>
-          <strong id="comment-target-title"></strong>
-          <div
-            id="comment-target-preview"
-            className="comment-target-preview"
-            aria-label="주석 대상 미리보기"
-          ></div>
-          <small id="comment-preview-label"></small>
-          <div className="component-comment">
-            <label htmlFor="component-comment">{'이 요소에 주석 남기기'}</label>
-            <Textarea
-              id="component-comment"
-              rows={4}
-              maxLength={4000}
-              placeholder="예: 제목 오른쪽에 정렬하고, 좁은 화면에서는 다음 줄에 배치해 주세요."
-            ></Textarea>
-          </div>
-        </div>
-        <div className="comment-dialog-footer">
-          <div className="comment-actions">
-            <Button id="clear-comment" variant="outline">
-              {'주석 삭제'}
-            </Button>
-            <Button id="save-comment" className="primary" variant="outline">
-              {'완료'}
+            <Button id="close-inline-comment" variant="ghost" aria-label="주석 편집 닫기">
+              ×
             </Button>
           </div>
-          <span id="comment-status" role="status"></span>
+          <div id="comment-editor-host">
+            <div className="comment-navigation">
+              <Button id="comment-previous" variant="outline" aria-label="이전 요청">
+                ← 이전
+              </Button>
+              <NativeSelect id="comment-request" aria-label="검토할 요청"></NativeSelect>
+              <Button id="comment-next" variant="outline" aria-label="다음 요청">
+                다음 →
+              </Button>
+            </div>
+            <strong id="comment-target-title"></strong>
+            <div
+              id="comment-target-preview"
+              className="comment-target-preview"
+              aria-label="주석 대상 미리보기"
+            ></div>
+            <small id="comment-preview-label"></small>
+            <div className="component-comment">
+              <label htmlFor="component-comment">{'이 요소에 주석 남기기'}</label>
+              <Textarea
+                id="component-comment"
+                rows={4}
+                maxLength={4000}
+                placeholder="예: 제목 오른쪽에 정렬하고, 좁은 화면에서는 다음 줄에 배치해 주세요."
+              ></Textarea>
+            </div>
+          </div>
+          <div className="comment-dialog-footer">
+            <div className="comment-actions">
+              <Button id="clear-comment" variant="outline">
+                {'주석 삭제'}
+              </Button>
+              <Button id="save-comment" className="primary" variant="outline">
+                {'완료'}
+              </Button>
+            </div>
+            <span id="comment-status" role="status"></span>
+          </div>
         </div>
       </DialogSurface>
       <DialogSurface id="rename-dialog" aria-labelledby="rename-title">
@@ -856,32 +914,54 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
         <div id="mcp-content">
           <div className="eyebrow">{'CONNECT YOUR AGENT'}</div>
           <h2>{'에이전트와 함께 편집'}</h2>
-          <h3>로컬 MCP 서버 연결</h3>
+          <dl className="connection-facts">
+            <dt>로컬 서버</dt>
+            <dd id="connection-server" />
+            <dt>에이전트 통신</dt>
+            <dd id="connection-agent" />
+            <dt>프로젝트 저장소</dt>
+            <dd id="connection-repository" />
+          </dl>
           <p>
-            {'허용한 프로젝트의 저장 티켓만 에이전트가 읽고 편집합니다.'}
-            <br />
-            {'독립 앱에서는 자동으로\n        연결됩니다.\n      '}
+            서버 실행과 에이전트 인증은 다릅니다. 최근 통신도 현재 대화의 인증을 보장하지 않습니다.
           </p>
-          <label className="review-note-label">
-            {'로컬 서버 주소'}
-            <Input id="mcp-address" defaultValue="http://127.0.0.1:8849" type="url" />
-          </label>
-          <label className="review-note-label">
-            {'연결 코드'}
-            <Input
-              id="mcp-code"
-              type="password"
-              autoComplete="off"
-              placeholder="에이전트가 준비한 연결 코드"
-            />
-          </label>
           <div className="export-actions">
-            <Button id="mcp-disconnect" variant="outline">
-              {'연결 끊기'}
+            <Button id="connection-retry" variant="outline">
+              서버 다시 연결
             </Button>
-            <Button id="mcp-connect" className="primary" variant="outline">
-              {'연결'}
+            <Button id="connection-copy-command" variant="outline">
+              MCP 연결 명령 복사
             </Button>
+            <Button id="connection-copy-project" variant="outline">
+              저장소 연결 요청 복사
+            </Button>
+          </div>
+          <p id="connection-recovery">
+            기존 대화에서만 조회가 실패하면 MCP 클라이언트를 다시 연결하세요. 삭제된 도구가 보이면
+            도구 목록도 새로 받아야 합니다. 앱이 대화를 재시작하지는 않습니다.
+          </p>
+          <div id="manual-connection">
+            <label className="review-note-label">
+              {'로컬 서버 주소'}
+              <Input id="mcp-address" defaultValue="http://127.0.0.1:8849" type="url" />
+            </label>
+            <label className="review-note-label">
+              {'연결 코드'}
+              <Input
+                id="mcp-code"
+                type="password"
+                autoComplete="off"
+                placeholder="에이전트가 준비한 연결 코드"
+              />
+            </label>
+            <div className="export-actions">
+              <Button id="mcp-disconnect" variant="outline">
+                {'연결 끊기'}
+              </Button>
+              <Button id="mcp-connect" className="primary" variant="outline">
+                {'연결'}
+              </Button>
+            </div>
           </div>
           <div id="mcp-message" className="export-status" role="status"></div>
         </div>

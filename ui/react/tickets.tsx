@@ -4,12 +4,14 @@ import { Button } from './components/button';
 import { Input } from './components/input';
 import { listTickets, TICKET_STATES } from '../../ticket-model.js';
 import { restoreDocument, trashDocument } from '../../db.js';
+import { ticketSummary, ticketSource } from '../../ticket-presentation.js';
 export interface TicketUIOptions {
   project?: string;
   documentId?: string;
   open(id: string): Promise<void>;
   close(): void;
   changed(): void;
+  handoff?(intent: 'read' | 'implement'): Promise<void>;
   removed?(id: string): Promise<void>;
 }
 function Tickets({ options }: { options: TicketUIOptions }) {
@@ -17,7 +19,8 @@ function Tickets({ options }: { options: TicketUIOptions }) {
     [filter, setFilter] = useState('unfinished'),
     [query, setQuery] = useState(''),
     [error, setError] = useState(''),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [readyCount, setReadyCount] = useState(0);
   const load = async () =>
     (
       await listTickets(options.project, {
@@ -27,9 +30,17 @@ function Tickets({ options }: { options: TicketUIOptions }) {
         limit: 10000,
       })
     ).tickets;
-  const refresh = async () => setRows(await load());
+  const refresh = async () => {
+    setRows(await load());
+    setReadyCount((await listTickets(options.project, { status: 'ready', limit: 1 })).total);
+  };
   useEffect(() => {
     let current = true;
+    listTickets(options.project, { status: 'ready', limit: 1 })
+      .then((r) => {
+        if (current) setReadyCount(r.total);
+      })
+      .catch(() => {});
     load()
       .then((rows) => {
         if (current) setRows(rows);
@@ -79,6 +90,7 @@ function Tickets({ options }: { options: TicketUIOptions }) {
           onChange={(e) => setFilter(e.target.value)}
         >
           <option value="unfinished">미완료</option>
+          <option value="ready">확정 · 미착수</option>
           <option value="all">전체</option>
           <option value="done">완료</option>
           <option value="trash">휴지통</option>
@@ -118,8 +130,9 @@ function Tickets({ options }: { options: TicketUIOptions }) {
                 </strong>
                 <small>
                   {t.comment_count ? `주석 ${t.comment_count} · ` : ''}
-                  {t.current_note || t.request || '편집 화면과 주석'}
+                  {ticketSummary(t)}
                 </small>
+                <small className="ticket-source">{ticketSource(t)}</small>
               </div>
               <span className={'ticket-badge status-' + t.status}>
                 {t.revision_requested
@@ -150,6 +163,23 @@ function Tickets({ options }: { options: TicketUIOptions }) {
           </div>
         ))}
       </div>
+      {options.handoff && (
+        <footer className="ticket-handoff">
+          <Button disabled={busy} onClick={() => options.handoff?.('read')}>
+            에이전트 조회 요청 복사
+          </Button>
+          <details>
+            <summary>다른 요청</summary>
+            <Button
+              disabled={busy || !readyCount}
+              title="현재 프로젝트 전체 · 구현 요청 시점에 대상을 확정합니다"
+              onClick={() => options.handoff?.('implement')}
+            >
+              확정 티켓 {readyCount}개 구현 요청 복사
+            </Button>
+          </details>
+        </footer>
+      )}
     </>
   );
 }

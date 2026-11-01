@@ -22,6 +22,8 @@ import {
   renameDocument,
   transact,
 } from '../db.js';
+import { agentRequest } from '../handoff-request.js';
+import { ticketSummary, ticketSource } from '../ticket-presentation.js';
 import { semanticState } from '../semantic-state.js';
 const frame = document.querySelector('#editor'),
   results = [];
@@ -514,6 +516,82 @@ try {
       .textContent.includes('목록을 닫은 뒤 새로 가져온 화면'),
   );
   doc.querySelector('#tickets-dialog').close();
+  const variants = [];
+  const targetId = app.state.snapshot.nodes.find((n) => n.tag === 'button').id;
+  for (let i = 0; i < 5; i++) {
+    const capture = {
+      ...structuredClone(repeated),
+      id: crypto.randomUUID(),
+      documentName: '동일 페이지',
+      project_id: project.id,
+    };
+    await saveCapture(capture);
+    await saveSession(capture.id, {
+      note: i === 0 ? '검색 영역 개선' : '',
+      annotations: i === 1 ? { [targetId]: '고객 등록 정렬' } : {},
+      edits: i === 2 ? { [targetId]: { dx: 8, dy: 0 } } : {},
+    });
+    variants.push(capture.id);
+  }
+  const summaries = (await listTickets(project.id, { limit: 10000 })).tickets.filter((t) =>
+    variants.includes(t.id),
+  );
+  check(
+    'Same-page rows use current note, annotation, actual edits and explicit empty state',
+    summaries.some((t) => ticketSummary(t) === '검색 영역 개선') &&
+      summaries.some((t) => ticketSummary(t) === '고객 등록 정렬') &&
+      summaries.some((t) => ticketSummary(t).includes('1건')) &&
+      summaries.filter((t) => ticketSummary(t) === '변경·요청 없음').length === 2 &&
+      summaries.every((t) => ticketSource(t).includes(' · ')),
+  );
+  const reference = await getTicket(variants[4]);
+  const frozenReference = await confirmTicketGoal({
+    ticket_id: reference.id,
+    project_id: project.id,
+    expected_revision: 0,
+    expected_edit_revision: 0,
+    operation_id: crypto.randomUUID(),
+    image_data_url: image,
+    request: '',
+    selection_confirmed: true,
+  });
+  check(
+    'A reference image can be confirmed without inventing an implementation request',
+    frozenReference.goal.request === '' &&
+      frozenReference.goal.request_unspecified &&
+      frozenReference.status === 'queued',
+  );
+  const request = agentRequest(project, { ticket: reference, intent: 'read' });
+  check(
+    'Copied read requests carry exact project and ticket identity without implementation authorization',
+    request.includes(project.id) &&
+      request.includes(reference.display_id) &&
+      request.includes('조회만') &&
+      !(await getTicket(reference.id)).claim,
+  );
+  check(
+    'Bulk requests specify request-time scope without a frozen manifest at copy time',
+    agentRequest(project, { intent: 'implement' }).includes('요청 시점') &&
+      !(await getTicket(reference.id)).claim,
+  );
+  const beforeNoteUndo = app.state.undo.length;
+  const beforeNoteAnnotations = JSON.stringify(app.state.scene.annotations);
+  doc.querySelector('#review-note').value = '추가 설명 독립 실행 취소';
+  doc
+    .querySelector('#review-note')
+    .dispatchEvent(new frame.contentWindow.Event('input', { bubbles: true }));
+  await app.flushEditor();
+  check(
+    'Flushing an edited note adds its own undo point before confirmation',
+    app.state.undo.length === beforeNoteUndo + 1,
+  );
+  app.undo();
+  await app.flushEditor();
+  check(
+    'Undoing the note does not erase the previous element annotations',
+    doc.querySelector('#review-note').value !== '추가 설명 독립 실행 취소' &&
+      JSON.stringify(app.state.scene.annotations) === beforeNoteAnnotations,
+  );
   check('Project entities remain after all ticket operations', (await listProjects()).length >= 2);
   document.querySelector('#status').textContent = JSON.stringify({
     passed: results.length,

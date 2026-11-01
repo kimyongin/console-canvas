@@ -294,6 +294,7 @@ async function start() {
         'rename',
         'copy-connection',
         'copy-ticket-id',
+        'copy-handoff',
         'open-file',
         'tickets',
         'confirm',
@@ -307,8 +308,8 @@ async function start() {
     if (['tickets', 'confirm', 'editor', 'ticket-menu'].includes(command.action))
       show(command.action === 'tickets' ? 'tickets' : 'editor');
     const previous = workspaceState?.project?.id;
-    const result = await requestEditor(command);
-    if (['copy-connection', 'copy-ticket-id'].includes(command.action))
+    const result = await requestEditor({ ...command, viaShell: true });
+    if (['copy-connection', 'copy-ticket-id', 'copy-handoff'].includes(command.action))
       clipboard.writeText(result.connection_request);
     if (command.action === 'select' && previous !== result.project?.id && result.project?.last_url)
       await source.webContents.loadURL(require('./security.cjs').webUrl(result.project.last_url));
@@ -355,6 +356,17 @@ async function start() {
   ipcMain.handle('canvas:connection', (event) => {
     trusted(event, 'editor');
     return { url: connection.url, token: connection.token };
+  });
+  ipcMain.handle('canvas:editor-mcp-copy', (event) => {
+    trusted(event, 'editor');
+    clipboard.writeText(skills.command);
+    return { copied: true };
+  });
+  ipcMain.handle('canvas:editor-copy-request', (event, text) => {
+    trusted(event, 'editor');
+    if (typeof text !== 'string' || text.length > 6000) throw Error('요청 크기를 확인해 주세요.');
+    clipboard.writeText(text);
+    return { copied: true };
   });
   ipcMain.on('canvas:editor-ready', (event) => {
     trusted(event, 'editor');

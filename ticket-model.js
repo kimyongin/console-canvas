@@ -100,7 +100,7 @@ export async function validateStoredTicket(t, project_id, document_id) {
     invalid('티켓 정보를 확인해 주세요.');
   text(t.id, '티켓 ID', 200);
   text(t.title || t.goal?.title, '티켓 이름', 120);
-  if (t.goal) text(t.goal.request, '변경 요청');
+  if (t.goal) text(t.goal.request, '변경 요청', 12000, false);
   if (!t.goal && !['draft', 'blocked'].includes(t.status)) invalid('확정 목표가 필요합니다.');
   if (!Number.isFinite(Date.parse(t.created_at)) || !Number.isFinite(Date.parse(t.updated_at)))
     invalid('티켓 날짜를 확인해 주세요.');
@@ -201,10 +201,7 @@ export async function confirmTicketGoal(input) {
   if (input.selection_confirmed !== true)
     invalid('사람이 선택한 목표만 확정할 수 있습니다.', 'selection_required');
   const image = await ticketImage(input.image_data_url),
-    request = text(
-      input.request || '현재 편집 화면과 주석을 기준으로 반응형 UI를 구현해 주세요.',
-      '변경 요청',
-    );
+    request = text(input.request || '', '변경 요청', 12000, false);
   let thumbnail;
   try {
     if (typeof createImageBitmap === 'function') {
@@ -266,6 +263,7 @@ export async function confirmTicketGoal(input) {
             document_id: t.document_id,
             image,
             request,
+            request_unspecified: !request,
             source: metadata(input.source || {}, '출처'),
             annotations: metadata(input.annotations || {}, '주석'),
             selection: metadata(input.selection || [], '선택'),
@@ -356,6 +354,12 @@ export async function listTickets(
           t.comment_count = Object.values(sr.result?.annotations || {}).filter(Boolean).length;
           t.edit_revision = sr.result?.edit_revision || 0;
           t.current_note = sr.result?.note || '';
+          t.first_comment =
+            Object.values(sr.result?.annotations || {}).find(
+              (v) => typeof v === 'string' && v.trim(),
+            ) || '';
+          t.change_count =
+            Object.keys(sr.result?.edits || {}).length + (sr.result?.resourceRepairs || []).length;
         };
       }
       done({

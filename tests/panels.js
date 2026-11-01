@@ -186,6 +186,7 @@ try {
     (n) => n.tag === 'button' && n.locator.id === 'new-customer',
   );
   app.selectNode(node.id);
+  doc.querySelector('#context-comment').click();
   doc.querySelector('#component-comment').value = '접어도 보존할 수정 방향';
   click('toggle-properties');
   check(
@@ -223,15 +224,21 @@ try {
   check(
     'Reopened panels retain the saved document, comment',
     app.state.snapshot.id === documentId &&
-      doc.querySelector('#component-comment').value === '접어도 보존할 수정 방향' &&
+      app.state.scene.annotations[node.id] === '접어도 보존할 수정 방향' &&
       !app.state.timeline,
   );
   doc.querySelector('.request-row').click();
   check(
-    'Comment opens a modal independent of side-panel visibility',
-    doc.querySelector('#comment-dialog').open && doc.activeElement.id === 'component-comment',
+    'Comment opens an inline editor without a modal',
+    !doc.querySelector('#comment-dialog').open &&
+      !doc.querySelector('#inline-comment-editor').hidden &&
+      doc.activeElement.id === 'component-comment',
   );
   const commentField = doc.querySelector('#component-comment');
+  check(
+    'Editing a comment uses one panel surface without a duplicate request card',
+    doc.querySelectorAll('.request-row').length === 0,
+  );
   const stableComment = app.state.scene.annotations[node.id];
   commentField.dispatchEvent(
     new frame.contentWindow.CompositionEvent('compositionstart', { bubbles: true }),
@@ -254,7 +261,7 @@ try {
     commentField.dispatchEvent(event);
     check(
       'IME does not dismiss/submit dialog: ' + JSON.stringify(options),
-      doc.querySelector('#comment-dialog').open && event.defaultPrevented,
+      !doc.querySelector('#inline-comment-editor').hidden && event.defaultPrevented,
     );
   }
   await new Promise((r) => setTimeout(r, 750));
@@ -286,8 +293,8 @@ try {
     }),
   );
   check(
-    'Escape closes the dialog normally after composition',
-    !doc.querySelector('#comment-dialog').open,
+    'Escape closes the inline editor normally after composition',
+    doc.querySelector('#inline-comment-editor').hidden,
   );
   await app.state.saving;
   const hiddenSnapshot = structuredClone(app.state.snapshot);

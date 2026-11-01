@@ -63,6 +63,13 @@ test('existing SDK connection recovers a rotated bridge credential without repla
     await client.callTool({ name: 'get_agent_guide', arguments: {} });
     assert.equal(rejected, 1);
     assert.equal(delivered, 3);
+    token = 'fixture-rejected-without-new-file';
+    const denied = await client.callTool({ name: 'get_agent_guide', arguments: {} });
+    assert.equal(denied.isError, true);
+    assert.equal(denied.structuredContent.error.code, 'connection_authentication_failed');
+    assert.equal(denied.structuredContent.error.http_status, 401);
+    assert.equal(JSON.stringify(denied).includes(token), false);
+    assert.equal(delivered, 3);
   } finally {
     await client.close();
     await new Promise((resolve) => server.close(resolve));
