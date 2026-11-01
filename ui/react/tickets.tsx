@@ -106,6 +106,7 @@ function Tickets({ options }: { options: TicketUIOptions }) {
           >
             <button
               className="ticket-open"
+              title={t.source_url ? '원본: ' + t.source_url : undefined}
               aria-current={t.document_id === options.documentId ? 'page' : undefined}
               disabled={busy || filter === 'trash'}
               onClick={() => run(() => options.open(t.id))}

@@ -74,6 +74,11 @@ try {
   await saveCapture(repeated);
   await saveCapture(repeated);
   check(
+    'Catalog provides the immutable original URL as secondary metadata',
+    (await listTickets(project.id)).tickets.find((t) => t.id === first).source_url ===
+      repeated.source.url,
+  );
+  check(
     'Capture retry does not duplicate the ticket or its counter',
     (await listTickets(project.id, { limit: 10000 })).total === count,
   );

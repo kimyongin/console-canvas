@@ -8,9 +8,9 @@ import unittest
 import io
 import json
 from unittest.mock import patch
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'mcp'))
 from server import stdio
 from bridge import Broker
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'mcp'))
 from repository import repository_identity
 
 class RepositoryTests(unittest.TestCase):
@@ -27,6 +27,9 @@ class RepositoryTests(unittest.TestCase):
             self.assertNotEqual(one['root'],two['root'])
             self.assertEqual(one['identity'],repository_identity(str(alias))['identity'])
             self.assertNotEqual(one['identity'],repository_identity(str(clone))['identity'])
+            old_clone=repository_identity(str(clone));moved=base/'moved clone';clone.rename(moved)
+            self.assertNotEqual(old_clone['identity'],repository_identity(str(moved))['identity'])
+            self.assertEqual(repository_identity(str(moved))['root'],str(moved.resolve()))
 
     def test_non_git_path_is_not_guessed_from_a_website_or_remote(self):
         with tempfile.TemporaryDirectory() as directory:

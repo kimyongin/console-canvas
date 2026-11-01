@@ -265,6 +265,13 @@ async function start() {
     trusted(event);
     return new Promise((resolve) => {
       const menu = Menu.buildFromTemplate([
+        {
+          label: workspaceState?.project?.repository
+            ? '저장소 연결됨 · ' + workspaceState.project.repository.root
+            : '저장소 미연결',
+          enabled: false,
+        },
+        { type: 'separator' },
         { label: '연결 요청 복사', click: () => resolve('copy-connection') },
         { label: '프로젝트 이름 변경', click: () => resolve('rename') },
       ]);

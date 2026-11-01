@@ -316,7 +316,7 @@ export async function listTickets(
     !Object.hasOwn(TICKET_STATES, status)
   )
     invalid('티켓 상태를 확인해 주세요.');
-  return transact(['tickets', 'sessions'], 'readonly', (tx, done) => {
+  return transact(['tickets', 'sessions', 'documents'], 'readonly', (tx, done) => {
     const r = tx.objectStore('tickets').getAll();
     r.onsuccess = () => {
       const rows = r.result
@@ -347,12 +347,15 @@ export async function listTickets(
         record_count: records.length,
       }));
       for (const t of tickets) {
+        const original = tx.objectStore('documents').get(t.document_id);
+        original.onsuccess = () => {
+          t.source_url = original.result?.url || '';
+        };
         const sr = tx.objectStore('sessions').get(t.document_id);
         sr.onsuccess = () => {
           t.comment_count = Object.values(sr.result?.annotations || {}).filter(Boolean).length;
           t.edit_revision = sr.result?.edit_revision || 0;
           t.current_note = sr.result?.note || '';
-          t.source_url = sr.result?.source_url || '';
         };
       }
       done({
