@@ -304,6 +304,19 @@ export async function confirmTicketGoal(input) {
     },
   );
 }
+// Project names describe catalog contents; they do not authorize agent access.
+export async function listTicketProjects() {
+  return transact(['tickets'], 'readonly', (tx, done) => {
+    const projects = new Set();
+    const request = tx.objectStore('tickets').openCursor();
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return done([...projects].sort());
+      if (!cursor.value.deletedAt) projects.add(cursor.value.project_id);
+      cursor.continue();
+    };
+  });
+}
 /** @param {string|undefined} project_id @param {any} options */
 export async function listTickets(
   project_id,

@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'mcp'))
 from server import stdio
-from modern import MODERN, VERSION_KEY, CAPS_KEY
+from modern import MODERN, VERSION_KEY, CAPS_KEY, ModernProtocol
 
 
 def invoke(messages):
@@ -38,6 +38,23 @@ class ModernTests(unittest.TestCase):
         self.assertEqual(results[0]['error']['code'], -32022)
         self.assertIn(MODERN, results[0]['error']['data']['supported'])
         self.assertEqual(results[1]['error']['code'], -32602)
+
+    def test_empty_connected_workspace_has_readable_resource_without_shared_projects(self):
+        connected = True
+        def call(name, args):
+            if name == 'list_screens':
+                return {'ok':True,'screens':[{'editor_id':'empty-workspace','title':'Empty','workspace':True,'project_ids':[]}] if connected else []}
+            return {'ok':True,'tickets':[],'total':0}
+        protocol = ModernProtocol(call, 'test', lambda value:None)
+        try:
+            uri = protocol.resources()[0]['uri']
+            self.assertEqual(json.loads(protocol.read(uri)['contents'][0]['text'])['tickets'], [])
+            connected = False
+            self.assertEqual(protocol.resources(), [])
+            with self.assertRaises(ValueError):
+                protocol.read(uri)
+        finally:
+            protocol.close()
 
     def test_legacy_handshake_retains_legacy_wire_results(self):
         results = invoke([rpc(1, 'initialize', {'protocolVersion': '2025-11-25'}), rpc(2, 'tools/list')])

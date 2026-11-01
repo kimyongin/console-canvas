@@ -373,21 +373,6 @@ export function sourceProject(url) {
     return 'local-project';
   }
 }
-export async function setProjectAccess(project_id, allowed) {
-  return transact(['settings'], 'readwrite', (tx) =>
-    tx.objectStore('settings').put({ id: 'access:' + project_id, allowed: !!allowed }),
-  );
-}
-export async function sharedProjects() {
-  return transact(['settings'], 'readonly', (tx, done) => {
-    const r = tx.objectStore('settings').getAll();
-    r.onsuccess = () =>
-      done(
-        r.result.filter((v) => v.id.startsWith('access:') && v.allowed).map((v) => v.id.slice(7)),
-      );
-  });
-}
-
 export async function editReceipt(id, hash) {
   return transact(['operations'], 'readonly', (tx, done) => {
     const r = tx.objectStore('operations').get(id);

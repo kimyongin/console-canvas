@@ -67,10 +67,7 @@ async function main() {
       'Capture/MCP missing',
     );
     assert.equal(await evaluate(source, 'document.documentElement.outerHTML'), before);
-    await evaluate(
-      editor,
-      "(async()=>{const m=await import('/db.js');await m.setProjectAccess(window.ConsoleCanvas.state.project_id,true);await window.ConsoleCanvas.ticketWorkspace.permissions();})()",
-    );
+    await evaluate(editor, 'window.ConsoleCanvas.ticketWorkspace.refreshProjects()');
     const originalSave = dialog.showSaveDialog;
     const pngFile = path.join(directory, 'current-goal.png');
     dialog.showSaveDialog = async () => ({ canceled: false, filePath: pngFile });

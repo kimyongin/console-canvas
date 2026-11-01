@@ -161,16 +161,15 @@ class Broker:
             def live(session):
                 return not session.get('closed') and time.monotonic() - session['seen'] < 20
             if name == 'list_screens':
-                return {'ok': True, 'screens': [({**{k:v for k,v in s['screen'].items() if k!='project_id'},'title':'Console Canvas 티켓','url':'','document_id':'workspace','element_count':0,'comment_count':0} if s['screen'].get('workspace') and s['screen'].get('project_id') not in s['screen'].get('project_ids',[]) else s['screen']) for s in self.sessions.values() if live(s)]}
+                return {'ok': True, 'screens': [s['screen'] for s in self.sessions.values() if live(s)]}
             editor_id = arguments.get('editor_id')
             if not editor_id:
-                candidates=[s for s in self.sessions.values() if live(s) and s['screen'].get('workspace') and
-                            (not arguments.get('project_id') or arguments['project_id'] in s['screen'].get('project_ids',[]))]
+                candidates=[s for s in self.sessions.values() if live(s) and s['screen'].get('workspace')]
                 # One catalog owns a storage origin. Never combine independent browser profiles.
                 if len(candidates)>1:
                     return error('ambiguous_workspace','More than one workspace is connected; disconnect unused workspaces or specify editor_id')
                 if not candidates:
-                    return error('not_authorized' if arguments.get('project_id') and any(live(s) and s['screen'].get('workspace') for s in self.sessions.values()) else 'not_connected','Run Console Canvas and allow the project in Work tickets')
+                    return error('not_connected','Run Console Canvas and connect its workspace')
                 editor_id=candidates[0]['screen']['editor_id']
             session = self.sessions.get(editor_id)
             if not session or not live(session):

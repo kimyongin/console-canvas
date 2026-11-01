@@ -821,7 +821,7 @@ async function refreshTicket() {
   if (state.snapshot) state.ticket = await getTicket(state.snapshot.id);
   renderDocumentName();
   adapter.publish();
-  await ticketWorkspace.permissions();
+  await ticketWorkspace.refreshProjects();
 }
 async function openTicket(id) {
   await flushEditor();

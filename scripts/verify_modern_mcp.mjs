@@ -29,19 +29,17 @@ try {
     client.getServerVersion()?.name === 'console-canvas',
   );
   check('Modern discovers current shared tools', (await client.listTools()).tools.length === 16);
-  const screen = (await tool('list_screens')).screens.find(
-    (s) => s.workspace && s.project_ids?.length,
-  );
+  const screen = (await tool('list_screens')).screens.find((s) => s.workspace);
   assert.ok(screen);
   const resource = (await client.listResources()).resources.find((r) =>
     r.uri.includes(screen.editor_id),
   );
-  check(
-    'Only connected project tickets are explicit resources',
-    resource?.uri.endsWith('/tickets'),
-  );
+  check('Connected workspace catalog is an explicit resource', resource?.uri.endsWith('/tickets'));
   const read = await client.readResource({ uri: resource.uri });
-  check('Read project ticket resource', JSON.parse(read.contents[0].text).tickets.length > 0);
+  check(
+    'Read full workspace ticket resource',
+    JSON.parse(read.contents[0].text).tickets.length > 0,
+  );
   let notifications = 0;
   client.setNotificationHandler('notifications/resources/updated', (n) => {
     if (n.params.uri === resource.uri) notifications++;

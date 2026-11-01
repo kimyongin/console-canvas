@@ -7,10 +7,8 @@ import {
 } from '../ticket-model.js';
 import {
   getDocument,
-  setProjectAccess,
   trashDocument,
   restoreDocument,
-  sharedProjects,
   renameDocument,
   transact,
   saveSession,
@@ -98,8 +96,10 @@ try {
   await app.openSnapshot(await getDocument(initial));
   ticket = await getTicket(initial, project);
   const originalId = ticket.id;
-  await setProjectAccess(project, true);
-  await app.ticketWorkspace.permissions();
+  await transact(['settings'], 'readwrite', (tx) =>
+    tx.objectStore('settings').put({ id: 'access:' + project, allowed: false }),
+  );
+  await app.ticketWorkspace.refreshProjects();
   const call = (name, args = {}) =>
     app.ticketWorkspace.execute({ name, arguments: args, deadline: Date.now() / 1000 + 60 });
   let node = [...app.state.scene.nodes.values()].find((n) => n.locator.id === 'new-customer');
@@ -117,7 +117,14 @@ try {
     read.images.every((i) => i.role === 'current') && !read.ticket.goal,
   );
   const other = await call('get_ticket', { ticket_ref: ticket.id, project_id: 'unrelated' });
-  check('An unrelated project is not exposed', !other.ok && other.error.code === 'not_authorized');
+  check(
+    'An explicit project filter does not select a ticket from another project',
+    !other.ok && other.error.code === 'ticket_not_found',
+  );
+  check(
+    'An unknown project filter returns an empty catalog',
+    (await call('list_tickets', { project_id: 'unrelated' })).total === 0,
+  );
   const blank = await createTicket({
     project_id: project,
     title: '비어 있는 티켓',
@@ -199,7 +206,7 @@ try {
   });
   const ambiguous = await call('get_ticket', { ticket_ref: '고객 검색 개선' });
   check(
-    'Duplicate names return only scoped candidates instead of guessing',
+    'Duplicate names return candidates instead of guessing',
     !ambiguous.ok &&
       ambiguous.error.code === 'ambiguous_ticket' &&
       ambiguous.error.candidates.length === 2,
@@ -211,13 +218,11 @@ try {
   );
   await restoreDocument(twin.id);
   check('Recover restores the same ticket ID', (await getTicket(twin.id)).id === twin.id);
-  await setProjectAccess(project, false);
   check(
-    'Revoking access hides list and image/detail paths',
-    !(await call('get_ticket', { ticket_ref: originalId })).ok &&
-      (await call('list_tickets', {})).total === 0,
+    'Legacy project denial settings do not hide list, detail or current images',
+    (await call('get_ticket', { ticket_ref: originalId })).images.length > 0 &&
+      (await call('list_tickets', {})).tickets.some((t) => t.id === originalId),
   );
-  await setProjectAccess(project, true);
   const canvas = document.createElement('canvas');
   canvas.width = 80;
   canvas.height = 50;
@@ -397,17 +402,11 @@ try {
   );
   doc.querySelector('#tickets-dialog').close();
   doc.querySelector('#tickets-button').click();
-  await until(
-    () => doc.querySelector('#tickets-dialog').open && doc.querySelector('#share-project'),
+  await until(() => doc.querySelector('#tickets-dialog').open && doc.querySelector('.ticket-row'));
+  check(
+    'Project access controls are removed from the ticket catalog',
+    !doc.querySelector('#share-project'),
   );
-  let share = doc.querySelector('#share-project');
-  await until(() => share.checked);
-  share.click();
-  await until(async () => !(await sharedProjects()).includes(project) && !share.checked);
-  check('Public-access switch stays off after asynchronous persistence', !share.checked);
-  share.click();
-  await until(async () => (await sharedProjects()).includes(project) && share.checked);
-  check('Public-access switch stays on and reflects the real permission', share.checked);
   const outside = await createTicket({
     project_id: 'qa-other-catalog',
     title: 'Other scope',
@@ -432,13 +431,39 @@ try {
   );
   projectFilter.value = 'qa-other-catalog';
   projectFilter.dispatchEvent(new frame.contentWindow.Event('change', { bubbles: true }));
-  await until(
-    () => doc.querySelectorAll('.ticket-row').length === 1 && doc.querySelector('#share-project'),
+  await until(() => doc.querySelectorAll('.ticket-row').length === 1);
+  const allTickets = await call('list_tickets');
+  check(
+    'UI project filtering does not restrict the agent catalog',
+    allTickets.tickets.some((t) => t.id === outside.id) &&
+      allTickets.tickets.some((t) => t.id === originalId),
   );
   check(
-    'Filtering another project does not grant it agent access',
-    !doc.querySelector('#share-project').checked &&
-      !(await sharedProjects()).includes('qa-other-catalog'),
+    'A previously unshared project is immediately readable by ticket ID',
+    (await call('get_ticket', { ticket_ref: outside.display_id })).ticket.id === outside.id,
+  );
+  const narrowed = await call('list_tickets', { project_id: 'qa-other-catalog' });
+  check(
+    'Project filter narrows rows without granting access',
+    narrowed.total === 1 && narrowed.tickets[0].id === outside.id,
+  );
+  const page = await call('list_tickets', { limit: 1 });
+  const next = await call('list_tickets', { limit: 1, cursor: page.next_cursor });
+  check(
+    'All-project pagination does not repeat the first ticket',
+    page.total > 1 && next.tickets[0].id !== page.tickets[0].id,
+  );
+  await renameDocument(outside.id, '고객 검색 개선');
+  const across = await call('get_ticket', { ticket_ref: '고객 검색 개선' });
+  const within = await call('get_ticket', {
+    ticket_ref: '고객 검색 개선',
+    project_id: 'qa-other-catalog',
+  });
+  check(
+    'Cross-project duplicate names require a stable ID or explicit project',
+    across.error?.code === 'ambiguous_ticket' &&
+      across.error.candidates.some((t) => t.id === outside.id) &&
+      within.ticket.id === outside.id,
   );
   doc.querySelector('#tickets-dialog').close();
   const originalCount = (await listTickets(project, { limit: 10000 })).total;

@@ -40,7 +40,7 @@ try {
       guide.markdown.includes('confirm_ticket_goal'),
   );
   const rows = await tool('list_tickets');
-  assert.ok(rows.tickets.length, 'Disposable shared project required');
+  assert.ok(rows.tickets.length, 'Disposable connected workspace required');
   const t = rows.tickets.find((t) => t.status === 'draft');
   assert.ok(t);
   const ref = { ticket_ref: t.display_id, project_id: t.project_id };
@@ -167,9 +167,21 @@ try {
       final.content.filter((b) => b.type === 'image').length >= 2,
   );
   check(
-    'Unauthorized project returns no ticket candidates',
-    (await tool('list_tickets', { project_id: 'not-shared' }, true)).error.code ===
-      'not_authorized',
+    'Project is an optional filter and an unknown project is empty',
+    (await tool('list_tickets', { project_id: 'unknown-project' })).total === 0,
+  );
+  const newProject = 'qa-new-project-' + randomUUID();
+  const fresh = await tool('create_ticket', {
+    project_id: newProject,
+    title: 'New project without sharing',
+    operation_id: randomUUID(),
+  });
+  const freshRead = await tool('get_ticket', { ticket_ref: fresh.ticket.id });
+  const freshList = await tool('list_tickets', { project_id: newProject });
+  check(
+    'New project tickets are listed and readable without an access grant',
+    freshRead.ticket.id === fresh.ticket.id &&
+      freshList.tickets.some((t) => t.id === fresh.ticket.id),
   );
   const report = { passed: checks.length, checks, ticket_id: t.id, project_id: t.project_id };
   await fs.mkdir(path.join(root, 'local'), { recursive: true });

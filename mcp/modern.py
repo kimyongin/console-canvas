@@ -1,4 +1,4 @@
-"""2026-07-28 per-request stdio framing and scoped resource subscriptions.
+"""2026-07-28 per-request stdio framing and connected-workspace resource subscriptions.
 
 No sampling/server-initiated requests. The loopback broker remains an internal
 transport, not a public Streamable HTTP MCP endpoint.
@@ -37,7 +37,7 @@ class ModernProtocol:
 
     def resources(self):
         return [{'uri': self.uri(s['editor_id']), 'name': s['title'] + ' · Work tickets',
-                 'mimeType': 'application/json'} for s in self.screens() if not s.get('workspace') or s.get('project_ids')]
+                 'mimeType': 'application/json'} for s in self.screens()]
 
     def notify(self, method, request_id, values):
         self.emit({'jsonrpc': '2.0', 'method': method, 'params': {

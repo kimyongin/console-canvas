@@ -108,6 +108,29 @@ class BrokerTests(unittest.TestCase):
         self.assertEqual(self.broker.call('apply_edits', changed)['error']['code'], 'operation_id_reused')
         self.broker.disconnect('different');wrong_poll.join(1)
 
+    def test_connected_workspace_routes_unknown_project_filter_without_access_grant(self):
+        self.screen.update(workspace=True, project_ids=[], project_id='current-project')
+        self.assertEqual(self.broker.call('list_screens', {})['screens'][0], self.screen)
+        result = []
+        thread = threading.Thread(target=lambda: result.append(self.broker.call('list_tickets', {'project_id':'new-project'})))
+        thread.start()
+        delivery = self.broker.poll({'screen':self.screen})['command']
+        self.assertEqual(delivery['arguments']['project_id'], 'new-project')
+        with self.broker.condition:
+            self.broker.commands[delivery['command_id']]['result'] = {'ok':True,'tickets':[],'total':0}
+            self.broker.condition.notify_all()
+        thread.join(1)
+        self.assertEqual(result, [{'ok':True,'tickets':[],'total':0}])
+        self.broker.disconnect('test-editor')
+        self.assertEqual(self.broker.call('list_tickets', {})['error']['code'], 'not_connected')
+
+    def test_project_filter_never_merges_or_implicitly_selects_another_workspace(self):
+        self.screen.update(workspace=True, project_ids=['first-project'])
+        with self.broker.condition:
+            self.broker.sessions['second'] = {'screen':{**self.screen,'editor_id':'second','project_ids':['second-project']},
+                'seen':time.monotonic(),'closed':False,'queue':__import__('collections').deque()}
+        self.assertEqual(self.broker.call('list_tickets', {'project_id':'first-project'})['error']['code'], 'ambiguous_workspace')
+
     def test_origin_allow_list(self):
         for origin in ('http://127.0.0.1:8849', 'chrome-extension://' + 'a' * 32, 'null', None):
             self.assertTrue(allowed_origin(origin))

@@ -1,13 +1,14 @@
 import {
   createTicket,
   listTickets,
+  listTicketProjects,
   getTicket,
   confirmTicketGoal,
   updateTicket,
   ticketReceipt,
   fingerprint,
 } from './ticket-model.js';
-import { getDocument, sharedProjects, editReceipt } from './db.js';
+import { getDocument, editReceipt } from './db.js';
 import { withSceneCopy } from './scene-preview.js';
 import { createEditorController } from './editor-controller.js';
 import { createEditorSession } from './editor-session.js';
@@ -24,11 +25,11 @@ const dataUrl = (blob) =>
 const failure = (code, message, extra = {}) => ({ ok: false, error: { code, message, ...extra } });
 export function createTicketWorkspace({ state, editorId, controller, flushEditor, refresh }) {
   let projects = [];
-  async function permissions() {
-    projects = await sharedProjects();
+  async function refreshProjects() {
+    projects = await listTicketProjects();
     return projects;
   }
-  void permissions();
+  void refreshProjects();
   const metadata = () => ({
     ...(controller.metadata() || {
       editor_id: editorId,
@@ -40,38 +41,13 @@ export function createTicketWorkspace({ state, editorId, controller, flushEditor
       comment_count: 0,
     }),
     workspace: true,
-    project_ids: projects,
+    project_ids: projects.slice(0, 1000),
   });
   async function resolve(args) {
-    const allowed = await permissions();
-    if (args.project_id && !allowed.includes(args.project_id))
-      throw Object.assign(Error('허용된 프로젝트가 아닙니다.'), { code: 'not_authorized' });
-    const found = [];
-    for (const project of args.project_id ? [args.project_id] : allowed) {
-      try {
-        const t = await getTicket(args.ticket_ref, project);
-        if (t) found.push(t);
-      } catch (e) {
-        if (e.code === 'ambiguous_ticket') found.push(...e.candidates);
-        else throw e;
-      }
-    }
-    if (found.length > 1)
-      throw Object.assign(Error('티켓이 여러 개입니다. ID로 선택해 주세요.'), {
-        code: 'ambiguous_ticket',
-        candidates: found.map(({ id, display_id, title, project_id, status }) => ({
-          id,
-          display_id,
-          title,
-          project_id,
-          status,
-        })),
-      });
-    if (!found.length)
-      throw Object.assign(Error('허용 범위에서 티켓을 찾을 수 없습니다.'), {
-        code: 'ticket_not_found',
-      });
-    return found[0];
+    const ticket = await getTicket(args.ticket_ref, args.project_id);
+    if (!ticket)
+      throw Object.assign(Error('티켓을 찾을 수 없습니다.'), { code: 'ticket_not_found' });
+    return ticket;
   }
   async function runScene(ticket, run, saved = false) {
     if (saved && state.snapshot?.id === ticket.document_id) await flushEditor();
@@ -134,19 +110,9 @@ export function createTicketWorkspace({ state, editorId, controller, flushEditor
       name = command.name;
     if (Date.now() > command.deadline * 1000) return failure('expired', '명령이 만료됐습니다.');
     try {
-      await permissions();
+      await refreshProjects();
       if (name === 'list_tickets') {
-        if (args.project_id && !projects.includes(args.project_id))
-          return failure('not_authorized', '허용된 프로젝트가 아닙니다.');
         if (state.ready) await flushEditor();
-        let rows = [];
-        for (const project of args.project_id ? [args.project_id] : projects)
-          rows.push(
-            ...(
-              await listTickets(project, { status: args.status, query: args.query, limit: 10000 })
-            ).tickets,
-          );
-        rows.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
         const offset = Number(args.cursor || 0),
           limit = args.limit || 50;
         if (!Number.isSafeInteger(offset) || offset < 0)
@@ -154,16 +120,20 @@ export function createTicketWorkspace({ state, editorId, controller, flushEditor
         return {
           ok: true,
           projects,
-          total: rows.length,
-          tickets: rows.slice(offset, offset + limit),
-          next_cursor: offset + limit < rows.length ? String(offset + limit) : null,
+          ...(await listTickets(args.project_id, {
+            status: args.status,
+            query: args.query,
+            offset,
+            limit,
+          })),
         };
       }
       if (name === 'create_ticket') {
-        const project = args.project_id || (projects.length === 1 ? projects[0] : null);
-        if (!project || !projects.includes(project))
-          return failure('project_required', '허용된 프로젝트를 지정해 주세요.', { projects });
+        const project =
+          args.project_id || state.project_id || (projects.length === 1 ? projects[0] : null);
+        if (!project) return failure('project_required', '프로젝트를 지정해 주세요.', { projects });
         const t = await createTicket({ ...args, project_id: project });
+        await refreshProjects();
         refresh?.();
         return { ok: true, ticket: t, persisted: true };
       }
@@ -356,6 +326,6 @@ export function createTicketWorkspace({ state, editorId, controller, flushEditor
       navigator.locks
         ? navigator.locks.request('console-canvas-agent', () => execute(command))
         : execute(command),
-    permissions,
+    refreshProjects,
   };
 }

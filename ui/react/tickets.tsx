@@ -10,13 +10,7 @@ import {
   updateTicket,
   TICKET_STATES,
 } from '../../ticket-model.js';
-import {
-  renameDocument,
-  trashDocument,
-  restoreDocument,
-  setProjectAccess,
-  sharedProjects,
-} from '../../db.js';
+import { renameDocument, trashDocument, restoreDocument } from '../../db.js';
 const labels = TICKET_STATES as Record<string, string>;
 export interface TicketUIOptions {
   project?: string;
@@ -54,23 +48,12 @@ function Tickets({ options }: { options: TicketUIOptions }) {
     [checks, setChecks] = useState(''),
     [evidence, setEvidence] = useState(''),
     [name, setName] = useState(options.ticket?.title || ''),
-    [shared, setShared] = useState(false),
-    [accessProject, setAccessProject] = useState(options.project || 'local-project');
+    [projectFilter, setProjectFilter] = useState(options.project || 'local-project');
   const refresh = async () =>
     setRows((await listTickets(undefined, { deleted, limit: 10000 })).tickets);
   useEffect(() => {
     refresh().catch((e) => setError(e.message));
   }, [deleted]);
-  useEffect(() => {
-    let active = true;
-    setShared(false);
-    sharedProjects().then((p) => {
-      if (active) setShared(p.includes(accessProject));
-    });
-    return () => {
-      active = false;
-    };
-  }, [accessProject]);
   useEffect(() => {
     if (!confirming || !options.capture) return;
     let active = true;
@@ -92,7 +75,7 @@ function Tickets({ options }: { options: TicketUIOptions }) {
   }, [confirming]);
   const visibleRows = rows.filter(
     (t) =>
-      (!accessProject || t.project_id === accessProject) &&
+      (!projectFilter || t.project_id === projectFilter) &&
       (!filter || t.status === filter) &&
       (!query ||
         [t.display_id, t.title, t.request]
@@ -460,14 +443,14 @@ function Tickets({ options }: { options: TicketUIOptions }) {
               프로젝트
               <select
                 aria-label="프로젝트"
-                value={accessProject}
-                onChange={(e) => setAccessProject(e.target.value)}
+                value={projectFilter}
+                onChange={(e) => setProjectFilter(e.target.value)}
               >
                 <option value="">모든 프로젝트</option>
                 {[
                   ...new Set([
                     options.project || 'local-project',
-                    ...(accessProject ? [accessProject] : []),
+                    ...(projectFilter ? [projectFilter] : []),
                     ...rows.map((t) => t.project_id),
                   ]),
                 ].map((p) => (
@@ -477,23 +460,6 @@ function Tickets({ options }: { options: TicketUIOptions }) {
                 ))}
               </select>
             </label>
-            {accessProject && (
-              <label>
-                <input
-                  id="share-project"
-                  type="checkbox"
-                  checked={shared}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    void run(async () => {
-                      await setProjectAccess(accessProject, checked);
-                      setShared(checked);
-                    });
-                  }}
-                />{' '}
-                이 프로젝트의 저장 티켓을 에이전트에 공개
-              </label>
-            )}
           </div>
           <div id="ticket-list">
             {visibleRows.length ? (
