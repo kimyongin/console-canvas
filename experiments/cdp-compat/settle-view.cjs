@@ -1,0 +1,2 @@
+// Identical read-only test readiness condition for both browser inputs.
+module.exports = `new Promise(resolve=>{const started=performance.now();let previous='',since=started;function sample(){const size=JSON.stringify([innerWidth,innerHeight]);const now=performance.now();if(size!==previous){previous=size;since=now;}if(now-since>=650||now-started>=5000)resolve({width:innerWidth,height:innerHeight,stable:now-since>=650,elapsedMs:now-started});else setTimeout(sample,32);}sample();})`;
