@@ -94,6 +94,18 @@ try {
   ]);
   await active.done;
   active = null;
+  const lateWorkspaceAfterClose = offscreen
+    ? null
+    : await Promise.all(
+        ['prepare', 'reopen'].map(async (phase) => {
+          const result = JSON.parse(
+            await fs.readFile(path.join(temporary, phase + '-late-workspace.json'), 'utf8'),
+          );
+          if (!result.ignored)
+            throw Error('Late workspace after shell close was not checked: ' + phase);
+          return phase;
+        }),
+      );
   active = start(electron, ['tests/visual-input.cjs']);
   const visualInput = JSON.parse((await active.done).trim());
   console.log('Visual input: ' + JSON.stringify(visualInput));
@@ -112,6 +124,7 @@ try {
     modernSdkChecks: modernReport.passed,
     modernProtocol: modernReport.protocol,
     normalQuitAndRelaunch: true,
+    lateWorkspaceAfterClose,
   };
   await fs.writeFile(
     path.join(root, offscreen ? 'dist/desktop-offscreen-checks.json' : 'dist/desktop-checks.json'),

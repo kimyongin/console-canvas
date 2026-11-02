@@ -38,7 +38,10 @@ if (process.env.CONSOLE_CANVAS_USER_DATA_DIR) {
   fs.mkdirSync(qaProfile, { recursive: true });
   app.setPath('userData', qaProfile);
 }
+// Keep the security identity: Electron derives the macOS keychain service from this name.
+// Display branding is separate so existing encrypted cookies and MCP credentials remain usable.
 app.setName('Console Canvas');
+app.setAboutPanelOptions({ applicationName: 'Page Canvas' });
 const stateDir =
   process.env.CONSOLE_CANVAS_STATE_DIR ||
   path.join(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'console-canvas');
@@ -183,7 +186,7 @@ async function start() {
     height: 1000,
     minWidth: 1000,
     minHeight: 720,
-    title: 'Console Canvas',
+    title: 'Page Canvas',
     backgroundColor: '#f5f6fb',
     webPreferences: {
       preload: path.join(__dirname, 'shell-preload.cjs'),
@@ -250,6 +253,8 @@ async function start() {
     downloads: app.getPath('downloads'),
   });
   ipcMain.on('canvas:workspace-state', (event, value) => {
+    // A queued editor update can arrive after the acknowledged quit destroys the shell.
+    if (!win || win.isDestroyed()) return;
     trusted(event, 'editor');
     if (
       !value ||
@@ -420,7 +425,7 @@ async function start() {
     const result = await dialog.showOpenDialog(win, {
       title: '편집 파일 열기',
       properties: ['openFile'],
-      filters: [{ name: 'Console Canvas', extensions: ['json', 'uiclone'] }],
+      filters: [{ name: 'Page Canvas', extensions: ['json', 'uiclone'] }],
     });
     if (result.canceled || !result.filePaths[0]) return { canceled: true };
     const file = result.filePaths[0],
@@ -534,9 +539,9 @@ async function start() {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       {
-        label: 'Console Canvas',
+        label: 'Page Canvas',
         submenu: [
-          { role: 'about' },
+          { role: 'about', label: 'About Page Canvas' },
           {
             label: '앱 디자인 편집',
             click: () => captureApp().catch((error) => notify(error.message)),
@@ -549,7 +554,7 @@ async function start() {
             },
           },
           { type: 'separator' },
-          { role: 'quit' },
+          { role: 'quit', label: 'Quit Page Canvas' },
         ],
       },
       {
@@ -602,7 +607,7 @@ else {
     .whenReady()
     .then(start)
     .catch((error) => {
-      require('electron').dialog.showErrorBox('Console Canvas 실행 오류', error.message);
+      require('electron').dialog.showErrorBox('Page Canvas 실행 오류', error.message);
       app.quit();
     });
 }

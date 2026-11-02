@@ -3,7 +3,7 @@
   "tools": [
     {
       "name": "get_agent_guide",
-      "description": "Read the app-bundled Console Canvas skill instructions and version before editing. Works before capturing a screen and does not install files.",
+      "description": "Read the app-bundled Page Canvas skill instructions and version before editing. Works before capturing a screen and does not install files.",
       "inputSchema": {
         "type": "object",
         "properties": {},

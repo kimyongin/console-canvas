@@ -35,7 +35,7 @@ function registerShellIpc({
   });
   handle('skill-save', async () => {
     const result = await dialog.showSaveDialog(win, {
-      title: 'Console Canvas 스킬 ZIP 저장',
+      title: 'Page Canvas 스킬 ZIP 저장',
       defaultPath: path.join(app.getPath('downloads'), 'console-canvas-skill-' + version + '.zip'),
       filters: [{ name: 'ZIP 파일', extensions: ['zip'] }],
     });

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Console Canvas MCP stdio adapter (Python 3.9+, no dependencies)."""
+"""Page Canvas MCP stdio adapter (Python 3.9+, no dependencies)."""
 import argparse
 import http.client
 import json
@@ -228,7 +228,7 @@ def stdio(connection, connection_file=None):
                 except urllib.error.HTTPError as error:
                     value = {'ok': False, 'error': {
                         'code': 'connection_authentication_failed' if error.code in (401, 403) else 'connection_failed',
-                        'message': 'Console Canvas connection was rejected. Reconnect this MCP client using the installed app connection command. Do not disable authentication.',
+                        'message': 'Page Canvas connection was rejected. Reconnect this MCP client using the installed app connection command. Do not disable authentication.',
                         'http_status': error.code,
                         'recovery': 'Open the canvas connection status, copy the current MCP command if the configured path changed, then reconnect the MCP client. A running local server does not prove this client is authenticated.'}}
                     result = {'content': [{'type': 'text', 'text': json.dumps(value)}], 'structuredContent': value, 'isError': True}

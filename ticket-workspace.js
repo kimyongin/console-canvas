@@ -54,7 +54,7 @@ export function createTicketWorkspace({ state, editorId, controller, flushEditor
     ...(controller.metadata() || {
       editor_id: editorId,
       document_id: 'workspace',
-      title: 'Console Canvas 티켓',
+      title: 'Page Canvas 티켓',
       url: '',
       revision: 0,
       element_count: 0,

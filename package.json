@@ -1,9 +1,9 @@
 {
   "name": "console-canvas",
-  "version": "0.55.0",
+  "version": "0.56.0",
   "license": "MIT",
   "private": true,
-  "description": "Embedded Chromium console UI editor with MCP control",
+  "description": "Web page design canvas with local agent MCP control",
   "main": "desktop/main.cjs",
   "scripts": {
     "start": "electron .",

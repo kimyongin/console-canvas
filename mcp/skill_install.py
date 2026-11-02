@@ -49,7 +49,7 @@ def packaged_files(archive):
             raise ValueError('스킬 ZIP의 크기 또는 암호화 형식을 확인해 주세요.')
         values = {name: bundle.read('console-canvas/' + name) for name in MANAGED}
     if not re.search(r'^name: console-canvas\s*$', values['SKILL.md'].decode(), re.M):
-        raise ValueError('Console Canvas 스킬이 아닙니다.')
+        raise ValueError('Page Canvas 스킬이 아닙니다.')
     return values
 
 

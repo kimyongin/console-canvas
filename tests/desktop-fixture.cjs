@@ -1,5 +1,5 @@
 // Native integration: isolated app profile, skill directory and authenticated broker.
-const { app, BrowserWindow, dialog, Menu } = require('electron');
+const { app, BrowserWindow, dialog, Menu, ipcMain } = require('electron');
 const fs = require('node:fs/promises'),
   path = require('node:path'),
   assert = require('node:assert/strict');
@@ -404,6 +404,16 @@ async function main() {
       }),
     );
   }
+  const lateStateEvent = { sender: editor, senderFrame: editor.mainFrame };
+  window.once('closed', () => {
+    assert.doesNotThrow(() =>
+      ipcMain.emit('canvas:workspace-state', lateStateEvent, { projects: [] }),
+    );
+    require('node:fs').writeFileSync(
+      path.join(directory, phase + '-late-workspace.json'),
+      JSON.stringify({ ignored: true }),
+    );
+  });
   window.close();
 }
 main().catch((e) => {

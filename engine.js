@@ -24,7 +24,7 @@ export function validateSnapshot(value) {
     typeof value.html !== 'string' ||
     !Array.isArray(value.nodes)
   )
-    throw new Error('Console Canvas에서 가져온 화면 파일이 아닙니다.');
+    throw new Error('Page Canvas에서 가져온 화면 파일이 아닙니다.');
   if (value.html.length > 60_000_000 || value.nodes.length > 40000)
     throw new Error('화면 파일이 너무 큽니다.');
   if (

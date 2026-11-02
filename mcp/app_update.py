@@ -103,7 +103,7 @@ def validate_archive(archive):
 def validate_app(app_path, expected_version=None, arch=None):
     info = plistlib.loads((app_path / 'Contents/Info.plist').read_bytes())
     if info.get('CFBundleIdentifier') != BUNDLE_ID:
-        raise ValueError('Console Canvas 앱만 업데이트할 수 있습니다.')
+        raise ValueError('Page Canvas 앱만 업데이트할 수 있습니다.')
     found = info.get('CFBundleShortVersionString', '')
     version(found)
     if expected_version and found != expected_version:

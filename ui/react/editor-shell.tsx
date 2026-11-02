@@ -37,7 +37,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
   return (
     <>
       <header className="app-header" hidden={!!(window as any).ConsoleCanvasDesktop}>
-        <strong className="brand">▧ Console Canvas</strong>
+        <strong className="brand">▧ Page Canvas</strong>
         <div id="project-control" />
         <nav className="workflow-nav">
           <Button id="web-source" variant="ghost">

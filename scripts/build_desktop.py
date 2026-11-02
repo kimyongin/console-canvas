@@ -86,7 +86,8 @@ def main():
             shutil.copyfile(extracted / name, resources / 'licenses' / name)
     plist = app / 'Contents' / 'Info.plist'
     value = plistlib.loads(plist.read_bytes())
-    value.update({'CFBundleName': 'Console Canvas', 'CFBundleDisplayName': 'Console Canvas',
+    # CFBundleName is the startup keychain identity; only the display name is rebranded.
+    value.update({'CFBundleName': 'Console Canvas', 'CFBundleDisplayName': 'Page Canvas',
                   'CFBundleIdentifier': 'com.consolecanvas.desktop',
                   'CFBundleShortVersionString': json.loads((ROOT / 'package.json').read_text())['version'],
                   'CFBundleVersion': json.loads((ROOT / 'package.json').read_text())['version']})

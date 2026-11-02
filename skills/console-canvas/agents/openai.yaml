@@ -1,4 +1,4 @@
 interface:
-  display_name: "Console Canvas"
+  display_name: "Page Canvas"
   short_description: "티켓 ID·이름으로 편집·주석을 읽고 시안·구현·검토 이어가기"
   default_prompt: "$console-canvas로 캔버스 티켓을 가져와 목록을 보여줘."

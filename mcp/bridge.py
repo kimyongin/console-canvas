@@ -147,7 +147,7 @@ class Broker:
     def call(self, name, arguments, repository_context=None):
         rules = {item[0]: item[2] for item in TOOLS}
         if name not in rules:
-            return error('unknown_tool', 'Unknown Console Canvas tool')
+            return error('unknown_tool', 'Unknown Page Canvas tool')
         try:
             validate(arguments, rules[name])
         except ValueError as exc:
@@ -168,7 +168,7 @@ class Broker:
                         'source': 'app_bundle', 'installation_required_for_mcp': False,
                         'helper_scripts': 'Install the skill from the desktop app for prepare/review CLI helpers.'}
             except OSError:
-                return error('guide_unavailable', 'The app-bundled skill guide is missing. Rebuild or update Console Canvas.')
+                return error('guide_unavailable', 'The app-bundled skill guide is missing. Rebuild or update Page Canvas.')
         with self.condition:
             def live(session):
                 return not session.get('closed') and time.monotonic() - session['seen'] < 20
@@ -181,7 +181,7 @@ class Broker:
                 if len(candidates)>1:
                     return error('ambiguous_workspace','More than one workspace is connected; disconnect unused workspaces or specify editor_id')
                 if not candidates:
-                    return error('not_connected','Run Console Canvas and connect its workspace')
+                    return error('not_connected','Run Page Canvas and connect its workspace')
                 editor_id=candidates[0]['screen']['editor_id']
             session = self.sessions.get(editor_id)
             if not session or not live(session):
