@@ -1,23 +1,42 @@
-# 티켓 우선 편집 · 개발 티켓 추적표
+# Page Canvas · 개발 티켓 추적표
+
+## 다음 구현 · 앱과 Chrome 확장 독립 실행
+
+2026-11-02 · 상위 [#210](https://github.com/kimyongin/console-canvas/issues/210) · [승인한 범위·모호성 결정·수용 기준](independent-extension-plan.md). 현재 소스/설치는0.56.0 내장 앱이며 아래는 미구현이다. 앱↔확장 통신·Native Messaging·전용 로컬 수집 서버·별도 복제 엔진은 추가하지 않는다. 기존 자료 삭제 승인은 없다.
+
+| 순서 | GitHub | 범위 | 상태 |
+| --- | --- | --- | --- |
+| 1 | [#211](https://github.com/kimyongin/console-canvas/issues/211) | 공통 엔진의 브라우저 단독 실행 | 미착수·선행 검증 |
+| 2 | [#212](https://github.com/kimyongin/console-canvas/issues/212) | 일반 Chrome의 외부 WebMCP 실연결 | 미착수·선행 검증 |
+| 3 | [#213](https://github.com/kimyongin/console-canvas/issues/213) | 공통 티켓/저장·workspace·검증 주체 | 미착수 |
+| 4 | [#214](https://github.com/kimyongin/console-canvas/issues/214) | Chrome 어댑터·권한·중단/재시도 | 미착수 |
+| 5 | [#215](https://github.com/kimyongin/console-canvas/issues/215) | 독립 확장 편집기·간결한 동선 | 미착수 |
+| 6 | [#216](https://github.com/kimyongin/console-canvas/issues/216) | WebMCP·이미지·저장소 맥락·스킬 | 미착수 |
+| 7 | [#217](https://github.com/kimyongin/console-canvas/issues/217) | 양쪽 품질·전체 기능/UX·액션 측정 | 미착수 |
+| 8 | [#218](https://github.com/kimyongin/console-canvas/issues/218) | 개인용 패키징·업데이트·가이드·설치 | 미착수 |
+
+기존 열린 #7의 OS IME/권한 검증은 별도 유지한다. 아래는 이전 이터레이션 기록이며 Chrome 영구 제외나 자료 초기화 승인을 이번 작업에 재사용하지 않는다.
+
+## 이전 · 티켓 우선 편집
 
 2026-11-01 · [PRD](PRD.md) · [MCP·스킬 구현 계약](ticket-first-mcp-skill.md) · 상위 [#169](https://github.com/kimyongin/console-canvas/issues/169)
 
 **0.46.0 구현·검증 완료.** 저장·UI·같은 ID 목표·MCP·스킬을 순서대로 구현했다. [검증 기록](ticket-first-0.46.md)과 [실제 화면 가이드](https://console-canvas-guide.yonginkim.chatgpt.site/)를 제공하며 설치 앱도 갱신했다. 이전 증빙은 [0.45 추적표](ticket-review-0.45-history.md)에 보존한다.
 
-## 다음 구현 · 프로젝트/저장소 연결과 가져오기 중심 동선
+## 이전 구현 · 프로젝트/저장소 연결과 가져오기 중심 동선
 
-2026-11-01 승인 계획 · 상위 [#189](https://github.com/kimyongin/console-canvas/issues/189) · [범위·시안·의존성·WF 수용 기준](workflow-project-plan.md). 현재 설치/소스0.51.4의 완료 기록과 구별하며 아래 작업은 모두 미착수다. 사용자 승인으로 이번 전환의 기존 업무 자료는 초기화 가능하며 보존 이전·구버전 호환은 제외한다. 새 자료의 저장/재실행 검증은 유지한다.
+2026-11-01 승인 계획 · 상위 [#189](https://github.com/kimyongin/console-canvas/issues/189) · [범위·시안·의존성·WF 수용 기준](workflow-project-plan.md). 아래는0.52.1에서 구현·검증한 기록이며 [결과](workflow-0.52.md)를 따른다. 당시 전환에 한정한 업무 자료 초기화는 끝났고 이번 확장 계획의 삭제 승인이 아니다.
 
 | 순서 | GitHub | 범위 | 상태 |
 | --- | --- | --- | --- |
-| 1 | #190 | 프로젝트·저장소 모델/업무DB 초기화 | 미착수 |
-| 2 | #192 | 저장소 연결·세션별 프로젝트 MCP | 미착수 |
-| 3 | #191 | 프로젝트 생성/전환·연결 복사/상태 UI | 미착수 |
-| 4 | #188 | 가져오기→자동 티켓→편집·한 번 확정 | 미착수 |
-| 5 | #193 | 공통 한 줄 헤더·메뉴·화면 전환 | 미착수 |
-| 6 | #194 | 프로젝트별 목록·일괄 구현·진행 추적 | 미착수 |
-| 7 | #195 | 실제 MCP/스킬·PRD·실제 화면 HTML 가이드 | 미착수 |
-| 8 | #196 | 전체 동선/액션·초기화·설치/재실행 | 미착수 |
+| 1 | #190 | 프로젝트·저장소 모델/업무DB 초기화 | 완료 |
+| 2 | #192 | 저장소 연결·세션별 프로젝트 MCP | 완료 |
+| 3 | #191 | 프로젝트 생성/전환·연결 복사/상태 UI | 완료 |
+| 4 | #188 | 가져오기→자동 티켓→편집·한 번 확정 | 완료 |
+| 5 | #193 | 공통 한 줄 헤더·메뉴·화면 전환 | 완료 |
+| 6 | #194 | 프로젝트별 목록·일괄 구현·진행 추적 | 완료 |
+| 7 | #195 | 실제 MCP/스킬·PRD·실제 화면 HTML 가이드 | 완료 |
+| 8 | #196 | 전체 동선/액션·초기화·설치/재실행 | 완료 |
 
 기존 #188의 원본 재사용/티켓 분할 초안은 채택하지 않고 이번 승인된 캡처 주경로로 재정의했다. #187 공개 옵션 제거 완료와 #7 실제 OS 검증 잔여를 유지한다. 구현 전 UX 재검토로 처음 가져오기부터 시작·같은 자리에서 연결+조회 요청 복사·직접 수정/재확정·미완료 목록/직접 편집·중복 승인 제거를 각 티켓에 추가했다. 확정 후 제자리 피드백과 사용자 선택의 웹 복귀를 유지하며 실제 액션 측정은 구현 뒤 수행한다.
 
