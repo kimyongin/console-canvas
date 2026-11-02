@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Page Canvas",
+  "description": "웹 화면을 복제하고 티켓으로 디자인 의도를 정리하세요.",
+  "minimum_chrome_version": "156",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAz9iGcuARsQCmmn3zaaOqdEvScEBNbBXCGfO7beSJQwxJzxLUcIe0+3eAvbVGjgNfiH1em/A0HGbN/uCIIbTL+Qt0GSRZI7Mkhih67y01Gj8TboSpFWNFE2QM8CafXM9LnEKCl7DXLWtoDlW7gS2y9+8p1/TjJnbl4cFidjjNVBIslPO6v1lrwsdJsNB1RFauMNEQirqz5oK2ku8HodKiZzpqkDEHWXX4qQMZ5f2MAUiI9Iw+TUzznziTNIQgSUyhIUcx8jj3oDHzBTkSCY2iHexjAzJZA1xsqC+uNi3L9GCo5jA28FnS/2RCVqyO0+52gHdXx8I4nJ5F96EIH0S/RQIDAQAB",
+  "permissions": [
+    "debugger",
+    "activeTab",
+    "tabs",
+    "storage",
+    "webNavigation"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Page Canvas로 가져오기",
+    "default_popup": "popup.html"
+  },
+  "cross_origin_opener_policy": {
+    "value": "same-origin"
+  },
+  "cross_origin_embedder_policy": {
+    "value": "require-corp"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none';"
+  }
+}

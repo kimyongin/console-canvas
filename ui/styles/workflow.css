@@ -106,6 +106,34 @@
   white-space: nowrap;
 }
 /* Workflow feedback and controls stay inside the header at narrow widths. */
+.app-header.extension-header {
+  display: grid;
+  grid-template-columns: auto minmax(90px, 180px) auto minmax(0, 1fr) auto;
+  height: 56px;
+}
+.extension-header #header-ticket-identity {
+  width: 100%;
+  max-width: 100%;
+  justify-content: flex-start;
+}
+.extension-header .header-actions {
+  margin-left: 0;
+}
+#editor-root .extension-header #document-menu-button {
+  width: 32px;
+  flex: 0 0 32px;
+  padding-inline: 0;
+}
+@media (max-width: 900px) {
+  .app-header.extension-header {
+    grid-template-columns: auto minmax(80px, 120px) auto minmax(0, 1fr) auto;
+    padding-inline: 8px;
+    gap: 4px;
+  }
+  .extension-header .header-actions button {
+    padding-inline: 6px;
+  }
+}
 .app-header {
   padding-inline: 16px;
   gap: 8px;

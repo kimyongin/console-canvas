@@ -1,19 +1,21 @@
 # Page Canvas · 개발 티켓 추적표
 
-## 다음 구현 · 앱과 Chrome 확장 독립 실행
+## 0.57 구현 · 앱과 Chrome 확장 독립 실행
 
-2026-11-02 · 상위 [#210](https://github.com/kimyongin/console-canvas/issues/210) · [승인한 범위·모호성 결정·수용 기준](independent-extension-plan.md). 현재 소스/설치는0.56.0 내장 앱이며 아래는 미구현이다. 앱↔확장 통신·Native Messaging·전용 로컬 수집 서버·별도 복제 엔진은 추가하지 않는다. 기존 자료 삭제 승인은 없다.
+2026-11-02 · 상위 [#210](https://github.com/kimyongin/console-canvas/issues/210) · [승인한 범위·모호성 결정·수용 기준](independent-extension-plan.md). 소스0.57.0 구현·격리 브라우저 검증을 진행했다. [현재 검증·설치 범위](extension-0.57.md)를 따르며 실제 사용자 Chrome 승인 조건을 별도로 추적한다. 앱↔확장 통신·Native Messaging·전용 로컬 수집 서버·별도 복제 엔진은 추가하지 않는다. 기존 자료 삭제 승인은 없다.
 
 | 순서 | GitHub | 범위 | 상태 |
 | --- | --- | --- | --- |
-| 1 | [#211](https://github.com/kimyongin/console-canvas/issues/211) | 공통 엔진의 브라우저 단독 실행 | 미착수·선행 검증 |
-| 2 | [#212](https://github.com/kimyongin/console-canvas/issues/212) | 일반 Chrome의 외부 WebMCP 실연결 | 미착수·선행 검증 |
-| 3 | [#213](https://github.com/kimyongin/console-canvas/issues/213) | 공통 티켓/저장·workspace·검증 주체 | 미착수 |
-| 4 | [#214](https://github.com/kimyongin/console-canvas/issues/214) | Chrome 어댑터·권한·중단/재시도 | 미착수 |
-| 5 | [#215](https://github.com/kimyongin/console-canvas/issues/215) | 독립 확장 편집기·간결한 동선 | 미착수 |
-| 6 | [#216](https://github.com/kimyongin/console-canvas/issues/216) | WebMCP·이미지·저장소 맥락·스킬 | 미착수 |
-| 7 | [#217](https://github.com/kimyongin/console-canvas/issues/217) | 양쪽 품질·전체 기능/UX·액션 측정 | 미착수 |
-| 8 | [#218](https://github.com/kimyongin/console-canvas/issues/218) | 개인용 패키징·업데이트·가이드·설치 | 미착수 |
+| 1 | [#211](https://github.com/kimyongin/console-canvas/issues/211) | 공통 엔진의 브라우저 단독 실행 | 공통 엔진·6샘플/10사이트 검증 |
+| 2 | [#212](https://github.com/kimyongin/console-canvas/issues/212) | 일반 Chrome의 외부 WebMCP 실연결 | 일반 창 browser-url 통과 · 사용자 프로필 승인 대기 |
+| 3 | [#213](https://github.com/kimyongin/console-canvas/issues/213) | 공통 티켓/저장·workspace·검증 주체 | 구현·격리 검사 통과 · #212 승인 조건 대기 |
+| 4 | [#214](https://github.com/kimyongin/console-canvas/issues/214) | Chrome 어댑터·권한·중단/재시도 | 구현·격리 검사 통과 · #212 승인 조건 대기 |
+| 5 | [#215](https://github.com/kimyongin/console-canvas/issues/215) | 독립 확장 편집기·간결한 동선 | 구현·격리 검사 통과 · #212 승인 조건 대기 |
+| 6 | [#216](https://github.com/kimyongin/console-canvas/issues/216) | WebMCP·이미지·저장소 맥락·스킬 | 구현·격리 검사 통과 · #212 승인 조건 대기 |
+| 7 | [#217](https://github.com/kimyongin/console-canvas/issues/217) | 양쪽 품질·전체 기능/UX·액션 측정 | 구현·격리 검사 통과 · #212 승인 조건 대기 |
+| 8 | [#218](https://github.com/kimyongin/console-canvas/issues/218) | 개인용 패키징·업데이트·가이드·설치 | 구현·격리 검사 통과 · #212 승인 조건 대기 |
+
+실제 발견한 #219 placeholder·#220 헤더 메뉴·#221 취소 안내를 수정하고 회귀했다. 설치 앱0.57.0·기존 티켓/주석/목표3개와 관리 스킬 보존을 확인했다. #212의 평소 Chrome 설치/autoConnect와 #218의 수동 확장 새로고침은 승인 전 완료로 표시하지 않으며 선행 조건 때문에 상위와 후속 티켓의 최종 종료를 보류한다.
 
 기존 열린 #7의 OS IME/권한 검증은 별도 유지한다. 아래는 이전 이터레이션 기록이며 Chrome 영구 제외나 자료 초기화 승인을 이번 작업에 재사용하지 않는다.
 

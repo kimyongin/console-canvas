@@ -1,6 +1,6 @@
 {
   "name": "console-canvas",
-  "version": "0.56.0",
+  "version": "0.57.0",
   "license": "MIT",
   "private": true,
   "description": "Web page design canvas with local agent MCP control",

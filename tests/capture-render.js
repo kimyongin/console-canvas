@@ -13,6 +13,12 @@ try {
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   window.captureScene = scene;
   const testedHeight = Math.min(snapshot.source.height, 12000);
+  const captured = snapshot.captureScope?.rect || {
+    x: 0,
+    y: 0,
+    width: snapshot.source.viewport.width,
+    height: testedHeight,
+  };
   const missingMedia = [...scene.nodes.values()]
     .filter((n) => {
       if (!n.visible || n.image?.broken) return false;
@@ -28,6 +34,13 @@ try {
           Math.max(r.x, c.x, 0) ||
         Math.min(r.y + r.height, c.y + c.height, testedHeight) <= Math.max(r.y, c.y, 0) ||
         r.width * r.height < 64
+      )
+        return false;
+      if (
+        r.x + r.width <= captured.x ||
+        r.y + r.height <= captured.y ||
+        r.x >= captured.x + captured.width ||
+        r.y >= captured.y + captured.height
       )
         return false;
       const e = scene.elements.get(n.id);

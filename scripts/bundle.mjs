@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import postcss from 'postcss';
 import tailwind from '@tailwindcss/postcss';
+import { buildExtension } from './build-extension.mjs';
 const root = path.resolve(import.meta.dirname, '..');
 const result = await build({
   absWorkingDir: root,
@@ -90,7 +91,22 @@ const publicFiles = [
     ),
   ]),
 ].sort();
+const nativeCapture = await build({
+  absWorkingDir: root,
+  entryPoints: ['desktop/capture.cjs', 'desktop/repair-resources.cjs'],
+  outdir: 'dist/native-capture-graph',
+  bundle: true,
+  platform: 'node',
+  packages: 'external',
+  write: false,
+  metafile: true,
+});
 await fs.writeFile(
   path.join(root, 'runtime-manifest.json'),
-  JSON.stringify({ public: publicFiles }, null, 2) + '\n',
+  JSON.stringify(
+    { public: publicFiles, native: Object.keys(nativeCapture.metafile.inputs).sort() },
+    null,
+    2,
+  ) + '\n',
 );
+await buildExtension(root);

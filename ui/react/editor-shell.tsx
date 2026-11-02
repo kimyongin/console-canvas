@@ -6,6 +6,7 @@ import { Button } from './components/button';
 import { Input } from './components/input';
 import { Textarea } from './components/textarea';
 import { DialogSurface, NativeSelect, TaskHeader } from './components/surfaces';
+import { isExtension } from '../../runtime-platform.js';
 const emptySubscribe = () => () => {};
 export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
   useSyncExternalStore(adapter?.subscribe || emptySubscribe, () => {
@@ -36,16 +37,21 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
   };
   return (
     <>
-      <header className="app-header" hidden={!!(window as any).ConsoleCanvasDesktop}>
+      <header
+        className={isExtension ? 'app-header extension-header' : 'app-header'}
+        hidden={!!(window as any).ConsoleCanvasDesktop}
+      >
         <strong className="brand">▧ Page Canvas</strong>
         <div id="project-control" />
         <nav className="workflow-nav">
           <Button id="web-source" variant="ghost">
-            웹사이트
+            {isExtension ? '원본으로' : '웹사이트'}
           </Button>
-          <Button id="web-editor" variant="ghost" disabled={!view?.ready}>
-            편집
-          </Button>
+          {!isExtension && (
+            <Button id="web-editor" variant="ghost" disabled={!view?.ready}>
+              편집
+            </Button>
+          )}
           <Button
             id="tickets-button"
             variant="ghost"
@@ -356,7 +362,7 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                 {'말로 남겨도 좋아요.'}
               </h2>
               <p>
-                {'실제 콘솔 화면을 복제하고'}
+                {'실제 웹 화면을 복제하고'}
                 <br />
                 {'티켓 안에서 편집하고, 에이전트에게 티켓 ID로 요청하세요.'}
               </p>
@@ -373,9 +379,14 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
                 </Button>
               </div>
               <div id="import-guide" className="capture-start-help" hidden={true}>
-                <strong>내장 앱에서 화면 가져오기</strong>
-                <p>상단 웹사이트에서 주소를 열고, 원하는 상태에서 ‘이 화면 가져오기’를 누르세요.</p>
-                <p>기존 Chrome 확장 문서는 편집 파일로 저장한 뒤 이 앱에서 열 수 있습니다.</p>
+                <strong>
+                  {isExtension ? 'Chrome에서 화면 가져오기' : '내장 앱에서 화면 가져오기'}
+                </strong>
+                <p>
+                  {isExtension
+                    ? 'Chrome에서 원하는 페이지를 열고, 확장 버튼의 ‘현재 화면 가져오기’를 누르세요.'
+                    : '상단 웹사이트에서 주소를 열고, 원하는 상태에서 ‘이 화면 가져오기’를 누르세요.'}
+                </p>
               </div>
               <div id="recent-documents" className="recent-documents"></div>
             </div>
@@ -909,60 +920,96 @@ export function EditorShell({ adapter }: { adapter?: EditorAdapter }) {
             {'×'}
           </Button>
         </form>
-        <div id="mcp-content">
-          <div className="eyebrow">{'CONNECT YOUR AGENT'}</div>
-          <h2>{'에이전트와 함께 편집'}</h2>
-          <dl className="connection-facts">
-            <dt>로컬 서버</dt>
-            <dd id="connection-server" />
-            <dt>에이전트 통신</dt>
-            <dd id="connection-agent" />
-            <dt>프로젝트 저장소</dt>
-            <dd id="connection-repository" />
-          </dl>
-          <p>
-            서버 실행과 에이전트 인증은 다릅니다. 최근 통신도 현재 대화의 인증을 보장하지 않습니다.
-          </p>
-          <div className="export-actions">
-            <Button id="connection-retry" variant="outline">
-              서버 다시 연결
-            </Button>
-            <Button id="connection-copy-command" variant="outline">
-              MCP 연결 명령 복사
-            </Button>
-            <Button id="connection-copy-project" variant="outline">
-              저장소 연결 요청 복사
-            </Button>
-          </div>
-          <p id="connection-recovery">
-            기존 대화에서만 조회가 실패하면 MCP 클라이언트를 다시 연결하세요. 삭제된 도구가 보이면
-            도구 목록도 새로 받아야 합니다. 앱이 대화를 재시작하지는 않습니다.
-          </p>
-          <div id="manual-connection">
-            <label className="review-note-label">
-              {'로컬 서버 주소'}
-              <Input id="mcp-address" defaultValue="http://127.0.0.1:8849" type="url" />
-            </label>
-            <label className="review-note-label">
-              {'연결 코드'}
-              <Input
-                id="mcp-code"
-                type="password"
-                autoComplete="off"
-                placeholder="에이전트가 준비한 연결 코드"
-              />
-            </label>
+        {isExtension ? (
+          <div id="mcp-content">
+            <div className="eyebrow">WEBMCP</div>
+            <h2>에이전트 연결</h2>
+            <dl className="connection-facts">
+              <dt>도구 상태</dt>
+              <dd id="connection-server" />
+              <dt>최근 호출</dt>
+              <dd id="connection-agent" />
+              <dt>프로젝트 저장소</dt>
+              <dd id="connection-repository" />
+            </dl>
+            <p>
+              Chrome의 WebMCP 기능을 켜고, 로컬 에이전트에서 공식 Chrome DevTools MCP로 이
+              브라우저에 연결하세요. 이 작업공간 탭 하나는 열어 두세요.
+            </p>
             <div className="export-actions">
+              <Button id="mcp-connect">도구 연결</Button>
               <Button id="mcp-disconnect" variant="outline">
-                {'연결 끊기'}
+                연결 해제
               </Button>
-              <Button id="mcp-connect" className="primary" variant="outline">
-                {'연결'}
+              <Button id="connection-copy-project" variant="outline">
+                저장소 연결 요청 복사
               </Button>
             </div>
+            <p>
+              저장소는 로컬 에이전트가 확인합니다. 도구 준비 상태와 에이전트의 실제 호출은 다릅니다.
+            </p>
+            <a href="agent-skill.zip" download="page-canvas-skill.zip">
+              에이전트 스킬 내려받기
+            </a>
+            <div id="mcp-message" className="export-status" role="status" />
           </div>
-          <div id="mcp-message" className="export-status" role="status"></div>
-        </div>
+        ) : (
+          <div id="mcp-content">
+            <div className="eyebrow">{'CONNECT YOUR AGENT'}</div>
+            <h2>{'에이전트와 함께 편집'}</h2>
+            <dl className="connection-facts">
+              <dt>로컬 서버</dt>
+              <dd id="connection-server" />
+              <dt>에이전트 통신</dt>
+              <dd id="connection-agent" />
+              <dt>프로젝트 저장소</dt>
+              <dd id="connection-repository" />
+            </dl>
+            <p>
+              서버 실행과 에이전트 인증은 다릅니다. 최근 통신도 현재 대화의 인증을 보장하지
+              않습니다.
+            </p>
+            <div className="export-actions">
+              <Button id="connection-retry" variant="outline">
+                서버 다시 연결
+              </Button>
+              <Button id="connection-copy-command" variant="outline">
+                MCP 연결 명령 복사
+              </Button>
+              <Button id="connection-copy-project" variant="outline">
+                저장소 연결 요청 복사
+              </Button>
+            </div>
+            <p id="connection-recovery">
+              기존 대화에서만 조회가 실패하면 MCP 클라이언트를 다시 연결하세요. 삭제된 도구가 보이면
+              도구 목록도 새로 받아야 합니다. 앱이 대화를 재시작하지는 않습니다.
+            </p>
+            <div id="manual-connection">
+              <label className="review-note-label">
+                {'로컬 서버 주소'}
+                <Input id="mcp-address" defaultValue="http://127.0.0.1:8849" type="url" />
+              </label>
+              <label className="review-note-label">
+                {'연결 코드'}
+                <Input
+                  id="mcp-code"
+                  type="password"
+                  autoComplete="off"
+                  placeholder="에이전트가 준비한 연결 코드"
+                />
+              </label>
+              <div className="export-actions">
+                <Button id="mcp-disconnect" variant="outline">
+                  {'연결 끊기'}
+                </Button>
+                <Button id="mcp-connect" className="primary" variant="outline">
+                  {'연결'}
+                </Button>
+              </div>
+            </div>
+            <div id="mcp-message" className="export-status" role="status"></div>
+          </div>
+        )}
       </DialogSurface>
       <DialogSurface id="tickets-dialog" aria-labelledby="tickets-title">
         <div id="tickets-content" />

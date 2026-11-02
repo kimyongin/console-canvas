@@ -1,9 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-const { readPublicResource } = createRequire(import.meta.url)(
-  '../../desktop/capture-resources.cjs',
-);
+const { readPublicResource } = createRequire(import.meta.url)('../../capture/resources.cjs');
 test('observed public resource fallback omits credentials and bounds its response', async () => {
   let options;
   const result = await readPublicResource(

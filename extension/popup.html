@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Page Canvas</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <strong>Page Canvas</strong><button id="editor" type="button">편집기 열기</button>
+    </header>
+    <form id="capture-form">
+      <label for="project">프로젝트</label
+      ><select id="project"></select>
+      <div id="new-project" hidden>
+        <label for="project-name">새 프로젝트 이름</label
+        ><input id="project-name" maxlength="120" placeholder="프로젝트 이름" />
+      </div>
+      <div class="capture-actions">
+        <button id="capture" type="submit">현재 화면 가져오기</button
+        ><select id="scope" aria-label="가져오기 범위">
+          <option value="viewport">현재 화면</option>
+          <option value="document">전체 페이지</option>
+          <option value="region">영역 선택</option>
+        </select>
+      </div>
+    </form>
+    <p id="status" role="status"></p>
+    <button id="cancel" type="button" hidden>가져오기 취소</button>
+    <script src="popup.js"></script>
+  </body>
+</html>

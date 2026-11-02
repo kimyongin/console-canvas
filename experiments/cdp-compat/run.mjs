@@ -11,10 +11,10 @@ import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
 const require = createRequire(import.meta.url);
 const root = path.resolve(import.meta.dirname, '../..');
-const { captureWithProtocol } = require(path.join(root, 'desktop/capture-cdp.cjs'));
+const { captureWithProtocol } = require(path.join(root, 'capture/protocol.cjs'));
 const { prepareCaptureView } = require(path.join(root, 'desktop/capture-view.cjs'));
 const { resolveScope } = require(path.join(root, 'desktop/capture.cjs'));
-const { readPublicResource } = require(path.join(root, 'desktop/capture-resources.cjs'));
+const { readPublicResource } = require(path.join(root, 'capture/resources.cjs'));
 const output = path.resolve(process.env.CDP_PROBE_OUTPUT || path.join(root, 'local/cdp-compat'));
 await fs.mkdir(output, { recursive: true });
 const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'page-canvas-cdp-probe-'));
@@ -34,11 +34,11 @@ let targets = [],
   injected = false;
 const report = {
   engineSha256: createHash('sha256')
-    .update(await fs.readFile(path.join(root, 'desktop/capture-cdp.cjs')))
+    .update(await fs.readFile(path.join(root, 'capture/protocol.cjs')))
     .digest('hex'),
   productVersion: JSON.parse(await fs.readFile(path.join(root, 'package.json'))).version,
   isolated: true,
-  sameEngineFile: 'desktop/capture-cdp.cjs',
+  sameEngineFile: 'capture/protocol.cjs',
   cases: [],
   calls: [],
 };
@@ -431,7 +431,7 @@ try {
   const part = await send('IO.read', { handle: loaded.stream, size: 64 });
   assert.ok(part.data);
   await send('IO.close', { handle: loaded.stream });
-  const commandSource = await fs.readFile(path.join(root, 'desktop/capture-cdp.cjs'), 'utf8');
+  const commandSource = await fs.readFile(path.join(root, 'capture/protocol.cjs'), 'utf8');
   const required = [
     ...new Set(
       [

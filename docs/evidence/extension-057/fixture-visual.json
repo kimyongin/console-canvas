@@ -1,0 +1,122 @@
+[
+  {
+    "transport": "chrome",
+    "name": "cross-frame-fallback",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.99740697523661,
+    "exactPixels": 99.98914170880332
+  },
+  {
+    "transport": "chrome",
+    "name": "console",
+    "ok": true,
+    "comparison": "document",
+    "width": 1440,
+    "height": 1120,
+    "matchedPixels": 99.96323164682539,
+    "exactPixels": 99.92683531746032
+  },
+  {
+    "transport": "chrome",
+    "name": "complex",
+    "ok": true,
+    "comparison": "initial-viewport-only",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.97261117593673,
+    "exactPixels": 99.96896473486322
+  },
+  {
+    "transport": "chrome",
+    "name": "iframes",
+    "ok": true,
+    "comparison": "document",
+    "width": 1440,
+    "height": 1228,
+    "matchedPixels": 99.91121516467608,
+    "exactPixels": 99.90991449511401
+  },
+  {
+    "transport": "chrome",
+    "name": "scroll-viewport",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 100,
+    "exactPixels": 98.73160573058473
+  },
+  {
+    "transport": "chrome",
+    "name": "scroll-region",
+    "ok": true,
+    "comparison": "region",
+    "width": 500,
+    "height": 300,
+    "matchedPixels": 100,
+    "exactPixels": 99.25533333333334
+  },
+  {
+    "transport": "native",
+    "name": "cross-frame-fallback",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.99740697523661,
+    "exactPixels": 99.98914170880332
+  },
+  {
+    "transport": "native",
+    "name": "console",
+    "ok": true,
+    "comparison": "document",
+    "width": 1440,
+    "height": 1120,
+    "matchedPixels": 99.96323164682539,
+    "exactPixels": 99.92683531746032
+  },
+  {
+    "transport": "native",
+    "name": "complex",
+    "ok": true,
+    "comparison": "initial-viewport-only",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.97261117593673,
+    "exactPixels": 99.96896473486322
+  },
+  {
+    "transport": "native",
+    "name": "iframes",
+    "ok": true,
+    "comparison": "document",
+    "width": 1440,
+    "height": 1228,
+    "matchedPixels": 99.91121516467608,
+    "exactPixels": 99.90991449511401
+  },
+  {
+    "transport": "native",
+    "name": "scroll-viewport",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.77116556463115,
+    "exactPixels": 98.55762997536627
+  },
+  {
+    "transport": "native",
+    "name": "scroll-region",
+    "ok": true,
+    "comparison": "region",
+    "width": 500,
+    "height": 300,
+    "matchedPixels": 100,
+    "exactPixels": 99.25533333333334
+  }
+]

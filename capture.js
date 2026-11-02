@@ -2,6 +2,21 @@
 (() => {
   'use strict';
   const VERSION = 1;
+  const HINT_PROPS = [
+    'color',
+    'opacity',
+    'font-family',
+    'font-size',
+    'font-weight',
+    'font-style',
+    'letter-spacing',
+    'word-spacing',
+    'text-transform',
+    'text-shadow',
+    '-webkit-text-fill-color',
+    '-webkit-text-stroke-color',
+    '-webkit-text-stroke-width',
+  ];
   const registeredShadows = new WeakMap();
   const resourceCaches = new WeakMap();
   const frameIdentities = new WeakMap(),
@@ -901,6 +916,12 @@
         imageJobs.push({ node, clone, url, data });
         if (/^https?:/.test(url)) assets.add(url);
       }
+      if (['INPUT', 'TEXTAREA'].includes(source.tagName) && source.hasAttribute('placeholder')) {
+        const hint = source.ownerDocument.defaultView.getComputedStyle(source, '::placeholder');
+        clone.setAttribute('data-uic-input-hint', '');
+        for (const property of HINT_PROPS)
+          clone.style.setProperty('--uic-hint-' + property, hint.getPropertyValue(property));
+      }
       if (source.tagName === 'INPUT') {
         clone.setAttribute('value', source.type === 'password' ? '' : source.value);
         if (source.checked) clone.setAttribute('checked', '');
@@ -1182,6 +1203,9 @@
       win.getComputedStyle(doc.documentElement).backgroundColor +
       '}body{overflow:visible!important}*{animation:none!important;transition:none!important}[data-uic-text]{display:contents}' +
       fonts +
+      '[data-uic-input-hint]::placeholder{' +
+      HINT_PROPS.map((property) => property + ':var(--uic-hint-' + property + ')').join(';') +
+      '}' +
       '</style></head>' +
       clonedBody.outerHTML +
       '</html>';

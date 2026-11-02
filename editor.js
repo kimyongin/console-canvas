@@ -46,6 +46,8 @@ import { createEditorSession } from './editor-session.js';
 import { CanvasScene, copy, validateSnapshot } from './engine.js';
 import { createEditorController } from './editor-controller.js';
 import { createMcpBridge } from './bridge-client.js';
+import { isExtension } from './runtime-platform.js';
+import { initializeExtension, openOriginal } from './extension/editor.js';
 import { validateDocumentInput } from './document-input.js';
 import {
   mountEditorShell,
@@ -78,6 +80,7 @@ const state = {
   lastSaveError: null,
   mcpStatus: { connected: false },
 };
+let extensionClient = null;
 const editorId =
   globalThis.crypto?.randomUUID?.() ||
   'editor-' + Date.now() + '-' + Math.random().toString(36).slice(2);
@@ -1047,6 +1050,17 @@ window.addEventListener('drop', (event) => {
 });
 function renderMcpStatus() {
   const status = state.mcpStatus;
+  if (isExtension) {
+    $('#mcp-button').textContent = '에이전트 연결';
+    $('#mcp-button').classList.toggle('connected', !!status.connected);
+    $('#connection-server').textContent = status.message || 'WebMCP 연결 전';
+    $('#connection-agent').textContent = state.lastAgentCommand || '이 실행에서 수신 기록 없음';
+    $('#mcp-disconnect').disabled = !status.connected;
+    $('#mcp-connect').disabled = !!status.connected;
+    $('#mcp-state').textContent = status.message || 'WebMCP 연결 전';
+    void activeConnectionProject();
+    return;
+  }
   $('#mcp-disconnect').disabled = !status.connected;
   $('#mcp-disconnect').title = status.connected
     ? '이 복제본의 연결 끊기'
@@ -1136,7 +1150,7 @@ const mcpBridge = createMcpBridge({
 });
 $('#mcp-button').addEventListener('click', () => {
   $('#mcp-dialog').showModal();
-  if (!state.mcpStatus.connected) $('#mcp-code').focus();
+  if (!state.mcpStatus.connected) $('#mcp-code')?.focus();
 });
 async function activeConnectionProject() {
   const projectId = state.project_id;
@@ -1146,15 +1160,16 @@ async function activeConnectionProject() {
     project?.repository?.root || '미연결 · 편집·확정은 사용할 수 있습니다.';
   $('#connection-copy-project').hidden = !project || !!project.repository;
 }
-$('#connection-copy-command').onclick = async () => {
-  try {
-    await window.ConsoleCanvasDesktop.copyMcpCommand();
-    $('#mcp-message').textContent =
-      '연결 명령을 복사했습니다. 설정 경로가 다르면 등록한 뒤 MCP 클라이언트를 다시 연결하세요.';
-  } catch (e) {
-    $('#mcp-message').textContent = e.message;
-  }
-};
+if ($('#connection-copy-command'))
+  $('#connection-copy-command').onclick = async () => {
+    try {
+      await window.ConsoleCanvasDesktop.copyMcpCommand();
+      $('#mcp-message').textContent =
+        '연결 명령을 복사했습니다. 설정 경로가 다르면 등록한 뒤 MCP 클라이언트를 다시 연결하세요.';
+    } catch (e) {
+      $('#mcp-message').textContent = e.message;
+    }
+  };
 $('#connection-copy-project').onclick = () =>
   projectWorkflow
     .execute({ action: 'copy-connection' })
@@ -1164,18 +1179,23 @@ $('#connection-copy-project').onclick = () =>
     .catch((e) => {
       $('#mcp-message').textContent = e.message;
     });
-$('#connection-retry').onclick = async () => {
-  try {
-    const c = await window.ConsoleCanvasDesktop.getConnection();
-    await mcpBridge.connect(c.url, c.token);
-    $('#mcp-message').textContent = '앱과 로컬 서버를 다시 연결했습니다.';
-  } catch (e) {
-    $('#mcp-message').textContent = e.message;
-  }
-};
+if ($('#connection-retry'))
+  $('#connection-retry').onclick = async () => {
+    try {
+      const c = await window.ConsoleCanvasDesktop.getConnection();
+      await mcpBridge.connect(c.url, c.token);
+      $('#mcp-message').textContent = '앱과 로컬 서버를 다시 연결했습니다.';
+    } catch (e) {
+      $('#mcp-message').textContent = e.message;
+    }
+  };
 $('#direct-open-source').addEventListener('click', () => {
   $('#document-menu-content').hidePopover();
   if (!state.snapshot) return;
+  if (isExtension) {
+    openOriginal(state.snapshot).catch((error) => notice(error.message));
+    return;
+  }
   if (window.ConsoleCanvasDesktop)
     window.ConsoleCanvasDesktop.openSource(state.snapshot.source.url).catch((error) =>
       notice(error.message),
@@ -1188,17 +1208,25 @@ $('#mcp-connect').addEventListener('click', async () => {
   button.disabled = true;
   try {
     commitCommentDraft();
+    if (isExtension) {
+      if (!extensionClient) throw Error('확장 작업공간을 준비하고 있습니다.');
+      const r = await extensionClient.enable();
+      if (!r.ok) throw Error(r.error);
+      $('#mcp-dialog').close();
+      return;
+    }
     await mcpBridge.connect($('#mcp-address').value.trim(), $('#mcp-code').value.trim());
     $('#mcp-code').value = '';
     $('#mcp-dialog').close();
   } catch (error) {
     $('#mcp-message').textContent = error.message;
   } finally {
-    button.disabled = false;
+    button.disabled = isExtension ? !!state.mcpStatus.connected : false;
   }
 });
 $('#mcp-disconnect').addEventListener('click', async () => {
-  await mcpBridge.disconnect();
+  if (isExtension) await extensionClient?.disable();
+  else await mcpBridge.disconnect();
   $('#mcp-dialog').close();
 });
 const projectWorkflow = createProjectWorkflow({
@@ -1209,7 +1237,12 @@ const projectWorkflow = createProjectWorkflow({
   showTickets,
   confirm: confirmCurrentTicket,
   importFile,
-  copyRequest: window.ConsoleCanvasDesktop?.copyRequest,
+  copyRequest: isExtension
+    ? (text) => {
+        if (!extensionClient) throw Error('확장 작업공간을 준비하고 있습니다.');
+        return extensionClient.copyRequest(text);
+      }
+    : window.ConsoleCanvasDesktop?.copyRequest,
   leave: () => {
     for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
     for (const popover of document.querySelectorAll(':popover-open')) popover.hidePopover();
@@ -1294,9 +1327,11 @@ $('#header-ticket-identity').onclick = () => {
       .writeText(state.ticket.display_id)
       .then(() => toast('티켓 ID를 복사했습니다.'));
 };
-$('#web-source').onclick = () =>
+$('#web-source').onclick = () => {
+  if (isExtension) return openOriginal(state.snapshot).catch((error) => toast(error.message));
   window.ConsoleCanvasDesktop?.showSource() || toast('내장 앱의 웹사이트에서 화면을 가져오세요.');
-$('#web-editor').onclick = () => $('#tickets-dialog').close();
+};
+if ($('#web-editor')) $('#web-editor').onclick = () => $('#tickets-dialog').close();
 void projectWorkflow.initialize().then(() => projectWorkflow.emit());
 if (window.ConsoleCanvasDesktop) {
   document.body.classList.add('desktop-editor');
@@ -1420,6 +1455,23 @@ window.ConsoleCanvas = {
   exportDocument: (options) =>
     exportDocument(state.snapshot, checkpoint(), state.project_id, options),
 };
+if (isExtension)
+  void initializeExtension({
+    workspace: ticketWorkspace,
+    openTicket,
+    onStatus: (status) => {
+      state.mcpStatus = status;
+      if (status.agent_command)
+        state.lastAgentCommand =
+          new Date().toLocaleTimeString('ko-KR') + ' · ' + status.agent_command;
+      renderMcpStatus();
+    },
+  })
+    .then((client) => {
+      extensionClient = client;
+      renderMcpStatus();
+    })
+    .catch((error) => notice(error.message));
 function connectDesktopIfReady() {
   if (state.desktopConnection && !mcpBridge.isConnected()) {
     const connection = state.desktopConnection;

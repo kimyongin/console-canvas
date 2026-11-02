@@ -1,3 +1,4 @@
+const { fromText, fromBase64, toBase64, concatBytes, toText, signature } = require('./bytes.cjs');
 // Read-only capture in each frame's own isolated world. The transport is shared
 // by embedded Chromium and browser integration tests; it never disables SOP.
 const MAX_FRAMES = 32;
@@ -114,13 +115,13 @@ async function captureWithProtocol({
       try {
         while (true) {
           const part = await call(frame, 'IO.read', { handle: loaded.stream, size: 262144 });
-          const data = Buffer.from(part.data, part.base64Encoded ? 'base64' : 'utf8');
+          const data = part.base64Encoded ? fromBase64(part.data) : fromText(part.data);
           length += data.length;
           if (length > 5_000_000) throw Error('리소스 크기 한도');
           chunks.push(data);
           if (part.eof) break;
         }
-        return { content: Buffer.concat(chunks).toString('base64'), base64Encoded: true };
+        return { content: toBase64(concatBytes(chunks)), base64Encoded: true };
       } finally {
         await call(frame, 'IO.close', { handle: loaded.stream }).catch(() => {});
       }
@@ -266,15 +267,13 @@ async function captureWithProtocol({
               if (resourceCount++ >= 400) return;
               const value = await resourceContent(frame, resource);
               const bytes = value.base64Encoded
-                ? Buffer.from(value.content, 'base64')
-                : Buffer.from(value.content);
+                ? fromBase64(value.content)
+                : fromText(value.content);
               if (bytes.length > 5_000_000 || assetBytes + bytes.length > 25_000_000) return;
               if (resource.type === 'Stylesheet') {
-                for (const match of bytes
-                  .toString()
-                  .matchAll(
-                    /@font-(?:face|feature-values|palette-values)\b[^{}]*\{(?:[^{}]|\{[^{}]*\})*\}/gi,
-                  ))
+                for (const match of toText(bytes).matchAll(
+                  /@font-(?:face|feature-values|palette-values)\b[^{}]*\{(?:[^{}]|\{[^{}]*\})*\}/gi,
+                ))
                   fontCss.push(
                     match[0].replace(/url\(\s*['"]?([^)'"\s]+)['"]?\s*\)/g, (all, url) => {
                       try {
@@ -289,16 +288,16 @@ async function captureWithProtocol({
               } else {
                 const mime =
                   resource.type === 'Font'
-                    ? bytes.toString('ascii', 0, 4) === 'wOF2'
+                    ? signature(bytes) === 'wOF2'
                       ? 'font/woff2'
-                      : bytes.toString('ascii', 0, 4) === 'wOFF'
+                      : signature(bytes) === 'wOFF'
                         ? 'font/woff'
                         : 'font/ttf'
                     : resource.mimeType === 'binary/octet-stream'
                       ? 'application/octet-stream'
                       : resource.mimeType || 'application/octet-stream';
                 if (!/^(image\/|font\/|application\/(font|x-font|octet-stream))/.test(mime)) return;
-                assetData[resource.url] = `data:${mime};base64,${bytes.toString('base64')}`;
+                assetData[resource.url] = `data:${mime};base64,${toBase64(bytes)}`;
                 assetBytes += bytes.length;
               }
             } catch {}
@@ -834,6 +833,9 @@ async function captureWithProtocol({
         .map((f) => ({ url: f.url, error: f.error }));
       snapshot.warnings.push(...pictures.warnings);
     }
+    const finalFrame = (await send('Page.getFrameTree', {})).frameTree.frame;
+    if (root.loaderId && root.loaderId !== finalFrame.loaderId)
+      throw Error('가져오는 동안 원본 문서가 새로 열렸습니다. 다시 가져와 주세요.');
     snapshot.captureReport.finalContentSize = (
       await send('Page.getLayoutMetrics', {})
     ).cssContentSize;

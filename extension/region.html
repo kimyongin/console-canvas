@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Page Canvas · 영역 선택</title>
+    <link rel="stylesheet" href="region.css" />
+  </head>
+  <body>
+    <header>
+      <strong>가져올 영역을 드래그하세요</strong><span id="status" role="status"></span
+      ><button id="cancel">취소</button><button id="save" disabled>선택 영역 가져오기</button>
+    </header>
+    <main>
+      <div id="surface">
+        <img id="preview" alt="가져올 원본 화면" />
+        <div id="selection" hidden></div>
+      </div>
+    </main>
+    <script src="region.js"></script>
+  </body>
+</html>

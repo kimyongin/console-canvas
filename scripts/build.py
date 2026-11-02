@@ -48,8 +48,9 @@ def build_standalone(output):
 
 
 def runtime_files():
-    public = json.loads((ROOT / 'runtime-manifest.json').read_text())['public']
-    files = set(public) | {
+    graph = json.loads((ROOT / 'runtime-manifest.json').read_text())
+    public = graph['public']
+    files = set(public) | set(graph.get('native', [])) | {
         'runtime-manifest.json',
         'README.md', 'agent-guide.md', 'package.json',
         # Native/Python dependencies must not depend on a browser import graph.
@@ -95,10 +96,25 @@ def main():
     write_archive(skill_archive, ((path.relative_to(skill).as_posix(), path.read_bytes())
                                  for path in sorted(skill.rglob('*'))
                                  if path.is_file() and '__pycache__' not in path.parts))
+    # The standalone extension distributes instructions only, not the app helper/runtime.
+    chrome_skill = output / 'page-canvas-chrome-skill.zip'
+    write_archive(chrome_skill, ((name, (skill / name).read_bytes())
+                               for name in ['SKILL.md', 'LICENSE', 'agents/openai.yaml']))
+    chrome_dir = ROOT / 'dist/page-canvas-chrome'
+    shutil.copyfile(chrome_skill, chrome_dir / 'agent-skill.zip')
+    chrome_archive = output / 'page-canvas-chrome.zip'
+    with zipfile.ZipFile(chrome_archive, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as chrome_package:
+        for item in sorted(chrome_dir.rglob('*')):
+            if item.is_file():
+                entry = zipfile.ZipInfo('page-canvas-chrome/' + item.relative_to(chrome_dir).as_posix(), ZIP_DATE)
+                entry.compress_type = zipfile.ZIP_DEFLATED
+                entry.external_attr = 0o100644 << 16
+                chrome_package.writestr(entry, item.read_bytes(), compresslevel=9)
     print(json.dumps({
         'standalone': str(output / 'Console Canvas.html'),
         'runtime': str(archive), 'skill': str(skill_archive),
-        'files': len(files), 'bytes': archive.stat().st_size,
+        'files': len(files), 'bytes': (output / 'console-canvas-runtime.zip').stat().st_size,
+        'chrome': str(chrome_archive),
     }, ensure_ascii=False))
 
 

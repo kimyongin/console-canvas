@@ -104,6 +104,16 @@ try {
   const scene = await new CanvasScene(document.querySelector('#clone'), snapshot, {
     smartSelection: true,
   }).mount();
+  const inputHint = scene.doc.querySelector('#placeholder-check');
+  const hintStyle = scene.doc.defaultView.getComputedStyle(inputHint, '::placeholder');
+  check(
+    'Input placeholder preserves its own color, opacity and font instead of inheriting the input fill',
+    hintStyle.color === 'rgb(170, 40, 60)' &&
+      Math.abs(Number(hintStyle.opacity) - 0.7) < 0.01 &&
+      hintStyle.fontStyle === 'italic' &&
+      hintStyle.fontWeight === '300',
+  );
+
   check(
     'Readable compressed photos retain original JPEG bytes instead of expanding to PNG',
     scene.elements.get(node('compressed-photo').id).src.startsWith('data:image/jpeg;'),

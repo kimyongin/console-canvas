@@ -68,6 +68,7 @@ async function main() {
     'tickets',
     'core-editor',
     'storage',
+    'extension-workspace',
   ]) {
     if (
       process.env.CONSOLE_CANVAS_TEST_SUITES &&

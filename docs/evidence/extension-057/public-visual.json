@@ -1,0 +1,202 @@
+[
+  {
+    "transport": "chrome",
+    "name": "naver",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.22995267729807,
+    "exactPixels": 98.45569168935563
+  },
+  {
+    "transport": "chrome",
+    "name": "wikipedia",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.94886879294697,
+    "exactPixels": 99.91856281602489
+  },
+  {
+    "transport": "chrome",
+    "name": "government",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.97350252819915,
+    "exactPixels": 99.96815441462466
+  },
+  {
+    "transport": "chrome",
+    "name": "mdn",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.8811260210035,
+    "exactPixels": 99.84928043562816
+  },
+  {
+    "transport": "chrome",
+    "name": "python",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.9862245559445,
+    "exactPixels": 99.97536626474783
+  },
+  {
+    "transport": "chrome",
+    "name": "w3c",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.60626539608454,
+    "exactPixels": 98.36574614287566
+  },
+  {
+    "transport": "chrome",
+    "name": "hackernews",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.59297614417218,
+    "exactPixels": 99.34031829378971
+  },
+  {
+    "transport": "chrome",
+    "name": "shopping",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 100,
+    "exactPixels": 99.97204395176973
+  },
+  {
+    "transport": "chrome",
+    "name": "sports",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.83728769609749,
+    "exactPixels": 87.63783547257876
+  },
+  {
+    "transport": "chrome",
+    "name": "nasa",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.88104498897964,
+    "exactPixels": 79.67465642421885
+  },
+  {
+    "transport": "native",
+    "name": "naver",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.28667509399715,
+    "exactPixels": 98.3719045766887
+  },
+  {
+    "transport": "native",
+    "name": "wikipedia",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.95032736937638,
+    "exactPixels": 99.92115584078827
+  },
+  {
+    "transport": "native",
+    "name": "government",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.97350252819915,
+    "exactPixels": 99.96815441462466
+  },
+  {
+    "transport": "native",
+    "name": "mdn",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.85973356670556,
+    "exactPixels": 99.8121677687022
+  },
+  {
+    "transport": "native",
+    "name": "python",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.9862245559445,
+    "exactPixels": 99.97536626474783
+  },
+  {
+    "transport": "native",
+    "name": "w3c",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.60626539608454,
+    "exactPixels": 98.36574614287566
+  },
+  {
+    "transport": "native",
+    "name": "hackernews",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.59297614417218,
+    "exactPixels": 99.34031829378971
+  },
+  {
+    "transport": "native",
+    "name": "shopping",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.99991896797614,
+    "exactPixels": 99.65845001944768
+  },
+  {
+    "transport": "native",
+    "name": "sports",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.76452093867496,
+    "exactPixels": 85.16465707247504
+  },
+  {
+    "transport": "native",
+    "name": "nasa",
+    "ok": true,
+    "comparison": "viewport",
+    "width": 1440,
+    "height": 857,
+    "matchedPixels": 99.89887203422792,
+    "exactPixels": 91.16289057435499
+  }
+]

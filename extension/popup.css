@@ -1,0 +1,75 @@
+* {
+  box-sizing: border-box;
+}
+body {
+  width: 352px;
+  margin: 0;
+  padding: 18px;
+  color: #172038;
+  background: #fff;
+  font: 13px system-ui;
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+strong {
+  font-size: 17px;
+}
+button,
+select,
+input {
+  font: inherit;
+  border: 1px solid #d8deea;
+  border-radius: 7px;
+  min-height: 36px;
+  padding: 7px 12px;
+  background: #fff;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+label {
+  display: block;
+  margin: 12px 0 6px;
+}
+select,
+input {
+  width: 100%;
+  padding-right: 30px;
+}
+.capture-actions {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr 116px;
+  gap: 8px;
+}
+#capture {
+  background: #6547ed;
+  border-color: #6547ed;
+  color: #fff;
+}
+#status {
+  margin-bottom: 0;
+  line-height: 1.5;
+}
+#status:empty {
+  display: none;
+}
+#cancel {
+  margin-top: 10px;
+}
+[hidden] {
+  display: none !important;
+}
+:focus-visible {
+  outline: 2px solid #6547ed;
+  outline-offset: 2px;
+}

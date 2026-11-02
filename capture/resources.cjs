@@ -1,3 +1,4 @@
+const { toBase64, concatBytes } = require('./bytes.cjs');
 // A bounded, credential-free read of a resource already observed by Inspector.
 // No page IPC, custom protocols, authenticated session or security flag changes.
 async function readPublicResource(url, fetchResource) {
@@ -21,11 +22,11 @@ async function readPublicResource(url, fetchResource) {
       if (done) break;
       length += value.byteLength;
       if (length > 5_000_000) throw Error('리소스 크기 한도');
-      parts.push(Buffer.from(value));
+      parts.push(value);
     }
   } finally {
     await reader.cancel().catch(() => {});
   }
-  return { content: Buffer.concat(parts).toString('base64'), base64Encoded: true };
+  return { content: toBase64(concatBytes(parts)), base64Encoded: true };
 }
 module.exports = { readPublicResource };

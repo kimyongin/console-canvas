@@ -1,0 +1,151 @@
+{
+  "checks": [
+    "Popup creates project and real captured ticket without app/server",
+    "Extension shell has no local server form or duplicated website editor tabs",
+    "Live workspace discovery is scoped to the extension",
+    "Live skill describes both independent execution modes",
+    "Repository connection labels verification as performed by the local agent",
+    "A new request resolves the same Git project without app selection",
+    "Another workspace ID cannot access a matching ticket ID",
+    "Captured editable button identity is exposed",
+    "Shared editor changes and annotations persist",
+    "Confirmed goal and current image are returned",
+    "Repeated import reuses one editor and keeps the selected project",
+    "Agent reads both saved tickets including a closed first ticket",
+    "Closed-ticket reads preserve annotations without changing the visible ticket",
+    "Reload keeps workspace ID and repository connection",
+    "Region selector captures the chosen rectangle without changing original DOM",
+    "Full-page mode is distinct from current viewport",
+    "Cancelling a running capture leaves no empty or duplicate ticket",
+    "Header controls stay inside the browser width",
+    "Narrow header keeps all controls reachable",
+    "History, design context and image tools share the persisted ticket",
+    "Undo and redo persist through the same WebMCP contract",
+    "Explicit bulk instruction freezes the confirmed goal",
+    "Read and confirmation do not authorize implementation",
+    "A second claim cannot take the same goal",
+    "Implementation evidence does not bypass real human approval",
+    "Service-worker restart keeps the project and latest durable capture outcome",
+    "Same-ID version update keeps annotations, goal and ticket workspace",
+    "Persisted operation receipt prevents edit replay after extension update",
+    "Browser restart keeps workspace and repository connection"
+  ],
+  "actions": [
+    {
+      "kind": "menu",
+      "label": "Chrome \ud655\uc7a5 \uc5f4\uae30"
+    },
+    {
+      "kind": "input",
+      "label": "\uc0c8 \ud504\ub85c\uc81d\ud2b8 \uc774\ub984"
+    },
+    {
+      "kind": "click",
+      "label": "\ud604\uc7ac \ud654\uba74 \uac00\uc838\uc624\uae30"
+    },
+    {
+      "kind": "click",
+      "label": "\uc5d0\uc774\uc804\ud2b8 \uc5f0\uacb0"
+    },
+    {
+      "kind": "click",
+      "label": "\ub3c4\uad6c \uc5f0\uacb0"
+    },
+    {
+      "kind": "click",
+      "label": "\ud655\uc815"
+    },
+    {
+      "kind": "click",
+      "label": "\ud2f0\ucf13 \ubaa9\ub85d"
+    },
+    {
+      "kind": "click",
+      "label": "\ud2f0\ucf13 \ubaa9\ub85d \ub2eb\uae30"
+    },
+    {
+      "kind": "click",
+      "label": "\uc6d0\ubcf8\uc73c\ub85c"
+    },
+    {
+      "kind": "menu",
+      "label": "Chrome \ud655\uc7a5 \uc5f4\uae30"
+    },
+    {
+      "kind": "click",
+      "label": "\ud604\uc7ac \ud654\uba74 \uac00\uc838\uc624\uae30"
+    },
+    {
+      "kind": "click",
+      "label": "\uc6d0\ubcf8\uc73c\ub85c"
+    },
+    {
+      "kind": "menu",
+      "label": "Chrome \ud655\uc7a5 \uc5f4\uae30\u00b7\uc601\uc5ed"
+    },
+    {
+      "kind": "input",
+      "label": "\uac00\uc838\uc624\uae30 \ubc94\uc704"
+    },
+    {
+      "kind": "click",
+      "label": "\uc601\uc5ed \uc120\ud0dd"
+    },
+    {
+      "kind": "drag",
+      "label": "\uc601\uc5ed \uc9c0\uc815"
+    },
+    {
+      "kind": "click",
+      "label": "\uc120\ud0dd \uc601\uc5ed \uac00\uc838\uc624\uae30"
+    },
+    {
+      "kind": "click",
+      "label": "\uc6d0\ubcf8\uc73c\ub85c"
+    },
+    {
+      "kind": "menu",
+      "label": "Chrome \ud655\uc7a5 \uc5f4\uae30\u00b7\uc804\uccb4"
+    },
+    {
+      "kind": "input",
+      "label": "\uac00\uc838\uc624\uae30 \ubc94\uc704"
+    },
+    {
+      "kind": "click",
+      "label": "\uc804\uccb4 \ud398\uc774\uc9c0 \uac00\uc838\uc624\uae30"
+    },
+    {
+      "kind": "click",
+      "label": "\uc6d0\ubcf8\uc73c\ub85c"
+    },
+    {
+      "kind": "menu",
+      "label": "Chrome \ud655\uc7a5 \uc5f4\uae30\u00b7\ucde8\uc18c \uac80\uc99d"
+    },
+    {
+      "kind": "click",
+      "label": "\ud604\uc7ac \ud654\uba74 \uac00\uc838\uc624\uae30"
+    },
+    {
+      "kind": "click",
+      "label": "\uac00\uc838\uc624\uae30 \ucde8\uc18c"
+    },
+    {
+      "kind": "click",
+      "label": "\ud3b8\uc9d1\uae30 \uc5f4\uae30"
+    }
+  ],
+  "product": true,
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/156.0.8078.76",
+    "revision": "@93ce6b54af3fee27e384d1f30346e80db47a14da",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+    "jsVersion": "15.6.75.25"
+  },
+  "extensionId": "bimhpngcfedknajbgenkbbpkoobfdloa",
+  "updateMethod": "same profile, same key/path, normal browser restart, CDP reload bootstrap",
+  "manualExtensionRefreshVerified": false,
+  "ok": true
+}

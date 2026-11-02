@@ -32,9 +32,25 @@ app.on('window-all-closed', () => {});
     results.push(result);
     try {
       if (item.viewport) window.setContentSize(item.viewport.width, item.viewport.height);
-      await window.loadURL(item.url);
+      let timer;
+      const ready = new Promise((resolve) => window.webContents.once('dom-ready', resolve));
+      try {
+        const navigation = window.loadURL(item.url);
+        if (item.verifySourceUnchanged === false)
+          await Promise.race([
+            navigation,
+            ready,
+            new Promise((_, reject) => {
+              timer = setTimeout(() => reject(Error('Source DOM load timeout')), 20000);
+            }),
+          ]);
+        else await navigation;
+      } finally {
+        clearTimeout(timer);
+      }
+
       await window.webContents.executeJavaScript(
-        'Promise.all([document.fonts.ready,...[...document.images].map(i=>i.decode().catch(()=>{}))])',
+        'Promise.race([Promise.all([document.fonts.ready,...[...document.images].map(i=>i.decode().catch(()=>{}))]),new Promise(r=>setTimeout(r,10000))])',
       );
       result.viewportReadiness = await window.webContents.executeJavaScript(
         require('./settle-view.cjs'),
@@ -50,7 +66,8 @@ app.on('window-all-closed', () => {});
       const snapshot = await captureWebsite(window.webContents, root, {
         scope: { mode: item.mode, rect: item.rect },
       });
-      if (before !== (await state())) throw Error('Source changed');
+      const sourceUnchanged = before === (await state());
+      if (item.verifySourceUnchanged !== false && !sourceUnchanged) throw Error('Source changed');
       const dir = path.join(process.env.CDP_PROBE_OUTPUT, 'native', item.name);
       await fs.mkdir(dir, { recursive: true });
       await fs.writeFile(path.join(dir, 'capture.uiclone.json'), JSON.stringify(snapshot));
@@ -61,7 +78,7 @@ app.on('window-all-closed', () => {});
         domFrames: snapshot.captureReport.domFrames,
         failedFrames: snapshot.captureReport.failedFrames,
         closedShadowRoots: snapshot.captureReport.closedShadowRoots,
-        sourceUnchanged: true,
+        sourceUnchanged,
       });
       console.log(
         'PASS native ' +

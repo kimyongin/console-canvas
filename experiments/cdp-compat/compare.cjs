@@ -77,15 +77,15 @@ const compare = (a, b) => {
     },
   });
   const results = [];
+  const localOrigin = 'http://127.0.0.1:' + server.address().port;
+  win.webContents.session.webRequest.onBeforeRequest(
+    { urls: ['http://*/*', 'https://*/*'] },
+    (details, callback) => callback({ cancel: !details.url.startsWith(localOrigin + '/') }),
+  );
   for (const transport of ['chrome', 'native'])
-    for (const name of [
-      'console',
-      'complex',
-      'iframes',
-      'cross-frame-fallback',
-      'scroll-viewport',
-      'scroll-region',
-    ]) {
+    for (const name of JSON.parse(await fs.readFile(path.join(output, 'cases.json'), 'utf8')).map(
+      (item) => item.name,
+    )) {
       const row = { transport, name };
       results.push(row);
       try {

@@ -1,6 +1,6 @@
 # Page Canvas · 앱과 Chrome 확장 독립 실행 계획
 
-2026-11-02 · **승인한 제품 방향과 개발 계획. 아직 구현·설치·지원 완료가 아니다.** 현재 설치 제품은0.56.0 내장 앱이다. [PRD](PRD.md)의 현행 동작을 유지하면서 이 문서의 순서로 확장 지원을 추가한다. 아래 PCX 번호는 개발 항목 키이며 캔버스 사용자가 만드는 CC 티켓과 다르다.
+2026-11-02 · **승인한 수용 기준과0.57 구현 추적.** 실제 코드·검사·결함 수정·설치 범위는 [검증 기록](extension-0.57.md)을 따른다. 아래 체크리스트는 원래 완료 조건이며 실제 사용자 프로필 설치/승인까지 자동 완료로 간주하지 않는다. [PRD](PRD.md)의 현행 동작을 유지하면서 이 문서의 순서로 확장 지원을 추가한다. 아래 PCX 번호는 개발 항목 키이며 캔버스 사용자가 만드는 CC 티켓과 다르다.
 
 ## 목표와 범위
 
@@ -49,7 +49,7 @@ Chrome 탭 ───── 확장 연결부 ────┘                     
 
 ## 개발 티켓과 순서
 
-상위 [#210](https://github.com/kimyongin/console-canvas/issues/210) · 아래8개 개발 티켓을 모두 열린 상태로 등록했다.
+상위 [#210](https://github.com/kimyongin/console-canvas/issues/210) · 아래8개 개발 티켓과 실제 발견 결함 #219/#220을 구현·검증한다.
 
 | 순서 | GitHub | 작업 | 선행 |
 | --- | --- | --- | --- |
@@ -123,7 +123,7 @@ Chrome 탭 ───── 확장 연결부 ────┘                     
 - [ ] 연결 안내 뒤 viewport 안정화를 먼저 확인하고 scope를 읽는다. 현재/전체/선택 범위·DPR/zoom·내부 스크롤과 탭/document 변경을 검증한다. 영역 선택 UI는 원본 업무 DOM/이벤트를 변경하지 않는 경계에서 구현한다.
 - [ ] popup 종료·worker 종료·확장 reload·응답 유실을 처리한다. 자동으로 다른 탭을 다시 수집하지 않는다. 저장 전 중단은 안전한 실패/명시 재시도, 저장 완료 후 응답 유실은 receipt 재조회로 복구한다.
 - [ ] 이미지/폰트/iframe은 공통 엔진의 CDP 수집 우선순위와 credential 정책을 유지한다. 추가 host 권한 필요성/거절·CDP 차단·사진 폴백·미로딩을 구별하고 상시 모든 사이트 권한을 관성으로 추가하지 않는다.
-- [ ] 원본 DOM·업무 이벤트·로그인 상태를 유지하고 재로드/자동 스크롤/보안 해제를 하지 않는다. chrome 내부/스토어/지원 외 페이지와 정책 차단은 빈 티켓 없이 명확히 실패한다.
+- [ ] 원본 DOM·업무 이벤트·로그인 상태를 유지하고 재로드/보안 해제를 하지 않는다. 현재/영역 수집은 자동 스크롤하지 않으며 전체 페이지는 기존 공통 준비 단계의 임시 스크롤 후 원래 위치 복구를 검증한다. chrome 내부/스토어/지원 외 페이지와 정책 차단은 빈 티켓 없이 명확히 실패한다.
 
 ### PCX-05 · 확장 독립 편집기와 간결한 사용자 동선
 
@@ -185,6 +185,6 @@ Chrome 탭 ───── 확장 연결부 ────┘                     
 - [공식 Chrome MCP 설정](https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/configuration.md):2026-11-02 확인. WebMCP/third-party 카테고리와 autoConnect는 별도 옵션이다. main 문서의 존재를 실제 설치 패키지 지원/일반 Chrome 성공으로 추정하지 않고 PCX-02에서 버전·기능 조합을 고정한다.
 - [확장 worker 수명](https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle), [MV3 CSP](https://developer.chrome.com/docs/extensions/reference/manifest/content-security-policy), [확장 ID](https://developer.chrome.com/docs/extensions/reference/manifest/key): 종료 복구·패키징 검증 기준이다. WebMCP와 일반 MCP의 완전한 기능/수명 동일성을 약속하지 않는다.
 
-문서/개발 티켓 정리 단계에서는 제품 버전·설치 앱·스킬 번들·현재 데이터·사용자 Chrome 설정을 변경하지 않는다.
+이전 문서 정리 단계에서는 제품/설치를 바꾸지 않았다. 이후 사용자의 구현 승인에 따라0.57을 작업하며 기존 자료/보안 식별자를 유지한다.
 
 계획 정리 검증: GitHub #210~218의 열린 상태·본문을 재조회했고 문서 상대 링크·8개 개발 항목/상위 매핑·diff 형식을 확인했다. 원본과 같은 코드/검사 소스243개를 확인한 격리 checkout에서 npm run check(타입·포맷·빌드·Python57·Node43·Chromium 공통 회귀)를 통과했다. 최초 sandbox 실행은 루프백 bind 권한 때문에 Python3검사가 막혔고, 테스트 전용 포트를 허용한 재실행은 통과했다. 이는 확장 구현/일반 Chrome WebMCP·설치 검증 통과가 아니다. 제품 런타임 변경은 없으며 Electron 통합/설치 앱 갱신은 이번 문서 작업에서 수행하지 않았다.

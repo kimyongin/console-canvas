@@ -1,0 +1,12 @@
+html,
+body {
+  margin: 0;
+  background: white;
+}
+img {
+  display: block;
+}
+p {
+  padding: 24px;
+  font: 16px system-ui;
+}

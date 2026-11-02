@@ -321,6 +321,7 @@ async function checkCase(item, base) {
         'JSON.stringify({html:document.documentElement.outerHTML,actions:globalThis.actions||0,scroll:[scrollX,scrollY]})',
       );
       current = await captureWebsite(source.webContents, root, {
+        scope: item.scope,
         onProgress: (p) => console.log('PROGRESS ' + name + ' ' + JSON.stringify(p)),
       });
     }
@@ -394,11 +395,20 @@ async function checkCase(item, base) {
         (await screenshot(source.webContents, { x: 0, y: 0, width, height })).toPNG(),
       );
     }
-    const regions = [
-      { name: 'viewport', x: 0, y: 0, width, height: current.source.viewport.height },
-      { name: 'page', x: 0, y: 0, width, height },
-      ...(item.regions || []),
-    ];
+    const capturedRect = current.captureScope?.rect;
+    const regions = capturedRect
+      ? [{ name: current.captureScope.mode, ...capturedRect }]
+      : [
+          {
+            name: 'viewport',
+            x: current.source.scroll.x,
+            y: current.source.scroll.y,
+            width,
+            height: current.source.viewport.height,
+          },
+          { name: 'page', x: 0, y: 0, width, height },
+          ...(item.regions || []),
+        ];
     result.comparisons = [];
     const viewportMode =
       current.captureReport?.screenshotMode === 'viewport-scroll' ||
@@ -421,7 +431,9 @@ async function checkCase(item, base) {
     )
       independent = null;
     const matched =
-      viewportMode && !independent ? await matchingViewports(current, directory, height) : null;
+      viewportMode && !independent && !capturedRect
+        ? await matchingViewports(current, directory, height)
+        : null;
     if (matched) result.viewportComparisons = matched.checks;
     result.referenceMode = matched
       ? 'matched-viewport-and-scroll'
@@ -468,14 +480,16 @@ async function checkCase(item, base) {
       const after=scene.rect(target.id);const moved=Math.abs(after.x-before.x-17)<1&&Math.abs(after.y-before.y-11)<1;
       scene.setComment(target.id,'QA: responsive layout intent');scene.remove(target.id);
       const deleted=scene.hidden(target.id);const {saveCapture,saveSession,getDocument}=await import('/db.js');
-      const payload={...scene.snapshot,edits:scene.edits,annotations:scene.annotations};await saveCapture(payload);await saveSession(payload.id,payload);
+      const {listProjects,createProject}=await import('/project-model.js');
+      const project=(await listProjects())[0]||await createProject('Capture quality QA');
+      const payload={...scene.snapshot,project_id:project.id,edits:scene.edits,annotations:scene.annotations};await saveCapture(payload);await saveSession(payload.id,payload);
       const restored=await getDocument(payload.id);const persisted=restored.edits[target.id]?.deleted&&restored.annotations[target.id]===scene.annotations[target.id];
       scene.setEdits({});scene.setComments({});
       if(!moved||!deleted||!persisted)throw Error('Site editing or persistence failed '+JSON.stringify({moved,deleted,persisted}));
       return {target:target.id,moved,deleted,persisted};
     })()`,
     );
-    result.status = result.comparisons.every((c) => c.matchedPixels >= 95)
+    result.status = result.comparisons.every((c) => c.matchedPixels >= 99)
       ? 'pass'
       : 'below-target';
     result.finishedAt = new Date().toISOString();

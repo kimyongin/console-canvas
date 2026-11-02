@@ -1,0 +1,265 @@
+{
+  "engineFile": "capture/protocol.cjs",
+  "browserRuntime": true,
+  "source": [
+    {
+      "name": "capture/bytes.cjs",
+      "sha256": "13a578042d04f0534daa51acc5ce7588ee72cbd51133dc8fd124f2b76c7bed4b"
+    },
+    {
+      "name": "capture/protocol.cjs",
+      "sha256": "92fdf267baa47bf97aaf7921c7b3b71624c7e32de0abfe92ad206ec7f4409e41"
+    },
+    {
+      "name": "capture/view.cjs",
+      "sha256": "77530f20177920c04664e73ca618480c9ab458e2464923556e032d3ab9e6ac8e"
+    },
+    {
+      "name": "capture/scope.cjs",
+      "sha256": "82f18722aa55ad30852f327cf6af70012ac31ccf3cda11a825ed81f81bfa680e"
+    },
+    {
+      "name": "capture/resources.cjs",
+      "sha256": "dc550e199423fe4aadad76350a78a60045b1ec49c3efff3613ee3b285a74d38e"
+    },
+    {
+      "name": "capture/transport.cjs",
+      "sha256": "9e15344913c2ab38abcde31ff385f418337fe3f6243cd0d8bca02eb24f3582a7"
+    },
+    {
+      "name": "extension/capture.js",
+      "sha256": "2b88c69c1fad66efa05f68c4ba396c8af3cc200f4d169ac758a98aab754b3e44"
+    }
+  ],
+  "cases": [
+    {
+      "name": "cross-frame-fallback",
+      "ok": true,
+      "nodes": 75,
+      "domFrames": 2,
+      "failedFrames": [],
+      "viewport": {
+        "height": 857,
+        "width": 1440
+      },
+      "runtime": {
+        "process": "undefined",
+        "buffer": "undefined",
+        "location": "chrome-extension://hmgedbnafmakajibfjoanhghombbmomg/worker.js",
+        "node": "undefined"
+      }
+    },
+    {
+      "name": "console",
+      "ok": true,
+      "nodes": 364,
+      "domFrames": 1,
+      "failedFrames": [],
+      "viewport": {
+        "height": 857,
+        "width": 1440
+      },
+      "runtime": {
+        "process": "undefined",
+        "buffer": "undefined",
+        "location": "chrome-extension://hmgedbnafmakajibfjoanhghombbmomg/worker.js",
+        "node": "undefined"
+      }
+    },
+    {
+      "name": "complex",
+      "ok": true,
+      "nodes": 74,
+      "domFrames": 5,
+      "failedFrames": [
+        {
+          "url": "about:srcdoc",
+          "error": {
+            "code": "frame_changed_during_capture",
+            "message": "\uc218\uc9d1 \uc911 \ud504\ub808\uc784 \ub0b4\uc6a9\uc774 \ubc14\ub00c\uc5b4 \ucd2c\uc601\ud55c \uc774\ubbf8\uc9c0\ub85c \ubcf4\uc874\ud569\ub2c8\ub2e4."
+          }
+        }
+      ],
+      "viewport": {
+        "height": 857,
+        "width": 1440
+      },
+      "runtime": {
+        "process": "undefined",
+        "buffer": "undefined",
+        "location": "chrome-extension://hmgedbnafmakajibfjoanhghombbmomg/worker.js",
+        "node": "undefined"
+      }
+    },
+    {
+      "name": "iframes",
+      "ok": true,
+      "nodes": 25,
+      "domFrames": 6,
+      "failedFrames": [],
+      "viewport": {
+        "height": 857,
+        "width": 1440
+      },
+      "runtime": {
+        "process": "undefined",
+        "buffer": "undefined",
+        "location": "chrome-extension://hmgedbnafmakajibfjoanhghombbmomg/worker.js",
+        "node": "undefined"
+      }
+    },
+    {
+      "name": "scroll-viewport",
+      "ok": true,
+      "nodes": 855,
+      "domFrames": 1,
+      "failedFrames": [],
+      "viewport": {
+        "height": 857,
+        "width": 1440
+      },
+      "runtime": {
+        "process": "undefined",
+        "buffer": "undefined",
+        "location": "chrome-extension://hmgedbnafmakajibfjoanhghombbmomg/worker.js",
+        "node": "undefined"
+      }
+    },
+    {
+      "name": "scroll-region",
+      "ok": true,
+      "nodes": 855,
+      "domFrames": 1,
+      "failedFrames": [],
+      "viewport": {
+        "height": 857,
+        "width": 1440
+      },
+      "runtime": {
+        "process": "undefined",
+        "buffer": "undefined",
+        "location": "chrome-extension://hmgedbnafmakajibfjoanhghombbmomg/worker.js",
+        "node": "undefined"
+      }
+    }
+  ],
+  "native": [
+    {
+      "name": "cross-frame-fallback",
+      "electron": "45.0.0",
+      "chrome": "156.0.8078.48",
+      "viewportReadiness": {
+        "width": 1440,
+        "height": 857,
+        "stable": true,
+        "elapsedMs": 673.1000000238419
+      },
+      "ok": true,
+      "nodes": 75,
+      "frames": 2,
+      "domFrames": 2,
+      "failedFrames": [],
+      "closedShadowRoots": 0,
+      "sourceUnchanged": true
+    },
+    {
+      "name": "console",
+      "electron": "45.0.0",
+      "chrome": "156.0.8078.48",
+      "viewportReadiness": {
+        "width": 1440,
+        "height": 857,
+        "stable": true,
+        "elapsedMs": 676.3000000715256
+      },
+      "ok": true,
+      "nodes": 364,
+      "frames": 1,
+      "domFrames": 1,
+      "failedFrames": [],
+      "closedShadowRoots": 0,
+      "sourceUnchanged": true
+    },
+    {
+      "name": "complex",
+      "electron": "45.0.0",
+      "chrome": "156.0.8078.48",
+      "viewportReadiness": {
+        "width": 1440,
+        "height": 857,
+        "stable": true,
+        "elapsedMs": 665.7000000476837
+      },
+      "ok": true,
+      "nodes": 74,
+      "frames": 6,
+      "domFrames": 5,
+      "failedFrames": [
+        {
+          "url": "about:srcdoc",
+          "error": {
+            "code": "frame_changed_during_capture",
+            "message": "\uc218\uc9d1 \uc911 \ud504\ub808\uc784 \ub0b4\uc6a9\uc774 \ubc14\ub00c\uc5b4 \ucd2c\uc601\ud55c \uc774\ubbf8\uc9c0\ub85c \ubcf4\uc874\ud569\ub2c8\ub2e4."
+          }
+        }
+      ],
+      "closedShadowRoots": 2,
+      "sourceUnchanged": true
+    },
+    {
+      "name": "iframes",
+      "electron": "45.0.0",
+      "chrome": "156.0.8078.48",
+      "viewportReadiness": {
+        "width": 1440,
+        "height": 857,
+        "stable": true,
+        "elapsedMs": 678.1999999284744
+      },
+      "ok": true,
+      "nodes": 25,
+      "frames": 6,
+      "domFrames": 6,
+      "failedFrames": [],
+      "closedShadowRoots": 0,
+      "sourceUnchanged": true
+    },
+    {
+      "name": "scroll-viewport",
+      "electron": "45.0.0",
+      "chrome": "156.0.8078.48",
+      "viewportReadiness": {
+        "width": 1440,
+        "height": 857,
+        "stable": true,
+        "elapsedMs": 671.6999999284744
+      },
+      "ok": true,
+      "nodes": 855,
+      "frames": 1,
+      "domFrames": 1,
+      "failedFrames": [],
+      "closedShadowRoots": 0,
+      "sourceUnchanged": true
+    },
+    {
+      "name": "scroll-region",
+      "electron": "45.0.0",
+      "chrome": "156.0.8078.48",
+      "viewportReadiness": {
+        "width": 1440,
+        "height": 857,
+        "stable": true,
+        "elapsedMs": 665.8999999761581
+      },
+      "ok": true,
+      "nodes": 855,
+      "frames": 1,
+      "domFrames": 1,
+      "failedFrames": [],
+      "closedShadowRoots": 0,
+      "sourceUnchanged": true
+    }
+  ],
+  "ok": true
+}
